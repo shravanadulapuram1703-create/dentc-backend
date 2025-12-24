@@ -1,0 +1,7 @@
+__pycache__/ 
+dentc-env/ 
+.env 
+venv/
+*.pyc
+.idea/
+.vscode/
