@@ -14,6 +14,12 @@ import app.models  # ensures metadata is registered
 from app.core.logging import setup_logging
 
 from app.middleware.logging import request_logging_middleware
+from fastapi.middleware.cors import CORSMiddleware
+
+# from app.core.config import settings  # or os.environ
+
+
+
 
 #  Setup logging FIRST (before app creation)
 # try:
@@ -27,7 +33,7 @@ logger = logging.getLogger(__name__)
 logger.info("Starting DentC Backend application")
 
 
-#  Create FastAPI app
+# Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
@@ -36,16 +42,41 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-#  Middleware
+#  CORS must come first
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://16.176.134.94:5173/","http://16.176.134.94:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# if not settings.DEV_MODE:
 app.add_middleware(TenantMiddleware)
+
+
+#  Then your custom middlewares
+# app.add_middleware(TenantMiddleware)
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    return await request_logging_middleware(request, call_next)
+
+# origins = [
+#     "http://localhost:5173",
+#     "http://16.176.134.94:5173",  # your EC2 frontend
+#     "http://16.176.134.94:5173/",
+#     "*"
+
+# ]
+
 
 #  Routers
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    return await request_logging_middleware(request, call_next)
+
 
 #  Startup event
 @app.on_event("startup")

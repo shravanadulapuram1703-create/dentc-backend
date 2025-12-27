@@ -16,6 +16,24 @@ logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login-swager")
 
+
+import re
+
+def name_from_email(email: str) -> str:
+    # Take part before @
+    local_part = email.split("@")[0]
+
+    # Replace separators with space
+    local_part = re.sub(r"[._\-]+", " ", local_part)
+
+    # Remove digits and extra spaces
+    local_part = re.sub(r"\d+", "", local_part).strip()
+
+    logger.info(f"local_part ===>  {local_part.title()}")
+
+    # Convert to proper case
+    return local_part.title()
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
@@ -38,7 +56,7 @@ def get_current_user(
         .filter(
             User.id == int(user_id),
             User.tenant_id == tenant_id,
-            User.is_active == True
+            # User.is_active == True
         )
         .first()
     )
@@ -48,6 +66,8 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive"
         )
+    logger.info(f"user ----> {type(user)}")
+    user.name = name_from_email(user.email)
 
     return user
 

@@ -1,0 +1,179 @@
+INFO:     Will watch for changes in these directories: ['/home/ec2-user/dentc-backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [28402] using WatchFiles
+2025-12-27 05:37:10,468 | INFO | app.core.database | req_id=- | user=- | tenant=- | Intialise DentC Backend DB
+2025-12-27 05:37:10,520 | DEBUG | passlib.utils.compat | req_id=- | user=- | tenant=- | loaded lazy attr 'SafeConfigParser': <class 'configparser.ConfigParser'>
+2025-12-27 05:37:10,520 | DEBUG | passlib.utils.compat | req_id=- | user=- | tenant=- | loaded lazy attr 'NativeStringIO': <class '_io.StringIO'>
+2025-12-27 05:37:10,520 | DEBUG | passlib.utils.compat | req_id=- | user=- | tenant=- | loaded lazy attr 'BytesIO': <class '_io.BytesIO'>
+2025-12-27 05:37:10,522 | DEBUG | passlib.registry | req_id=- | user=- | tenant=- | registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+2025-12-27 05:37:10,552 | INFO | app.utils.token | req_id=- | user=- | tenant=- | In utils token for payload
+2025-12-27 05:37:10,552 | INFO | app.api.v1.auth.routes | req_id=- | user=- | tenant=- | Inside app auth routes +++++++++++++++++++++++++++++
+2025-12-27 05:37:10,575 | INFO | app.middleware.logging | req_id=- | user=- | tenant=- | Inside Middle ware  logging -------------- Role error
+2025-12-27 05:37:10,575 | INFO | app.main | req_id=- | user=- | tenant=- | Starting DentC Backend application
+2025-12-27 05:37:10,584 | INFO | uvicorn.error | req_id=- | user=- | tenant=- | Started server process [28404]
+2025-12-27 05:37:10,584 | INFO | uvicorn.error | req_id=- | user=- | tenant=- | Waiting for application startup.
+2025-12-27 05:37:10,584 | INFO | app.main | req_id=- | user=- | tenant=- | DentC Backend startup complete
+2025-12-27 05:37:10,584 | INFO | uvicorn.error | req_id=- | user=- | tenant=- | Application startup complete.
+2025-12-27 05:38:32,903 | INFO | app.middleware.logging | req_id=63436364-f70e-4767-86d7-facea02cc54e | user=- | tenant=- | Inside request_logging_middleware 63436364-f70e-4767-86d7-facea02cc54e <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cb92f580>
+2025-12-27 05:38:32,903 | INFO | app.middleware.logging | req_id=63436364-f70e-4767-86d7-facea02cc54e | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cb9de5d0> 
+2025-12-27 05:38:32,904 | INFO | app.middleware.logging | req_id=63436364-f70e-4767-86d7-facea02cc54e | user=- | tenant=- | GET /docs | status=200 | duration=0.39ms | client=106.215.170.254
+2025-12-27 05:38:32,904 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:11151 - "GET /docs HTTP/1.1" 200
+2025-12-27 05:38:34,132 | INFO | app.middleware.logging | req_id=df0a2d04-cc76-430b-b8a1-13ec6f5e9e7c | user=- | tenant=- | Inside request_logging_middleware df0a2d04-cc76-430b-b8a1-13ec6f5e9e7c <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cb9df040>
+2025-12-27 05:38:34,132 | INFO | app.middleware.logging | req_id=df0a2d04-cc76-430b-b8a1-13ec6f5e9e7c | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cb9e48d0> 
+2025-12-27 05:38:34,157 | INFO | app.middleware.logging | req_id=df0a2d04-cc76-430b-b8a1-13ec6f5e9e7c | user=- | tenant=- | GET /openapi.json | status=200 | duration=24.08ms | client=106.215.170.254
+2025-12-27 05:38:34,157 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:11151 - "GET /openapi.json HTTP/1.1" 200
+2025-12-27 05:38:50,697 | INFO | app.middleware.logging | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Inside request_logging_middleware cdc3dbdc-42ea-484e-9d9a-20b78a56f629 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cb5435c0>
+2025-12-27 05:38:50,697 | INFO | app.middleware.logging | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cb9df7d0> 
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_start with no data
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_name with data[0:10]
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_data with data[11:19]
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_end with no data
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_start with no data
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_name with data[20:28]
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_data with data[29:48]
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_end with no data
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_start with no data
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_name with data[49:57]
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_data with data[58:64]
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_field_end with no data
+2025-12-27 05:38:50,701 | DEBUG | python_multipart.multipart | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | Calling on_end with no data
+2025-12-27 05:38:50,702 | INFO | app.api.v1.auth.service | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | email user2@example.com -------- string ----------- 1
+/home/ec2-user/dentc-backend/app/api/v1/auth/service.py:26: SAWarning: relationship 'Role.user_roles' will copy column roles.id to column user_roles.role_id, which conflicts with relationship(s): 'UserRole.role' (copies roles.id to user_roles.role_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="role"' to the 'Role.user_roles' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.query(User)
+2025-12-27 05:38:54,297 | DEBUG | passlib.handlers.bcrypt | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | detected 'bcrypt' backend, version '3.2.2'
+2025-12-27 05:38:54,297 | DEBUG | passlib.handlers.bcrypt | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | 'bcrypt' backend lacks $2$ support, enabling workaround
+2025-12-27 05:38:56,182 | INFO | app.middleware.logging | req_id=cdc3dbdc-42ea-484e-9d9a-20b78a56f629 | user=- | tenant=- | POST /api/v1/auth/login-swager | status=200 | duration=5485.32ms | client=106.215.170.254
+2025-12-27 05:38:56,182 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:28239 - "POST /api/v1/auth/login-swager HTTP/1.1" 200
+2025-12-27 05:39:34,492 | INFO | app.middleware.logging | req_id=219f42fd-d662-4df2-bbbd-c2be4b0e1392 | user=- | tenant=- | Inside request_logging_middleware 219f42fd-d662-4df2-bbbd-c2be4b0e1392 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cb594400>
+2025-12-27 05:39:34,493 | INFO | app.middleware.logging | req_id=219f42fd-d662-4df2-bbbd-c2be4b0e1392 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cb594890> 
+2025-12-27 05:39:34,498 | INFO | app.api.v1.auth.routes | req_id=219f42fd-d662-4df2-bbbd-c2be4b0e1392 | user=- | tenant=- | Inside app auth payload : email user@example.com password : string tenant_id : 1 request : <starlette.requests.Request object at 0x7f84cb5a6690>
+2025-12-27 05:39:35,290 | INFO | app.middleware.logging | req_id=219f42fd-d662-4df2-bbbd-c2be4b0e1392 | user=- | tenant=- | POST /api/v1/auth/signup | status=400 | duration=797.29ms | client=106.215.170.254
+2025-12-27 05:39:35,290 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:26520 - "POST /api/v1/auth/signup HTTP/1.1" 400
+2025-12-27 05:39:44,042 | INFO | app.middleware.logging | req_id=c7492f1d-38ab-4b3b-ada6-b3f4185ad4a0 | user=- | tenant=- | Inside request_logging_middleware c7492f1d-38ab-4b3b-ada6-b3f4185ad4a0 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cb595880>
+2025-12-27 05:39:44,042 | INFO | app.middleware.logging | req_id=c7492f1d-38ab-4b3b-ada6-b3f4185ad4a0 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cb5a7850> 
+2025-12-27 05:39:44,043 | INFO | app.api.v1.auth.routes | req_id=c7492f1d-38ab-4b3b-ada6-b3f4185ad4a0 | user=- | tenant=- | Inside app auth payload : email user20@example.com password : string tenant_id : 1 request : <starlette.requests.Request object at 0x7f84cad9e2d0>
+Inside the sign up
+2025-12-27 05:39:45,056 | INFO | app.services.auth_service | req_id=c7492f1d-38ab-4b3b-ada6-b3f4185ad4a0 | user=- | tenant=- |  basic_role  : <app.models.role.Role object at 0x7f84cadbb250>
+2025-12-27 05:39:46,839 | INFO | app.middleware.logging | req_id=c7492f1d-38ab-4b3b-ada6-b3f4185ad4a0 | user=- | tenant=- | POST /api/v1/auth/signup | status=200 | duration=2797.36ms | client=106.215.170.254
+2025-12-27 05:39:46,839 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:27478 - "POST /api/v1/auth/signup HTTP/1.1" 200
+2025-12-27 05:40:06,625 | INFO | app.middleware.logging | req_id=0472886b-0484-4cd0-9f1b-38a6ab98c1f6 | user=- | tenant=- | Inside request_logging_middleware 0472886b-0484-4cd0-9f1b-38a6ab98c1f6 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cad9dd80>
+2025-12-27 05:40:06,625 | INFO | app.middleware.logging | req_id=0472886b-0484-4cd0-9f1b-38a6ab98c1f6 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cadc7dd0> 
+2025-12-27 05:40:06,627 | INFO | app.api.v1.auth.service | req_id=0472886b-0484-4cd0-9f1b-38a6ab98c1f6 | user=- | tenant=- | email user20@example.com -------- string ----------- 1
+2025-12-27 05:40:09,039 | INFO | app.middleware.logging | req_id=0472886b-0484-4cd0-9f1b-38a6ab98c1f6 | user=- | tenant=- | POST /api/v1/auth/login | status=200 | duration=2413.99ms | client=106.215.170.254
+2025-12-27 05:40:09,040 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:15271 - "POST /api/v1/auth/login HTTP/1.1" 200
+2025-12-27 05:40:56,046 | INFO | app.middleware.logging | req_id=23ce226b-8874-4a11-bf61-74ef9e06c41f | user=- | tenant=- | Inside request_logging_middleware 23ce226b-8874-4a11-bf61-74ef9e06c41f <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cad9f080>
+2025-12-27 05:40:56,047 | INFO | app.middleware.logging | req_id=23ce226b-8874-4a11-bf61-74ef9e06c41f | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cad9ecd0> 
+2025-12-27 05:41:01,622 | INFO | app.middleware.logging | req_id=23ce226b-8874-4a11-bf61-74ef9e06c41f | user=- | tenant=- | POST /api/v1/auth/refresh | status=200 | duration=5575.11ms | client=106.215.170.254
+2025-12-27 05:41:01,622 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:11237 - "POST /api/v1/auth/refresh HTTP/1.1" 200
+2025-12-27 05:41:17,741 | INFO | app.middleware.logging | req_id=292eccb0-e444-4373-8c78-d733bb9c2020 | user=- | tenant=- | Inside request_logging_middleware 292eccb0-e444-4373-8c78-d733bb9c2020 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cb0d2a00>
+2025-12-27 05:41:17,741 | INFO | app.middleware.logging | req_id=292eccb0-e444-4373-8c78-d733bb9c2020 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cad9e490> 
+2025-12-27 05:41:24,094 | INFO | app.middleware.logging | req_id=292eccb0-e444-4373-8c78-d733bb9c2020 | user=- | tenant=- | POST /api/v1/auth/logout | status=200 | duration=6353.06ms | client=106.215.170.254
+2025-12-27 05:41:24,095 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:12332 - "POST /api/v1/auth/logout HTTP/1.1" 200
+2025-12-27 05:42:49,685 | INFO | app.middleware.logging | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | Inside request_logging_middleware 7879287d-64c3-4b7f-b3a9-41639a5916f4 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cadfc080>
+2025-12-27 05:42:49,685 | INFO | app.middleware.logging | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cade6c50> 
+2025-12-27 05:42:49,686 | INFO | app.utils.token | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | Decoded payload : {'sub': '12', 'tenant_id': 1, 'is_superuser': False, 'exp': 1766817534}
+2025-12-27 05:42:49,686 | INFO | app.core.tenancy | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | schema_name -->  tenant_1
+2025-12-27 05:42:50,277 | INFO | app.utils.token | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | Decoded payload : {'sub': '12', 'tenant_id': 1, 'is_superuser': False, 'exp': 1766817534}
+2025-12-27 05:42:50,277 | INFO | app.api.v1.auth.dependencies | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | user_id 12, tenant_id : 1
+2025-12-27 05:42:52,263 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | role : -----> <app.models.role.Role object at 0x7f84ca955490>
+2025-12-27 05:42:52,263 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca955590>
+2025-12-27 05:42:52,263 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm.code : -----> PATIENT_VIEW
+2025-12-27 05:42:52,263 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm.code : PATIENT_VIEW : -----> permission_code : USER_MANAGE
+2025-12-27 05:42:52,263 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84cb92f710>
+2025-12-27 05:42:52,264 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm.code : -----> BILLING_VIEW
+2025-12-27 05:42:52,264 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm.code : BILLING_VIEW : -----> permission_code : USER_MANAGE
+2025-12-27 05:42:52,264 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84cb5a7f10>
+2025-12-27 05:42:52,264 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm.code : -----> REFUND_APPROVE
+2025-12-27 05:42:52,264 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm.code : REFUND_APPROVE : -----> permission_code : USER_MANAGE
+2025-12-27 05:42:52,264 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca955690>
+2025-12-27 05:42:52,264 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm.code : -----> USER_MANAGE
+2025-12-27 05:42:52,264 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | perm.code : USER_MANAGE : -----> permission_code : USER_MANAGE
+2025-12-27 05:42:52,264 | INFO | app.services.rbac_service | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | Permission granted
+2025-12-27 05:42:52,264 | INFO | app.api.v1.users.routes | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | current_user ------- > <app.models.user.User object at 0x7f84ca94c210>
+2025-12-27 05:42:53,054 | INFO | app.middleware.logging | req_id=7879287d-64c3-4b7f-b3a9-41639a5916f4 | user=- | tenant=- | POST /api/v1/users/create | status=400 | duration=3368.71ms | client=106.215.170.254
+2025-12-27 05:42:53,054 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:29745 - "POST /api/v1/users/create HTTP/1.1" 400
+2025-12-27 05:43:00,417 | INFO | app.middleware.logging | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | Inside request_logging_middleware ffcc1647-860c-49cc-864e-7d7468a57189 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cad84a00>
+2025-12-27 05:43:00,417 | INFO | app.middleware.logging | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84caded990> 
+2025-12-27 05:43:00,418 | INFO | app.utils.token | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | Decoded payload : {'sub': '12', 'tenant_id': 1, 'is_superuser': False, 'exp': 1766817534}
+2025-12-27 05:43:00,418 | INFO | app.core.tenancy | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | schema_name -->  tenant_1
+2025-12-27 05:43:01,008 | INFO | app.utils.token | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | Decoded payload : {'sub': '12', 'tenant_id': 1, 'is_superuser': False, 'exp': 1766817534}
+2025-12-27 05:43:01,008 | INFO | app.api.v1.auth.dependencies | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | user_id 12, tenant_id : 1
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | role : -----> <app.models.role.Role object at 0x7f84ca95f010>
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca95f110>
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm.code : -----> PATIENT_VIEW
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm.code : PATIENT_VIEW : -----> permission_code : USER_MANAGE
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca95f190>
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm.code : -----> BILLING_VIEW
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm.code : BILLING_VIEW : -----> permission_code : USER_MANAGE
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca95f210>
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm.code : -----> REFUND_APPROVE
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm.code : REFUND_APPROVE : -----> permission_code : USER_MANAGE
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca95f290>
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm.code : -----> USER_MANAGE
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | perm.code : USER_MANAGE : -----> permission_code : USER_MANAGE
+2025-12-27 05:43:01,797 | INFO | app.services.rbac_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | Permission granted
+2025-12-27 05:43:01,798 | INFO | app.api.v1.users.routes | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | current_user ------- > <app.models.user.User object at 0x7f84ca95e210>
+2025-12-27 05:43:02,197 | INFO | app.services.user_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | roles >>>>>>>>>> [<app.models.role.Role object at 0x7f84cadecad0>]
+2025-12-27 05:43:02,197 | INFO | app.services.user_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | 1 >>>>>>>>>> 1
+2025-12-27 05:43:02,613 | INFO | app.services.user_service | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | <app.models.user.User object at 0x7f84ca94c190>  user.id : 29 ,role_id : roles[0] ,created_by.office_id user.office_id
+2025-12-27 05:43:04,979 | INFO | app.middleware.logging | req_id=ffcc1647-860c-49cc-864e-7d7468a57189 | user=- | tenant=- | POST /api/v1/users/create | status=200 | duration=4561.73ms | client=106.215.170.254
+2025-12-27 05:43:04,979 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:1738 - "POST /api/v1/users/create HTTP/1.1" 200
+2025-12-27 05:43:46,727 | INFO | app.middleware.logging | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | Inside request_logging_middleware bbb8a511-22df-4468-95da-b67f7bf86750 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84ca957400>
+2025-12-27 05:43:46,727 | INFO | app.middleware.logging | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84cadfd790> 
+2025-12-27 05:43:46,727 | INFO | app.utils.token | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | Decoded payload : {'sub': '12', 'tenant_id': 1, 'is_superuser': False, 'exp': 1766817534}
+2025-12-27 05:43:46,727 | INFO | app.core.tenancy | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | schema_name -->  tenant_1
+2025-12-27 05:43:47,317 | INFO | app.utils.token | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | Decoded payload : {'sub': '12', 'tenant_id': 1, 'is_superuser': False, 'exp': 1766817534}
+2025-12-27 05:43:47,317 | INFO | app.api.v1.auth.dependencies | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | user_id 12, tenant_id : 1
+2025-12-27 05:43:48,106 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | role : -----> <app.models.role.Role object at 0x7f84ca95f550>
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca95c6d0>
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm.code : -----> PATIENT_VIEW
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm.code : PATIENT_VIEW : -----> permission_code : USER_MANAGE
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca95d350>
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm.code : -----> BILLING_VIEW
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm.code : BILLING_VIEW : -----> permission_code : USER_MANAGE
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca95e790>
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm.code : -----> REFUND_APPROVE
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm.code : REFUND_APPROVE : -----> permission_code : USER_MANAGE
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca95e1d0>
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm.code : -----> USER_MANAGE
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | perm.code : USER_MANAGE : -----> permission_code : USER_MANAGE
+2025-12-27 05:43:48,107 | INFO | app.services.rbac_service | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | Permission granted
+2025-12-27 05:43:48,501 | INFO | app.middleware.logging | req_id=bbb8a511-22df-4468-95da-b67f7bf86750 | user=- | tenant=- | GET /api/v1/users/me | status=200 | duration=1774.54ms | client=106.215.170.254
+2025-12-27 05:43:48,501 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:19837 - "GET /api/v1/users/me HTTP/1.1" 200
+2025-12-27 05:44:26,746 | INFO | app.middleware.logging | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | Inside request_logging_middleware 2974e594-c702-4b4c-b66f-227a18803421 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84ca957f80>
+2025-12-27 05:44:26,746 | INFO | app.middleware.logging | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84ca954b50> 
+2025-12-27 05:44:26,746 | INFO | app.utils.token | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | Decoded payload : {'sub': '12', 'tenant_id': 1, 'is_superuser': False, 'exp': 1766817534}
+2025-12-27 05:44:26,746 | INFO | app.core.tenancy | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | schema_name -->  tenant_1
+2025-12-27 05:44:27,337 | INFO | app.utils.token | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | Decoded payload : {'sub': '12', 'tenant_id': 1, 'is_superuser': False, 'exp': 1766817534}
+2025-12-27 05:44:27,337 | INFO | app.api.v1.auth.dependencies | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | user_id 12, tenant_id : 1
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | role : -----> <app.models.role.Role object at 0x7f84ca960310>
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca960410>
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm.code : -----> PATIENT_VIEW
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm.code : PATIENT_VIEW : -----> permission_code : USER_MANAGE
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca960490>
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm.code : -----> BILLING_VIEW
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm.code : BILLING_VIEW : -----> permission_code : USER_MANAGE
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca960510>
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm.code : -----> REFUND_APPROVE
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm.code : REFUND_APPROVE : -----> permission_code : USER_MANAGE
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm : -----> <app.models.permission.Permission object at 0x7f84ca960590>
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm.code : -----> USER_MANAGE
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | perm.code : USER_MANAGE : -----> permission_code : USER_MANAGE
+2025-12-27 05:44:28,127 | INFO | app.services.rbac_service | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | Permission granted
+2025-12-27 05:44:28,917 | INFO | app.middleware.logging | req_id=2974e594-c702-4b4c-b66f-227a18803421 | user=- | tenant=- | POST /api/v1/roles/create | status=400 | duration=2171.13ms | client=106.215.170.254
+2025-12-27 05:44:28,917 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:2928 - "POST /api/v1/roles/create HTTP/1.1" 400
+2025-12-27 05:45:00,530 | INFO | app.middleware.logging | req_id=6b97adc8-21d3-401b-8b3c-f5d0e2dbf0d7 | user=- | tenant=- | Inside request_logging_middleware 6b97adc8-21d3-401b-8b3c-f5d0e2dbf0d7 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cb594980>
+2025-12-27 05:45:00,530 | INFO | app.middleware.logging | req_id=6b97adc8-21d3-401b-8b3c-f5d0e2dbf0d7 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84ca95edd0> 
+2025-12-27 05:45:00,531 | INFO | app.main | req_id=6b97adc8-21d3-401b-8b3c-f5d0e2dbf0d7 | user=- | tenant=- | Root endpoint called
+2025-12-27 05:45:00,532 | INFO | app.middleware.logging | req_id=6b97adc8-21d3-401b-8b3c-f5d0e2dbf0d7 | user=- | tenant=- | GET / | status=200 | duration=1.47ms | client=106.215.170.254
+2025-12-27 05:45:00,532 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:12832 - "GET / HTTP/1.1" 200
+2025-12-27 05:45:11,529 | INFO | app.middleware.logging | req_id=e6f655a1-454e-4efb-9d2a-67a258a5f3f2 | user=- | tenant=- | Inside request_logging_middleware e6f655a1-454e-4efb-9d2a-67a258a5f3f2 <Token var=<ContextVar name='request_id' default='-' at 0x7f84ccd2fce0> at 0x7f84cade5140>
+2025-12-27 05:45:11,530 | INFO | app.middleware.logging | req_id=e6f655a1-454e-4efb-9d2a-67a258a5f3f2 | user=- | tenant=- | Inside request_logging_middleware request : <starlette.middleware.base._CachedRequest object at 0x7f84ca95eb90> 
+2025-12-27 05:45:11,530 | INFO | app.main | req_id=e6f655a1-454e-4efb-9d2a-67a258a5f3f2 | user=- | tenant=- | Health check endpoint called
+2025-12-27 05:45:11,531 | INFO | app.middleware.logging | req_id=e6f655a1-454e-4efb-9d2a-67a258a5f3f2 | user=- | tenant=- | GET /health | status=200 | duration=0.95ms | client=106.215.170.254
+2025-12-27 05:45:11,531 | INFO | uvicorn.access | req_id=- | user=- | tenant=- | 106.215.170.254:3855 - "GET /health HTTP/1.1" 200
+2025-12-27 05:45:26,572 | INFO | uvicorn.error | req_id=- | user=- | tenant=- | Shutting down
+2025-12-27 05:45:26,672 | INFO | uvicorn.error | req_id=- | user=- | tenant=- | Waiting for application shutdown.
+2025-12-27 05:45:26,672 | INFO | uvicorn.error | req_id=- | user=- | tenant=- | Application shutdown complete.
+2025-12-27 05:45:26,672 | INFO | uvicorn.error | req_id=- | user=- | tenant=- | Finished server process [28404]
+INFO:     Stopping reloader process [28402]

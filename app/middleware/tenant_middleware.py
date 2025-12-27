@@ -4,28 +4,30 @@ from app.core.tenancy import set_tenant_schema
 from app.utils.token import decode_access_token
 from app.core.database import SessionLocal
 from app.services.audit_service import log_audit
-from app.core.request_id import tenant_ctx
 import logging
 
 logger = logging.getLogger("tenant")
 
-# tenant_ctx.set(schema_name)
-
-# logger.info(
-#     "Tenant schema switched",
-#     extra={"tenant": schema_name}
-# )
-
+EXCLUDED_PATHS = (
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/health"
+)
 
 
 class TenantMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
 
+        #  Bypass Swagger / system endpoints
+        # if request.url.path.startswith(EXCLUDED_PATHS):
+        #     return await call_next(request)
+
         auth_header = request.headers.get("Authorization")
         tenant_header = request.headers.get("X-Tenant-ID")
 
-
+        # No auth → no tenant switching
         if not auth_header:
             return await call_next(request)
 
@@ -33,6 +35,7 @@ class TenantMiddleware(BaseHTTPMiddleware):
             token = auth_header.split(" ")[1]
             payload = decode_access_token(token)
         except Exception:
+            logger.warning("Invalid auth token, skipping tenant switch")
             return await call_next(request)
 
         user_tenant_id = payload.get("tenant_id")
@@ -47,9 +50,12 @@ class TenantMiddleware(BaseHTTPMiddleware):
 
         try:
             set_tenant_schema(db, target_tenant)
+
             response = await call_next(request)
 
-            log_audit(
+            #  Audit only if superuser actually switched tenant
+            if is_superuser and tenant_header:
+                log_audit(
                     db,
                     action="TENANT_SWITCH",
                     success=True,
@@ -58,7 +64,14 @@ class TenantMiddleware(BaseHTTPMiddleware):
                     reason="Superuser tenant switch"
                 )
 
+            return response
+
+        except Exception as e:
+            logger.exception("Tenant middleware failure")
+            raise
+
         finally:
+            #  Log denied attempt only when applicable
             if tenant_header and not is_superuser:
                 log_audit(
                     db,
@@ -69,5 +82,3 @@ class TenantMiddleware(BaseHTTPMiddleware):
                     reason="Non-superuser attempted tenant switch"
                 )
             db.close()
-
-        return response

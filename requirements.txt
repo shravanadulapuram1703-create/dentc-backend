@@ -2,13 +2,10 @@ fastapi
 uvicorn[standard]
 SQLAlchemy
 pydantic-settings
-psycopg2
+psycopg2-binary
 pydantic[email]
-
 python-jose[cryptography]
 python-dotenv
-
- passlib==1.7.4 
- bcrypt==3.2.2
-
- python-multipart
+passlib==1.7.4 
+bcrypt==3.2.2
+python-multipart

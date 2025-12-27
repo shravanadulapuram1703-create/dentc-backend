@@ -27,7 +27,7 @@ def login_user(db: Session, email: str, password: str, tenant_id: int, request: 
         .filter(
             User.email == email,
             User.tenant_id == tenant_id,
-            User.is_active == True
+            # User.is_active == True
         ).first()
     )
 
