@@ -33,17 +33,17 @@ import logging
 from app.core.logging import setup_logging
 logger = setup_logging()
 logger = logging.getLogger(__name__)
-logger.info("Inside Middle ware  logging -------------- Role error")
+logger.info("Inside Middle ware  logging")
 
 
 async def request_logging_middleware(request: Request, call_next):
     request_id = str(uuid.uuid4())
     token = request_id_ctx.set(request_id)
-    logger.info(f"Inside request_logging_middleware {request_id} {token}")
+    # logger.info(f"Inside request_logging_middleware {request_id} {token}")
 
     start_time = time.time()
     try:
-        logger.info(f"Inside request_logging_middleware request : {request} ")
+        # logger.info(f"Inside request_logging_middleware request : {request} ")
         response = await call_next(request)
         status_code = response.status_code
         return response

@@ -2,13 +2,15 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 import secrets
 from app.core.config import settings
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status,Depends
 import logging
 from app.core.logging import setup_logging
+from fastapi.security import OAuth2PasswordBearer
 logger = setup_logging()
 logger = logging.getLogger(__name__)
 logger.info("In utils token for payload")
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 def create_access_token(data: dict, expires_delta: int | None = None):
     to_encode = data.copy()
@@ -30,6 +32,8 @@ def create_refresh_token() -> str:
 
 def decode_access_token(token: str):
     try:
+        logger.info(f"Decoding token : {token}")
+
         payload = jwt.decode(
             token,
             settings.JWT_SECRET_KEY,
@@ -44,3 +48,6 @@ def decode_access_token(token: str):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
+
+def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
+    return decode_access_token(token)

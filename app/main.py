@@ -8,7 +8,7 @@ from fastapi import FastAPI,Request
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.middleware.tenant_middleware import TenantMiddleware
-import app.models  # ensures metadata is registered
+# import app.models  # ensures metadata is registered
 # from app.core.logging import LOGGING_CONFIG
 
 from app.core.logging import setup_logging
@@ -45,7 +45,7 @@ app = FastAPI(
 #  CORS must come first
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://16.176.134.94:5173/","http://16.176.134.94:5173"],
+    allow_origins=["http://16.176.134.94:5173/","http://16.176.134.94:5173","http://localhost:5173/","http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

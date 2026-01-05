@@ -18,6 +18,7 @@ class Role(Base):
     name = Column(String(100), nullable=False)
     level = Column(Integer, nullable=False)
     is_system = Column(Boolean, default=False)
+    scope = Column(String(50), nullable=False)  # system | tenant | office 
 
     permissions = relationship(
         "Permission",
