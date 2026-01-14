@@ -58,4 +58,7 @@ class Tenant(Base):
         lazy="joined",
     )
 
-    offices = relationship("Office", back_populates="tenant")
+    office = relationship(
+        "Office",
+        back_populates="tenant",
+        cascade="all, delete-orphan")

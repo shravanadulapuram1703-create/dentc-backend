@@ -25,13 +25,13 @@ from app.core.security import is_access_token_blacklisted
 
 
 from app.models.user_office import UserOffice
-from app.models.office_role_permission import OfficeRolePermission
-from app.models.office_permission import OfficePermission
+# from app.models.office_role_permission import OfficeRolePermission
+# from app.models.office_permission import OfficePermission
 
 
 from app.models.tenant import Tenant
 from app.models.user import User
-from app.models.office import Office
+from app.models.offices import Office
 from app.models.user_ip_rules import UserIPRule
 from app.models.ip_addresses import IPAddress
 from app.models.user_preferences import UserPreference

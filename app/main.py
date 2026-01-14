@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # from app.core.config import settings  # or os.environ
 
 
+# import app.models  # forces model registration
 
 
 #  Setup logging FIRST (before app creation)

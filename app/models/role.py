@@ -1,7 +1,49 @@
+# from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+# from sqlalchemy.orm import relationship
+# from app.core.database import Base
+# from app.models.associations import role_permissions#, user_roles
+
+
+# class Role(Base):
+#     __tablename__ = "roles"
+#     __table_args__ = {"schema": "public"}
+
+#     id = Column(Integer, primary_key=True)
+#     tenant_id = Column(
+#         Integer,
+#         ForeignKey("public.tenants.id", ondelete="CASCADE"),
+#         nullable=False,
+#     )
+
+#     name = Column(String(100), nullable=False)
+#     level = Column(Integer, nullable=False)
+#     is_system = Column(Boolean, default=False)
+#     scope = Column(String(50), nullable=False)  # system | tenant | office 
+
+#     permissions = relationship(
+#         "Permission",
+#         secondary=role_permissions,
+#         back_populates="roles",
+#         lazy="joined",
+#     )
+    
+#     user_roles = relationship(
+#         "UserRole",
+#         cascade="all, delete-orphan",
+#     )
+
+#     # users = relationship(
+#     #     "User",
+#     #     secondary=user_roles,
+#     #     back_populates="roles",
+#     # )
+
+
+
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
-from app.models.associations import role_permissions#, user_roles
+from app.models.associations import role_permissions
 
 
 class Role(Base):
@@ -9,6 +51,7 @@ class Role(Base):
     __table_args__ = {"schema": "public"}
 
     id = Column(Integer, primary_key=True)
+
     tenant_id = Column(
         Integer,
         ForeignKey("public.tenants.id", ondelete="CASCADE"),
@@ -18,7 +61,11 @@ class Role(Base):
     name = Column(String(100), nullable=False)
     level = Column(Integer, nullable=False)
     is_system = Column(Boolean, default=False)
-    scope = Column(String(50), nullable=False)  # system | tenant | office 
+    scope = Column(String(50), nullable=False)  # system | tenant | office
+
+    # -----------------------------
+    # Relationships
+    # -----------------------------
 
     permissions = relationship(
         "Permission",
@@ -26,14 +73,10 @@ class Role(Base):
         back_populates="roles",
         lazy="joined",
     )
-    
+
     user_roles = relationship(
         "UserRole",
+        back_populates="role",      # ✅ REQUIRED
         cascade="all, delete-orphan",
+        overlaps="role",            # ✅ silences SAWarning
     )
-
-    # users = relationship(
-    #     "User",
-    #     secondary=user_roles,
-    #     back_populates="roles",
-    # )

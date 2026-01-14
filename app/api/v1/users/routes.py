@@ -135,18 +135,195 @@ def save_preferences(
 #  BULK LOAD USER SETUP
 # -------------------------------
 
-@router.get("/{tenant_id}/{user_id}/setup")
-def load_user_setup(
-    user_id: int,
-    tenant_id:int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    return load_user_setup_data(
-        db=db,
-        tenant_id=tenant_id,
-        user_id=user_id
-    )
+# @router.get("/{tenant_id}/{user_id}/setup")
+# def load_user_setup(
+#     user_id: int,
+#     tenant_id:int,
+#     request: Request,
+#     db: Session = Depends(get_db),
+# ):
+#     return load_user_setup_data(
+#         db=db,
+#         tenant_id=tenant_id,
+#         user_id=user_id
+#     )
+
+@router.get("/setup")
+def load_user_setup():
+    example_output = {
+                        "organization": {
+                            "pgid": "PG-108",
+                            "pgid_name": "Cranberry Dental Arts Corporation",
+                            "tenant_id": "TENANT-001"
+                        },
+
+                        "offices": [
+                            {
+                            "office_id": 101,
+                            "office_oid": "O-001",
+                            "office_name": "Cranberry Main",
+                            "is_active": True
+                            },
+                            {
+                            "office_id": 102,
+                            "office_oid": "O-002",
+                            "office_name": "Cranberry North",
+                            "is_active": True
+                            },
+                            {
+                            "office_id": 103,
+                            "office_oid": "O-003",
+                            "office_name": "Downtown Pittsburgh",
+                            "is_active": True
+                            },
+                            {
+                            "office_id": 104,
+                            "office_oid": "O-004",
+                            "office_name": "Shadyside",
+                            "is_active": False
+                            }
+                        ],
+
+                        "security_groups": [
+                            {
+                            "code": "ADMIN",
+                            "name": "Administrators",
+                            "description": "Full system access"
+                            },
+                            {
+                            "code": "FRONT_DESK",
+                            "name": "Front Desk",
+                            "description": "Scheduling and patient check-in"
+                            },
+                            {
+                            "code": "BILLING",
+                            "name": "Billing",
+                            "description": "Claims and payments"
+                            },
+                            {
+                            "code": "CLINICAL",
+                            "name": "Clinical",
+                            "description": "Clinical access only"
+                            }
+                        ],
+
+                        "roles": [
+                            {
+                            "code": "ADMIN",
+                            "label": "Administrator"
+                            },
+                            {
+                            "code": "OFFICE_MANAGER",
+                            "label": "Office Manager"
+                            },
+                            {
+                            "code": "DENTIST",
+                            "label": "Dentist"
+                            },
+                            {
+                            "code": "HYGIENIST",
+                            "label": "Hygienist"
+                            },
+                            {
+                            "code": "FRONT_DESK",
+                            "label": "Front Desk"
+                            }
+                        ],
+
+                        "patient_access_levels": [
+                            {
+                            "code": "all",
+                            "label": "Search patients in all offices"
+                            },
+                            {
+                            "code": "assigned",
+                            "label": "Search patients in assigned offices only"
+                            }
+                        ],
+
+                        "time_clock": {
+                            "enabled": True,
+                            "overtime_methods": [
+                            {
+                                "code": "daily",
+                                "label": "Daily"
+                            },
+                            {
+                                "code": "weekly",
+                                "label": "Weekly"
+                            },
+                            {
+                                "code": "none",
+                                "label": "None"
+                            }
+                            ],
+                            "overtime_rates": [
+                            {
+                                "value": 1.0,
+                                "label": "1.0x (Regular Rate)"
+                            },
+                            {
+                                "value": 1.5,
+                                "label": "1.5x (Time and a Half)"
+                            },
+                            {
+                                "value": 2.0,
+                                "label": "2.0x (Double Time)"
+                            }
+                            ]
+                        },
+
+                        "login_restrictions": {
+                            "allow_24x7_default": True,
+                            "allowed_days": [
+                            "Mon",
+                            "Tue",
+                            "Wed",
+                            "Thu",
+                            "Fri"
+                            ],
+                            "default_allowed_from": "08:00",
+                            "default_allowed_until": "18:00"
+                        },
+
+                        "user_preferences_schema": {
+                            "startup_screen": {
+                            "type": "enum",
+                            "options": ["Dashboard", "Scheduler", "Patient"]
+                            },
+                            "default_perio_screen": {
+                            "type": "enum",
+                            "options": ["Standard", "Advanced"]
+                            },
+                            "default_navigation_search": {
+                            "type": "enum",
+                            "options": ["Patient", "Appointment", "Claim"]
+                            },
+                            "default_search_by": {
+                            "type": "enum",
+                            "options": ["lastName", "firstName", "patientId", "chartNumber"]
+                            },
+                            "default_referral_view": {
+                            "type": "enum",
+                            "options": ["All", "Active", "Pending"]
+                            },
+                            "flags": {
+                            "show_production_view": True,
+                            "hide_provider_time": False,
+                            "print_labels_for_appointments": False,
+                            "prompt_for_entry_date": False,
+                            "include_inactive_patients_in_search": False,
+                            "hipaa_compliant_scheduler": False,
+                            "is_ortho_assistant": False
+                            }
+                        }
+                        }
+
+    return example_output
+
+
+
+
 
 @router.post("", response_model=UserResponse)
 def create_user(
@@ -251,7 +428,7 @@ def save_ip_rules(
 
 from app.api.v1.auth.dependencies import get_current_user, get_current_user_full
 from app.models.tenant import Tenant
-from app.models.office import Office
+from app.models.offices import Office
 
 @router.get("/all-tenants")
 def get_all_tenants(

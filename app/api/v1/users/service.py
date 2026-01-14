@@ -534,7 +534,7 @@ from collections import defaultdict
 
 from app.models.user import User
 from app.models.user_office import UserOffice
-from app.models.office import Office
+from app.models.offices import Office
 from app.models.tenant import Tenant
 from app.models.role import Role
 

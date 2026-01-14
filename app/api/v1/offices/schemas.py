@@ -1,208 +1,459 @@
-from pydantic import BaseModel, Field, EmailStr,validator
-from typing import Optional,List
-from datetime import datetime,time, date
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List, Dict
+from datetime import datetime, time, date
 
+# ==================================================
+# UI / SETUP PAYLOAD MODELS (FLAT RESPONSE)
+# ==================================================
 
-
-class OfficeBase(BaseModel):
-    office_code: str
-    office_name: str
-    timezone: Optional[str] = None
-
-    address_line1: Optional[str] = None
+class Address(BaseModel):
+    address1: Optional[str] = None
+    address2: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
     zip: Optional[str] = None
+    timeZone: Optional[str] = None
 
+
+class Contact(BaseModel):
     phone1: Optional[str] = None
+    phone1Ext: Optional[str] = None
     phone2: Optional[str] = None
-    fax: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
 
 
-class OfficeCreate(OfficeBase):
-    pass
+class Billing(BaseModel):
+    billingProviderId: Optional[str] = None
+    billingProviderName: Optional[str] = None
+    useBillingLicense: Optional[bool] = None
+    taxId: Optional[str] = None
+    openingDate: Optional[date] = None
+    officeGroup: Optional[str] = None
+    defaultUCRFeeSchedule: Optional[str] = None
+    defaultFeeSchedule: Optional[str] = None
 
 
-class OfficeUpdate(BaseModel):
-    office_name: Optional[str]
-    timezone: Optional[str]
-
-    address_line1: Optional[str]
-    city: Optional[str]
-    state: Optional[str]
-    zip: Optional[str]
-
-    phone1: Optional[str]
-    phone2: Optional[str]
-    fax: Optional[str]
-    email: Optional[EmailStr]
-
-    is_active: Optional[bool]
+class Settings(BaseModel):
+    schedulerTimeInterval: Optional[int] = None
+    isActive: Optional[bool] = None
 
 
-class OfficeResponse(OfficeBase):
-    id: int
-    tenant_id: int
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
+class StatementMessages(BaseModel):
+    general: Optional[str] = None
+    current: Optional[str] = None
+    day30: Optional[str] = None
+    day60: Optional[str] = None
+    day90: Optional[str] = None
+    day120: Optional[str] = None
 
 
-class OfficeStatementBase(BaseModel):
-    general_message: Optional[str] = None
-    current_message: Optional[str] = None
-    msg_30_day: Optional[str] = None
-    msg_60_day: Optional[str] = None
-    msg_90_day: Optional[str] = None
-    msg_120_day: Optional[str] = None
-
-    correspondence_name: Optional[str] = None
-    statement_address: Optional[str] = None
-    statement_city_state_zip: Optional[str] = None
-    statement_phone: Optional[str] = None
-    logo_url: Optional[str] = None
+class StatementSettings(BaseModel):
+    correspondenceName: Optional[str] = None
+    statementName: Optional[str] = None
+    statementAddress: Optional[str] = None
+    statementPhone: Optional[str] = None
+    logoUrl: Optional[str] = None
 
 
-class OfficeStatementUpdate(OfficeStatementBase):
-    """Used for PUT (UI Save button)"""
-    pass
-
-
-class OfficeStatementResponse(OfficeStatementBase):
-    office_id: int
-
-    class Config:
-        from_attributes = True
-
-
-class OfficeIntegrationBase(BaseModel):
-    eclaim_type: Optional[str] = None
-
-    edi_username: Optional[str] = None
-    edi_password: Optional[str] = None
-
-    imaging_system_1: Optional[str] = None
-    imaging_mode_1: Optional[str] = None
-
-    imaging_system_2: Optional[str] = None
-    imaging_mode_2: Optional[str] = None
-
-    imaging_system_3: Optional[str] = None
-    imaging_mode_3: Optional[str] = None
-
-    text_phone_number: Optional[str] = None
-    transactional_email: Optional[EmailStr] = None
-
-
-class OfficeIntegrationCreate(OfficeIntegrationBase):
-    """POST payload"""
-    pass
-
-
-class OfficeIntegrationResponse(OfficeIntegrationBase):
-    id: int
-    office_id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class OfficeScheduleDay(BaseModel):
-    day_of_week: int = Field(..., ge=1, le=7)
-    day_start: Optional[time] = None
-    day_end: Optional[time] = None
-    lunch_start: Optional[time] = None
-    lunch_end: Optional[time] = None
-
-    @validator("day_end")
-    def validate_day_range(cls, v, values):
-        start = values.get("day_start")
-        if start and v and v <= start:
-            raise ValueError("day_end must be after day_start")
-        return v
-
-    @validator("lunch_end")
-    def validate_lunch_range(cls, v, values):
-        start = values.get("lunch_start")
-        if start and v and v <= start:
-            raise ValueError("lunch_end must be after lunch_start")
-        return v
-
-
-class OfficeScheduleUpdate(BaseModel):
-    """PUT payload – full week replacement"""
-    schedule: List[OfficeScheduleDay]
-
-
-class OfficeScheduleResponse(OfficeScheduleDay):
-    id: int
-    office_id: int
-
-    class Config:
-        from_attributes = True
-
-
-class OperatoryCreate(BaseModel):
-    name: str
-    is_active: Optional[bool] = True
-
-
-class OperatoryUpdate(BaseModel):
+class Operatory(BaseModel):
+    id: Optional[str] = None
     name: Optional[str] = None
-    is_active: Optional[bool] = None
+    order: Optional[int] = None
+    isActive: bool = True
+    hasFutureAppointments: bool = False
+
+from datetime import time
+
+class DaySchedule(BaseModel):
+    start: Optional[time] = None
+    end: Optional[time] = None
+    lunchStart: Optional[time] = None
+    lunchEnd: Optional[time] = None
+    closed: bool = False
 
 
-class OperatoryResponse(BaseModel):
-    id: int
-    office_id: int
+# class Holiday(BaseModel):
+#     id: Optional[str] = None
+#     name: Optional[str] = None
+#     fromDate: Optional[date] = None
+#     toDate: Optional[date] = None
+#     isActive: bool = True
+
+class Holiday(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    fromDate: Optional[date] = None
+    toDate: Optional[date] = None
+    isActive: bool = True
+
+
+
+class SmartAssistItem(BaseModel):
+    enabled: bool = False
+    frequency: Optional[str] = None
+    includeBal: Optional[bool] = False
+    template: Optional[str] = None
+
+
+class SmartAssist(BaseModel):
+    enabled: bool = False
+    items: Dict[str, SmartAssistItem] = Field(default_factory=dict)
+
+
+# class EClaims(BaseModel):
+#     vendorType: Optional[str] = None
+#     username: Optional[str] = None
+#     password: Optional[str] = None
+
+
+# class Transworld(BaseModel):
+#     acceleratorAccount: Optional[str] = None
+#     collectionsAccount: Optional[str] = None
+#     userId: Optional[str] = None
+#     password: Optional[str] = None
+#     agingDays: Optional[int] = None
+
+
+# class ImagingSystem(BaseModel):
+#     name: Optional[str] = None
+#     linkType: Optional[str] = None
+#     mode: Optional[str] = None
+
+
+# class Imaging(BaseModel):
+#     system1: Optional[ImagingSystem] = None
+#     system2: Optional[ImagingSystem] = None
+#     system3: Optional[ImagingSystem] = None
+
+
+# class TextMessaging(BaseModel):
+#     phoneNumber: Optional[str] = None
+#     verified: Optional[bool] = None
+
+
+# class PatientUrls(BaseModel):
+#     formsUrl: Optional[str] = None
+#     schedulingUrl: Optional[str] = None
+#     financingUrl: Optional[str] = None
+#     customUrl1: Optional[str] = None
+#     customUrl2: Optional[str] = None
+
+
+# from typing import Optional, Dict, List
+# from pydantic import BaseModel, Field
+
+class EClaims(BaseModel):
+    vendorType: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
+class Transworld(BaseModel):
+    acceleratorAccount: Optional[str] = None
+    collectionsAccount: Optional[str] = None
+    userId: Optional[str] = None
+    password: Optional[str] = None
+    agingDays: Optional[int] = None
+
+
+class ImagingSystem(BaseModel):
+    name: Optional[str] = None
+    linkType: Optional[str] = None
+    mode: Optional[str] = None
+
+
+class Imaging(BaseModel):
+    system1: Optional[ImagingSystem] = None
+    system2: Optional[ImagingSystem] = None
+    system3: Optional[ImagingSystem] = None
+
+
+class TextMessaging(BaseModel):
+    phoneNumber: Optional[str] = None
+    verified: Optional[bool] = False
+
+
+class PatientUrls(BaseModel):
+    formsUrl: Optional[str] = None
+    schedulingUrl: Optional[str] = None
+    financingUrl: Optional[str] = None
+    customUrl1: Optional[str] = None
+    customUrl2: Optional[str] = None
+
+
+class Integrations(BaseModel):
+    eClaims: Optional[EClaims] = Field(default_factory=EClaims)
+    transworld: Optional[Transworld] = Field(default_factory=Transworld)
+    imaging: Optional[Imaging] = Field(default_factory=Imaging)
+    textMessaging: Optional[TextMessaging] = Field(default_factory=TextMessaging)
+    patientUrls: Optional[PatientUrls] = Field(default_factory=PatientUrls)
+    acceptedCards: List[str] = Field(default_factory=list)
+
+
+
+
+class OfficePayload(BaseModel):
+    officeId: int
+    officeName: Optional[str] = None
+    shortId: Optional[str] = None
+
+    address: Optional[Address] = None
+    contact: Optional[Contact] = None
+    billing: Optional[Billing] = None
+    settings: Optional[Settings] = None
+
+    integrations: Optional[Integrations] = None
+
+    statementMessages: Optional[StatementMessages] = None
+    statementSettings: Optional[StatementSettings] = None
+
+    # acceptedCards: Optional[List[str]] = []
+    operatories: Optional[List[Operatory]] = []
+    schedule: Optional[Dict[str, DaySchedule]] = {}
+    holidays: Optional[List[Holiday]] = []
+
+    advanced: Optional[OfficeAdvancedPayload] = None
+    smartAssist: Optional[SmartAssist] = None
+
+
+
+# app/api/v1/offices/schemas/advanced.py
+
+from pydantic import BaseModel
+from datetime import date
+from typing import Optional
+
+
+# class OfficeAdvancedPayload(BaseModel):
+#     annualFinanceChargePercent: Optional[float]
+#     minimumBalance: Optional[float]
+#     minimumFinanceCharge: Optional[float]
+#     daysBeforeFinanceCharge: Optional[int]
+#     salesTaxPercent: Optional[float]
+
+#     insuranceGroup: Optional[str]
+#     schedulerEndDate: Optional[date]
+#     eligibilityThresholdDays: Optional[int]
+#     sendECard: Optional[bool]
+
+#     defaultPlaceOfService: Optional[str]
+#     defaultAppointmentDuration: Optional[int]
+#     defaultAreaCode: Optional[str]
+#     defaultCity: Optional[str]
+#     defaultState: Optional[str]
+#     defaultZip: Optional[str]
+#     preferredProvider: Optional[str]
+#     defaultCoverageType: Optional[str]
+#     isOrthoOffice: Optional[bool]
+
+#     hipaaNotice: Optional[bool]
+#     consentForm: Optional[bool]
+#     additionalConsentForm: Optional[bool]
+
+#     automatedCampaignsEffectiveDate: Optional[date]
+
+class OfficeAdvancedPayload(BaseModel):
+    annualFinanceChargePercent: Optional[int] = None
+    minimumBalance: Optional[int] = None
+    minimumFinanceCharge: Optional[int] = None
+    daysBeforeFinanceCharge: Optional[int] = None
+    salesTaxPercent: Optional[int] = None
+    insuranceGroup: Optional[str] = None
+    schedulerEndDate: Optional[date] = None
+    eligibilityThresholdDays: Optional[int] = None
+
+    sendECard: Optional[bool] = False
+    defaultPlaceOfService: Optional[str] = None
+
+    defaultAppointmentDuration: Optional[int] = None
+    defaultAreaCode: Optional[str] = None
+    defaultCity: Optional[str] = None
+    defaultState: Optional[str] = None
+    defaultZip: Optional[str] = None
+
+    preferredProvider: Optional[str] = None
+    defaultCoverageType: Optional[str] = None
+
+    isOrthoOffice: Optional[bool] = False
+    hipaaNotice: Optional[bool] = False
+    consentForm: Optional[bool] = False
+    additionalConsentForm: Optional[bool] = False
+
+    automatedCampaignsEffectiveDate: Optional[date] = None
+
+
+class OfficeAdvancedResponse(OfficeAdvancedPayload):
+    pass
+
+
+
+# ==================================================
+# METADATA SCHEMAS (UI DROPDOWNS)
+# ==================================================
+
+# app/api/v1/offices/schemas_metadata.py
+
+from pydantic import BaseModel
+from typing import List, Optional
+
+
+class BillingProviderMeta(BaseModel):
+    id: str
     name: str
-    is_active: bool
+
+
+class FeeScheduleMeta(BaseModel):
+    id: str
+    name: str
+    type: str
+
+
+class OfficeMetadataResponse(BaseModel):
+    time_zones: List[str]
+    billing_providers: List[BillingProviderMeta]
+    fee_schedules: List[FeeScheduleMeta]
+
+
+class CreateHoliday(BaseModel):
+    name: str
+    fromDate: Optional[date] = None
+    toDate: Optional[date] = None
+    isActive: Optional[bool] = True
+
+class CreateOperatory(BaseModel):
+    name: str
+    order: int
+    isActive: Optional[bool] = True
+    hasFutureAppointments: Optional[bool] = False
+
+class CreateScheduleDay(BaseModel):
+    start: Optional[time] = None
+    end: Optional[time] = None
+    lunchStart: Optional[time] = None
+    lunchEnd: Optional[time] = None
+    closed: Optional[bool] = False
+
+
+class CreateSmartAssistItem(BaseModel):
+    enabled: bool
+    frequency: Optional[str] = None
+    includeBal: Optional[bool] = None
+    template: Optional[str] = None
+
+
+
+
+class CreateSmartAssist(BaseModel):
+    enabled: bool = False
+    items: Dict[str, CreateSmartAssistItem] = {}
+
+
+
+
+# class CreateOfficePayload(BaseModel):
+#     officeId: int
+#     officeName: str
+#     shortId: str
+
+#     address: Optional[Address] = None
+#     contact: Optional[Contact] = None
+#     billing: Optional[Billing] = None
+#     settings: Optional[Settings] = None
+
+#     statementMessages: Optional[StatementMessages] = None
+#     statementSettings: Optional[StatementSettings] = None
+
+#     operatories: List[CreateOperatory] = []
+#     schedule: Dict[str, CreateScheduleDay] = {}
+
+#     holidays: List[CreateHoliday] = []
+
+#     integrations: Optional[Integrations] = None
+#     advanced: Optional[AdvancedSettings] = None
+#     smartAssist: Optional[CreateSmartAssist] = None
+
+#     class Config:
+#         extra = "ignore"  # 🔥 ignores temp ids, junk fields safely
+
+class CreateOfficePayload(BaseModel):
+    officeId: int
+    officeName: str
+    shortId: str
+
+    address: Optional[Address] = None
+    contact: Optional[Contact] = None
+    billing: Optional[Billing] = None
+    settings: Optional[Settings] = None
+
+    statementMessages: Optional[StatementMessages] = None
+    statementSettings: Optional[StatementSettings] = None
+
+    operatories: Optional[list[Operatory]] = None
+    schedule: Optional[dict[str, CreateScheduleDay]] = None
+    holidays: Optional[list[Holiday]] = None
+
+    integrations: Optional[Integrations] = None
+    smartAssist: Optional[SmartAssist] = None
+
+    # THIS MUST MATCH THE CLASS NAME EXACTLY
+    advanced: Optional[OfficeAdvancedPayload] = None
+
+
+
+# app/api/v1/offices/schemas_billing_provider.py
+
+from pydantic import BaseModel
+from typing import Optional
+from uuid import UUID
+
+
+class BillingProviderCreate(BaseModel):
+    name: str
+    npi: Optional[str] = None
+    license: Optional[str] = None
+
+
+class BillingProviderResponse(BaseModel):
+    id: UUID
+    name: str
 
     class Config:
         from_attributes = True
 
 
-class OfficeHolidayCreate(BaseModel):
-    holiday_date: date
-    description: Optional[str] = None
+# app/api/v1/offices/schemas_fee_schedule.py
+
+from pydantic import BaseModel
+from typing import Literal
+from uuid import UUID
 
 
-class OfficeHolidayResponse(BaseModel):
-    id: int
-    office_id: int
-    holiday_date: date
-    description: Optional[str]
+class FeeScheduleCreate(BaseModel):
+    name: str
+    type: Literal["STANDARD", "UCR"]
+
+
+class FeeScheduleResponse(BaseModel):
+    id: UUID
+    name: str
+    type: str
 
     class Config:
         from_attributes = True
 
 
-# class OfficeCreateAllRequest(BaseModel):
-#     """
-#     Single payload to create Office + all related setup in one request
-#     """
-
-#     office: OfficeCreate
-
-#     holidays: Optional[List[OfficeHolidayCreate]] = []
-#     operatories: Optional[List[OperatoryCreate]] = []
-#     integrations: Optional[List[OfficeIntegrationCreate]] = []
-
-#     schedule: Optional[OfficeScheduleUpdate] = None
-#     statement: Optional[OfficeStatementUpdate] = None
 
 
-class OfficeCreateAllRequest(BaseModel):
-    office: OfficeCreate
+# REQUIRED FOR PYDANTIC v2
+CreateOfficePayload.model_rebuild()
+OfficePayload.model_rebuild()
 
-    holidays: Optional[List[OfficeHolidayCreate]] = None
-    operatories: Optional[List[OperatoryCreate]] = None
-    integrations: Optional[List[OfficeIntegrationCreate]] = None
-
-    schedule: Optional[OfficeScheduleUpdate] = None
-    statement: Optional[OfficeStatementUpdate] = None
+Address.model_rebuild()
+Contact.model_rebuild()
+Billing.model_rebuild()
+Settings.model_rebuild()
+StatementMessages.model_rebuild()
+StatementSettings.model_rebuild()
+SmartAssist.model_rebuild()
+OfficeAdvancedPayload.model_rebuild()
+Integrations.model_rebuild()

@@ -84,11 +84,11 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    
-    offices = relationship(
+
+    office = relationship(
         "UserOffice",
-        back_populates="user",
-        cascade="all, delete"
+        back_populates="users",
+        cascade="all, delete-orphan"
     )
     # offices = relationship("UserOffice", back_populates="user", cascade="all, delete")
     # groups = relationship("UserGroup", back_populates="user", cascade="all, delete")
