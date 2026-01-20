@@ -98,7 +98,6 @@ def get_all_tenants(
 
 
     # Determine tenant_id: query param > token > current_user dict
-    logger.info(f"tenant_id -------- > {tenant_id} ----------- > current_user.get(pgid) {current_user.get("pgid")}")
     target_tenant_id = tenant_id or current_user.get("pgid")
     target_tenant_id = current_user.get("pgid")
     
