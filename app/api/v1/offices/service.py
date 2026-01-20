@@ -2,6 +2,7 @@
 # Standard / Logging
 # =========================
 import logging
+from typing import Optional
 
 # =========================
 # FastAPI / SQLAlchemy Core
@@ -35,6 +36,7 @@ from app.models.offices import (
 )
 from app.models.billing_provider import BillingProvider
 from app.models.fee_schedule import FeeSchedule
+from app.models.user import User
 
 # =========================
 # Schemas – Office
@@ -84,7 +86,7 @@ logger = logging.getLogger(__name__)
 
 
 
-def get_office_full(db: Session, office_id: int, current_user: User = None) -> OfficePayload:
+def get_office_full(db: Session, office_id: int, current_user: Optional[User] = None) -> OfficePayload:
     office = db.query(Office).filter(Office.id == office_id).first()
     
     
