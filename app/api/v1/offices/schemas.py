@@ -214,6 +214,12 @@ class OfficePayload(BaseModel):
 
     advanced: Optional[OfficeAdvancedPayload] = None
     smartAssist: Optional[SmartAssist] = None
+    
+    # Audit fields
+    created_by: Optional[str] = None
+    created_date: Optional[datetime] = None
+    modified_by: Optional[str] = None
+    modified_at: Optional[datetime] = None
 
 
 

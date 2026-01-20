@@ -46,11 +46,14 @@ class Office(Base):
 
     is_active = Column(Boolean, default=True)
 
-    created_at = Column(TIMESTAMP, server_default=func.now())
+    created_by = Column(String(255), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_by = Column(String(255), nullable=True)
     updated_at = Column(
         TIMESTAMP,
         server_default=func.now(),
-        onupdate=func.now()
+        onupdate=func.now(),
+        nullable=True
     )
 
 

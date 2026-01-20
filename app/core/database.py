@@ -17,7 +17,7 @@ import app.models  # noqa
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
-    echo=True
+    # echo=True
 )
 
 SessionLocal = sessionmaker(

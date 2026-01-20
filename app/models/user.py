@@ -101,6 +101,12 @@ class User(Base):
     back_populates="user",
     cascade="all, delete-orphan",
 )
+    group_memberships = relationship(
+        "UserGroupMembership",
+        foreign_keys="UserGroupMembership.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
 
 
     @property

@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, Request
+from typing import Optional
 
 from app.models.user import User
 from app.models.role import Role
@@ -647,7 +648,7 @@ from app.models.user_preferences import UserPreference
 
 #     return list(users.values())
 
-def list_users_with_home_office(db: Session, tenant_id: int):
+def list_users_with_home_office(db: Session, tenant_id: int, office_id: Optional[int] = None):
     """
     Returns UI-ready users with:
     - PGID + name
@@ -657,6 +658,11 @@ def list_users_with_home_office(db: Session, tenant_id: int):
     - Group memberships
     - User preferences
     - Time clock placeholders
+    
+    Args:
+        db: Database session
+        tenant_id: Tenant ID to filter users
+        office_id: Optional office ID to filter users by assigned office
     """
 
     rows = (
@@ -844,8 +850,16 @@ def list_users_with_home_office(db: Session, tenant_id: int):
     # Convert sets → lists
     for user in users.values():
         user["groupMemberships"] = list(user["groupMemberships"])
+    
+    # Filter by office_id if provided
+    result = list(users.values())
+    if office_id:
+        result = [
+            u for u in result
+            if office_id in u.get("assigned_office_ids", []) or u.get("home_office_id") == office_id
+        ]
 
-    return list(users.values())
+    return result
 
 
 

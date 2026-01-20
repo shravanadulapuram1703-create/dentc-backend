@@ -107,6 +107,7 @@ from app.models.user_office import UserOffice
 from app.models.user_preferences import UserPreference
 from app.models.user_ip_rules import UserIPRule
 from app.models.user_time_clock import UserTimeClock
+from app.models.group import Group, UserGroupMembership
 
 # ==================================================
 # Role / Permission Mapping
@@ -124,3 +125,23 @@ from app.models.ip_addresses import IPAddress
 from app.models.refresh_token import RefreshToken
 from app.models.audit_log import AuditLog
 from app.models.impersonation_session import ImpersonationSession
+
+# ==================================================
+# Scheduler Models
+# ==================================================
+from app.api.v1.scheduler.models import (
+    SchedulerAppointment,
+    SchedulerOperatory,
+    SchedulerProvider,
+    SchedulerProcedureType,
+    SchedulerConfig,
+    AppointmentStatusEnum,
+    AppointmentStatus,
+    AppointmentType,
+    ProcedureCode,
+    ProcedureCategory,
+    TreatmentPlan,
+    TreatmentPlanPhase,
+    TreatmentPlanProcedure,
+    AppointmentTreatment
+)

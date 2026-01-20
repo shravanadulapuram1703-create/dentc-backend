@@ -7,7 +7,7 @@ import logging
 # FastAPI / SQLAlchemy Core
 # =========================
 from fastapi import HTTPException
-from sqlalchemy import text, distinct
+from sqlalchemy import text, distinct, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
@@ -84,7 +84,7 @@ logger = logging.getLogger(__name__)
 
 
 
-def get_office_full(db: Session, office_id: int) -> OfficePayload:
+def get_office_full(db: Session, office_id: int, current_user: User = None) -> OfficePayload:
     office = db.query(Office).filter(Office.id == office_id).first()
     
     
@@ -322,6 +322,12 @@ def get_office_full(db: Session, office_id: int) -> OfficePayload:
         # imaging=Imaging(),
         # textMessaging=TextMessaging(),
         # patientUrls=PatientUrls(),
+        
+        # Audit fields
+        created_by=office.created_by,
+        created_date=office.created_at,
+        modified_by=office.updated_by,
+        modified_at=office.updated_at,
     )
 
 
@@ -341,7 +347,7 @@ def serialize_smart_items(items: dict) -> dict:
 
 #####################################################################
 
-def update_office_full(db: Session, payload: OfficePayload):
+def update_office_full(db: Session, payload: OfficePayload, current_user: User):
     office = db.query(Office).filter(Office.id == payload.officeId).first()
     if not office:
         raise HTTPException(status_code=404, detail="Office not found")
@@ -857,6 +863,13 @@ def update_office_full(db: Session, payload: OfficePayload):
 
 
     # ==================================================
+    # UPDATE AUDIT FIELDS
+    # ==================================================
+    from datetime import datetime
+    office.updated_by = current_user.username if current_user else None
+    office.updated_at = datetime.utcnow()
+    
+    # ==================================================
     # COMMIT & RETURN
     # ==================================================
     logger.info(f"office ===============+++++++++++++> {office}")
@@ -864,12 +877,12 @@ def update_office_full(db: Session, payload: OfficePayload):
     db.refresh(office)
     db.commit()
 
-    return get_office_full(db, office.id)
+    return get_office_full(db, office.id, current_user)
 
 
 
 #####################################################################
-def create_office_full(db: Session, payload):
+def create_office_full(db: Session, payload, current_user: User):
 
     # ==================================================
     # VALIDATION
@@ -899,6 +912,7 @@ def create_office_full(db: Session, payload):
         phone1ext=payload.contact.phone1Ext if payload.contact else None,
         email=payload.contact.email if payload.contact else None,
         is_active=payload.settings.isActive if payload.settings else True,
+        created_by=current_user.username if current_user else "system",
     )
 
     db.add(office)
@@ -1115,7 +1129,7 @@ def create_office_full(db: Session, payload):
     # COMMIT & RETURN
     # ==================================================
     db.commit()
-    return get_office_full(db, office.id)
+    return get_office_full(db, office.id, current_user)
 
 # ############################################################################
 # # app/api/v1/offices/services/billing_provider.py

@@ -1,68 +1,44 @@
-from fastapi import APIRouter, Depends, HTTPException
+"""
+API routes for Treatment Plans.
+"""
+from fastapi import APIRouter, Depends, Query, status, Path
 from sqlalchemy.orm import Session
+from typing import Optional
 
-from app.core.database import get_db as get_tenant_db
-from app.api.v1.treatment_plans.service import (
-    create_plan,
-    add_plan_procedure,
-    accept_plan,
-)
+from app.core.database import get_db
+from app.api.v1.auth.dependencies import get_current_user
+from app.models.user import User
+from app.api.v1.treatment_plans.services import get_treatment_plans
+from app.api.v1.scheduler.schemas import TreatmentPlansResponse
 
-router = APIRouter(
-    prefix="/treatment-plans",
-    tags=["Treatment Plans"]
-)
+router = APIRouter(prefix="/patients", tags=["treatment-plans"])
 
 
-@router.post("/")
-def create_treatment_plan(
-    payload: dict,
-    db: Session = Depends(get_tenant_db),
+@router.get("/{patient_id}/treatment-plans", response_model=TreatmentPlansResponse)
+def get_patient_treatment_plans(
+    patient_id: str = Path(..., description="Patient ID (chart number)"),
+    status: Optional[str] = Query(None, description="Filter by status (Active, Completed, Cancelled)"),
+    include_completed: bool = Query(False, description="Include completed plans"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Create a new treatment plan (Draft)
+    Get all treatment plans for a specific patient.
+    
+    Path Parameters:
+    - patient_id: Patient ID (chart number)
+    
+    Query Parameters:
+    - status: Filter by status ("Active", "Completed", "Cancelled")
+    - include_completed: Include completed plans (default: false)
+    
+    Returns:
+    - List of treatment plans with phases and procedures
     """
-    try:
-        return create_plan(
-            db=db,
-            patient_id=payload["patient_id"],
-            office_id=payload["office_id"],
-            user_id=payload["created_by"],
-        )
-    except KeyError as e:
-        raise HTTPException(status_code=400, detail=f"Missing field: {e}")
-
-
-@router.post("/{plan_id}/procedures")
-def add_procedure_to_plan(
-    plan_id: int,
-    payload: dict,
-    db: Session = Depends(get_tenant_db),
-):
-    """
-    Add a procedure to a treatment plan
-    """
-    try:
-        return add_plan_procedure(
-            db=db,
-            plan_id=plan_id,
-            code=payload["procedure_code"],
-            fee=payload["fee"],
-            provider_id=payload.get("provider_id"),
-        )
-    except KeyError as e:
-        raise HTTPException(status_code=400, detail=f"Missing field: {e}")
-
-
-@router.post("/{plan_id}/accept")
-def accept_treatment_plan(
-    plan_id: int,
-    db: Session = Depends(get_tenant_db),
-):
-    """
-    Accept a treatment plan and approve all procedures
-    """
-    try:
-        return accept_plan(db, plan_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    plans = get_treatment_plans(
+        db=db,
+        patient_id=patient_id,
+        status_filter=status,
+        include_completed=include_completed
+    )
+    return TreatmentPlansResponse(treatment_plans=plans)

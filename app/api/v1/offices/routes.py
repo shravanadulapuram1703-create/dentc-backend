@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from sqlalchemy import text
 from app.models.offices import Office
+from app.models.user import User
+from app.api.v1.auth.dependencies import get_current_user
 
 from app.api.v1.offices.service  import (get_office_full, 
                                         create_billing_provider,
@@ -57,7 +59,10 @@ router = APIRouter(
 
 
 @router.get("/")
-def get_offices_list(db: Session = Depends(get_db)):
+def get_offices_list(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     offices = db.query(Office).order_by(Office.id).all()
 
     return [
@@ -69,7 +74,11 @@ def get_offices_list(db: Session = Depends(get_db)):
             "city": office.city,
             "state": office.state,
             "phone1": office.phone1,
-            "isActive": office.is_active
+            "isActive": office.is_active,
+            "created_by": office.created_by,
+            "created_at": office.created_at.isoformat() if office.created_at else None,
+            "updated_by": office.updated_by,
+            "updated_at": office.updated_at.isoformat() if office.updated_at else None
         }
         for office in offices
     ]
@@ -77,25 +86,31 @@ def get_offices_list(db: Session = Depends(get_db)):
 
 
 @router.get("/{office_id}/setup", response_model=OfficePayload)
-def get_office(office_id: int, db: Session = Depends(get_db)):
-    return get_office_full(db, office_id)
+def get_office(
+    office_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return get_office_full(db, office_id, current_user)
 
 @router.put("/{office_id}", response_model=OfficePayload)
 def update_office(
     office_id: int,
     payload: OfficePayload,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     payload.officeId = office_id
-    return update_office_full(db, payload)
+    return update_office_full(db, payload, current_user)
 
 # @router.post("", include_in_schema=False)
 @router.post("/", response_model=OfficePayload)
 def create_office(
     payload: CreateOfficePayload,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    return create_office_full(db, payload)
+    return create_office_full(db, payload, current_user)
 
 
 
