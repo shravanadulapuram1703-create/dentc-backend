@@ -3,7 +3,7 @@ Service layer for the Scheduler module.
 Contains all business logic for appointments, operatories, providers, etc.
 """
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func as sql_func, literal, cast
+from sqlalchemy import and_, or_, func as sql_func, literal, cast, text
 from sqlalchemy.types import String
 from datetime import date, time, datetime, timedelta
 from typing import List, Optional
@@ -635,12 +635,36 @@ def update_appointment(
     
     # Handle treatments update (replace all existing treatments)
     if payload.treatments is not None:
-        # Delete existing treatments
-        db.query(AppointmentTreatment).filter(
-            AppointmentTreatment.appointment_id == appointment_id
-        ).delete()
+        # CRITICAL: Delete ALL existing treatments for this appointment FIRST
+        # Use raw SQL delete to bypass any SQLAlchemy session caching issues
+        db.execute(
+            text("DELETE FROM tenant_1.appointment_treatments WHERE appointment_id = :appointment_id"),
+            {"appointment_id": appointment_id}
+        )
+        db.flush()
         
-        # Create new treatments
+        # Also clear any treatments that might be in SQLAlchemy session
+        # Query and expunge any treatments that might be cached
+        existing_treatments = db.query(AppointmentTreatment).filter(
+            AppointmentTreatment.appointment_id == appointment_id
+        ).all()
+        for treatment in existing_treatments:
+            db.expunge(treatment)
+        
+        # Clear relationship cache on appointment object
+        if hasattr(appointment, 'treatments'):
+            # Force reload by clearing the relationship
+            from sqlalchemy.orm.attributes import set_committed_value
+            set_committed_value(appointment, 'treatments', [])
+        
+        # Verify appointment.id is not None (shouldn't be, but safety check)
+        if appointment.id is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Appointment ID is None - cannot create treatments"
+            )
+        
+        # Create new treatments - ensure they're completely new objects
         import uuid
         for treatment_data in payload.treatments:
             # Use procedure_code from treatment_data, or default to "UNKNOWN"
@@ -669,23 +693,76 @@ def update_appointment(
                     db.add(unknown_code)
                     db.flush()
             
-            treatment = AppointmentTreatment(
-                id=f"TREAT-{uuid.uuid4().hex[:8].upper()}",
-                appointment_id=appointment.id,
-                procedure_code=procedure_code,
-                status=treatment_data.status,
-                tooth=treatment_data.tooth,
-                surface=treatment_data.surface,
-                description=treatment_data.description,
-                bill_to=treatment_data.bill_to or "Patient",
-                duration=treatment_data.duration,
-                provider=treatment_data.provider,
-                provider_units=treatment_data.provider_units or 1,
-                est_patient=treatment_data.est_patient,
-                est_insurance=treatment_data.est_insurance,
-                fee=treatment_data.fee
+            # Generate unique treatment ID - check if it exists ANYWHERE in the database
+            max_attempts = 10
+            treatment_id = None
+            for attempt in range(max_attempts):
+                candidate_id = f"TREAT-{uuid.uuid4().hex[:8].upper()}"
+                # Check if this ID exists anywhere (not just for this appointment)
+                existing = db.query(AppointmentTreatment).filter(
+                    AppointmentTreatment.id == candidate_id
+                ).first()
+                if not existing:
+                    treatment_id = candidate_id
+                    break
+            
+            if not treatment_id:
+                # Fallback: use timestamp-based ID if UUID collision (extremely rare)
+                treatment_id = f"TREAT-{int(datetime.utcnow().timestamp() * 1000)}"
+            
+            # Double-check the ID doesn't exist and delete if it does (safety check)
+            # Use raw SQL to avoid loading into session
+            existing_check = db.execute(
+                text("SELECT id FROM tenant_1.appointment_treatments WHERE id = :treatment_id"),
+                {"treatment_id": treatment_id}
+            ).first()
+            if existing_check:
+                # Delete it using raw SQL to avoid session issues
+                db.execute(
+                    text("DELETE FROM tenant_1.appointment_treatments WHERE id = :treatment_id"),
+                    {"treatment_id": treatment_id}
+                )
+                db.flush()
+            
+            # Verify appointment.id is set
+            if appointment.id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Cannot create treatment: appointment ID is None"
+                )
+            
+            # Use raw SQL INSERT to bypass SQLAlchemy's object tracking
+            # This ensures we're doing an INSERT, not an UPDATE
+            db.execute(
+                text("""
+                    INSERT INTO tenant_1.appointment_treatments 
+                    (id, appointment_id, procedure_code, status, tooth, surface, description, 
+                     bill_to, duration, provider, provider_units, est_patient, est_insurance, fee, 
+                     created_at, updated_at)
+                    VALUES 
+                    (:id, :appointment_id, :procedure_code, :status, :tooth, :surface, :description,
+                     :bill_to, :duration, :provider, :provider_units, :est_patient, :est_insurance, :fee,
+                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """),
+                {
+                    "id": treatment_id,
+                    "appointment_id": appointment.id,  # CRITICAL: Must be set
+                    "procedure_code": procedure_code,
+                    "status": treatment_data.status,
+                    "tooth": treatment_data.tooth,
+                    "surface": treatment_data.surface,
+                    "description": treatment_data.description,
+                    "bill_to": treatment_data.bill_to or "Patient",
+                    "duration": treatment_data.duration,
+                    "provider": treatment_data.provider,
+                    "provider_units": treatment_data.provider_units or 1,
+                    "est_patient": treatment_data.est_patient,
+                    "est_insurance": treatment_data.est_insurance,
+                    "fee": treatment_data.fee
+                }
             )
-            db.add(treatment)
+            # Flush immediately to ensure it's inserted before next iteration
+            db.flush()
     
     db.commit()
     db.refresh(appointment)

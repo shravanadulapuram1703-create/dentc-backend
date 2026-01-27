@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+gunicorn
 SQLAlchemy
 pydantic-settings
 psycopg2-binary
@@ -9,3 +10,9 @@ python-dotenv
 passlib==1.7.4 
 bcrypt==3.2.2
 python-multipart
+langchain>=0.1.0
+langchain-google-vertexai>=1.0.0
+google-cloud-aiplatform>=1.38.0
+websockets>=12.0
+redis>=5.0.0
+celery>=5.3.0

@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_PASSWORD: str | None = None
+    
+    # Google Cloud / Vertex AI
+    GOOGLE_CLOUD_PROJECT_ID: str | None = None
+    GOOGLE_CLOUD_LOCATION: str = "us-central1"
+    GEMINI_MODEL_NAME: str = "gemini-2.5-pro"
 
 
     model_config = SettingsConfigDict(

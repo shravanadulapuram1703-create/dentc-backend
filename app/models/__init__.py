@@ -127,6 +127,33 @@ from app.models.audit_log import AuditLog
 from app.models.impersonation_session import ImpersonationSession
 
 # ==================================================
+# Patient Models
+# ==================================================
+from app.models.patient import (
+    Patient,
+    PatientAddress,
+    PatientContactInfo,
+    ResponsibleParty,
+    PatientInsurance,
+    FeeSchedule,
+    PatientType,
+    ReferralType,
+    ResponsiblePartyRelationship,
+    ContactPreference,
+    PatientAccountMember,
+    PatientBalance,
+    PatientClinicalInfo,
+    PatientMedicalAlert,
+    Title,
+    Pronoun,
+    State,
+    MaritalStatus,
+    Gender)
+
+
+
+
+# ==================================================
 # Scheduler Models
 # ==================================================
 from app.api.v1.scheduler.models import (

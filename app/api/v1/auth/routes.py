@@ -109,8 +109,18 @@ def refresh(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     return {"access_token": access}
 
 @router.post("/logout")
-def logout_user(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
-    logout(db, payload.refresh_token)
+def logout_user(
+    payload: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Logout endpoint - optimized to use user_id from access token.
+    This makes logout much faster by only checking tokens for the current user.
+    Also handles automatic logout on token expiration via 401 response.
+    """
+    # Use user_id from access token to optimize the query (much faster)
+    logout(db, payload.refresh_token, user_id=current_user.id, tenant_id=current_user.tenant_id)
     return {"message": "Logged out successfully"}
 
 

@@ -9,6 +9,7 @@ from app.api.v1.appointments.router import router as appointments_router
 from app.api.v1.treatment_plans.router import router as treatment_plans_router
 from app.api.v1.scheduler.routes import router as scheduler_router
 from app.api.v1.procedures.router import router as procedures_router
+from app.api.v1.ai_chat.routes import router as ai_chat_router
 
 
 
@@ -26,3 +27,4 @@ api_router.include_router(appointments_router)
 api_router.include_router(treatment_plans_router)
 api_router.include_router(scheduler_router)
 api_router.include_router(procedures_router)
+api_router.include_router(ai_chat_router)

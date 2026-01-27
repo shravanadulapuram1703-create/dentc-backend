@@ -109,6 +109,13 @@ class SchedulerAppointment(Base):
     # Relationships
     office = relationship("Office", backref="scheduler_appointments")
 
+    treatments = relationship(
+        "AppointmentTreatment",
+        back_populates="appointment",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
 
 class SchedulerOperatory(Base):
     """
@@ -441,5 +448,5 @@ class AppointmentTreatment(Base):
     )
     
     # Relationships
-    appointment = relationship("SchedulerAppointment", backref="treatments")
+    appointment = relationship("SchedulerAppointment", back_populates="treatments")
     procedure = relationship("ProcedureCode", backref="appointment_treatments")

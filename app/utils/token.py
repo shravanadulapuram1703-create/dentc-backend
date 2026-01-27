@@ -31,19 +31,26 @@ def create_refresh_token() -> str:
 
 
 def decode_access_token(token: str):
+    """
+    Decode JWT access token.
+    Optimized for performance - minimal logging in hot path.
+    """
     try:
-        logger.info(f"Decoding token : {token}")
-
+        # Decode token (JWT decode is fast, but logging was slowing it down)
         payload = jwt.decode(
             token,
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM]
         )
-
-        logger.info(f"Decoded payload : {payload}")
-
+        
+        # Only log at debug level (not info) to avoid I/O overhead on every request
+        # Never log the actual token value (security risk)
+        logger.debug(f"Token decoded successfully for user_id: {payload.get('sub')}")
+        
         return payload
-    except JWTError:
+    except JWTError as e:
+        # Log errors at info level (but not the token itself)
+        logger.info(f"Token decode failed: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"

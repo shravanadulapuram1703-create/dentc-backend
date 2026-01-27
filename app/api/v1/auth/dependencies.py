@@ -63,10 +63,30 @@ def name_from_email(email: str) -> str:
 
 
 def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> User:
-    payload = decode_access_token(token)
+    """
+    Get current user from access token.
+    Optimized: Reuses decoded payload from middleware if available to avoid double decoding.
+    Automatically handles token expiration - JWT decode will raise 401 if expired.
+    """
+    # Performance optimization: Reuse payload from middleware if available
+    # This avoids decoding the token twice (once in middleware, once here)
+    if hasattr(request.state, 'token_payload'):
+        payload = request.state.token_payload
+        logger.debug("Reusing token payload from middleware")
+    else:
+        # Fallback: Decode if not available from middleware (e.g., excluded routes)
+        try:
+            payload = decode_access_token(token)
+        except HTTPException as e:
+            # Token is invalid or expired - raise 401 to trigger automatic logout on frontend
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired or invalid. Please login again."
+            )
 
     # if is_access_token_blacklisted(token_jti):
     #     raise HTTPException(status_code=401, detail="Token revoked")
@@ -74,7 +94,8 @@ def get_current_user(
     user_id: str | None = payload.get("sub")
     tenant_id: int | None = payload.get("tenant_id")
 
-    logger.info(f"user_id {user_id}, tenant_id : {tenant_id}")
+    # Reduced logging - only log at debug level to avoid I/O overhead
+    logger.debug(f"Token validated for user_id={user_id}, tenant_id={tenant_id}")
 
     if not user_id:
         raise HTTPException(
@@ -97,6 +118,14 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive"
         )
+    
+    # Check if user is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is inactive"
+        )
+    
     logger.info(f"user ----> {type(user)}")
     # user.name = name_from_email(user.email)
 

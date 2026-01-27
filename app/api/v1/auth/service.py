@@ -309,12 +309,28 @@ def refresh_access_token(db: Session, refresh_token: str):
 #         status_code=status.HTTP_400_BAD_REQUEST,
 #         detail="Invalid refresh token"
 #     )
-def logout(db: Session, refresh_token: str):
-    tokens = db.query(RefreshToken).filter(RefreshToken.revoked.is_(False)).all()
+def logout(db: Session, refresh_token: str, user_id: int = None, tenant_id: int = None):
+    """
+    Optimized logout function.
+    If user_id is provided, only checks tokens for that user (much faster).
+    Otherwise falls back to checking all tokens (slower but still works).
+    """
+    # Optimize: If user_id is provided, only query tokens for that user
+    if user_id is not None:
+        tokens = db.query(RefreshToken).filter(
+            RefreshToken.user_id == user_id,
+            RefreshToken.revoked.is_(False)
+        ).all()
+    else:
+        # Fallback: Query all non-revoked tokens (slower)
+        tokens = db.query(RefreshToken).filter(
+            RefreshToken.revoked.is_(False)
+        ).all()
 
+    # Verify the refresh token against user's tokens
     for token in tokens:
         if verify_token(refresh_token, token.token_hash):
-
+            # Idempotent: If already revoked, just return success
             if not token.revoked:
                 token.revoked = True
                 db.commit()
@@ -332,10 +348,11 @@ def logout(db: Session, refresh_token: str):
                     reason="User logged out",
                 )
 
-            #  idempotent logout
+            # Idempotent logout - always return success
             return
 
-    #  logout should never error
+    # Logout should never error - if token not found, still return success
+    # (prevents information leakage and handles edge cases)
     return
 
 

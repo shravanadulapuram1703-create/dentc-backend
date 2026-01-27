@@ -46,7 +46,7 @@ app = FastAPI(
 #  CORS must come first
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://16.176.134.94:5173/","http://16.176.134.94:5173","http://localhost:5173/","http://localhost:5173","http://34.66.199.55:5173","http://34.66.199.55:5173/"],
+    allow_origins=["http://localhost:3000","http://16.176.134.94:5173/","http://16.176.134.94:5173","http://localhost:5173/","http://localhost:5173","http://34.66.199.55:5173","http://34.66.199.55:5173/"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,6 +59,11 @@ app.add_middleware(TenantMiddleware)
 
 #  Then your custom middlewares
 # app.add_middleware(TenantMiddleware)
+
+from app.middleware.performance import PerformanceMiddleware
+
+# Add performance monitoring middleware
+app.add_middleware(PerformanceMiddleware)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):

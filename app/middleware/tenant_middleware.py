@@ -33,14 +33,17 @@ class TenantMiddleware(BaseHTTPMiddleware):
 
         # 2. No auth header → public schema (no tenant enforcement)
         if not auth_header:
-            logger.info("No auth header, proceeding without tenant context")
+            logger.debug("No auth header, proceeding without tenant context")
             return await call_next(request)
 
         try:
             token = auth_header.split(" ", 1)[1]
             payload = decode_access_token(token)
+            
+            # Store decoded payload in request state to avoid re-decoding in dependencies
+            request.state.token_payload = payload
         except Exception:
-            logger.warning("Invalid auth token, skipping tenant switch")
+            logger.debug("Invalid auth token, skipping tenant switch")
             return await call_next(request)
 
         user_id = payload.get("sub")
