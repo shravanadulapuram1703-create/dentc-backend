@@ -16,7 +16,7 @@ from sqlalchemy import or_
 
 from app.api.v1.auth.dependencies import get_current_user
 
-
+import hashlib
 import logging
 from app.core.logging import setup_logging
 logger = setup_logging()
@@ -30,6 +30,16 @@ logger = logging.getLogger(__name__)
 
 
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+
+def _sha256_fingerprint(token: str) -> str:
+    """
+    Compute a deterministic SHA-256 fingerprint of the refresh token.
+
+    This is used for O(1) DB lookup instead of scanning all rows and
+    running bcrypt verification in a loop.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 # def login_user(db: Session, email: str, password: str, request: Request):
@@ -185,10 +195,13 @@ def login_user(db: Session, identifier: str, password: str, request: Request):
 
     raw_refresh = create_refresh_token()
 
+    # Store both a bcrypt hash (for backward compatibility) and a deterministic
+    # SHA-256 fingerprint for fast, indexed lookup.
     refresh_token = RefreshToken(
         user_id=user.id,
         tenant_id=user.tenant_id,
         token_hash=hash_token(raw_refresh),
+        token_sha256=_sha256_fingerprint(raw_refresh),
         expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     )
 
@@ -214,62 +227,106 @@ def login_user(db: Session, identifier: str, password: str, request: Request):
 
 
 def refresh_access_token(db: Session, refresh_token: str):
-    tokens = (
+    """
+    Fast refresh using deterministic token fingerprint.
+
+    New tokens (with token_sha256 set) are looked up in O(1) using an indexed
+    column. Legacy tokens (without token_sha256) fall back to the old linear
+    scan with bcrypt verification, but they will naturally expire within
+    REFRESH_TOKEN_EXPIRE_DAYS.
+    """
+    now = datetime.utcnow()
+    fingerprint = _sha256_fingerprint(refresh_token)
+
+    # First try the fast path using token_sha256 (new tokens)
+    token = (
         db.query(RefreshToken)
         .filter(
+            RefreshToken.token_sha256 == fingerprint,
             RefreshToken.revoked.is_(False),
-            RefreshToken.expires_at > datetime.utcnow()
+            RefreshToken.expires_at > now,
         )
-        .all()
+        .one_or_none()
     )
 
-    for token in tokens:
-        if verify_token(refresh_token, token.token_hash):
-            user = db.query(User).get(token.user_id)
+    if token is None:
+        # Fallback for legacy tokens that don't have token_sha256 populated.
+        # This keeps existing users working until old tokens expire.
+        logger.info("Falling back to legacy refresh token lookup (no token_sha256 match)")
+        legacy_tokens = (
+            db.query(RefreshToken)
+            .filter(
+                RefreshToken.revoked.is_(False),
+                RefreshToken.expires_at > now,
+            )
+            .all()
+        )
 
-            if not user or not user.is_active:
+        for legacy in legacy_tokens:
+            if verify_token(refresh_token, legacy.token_hash):
+                token = legacy
                 break
 
-            is_superuser = user.role == "super_admin"
+    if token is None:
+        # Invalid / expired refresh token
+        log_audit(
+            db,
+            action="TOKEN_REFRESH",
+            success=False,
+            tenant_id=None,
+            actor_user_id=None,
+            resource="auth",
+            resource_type="refresh_token",
+            reason="Invalid or expired refresh token",
+        )
 
-            new_access = create_access_token({
-                "sub": str(user.id),
-                "tenant_id": user.tenant_id,
-                "is_superuser": is_superuser,
-            })
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
 
-            # Token refresh success
-            log_audit(
-                db,
-                action="TOKEN_REFRESH",
-                success=True,
-                tenant_id=user.tenant_id,
-                actor_user_id=user.id,
-                resource="auth",
-                resource_type="refresh_token",
-                resource_id=str(token.id),
-                resource_pk=str(token.id),
-                reason="Access token refreshed",
-            )
+    # We have a valid token row → issue new access token
+    user = db.query(User).get(token.user_id)
 
-            return new_access
+    if not user or not user.is_active:
+        log_audit(
+            db,
+            action="TOKEN_REFRESH",
+            success=False,
+            tenant_id=token.tenant_id,
+            actor_user_id=token.user_id,
+            resource="auth",
+            resource_type="refresh_token",
+            reason="User inactive or not found during token refresh",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
 
-    # Invalid / expired refresh token
+    is_superuser = user.role == "super_admin"
+
+    new_access = create_access_token({
+        "sub": str(user.id),
+        "tenant_id": user.tenant_id,
+        "is_superuser": is_superuser,
+    })
+
+    # Token refresh success
     log_audit(
         db,
         action="TOKEN_REFRESH",
-        success=False,
-        tenant_id=None,
-        actor_user_id=None,
+        success=True,
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
         resource="auth",
         resource_type="refresh_token",
-        reason="Invalid or expired refresh token",
+        resource_id=str(token.id),
+        resource_pk=str(token.id),
+        reason="Access token refreshed",
     )
 
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired refresh token"
-    )
+    return new_access
 
 
 
@@ -311,48 +368,47 @@ def refresh_access_token(db: Session, refresh_token: str):
 #     )
 def logout(db: Session, refresh_token: str, user_id: int = None, tenant_id: int = None):
     """
-    Optimized logout function.
-    If user_id is provided, only checks tokens for that user (much faster).
-    Otherwise falls back to checking all tokens (slower but still works).
+    Optimized logout using deterministic token fingerprint.
+
+    - Single DB lookup by token_sha256 (O(1))
+    - No Python loop, no bcrypt verify in a loop
+    - Idempotent: missing/invalid token still returns success
     """
-    # Optimize: If user_id is provided, only query tokens for that user
+    now = datetime.utcnow()
+    fingerprint = _sha256_fingerprint(refresh_token)
+
+    query = db.query(RefreshToken).filter(
+        RefreshToken.token_sha256 == fingerprint,
+        RefreshToken.revoked.is_(False),
+        RefreshToken.expires_at > now,
+    )
+
+    # Optional additional safety: scope by user if provided
     if user_id is not None:
-        tokens = db.query(RefreshToken).filter(
-            RefreshToken.user_id == user_id,
-            RefreshToken.revoked.is_(False)
-        ).all()
-    else:
-        # Fallback: Query all non-revoked tokens (slower)
-        tokens = db.query(RefreshToken).filter(
-            RefreshToken.revoked.is_(False)
-        ).all()
+        query = query.filter(RefreshToken.user_id == user_id)
 
-    # Verify the refresh token against user's tokens
-    for token in tokens:
-        if verify_token(refresh_token, token.token_hash):
-            # Idempotent: If already revoked, just return success
-            if not token.revoked:
-                token.revoked = True
-                db.commit()
+    token = query.one_or_none()
 
-                log_audit(
-                    db,
-                    action="LOGOUT",
-                    success=True,
-                    tenant_id=token.tenant_id,
-                    actor_user_id=token.user_id,
-                    resource="auth",
-                    resource_type="logout",
-                    resource_id=str(token.id),
-                    resource_pk=str(token.id),
-                    reason="User logged out",
-                )
+    if token:
+        # Either soft-revoke or hard-delete; here we delete to keep table small.
+        token.revoked = True
+        db.delete(token)
+        db.commit()
 
-            # Idempotent logout - always return success
-            return
+        log_audit(
+            db,
+            action="LOGOUT",
+            success=True,
+            tenant_id=token.tenant_id,
+            actor_user_id=token.user_id,
+            resource="auth",
+            resource_type="logout",
+            resource_id=str(token.id),
+            resource_pk=str(token.id),
+            reason="User logged out",
+        )
 
-    # Logout should never error - if token not found, still return success
-    # (prevents information leakage and handles edge cases)
+    # Always succeed (idempotent logout, no information leakage)
     return
 
 

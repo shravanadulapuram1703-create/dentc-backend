@@ -27,7 +27,7 @@ module.exports = {
       env_production: {
         NODE_ENV: "production",
         PYTHONUNBUFFERED: "1",
-        GUNICORN_WORKERS: "4", // Adjust based on CPU cores
+        GUNICORN_WORKERS: "4", // Adjust baseYd on CPU cores
         GUNICORN_BIND: "0.0.0.0:8000",
         GUNICORN_LOG_LEVEL: "info",
       },

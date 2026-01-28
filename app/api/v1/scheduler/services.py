@@ -9,9 +9,12 @@ from datetime import date, time, datetime, timedelta
 from typing import List, Optional
 from fastapi import HTTPException, status
 
+from app.models.offices import OfficeOperatory, OfficeProvider
+
 from app.api.v1.scheduler.models import (
     SchedulerAppointment,
     SchedulerOperatory,
+
     SchedulerProvider,
     SchedulerProcedureType,
     SchedulerConfig,
@@ -912,20 +915,32 @@ def get_operatories(
     Returns:
         List of operatory responses
     """
-    query = db.query(SchedulerOperatory).filter(
-        SchedulerOperatory.is_active == True
+    query = db.query(OfficeOperatory).filter(
+        OfficeOperatory.is_active == True
     )
+    logger.info(f"office_id: {office_id}")
+    logger.info(f"query: {query}")
     
     if office_id:
-        query = query.filter(SchedulerOperatory.office_id == office_id)
+        query = query.filter(OfficeOperatory.office_id == office_id)
     
-    operatories = query.order_by(SchedulerOperatory.id).all()
+    operatories = query.order_by(OfficeOperatory.id).all()
     
     result = []
     for op in operatories:
+        logger.info(f"Operatory: {op}")
+        # logger.info(f"Provider ID: {op.provider_id}")
+        logger.info(f"Office ID: {op.office_id}")
+        # logger.info(f"Provider: {op.provider}")
+        # logger.info(f"Office: {op.office}")
+        logger.info(f"Name: {op.name}")
+        logger.info(f"ID: {op.id}")
+        logger.info(f"Is Active: {op.is_active}")
+        logger.info(f"Created At: {op.created_at}")
+        # logger.info(f"Updated At: {op.updated_at}")
         # Get provider name
-        provider = db.query(SchedulerProvider).filter(
-            SchedulerProvider.id == op.provider_id
+        provider = db.query(OfficeProvider).filter(
+            OfficeProvider.id == op.provider_id
         ).first()
         provider_name = provider.name if provider else op.provider_id
         
@@ -937,7 +952,12 @@ def get_operatories(
             id=op.id,
             name=op.name,
             provider=provider_name,
-            office=office_name
+            office=office_name,
+            display_order=op.display_order,
+            is_active=op.is_active,
+            has_future_appointments=op.has_future_appointments,
+            created_at=op.created_at,
+            updated_at=op.updated_at
         ))
     
     return result
@@ -961,14 +981,14 @@ def get_providers(
     Returns:
         List of provider responses
     """
-    query = db.query(SchedulerProvider).filter(
-        SchedulerProvider.is_active == True
+    query = db.query(OfficeProvider).filter(
+        OfficeProvider.is_active == True
     )
     
     if office_id:
-        query = query.filter(SchedulerProvider.office_id == office_id)
+        query = query.filter(OfficeProvider.office_id == office_id)
     
-    providers = query.order_by(SchedulerProvider.id).all()
+    providers = query.order_by(OfficeProvider.id).all()
     
     result = []
     for prov in providers:

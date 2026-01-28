@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.api.v1.offices.schemas import OfficeAdvancedPayload
 
+# OfficeOperatory, OfficeProvider
 
 
 # ==================================================
@@ -74,6 +75,8 @@ class Office(Base):
 
 
     operatories = relationship("OfficeOperatory",back_populates="office",cascade="all, delete-orphan")
+
+    providers = relationship("OfficeProvider", back_populates="office",cascade="all, delete-orphan")
 
     tenant = relationship("Tenant", back_populates="office")
 
@@ -239,8 +242,9 @@ class OfficeHoliday(Base):
 class OfficeOperatory(Base):
     __tablename__ = "office_operatories"
     __table_args__ = {"schema": "public"}
-
-    id = Column(Integer, primary_key=True)
+    
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
 
     office_id = Column(
         Integer,
@@ -249,13 +253,84 @@ class OfficeOperatory(Base):
     )
 
     name = Column(String, nullable=False)
+    provider_id = Column(String, nullable=False)  # References scheduler_providers.id
     display_order = Column(Integer)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     has_future_appointments = Column(Boolean, default=False)
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at = Column(
+        TIMESTAMP,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
+    )
 
     office = relationship("Office", back_populates="operatories")
 
 
+
+
+
+
+# class SchedulerOperatory(Base):
+#     """
+#     Operatory model for scheduler.
+#     Represents a dental operatory/room.
+#     """
+#     __tablename__ = "scheduler_operatories"
+#     __table_args__ = {"schema": "tenant_1"}
+
+#     id = Column(String, primary_key=True)  # e.g., "OP1", "OP2"
+#     name = Column(String, nullable=False)  # e.g., "OP 1 - Hygiene"
+#     provider_id = Column(String, nullable=False)  # References scheduler_providers.id
+#     office_id = Column(
+#         Integer,
+#         ForeignKey("public.offices.id", ondelete="CASCADE"),
+#         nullable=False,
+#         index=True
+#     )
+#     is_active = Column(Boolean, default=True, nullable=False)
+    
+#     created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+#     updated_at = Column(
+#         TIMESTAMP,
+#         server_default=func.now(),
+#         onupdate=func.now(),
+#         nullable=False
+#     )
+    
+#     # Relationships
+#     office = relationship("Office", backref="scheduler_operatories")
+
+
+class OfficeProvider(Base):
+    """
+    Provider model for scheduler.
+    Represents a dental provider (doctor, hygienist, etc.)
+    """
+    __tablename__ = "office_providers"
+    __table_args__ = {"schema": "public"}
+
+    id = Column(String, primary_key=True)  # e.g., "PROV001", "PROV002"
+    name = Column(String, nullable=False)  # e.g., "Dr. Jinna"
+    office_id = Column(
+        Integer,
+        ForeignKey("public.offices.id", ondelete="CASCADE"),
+        nullable=True,  # Can be null for providers that work across offices
+        index=True
+    )
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at = Column(
+        TIMESTAMP,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
+    )
+    
+    # Relationships
+    office = relationship("Office", back_populates="providers")
 
 class OfficeOtherInfo(Base):
     __tablename__ = "office_other_info"

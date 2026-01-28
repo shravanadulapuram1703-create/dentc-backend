@@ -8,7 +8,7 @@ class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
     __table_args__ = {"schema": "public"}
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
 
     tenant_id = Column(
         Integer,
@@ -25,6 +25,9 @@ class RefreshToken(Base):
     )
 
     token_hash = Column(String(255), nullable=False, index=True)
+    # Deterministic SHA-256 fingerprint of the refresh token for O(1) lookup.
+    # This is used instead of bcrypt for matching, to avoid linear scans + CPU-heavy verification.
+    token_sha256 = Column(String(64), nullable=True, index=True)
 
     expires_at = Column(TIMESTAMP, nullable=False)
 

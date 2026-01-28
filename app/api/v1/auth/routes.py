@@ -32,6 +32,9 @@ from app.api.v1.auth.dependencies import get_current_user, get_current_user_full
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+from datetime import datetime
+
+
 
 # @router.post("/signup", response_model=SignupResponse)
 # def signup(
@@ -119,8 +122,18 @@ def logout_user(
     This makes logout much faster by only checking tokens for the current user.
     Also handles automatic logout on token expiration via 401 response.
     """
+    start = datetime.strptime("09:50:10", "%H:%M:%S")
+    
+
+
     # Use user_id from access token to optimize the query (much faster)
     logout(db, payload.refresh_token, user_id=current_user.id, tenant_id=current_user.tenant_id)
+    
+    end   = datetime.strptime("11:20:25", "%H:%M:%S")
+
+    seconds = (end - start).total_seconds()
+    logger.info(f"Seconds for logout: {seconds}")
+    
     return {"message": "Logged out successfully"}
 
 

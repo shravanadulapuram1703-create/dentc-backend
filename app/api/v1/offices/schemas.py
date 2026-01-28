@@ -73,6 +73,7 @@ class StatementSettings(BaseModel):
 
 class Operatory(BaseModel):
     id: Optional[str] = None
+    defaultProviderId: Optional[str] = None
     name: Optional[str] = None
     order: Optional[int] = None
     isActive: bool = True
@@ -207,7 +208,8 @@ class OfficeAdvancedResponse(OfficeAdvancedPayload):
 # ==================================================
 
 class OfficePayload(BaseModel):
-    officeId: int
+    # officeId: int
+    officeId: Optional[int] = None
     officeName: Optional[str] = None
     shortId: Optional[str] = None
 
@@ -234,9 +236,9 @@ class OfficePayload(BaseModel):
 
 
 class CreateOfficePayload(BaseModel):
-    officeId: int
-    officeName: str
-    shortId: str
+    officeId: Optional[int] = None
+    officeName: Optional[str] = None
+    shortId: Optional[str] = None
 
     address: Optional[Address] = None
     contact: Optional[Contact] = None

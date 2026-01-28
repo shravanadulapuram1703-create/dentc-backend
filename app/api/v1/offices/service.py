@@ -299,6 +299,7 @@ def get_office_full(db: Session, office_id: int, current_user: Optional[User] = 
         operatories=[
             Operatory(
                 id=f"op_{op.id}",
+                defaultProviderId=op.provider_id,
                 name=op.name,
                 order=op.display_order,
                 isActive=op.is_active,
@@ -496,15 +497,32 @@ def update_office_full(db: Session, payload: OfficePayload, current_user: User):
                 ).delete()
 
                 for op in payload.operatories:
+                    logger.info(f"op: {op}")
+                    # if  'defaultProviderId' in op:
+                    #     logger.info(f"defaultProviderId: {op.defaultProviderId}")
+                    #     db.add(
+                    #         OfficeOperatory(
+                    #             office_id=office.id,
+                    #             name=op.name,
+                    #             provider_id = op.defaultProviderId,
+                    #             display_order=op.order,
+                    #             is_active=op.isActive,
+                    #             has_future_appointments=op.hasFutureAppointments,
+                    #         )
+                    #     )
+                    # else:
+                    logger.info(f"op with no providername: {op.name}")
                     db.add(
                         OfficeOperatory(
                             office_id=office.id,
+                            provider_id = op.defaultProviderId,
                             name=op.name,
                             display_order=op.order,
                             is_active=op.isActive,
                             has_future_appointments=op.hasFutureAppointments,
                         )
                     )
+
         except SQLAlchemyError as exc:
             db.rollback()
             raise HTTPException(

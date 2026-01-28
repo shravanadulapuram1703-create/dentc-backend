@@ -8,7 +8,12 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal, List
 from datetime import date as date_type, time
 from enum import Enum
-
+from sqlalchemy import (
+    Column, Integer, String, Boolean, Date, Time,
+    ForeignKey, Text, TIMESTAMP, Identity,Numeric
+)
+from datetime import date
+from datetime import datetime
 
 
 # Type alias to avoid name clash with field name 'date'
@@ -254,9 +259,14 @@ class AppointmentSingleResponse(BaseModel):
 class OperatoryResponse(BaseModel):
     """Schema for operatory response"""
     id: str = Field(..., description="Operatory ID (e.g., 'OP1')")
-    name: str = Field(..., description="Operatory name (e.g., 'OP 1 - Hygiene')")
-    provider: str = Field(..., description="Provider name (e.g., 'Dr. Jinna')")
-    office: str = Field(..., description="Office name (e.g., 'Moon, PA')")
+    name: Optional[str] = Field(..., description="Operatory name (e.g., 'OP 1 - Hygiene')")
+    provider: Optional[str] = Field(..., description="Provider name (e.g., 'Dr. Jinna')")
+    office: Optional[str] = Field(..., description="Office name (e.g., 'Moon, PA')")
+    display_order: Optional[int] = Field(..., description="Display order (e.g., 1)")
+    is_active: Optional[bool] = Field(..., description="Is active (e.g., True)")
+    has_future_appointments: Optional[bool] = Field(..., description="Has future appointments (e.g., True)")
+    created_at:  Optional[datetime] = Field(..., description="Created at (e.g., '2021-01-01')")
+    updated_at:  Optional[datetime] = Field(..., description="Updated at (e.g., '2021-01-01')")
 
     class Config:
         json_schema_extra = {
