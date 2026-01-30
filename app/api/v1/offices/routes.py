@@ -56,6 +56,19 @@ router = APIRouter(
     tags=["Offices Setup"]
 )
 
+@router.get("/{officeId}/providers")
+def get_office_providers(
+    officeId: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Patient Ledger contract:
+    GET /api/v1/offices/{officeId}/providers
+    """
+    from app.api.v1.patient_ledger.service import get_office_providers as _get
+    return _get(db=db, office_id=officeId)
+
 
 
 @router.get("/")

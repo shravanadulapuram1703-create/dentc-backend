@@ -3,7 +3,10 @@ import logging.config
 
 
 
-from fastapi import FastAPI,Request
+from fastapi import FastAPI, Request
+from fastapi import HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -42,6 +45,49 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
+
+
+# ==================================================
+# Global error format (contract: {"error": {...}})
+# ==================================================
+
+def _error_payload(code: str, message: str, details=None):
+    return {"error": {"code": code, "message": message, "details": details}}
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    # Map common status codes to contract error codes
+    status_code = exc.status_code
+    code_map = {
+        400: "VALIDATION_ERROR",
+        401: "FORBIDDEN",
+        403: "FORBIDDEN",
+        404: "NOT_FOUND",
+        422: "BUSINESS_RULE_VIOLATION",
+        500: "INTERNAL_SERVER_ERROR",
+    }
+    err_code = code_map.get(status_code, "INTERNAL_SERVER_ERROR")
+
+    if isinstance(exc.detail, dict) and "error" in exc.detail:
+        payload = exc.detail
+    else:
+        payload = _error_payload(err_code, str(exc.detail), None)
+
+    return JSONResponse(status_code=status_code, content=payload)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Pydantic validation errors
+    return JSONResponse(
+        status_code=400,
+        content=_error_payload(
+            "VALIDATION_ERROR",
+            "Request validation failed",
+            details=exc.errors(),
+        ),
+    )
 
 #  CORS must come first
 app.add_middleware(
