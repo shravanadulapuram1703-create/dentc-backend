@@ -1,4 +1,8 @@
 from app.models.user import User
+from sqlalchemy.orm import Session
+from app.models.user_role import UserRole
+from app.models.role_permission import RolePermission
+
 import logging
 from app.core.logging import setup_logging
 logger = setup_logging()
@@ -36,3 +40,34 @@ def user_has_permission(user, permission_code: str) -> bool:
         extra={"permission": permission_code}
     )
     return False
+
+
+
+
+
+
+def get_user_permissions(
+    db: Session,
+    *,
+    user_id: int,
+    tenant_id: int,
+    office_id: int | None
+) -> set[str]:
+    """
+    Resolve effective permissions for a user in a given tenant + office context
+    """
+
+    query = (
+        db.query(RolePermission.permission)
+        .join(UserRole, UserRole.role_id == RolePermission.role_id)
+        .filter(
+            UserRole.user_id == user_id,
+            UserRole.tenant_id == tenant_id,
+        )
+    )
+
+    if office_id:
+        query = query.filter(UserRole.office_id == office_id)
+
+    permissions = {row.permission for row in query.all()}
+    return permissions

@@ -1,0 +1,47 @@
+# from enum import Enum
+
+# class Permission(str, Enum):
+#     USER_CREATE = "user:create"
+#     USER_UPDATE = "user:update"
+#     USER_DEACTIVATE = "user:deactivate"
+#     USER_ASSIGN_ROLE = "user:assign_role"
+
+#     OFFICE_ASSIGN = "office:assign"
+#     OFFICE_REMOVE = "office:remove"
+
+#     AUDIT_VIEW = "audit:view"
+
+#     PATIENT_READ = "patient:read"
+#     PATIENT_WRITE = "patient:write"
+
+
+from enum import Enum
+
+
+class Permission(str, Enum):
+    PATIENT_VIEW = "PATIENT_VIEW"
+    PATIENT_EDIT = "PATIENT_EDIT"
+    PATIENT_DELETE = "PATIENT_DELETE"
+
+    APPT_CREATE = "APPT_CREATE"
+    APPT_RESCHEDULE = "APPT_RESCHEDULE"
+    APPT_CANCEL = "APPT_CANCEL"
+    APPT_OVERRIDE = "APPT_OVERRIDE"
+
+    CLINICAL_NOTE_CREATE = "CLINICAL_NOTE_CREATE"
+    CLINICAL_NOTE_VIEW = "CLINICAL_NOTE_VIEW"
+    CLINICAL_NOTE_SIGN = "CLINICAL_NOTE_SIGN"
+    IMAGING_UPLOAD = "IMAGING_UPLOAD"
+
+    BILLING_VIEW = "BILLING_VIEW"
+    BILLING_EDIT = "BILLING_EDIT"
+    PAYMENT_COLLECT = "PAYMENT_COLLECT"
+    REFUND_APPROVE = "REFUND_APPROVE"
+
+    CLAIM_SUBMIT = "CLAIM_SUBMIT"
+    CLAIM_RESUBMIT = "CLAIM_RESUBMIT"
+    PREAUTH_REQUEST = "PREAUTH_REQUEST"
+
+    USER_MANAGE = "USER_MANAGE"
+    ROLE_ASSIGN = "ROLE_ASSIGN"
+    FEE_CONFIG = "FEE_CONFIG"

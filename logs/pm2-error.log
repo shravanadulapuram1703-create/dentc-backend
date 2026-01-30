@@ -1,0 +1,456 @@
+2026-01-27T13:10:19: Traceback (most recent call last):
+2026-01-27T13:10:19:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:19:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:19:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:19:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:19:     from gunicorn.app.base import Application
+2026-01-27T13:10:19:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:19:     
+2026-01-27T13:10:19: from gunicorn import util
+2026-01-27T13:10:19: 
+2026-01-27T13:10:19:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:19:     import fcntl
+2026-01-27T13:10:19: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:20: Traceback (most recent call last):
+2026-01-27T13:10:20:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:20:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:20:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:20:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:20:     from gunicorn.app.base import Application
+2026-01-27T13:10:20:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:20:     from gunicorn import util
+2026-01-27T13:10:20:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:20:     import fcntl
+2026-01-27T13:10:20: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:20: Traceback (most recent call last):
+2026-01-27T13:10:20:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:20:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:20:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:20:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:20:     from gunicorn.app.base import Application
+2026-01-27T13:10:20:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:20:     from gunicorn import util
+2026-01-27T13:10:20:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:20:     
+2026-01-27T13:10:20: import fcntl
+2026-01-27T13:10:20: 
+2026-01-27T13:10:20: ModuleNotFoundError
+2026-01-27T13:10:20: : 
+2026-01-27T13:10:20: No module named 'fcntl'
+2026-01-27T13:10:21: Traceback (most recent call last):
+2026-01-27T13:10:21:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:21:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:21:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:21:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:21:     from gunicorn.app.base import Application
+2026-01-27T13:10:21:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:21:     from gunicorn import util
+2026-01-27T13:10:21:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:21:     import fcntl
+2026-01-27T13:10:21: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:21: Traceback (most recent call last):
+2026-01-27T13:10:21:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:21:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:21:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:21:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:21:     from gunicorn.app.base import Application
+2026-01-27T13:10:21:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:21:     from gunicorn import util
+2026-01-27T13:10:21:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:21:     import fcntl
+2026-01-27T13:10:21: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:21: Traceback (most recent call last):
+2026-01-27T13:10:21:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:21:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:21:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:21:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:21:     from gunicorn.app.base import Application
+2026-01-27T13:10:21:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:21:     from gunicorn import util
+2026-01-27T13:10:21:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:21:     import fcntl
+2026-01-27T13:10:21: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:22: Traceback (most recent call last):
+2026-01-27T13:10:22:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:22:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:22:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:22:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:22:     from gunicorn.app.base import Application
+2026-01-27T13:10:22:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:22:     from gunicorn import util
+2026-01-27T13:10:22:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:22:     import fcntl
+2026-01-27T13:10:22: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:22: Traceback (most recent call last):
+2026-01-27T13:10:22:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:22:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:22:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:22:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:22:     from gunicorn.app.base import Application
+2026-01-27T13:10:22:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:22:     from gunicorn import util
+2026-01-27T13:10:22:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:22:     import fcntl
+2026-01-27T13:10:22: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:23: Traceback (most recent call last):
+2026-01-27T13:10:23:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:23:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:23:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:23:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:23:     from gunicorn.app.base import Application
+2026-01-27T13:10:23:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:23:     from gunicorn import util
+2026-01-27T13:10:23:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:23:     import fcntl
+2026-01-27T13:10:23: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:23: Traceback (most recent call last):
+2026-01-27T13:10:23:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:23:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:23:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:23:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:23:     from gunicorn.app.base import Application
+2026-01-27T13:10:23:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:23:     from gunicorn import util
+2026-01-27T13:10:23:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:23:     import fcntl
+2026-01-27T13:10:23: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:24: Traceback (most recent call last):
+2026-01-27T13:10:24:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:24:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:24:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:24:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:24:     from gunicorn.app.base import Application
+2026-01-27T13:10:24:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:24:     from gunicorn import util
+2026-01-27T13:10:24:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:24:     import fcntl
+2026-01-27T13:10:24: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:24: Traceback (most recent call last):
+2026-01-27T13:10:24:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:24:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:24:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:24:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:24:     from gunicorn.app.base import Application
+2026-01-27T13:10:24:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:24:     from gunicorn import util
+2026-01-27T13:10:24:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:24:     import fcntl
+2026-01-27T13:10:24: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:24: Traceback (most recent call last):
+2026-01-27T13:10:24:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:24:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:24:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:24:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:24:     from gunicorn.app.base import Application
+2026-01-27T13:10:24:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:24:     from gunicorn import util
+2026-01-27T13:10:24:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:24:     import fcntl
+2026-01-27T13:10:24: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:25: Traceback (most recent call last):
+2026-01-27T13:10:25:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:25:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:25:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:25:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:25: 
+2026-01-27T13:10:25:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:25:     from gunicorn import util
+2026-01-27T13:10:25:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:25:     import fcntl
+2026-01-27T13:10:25: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:25: Traceback (most recent call last):
+2026-01-27T13:10:25:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:25:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:25:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:25:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:25:     from gunicorn.app.base import Application
+2026-01-27T13:10:25:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:25: from gunicorn import util
+2026-01-27T13:10:25:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:25:     import fcntl
+2026-01-27T13:10:25: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:25: Traceback (most recent call last):
+2026-01-27T13:10:25:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:25:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:25:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:25:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:25:     from gunicorn.app.base import Application
+2026-01-27T13:10:25:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:25:     from gunicorn import util
+2026-01-27T13:10:25:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:25:     import fcntl
+2026-01-27T13:10:25: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:26: Traceback (most recent call last):
+2026-01-27T13:10:26:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:26:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:26:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:26:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:26:     from gunicorn.app.base import Application
+2026-01-27T13:10:26:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:26:     from gunicorn import util
+2026-01-27T13:10:26:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:26:     import fcntl
+2026-01-27T13:10:26: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:38: Traceback (most recent call last):
+2026-01-27T13:10:38:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:38:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:38:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:38:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:38:     from gunicorn.app.base import Application
+2026-01-27T13:10:38:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:38:     from gunicorn import util
+2026-01-27T13:10:38:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:38:     import fcntl
+2026-01-27T13:10:38: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:38: Traceback (most recent call last):
+2026-01-27T13:10:38:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:38:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:38:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:38:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:38:     from gunicorn.app.base import Application
+2026-01-27T13:10:38:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:38:     from gunicorn import util
+2026-01-27T13:10:38:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:38:     import fcntl
+2026-01-27T13:10:38: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:39: Traceback (most recent call last):
+2026-01-27T13:10:39:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:39:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:39:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:39:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:39:     from gunicorn.app.base import Application
+2026-01-27T13:10:39:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:39:     from gunicorn import util
+2026-01-27T13:10:39:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:39:     import fcntl
+2026-01-27T13:10:39: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:39: Traceback (most recent call last):
+2026-01-27T13:10:39:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:39:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:39:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:39:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:39:     from gunicorn.app.base import Application
+2026-01-27T13:10:39:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:39:     from gunicorn import util
+2026-01-27T13:10:39:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:39:     import fcntl
+2026-01-27T13:10:39: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:39: Traceback (most recent call last):
+2026-01-27T13:10:39:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:39:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:39:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:39:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:39:     from gunicorn.app.base import Application
+2026-01-27T13:10:39:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:39:     from gunicorn import util
+2026-01-27T13:10:39:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:39:     import fcntl
+2026-01-27T13:10:39: No module named 'fcntl'
+2026-01-27T13:10:40: Traceback (most recent call last):
+2026-01-27T13:10:40:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:40:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:40:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:40:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:40:     from gunicorn.app.base import Application
+2026-01-27T13:10:40:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:40:     from gunicorn import util
+2026-01-27T13:10:40:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:40:     import fcntl
+2026-01-27T13:10:40: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:40: Traceback (most recent call last):
+2026-01-27T13:10:40:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:40:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:40:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:40:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:40:     from gunicorn.app.base import Application
+2026-01-27T13:10:40:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:40:     from gunicorn import util
+2026-01-27T13:10:40:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:40:     import fcntl
+2026-01-27T13:10:40: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:40: Traceback (most recent call last):
+2026-01-27T13:10:40:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:40:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:40:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:40:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:40:     from gunicorn.app.base import Application
+2026-01-27T13:10:40:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:40:     from gunicorn import util
+2026-01-27T13:10:40:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:40:     import fcntl
+2026-01-27T13:10:40: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:41: Traceback (most recent call last):
+2026-01-27T13:10:41:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:41:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:41:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:41:     from gunicorn.app.base import Application
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:41:     from gunicorn import util
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:41:     import fcntl
+2026-01-27T13:10:41: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:41: Traceback (most recent call last):
+2026-01-27T13:10:41:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:41:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:41:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:41:     from gunicorn.app.base import Application
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:41: 
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:41:     import fcntl
+2026-01-27T13:10:41: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:41: Traceback (most recent call last):
+2026-01-27T13:10:41:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:41:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:41:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:41:     from gunicorn.app.base import Application
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:41:     from gunicorn import util
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:41:     import fcntl
+2026-01-27T13:10:41: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:41: Traceback (most recent call last):
+2026-01-27T13:10:41:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:41:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:41:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:41:     from gunicorn.app.base import Application
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:41:     from gunicorn import util
+2026-01-27T13:10:41:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:41:     import fcntl
+2026-01-27T13:10:41: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:42: Traceback (most recent call last):
+2026-01-27T13:10:42:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:42:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:42:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:42:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:42:     from gunicorn.app.base import Application
+2026-01-27T13:10:42:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:42:     from gunicorn import util
+2026-01-27T13:10:42:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:42:     import fcntl
+2026-01-27T13:10:42: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:42: Traceback (most recent call last):
+2026-01-27T13:10:42:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:42:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:42:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:42:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:42:     from gunicorn.app.base import Application
+2026-01-27T13:10:42:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:42:     from gunicorn import util
+2026-01-27T13:10:42:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:42:     import fcntl
+2026-01-27T13:10:42: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:42: Traceback (most recent call last):
+2026-01-27T13:10:42:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:42:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:42:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:42:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:42:     from gunicorn.app.base import Application
+2026-01-27T13:10:42:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:42:     from gunicorn import util
+2026-01-27T13:10:42:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:42:     import fcntl
+2026-01-27T13:10:42: ModuleNotFoundError: No module named 'fcntl'
+2026-01-27T13:10:43: Traceback (most recent call last):
+2026-01-27T13:10:43:   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-01-27T13:10:43:   File "<frozen runpy>", line 88, in _run_code
+2026-01-27T13:10:43:   File "C:\USERS\SRAVAN\DESKTOP\DENTC-BACKEND\DENTC-ENV\SCRIPTS\GUNICORN.EXE\__main__.py", line 4, in <module>
+2026-01-27T13:10:43:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\wsgiapp.py", line 8, in <module>
+2026-01-27T13:10:43:     from gunicorn.app.base import Application
+2026-01-27T13:10:43:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\app\base.py", line 10, in <module>
+2026-01-27T13:10:43:     from gunicorn import util
+2026-01-27T13:10:43:   File "C:\Users\Sravan\Desktop\dentc-backend\dentc-env\Lib\site-packages\gunicorn\util.py", line 7, in <module>
+2026-01-27T13:10:43:     import fcntl
+2026-01-27T13:10:43: ModuleNotFoundError: No module named 'fcntl'
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2422999] [INFO] Starting gunicorn 24.1.1
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2422999] [INFO] Starting DentC Backend server
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2422999] [INFO] Listening at: http://0.0.0.0:8000 (2422999)
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2422999] [INFO] Using worker: uvicorn.workers.UvicornWorker
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2422999] [INFO] DentC Backend server is ready. Spawning workers
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423022] [INFO] Booting worker with pid: 2423022
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423022] [INFO] Worker spawned (pid: 2423022)
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423022] [INFO] Worker initialized (pid: 2423022)
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423023] [INFO] Booting worker with pid: 2423023
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423023] [INFO] Worker spawned (pid: 2423023)
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423023] [INFO] Worker initialized (pid: 2423023)
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423022] [INFO] Started server process [2423022]
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423022] [INFO] Waiting for application startup.
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423022] [INFO] Application startup complete.
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423025] [INFO] Booting worker with pid: 2423025
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423025] [INFO] Worker spawned (pid: 2423025)
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423025] [INFO] Worker initialized (pid: 2423025)
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423027] [INFO] Booting worker with pid: 2423027
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423027] [INFO] Worker spawned (pid: 2423027)
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423023] [INFO] Started server process [2423023]
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423023] [INFO] Waiting for application startup.
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423023] [INFO] Application startup complete.
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423027] [INFO] Worker initialized (pid: 2423027)
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423025] [INFO] Started server process [2423025]
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423025] [INFO] Waiting for application startup.
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423025] [INFO] Application startup complete.
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423027] [INFO] Started server process [2423027]
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423027] [INFO] Waiting for application startup.
+2026-01-30T01:17:08: [2026-01-30 01:17:08 +0000] [2423027] [INFO] Application startup complete.
+2026-01-30T01:27:49: [2026-01-30 01:27:49 +0000] [2422999] [INFO] Handling signal: int
+2026-01-30T01:27:49: [2026-01-30 01:27:49 +0000] [2423027] [INFO] Shutting down
+2026-01-30T01:27:49: [2026-01-30 01:27:49 +0000] [2423027] [INFO] Error while closing socket [Errno 9] Bad file descriptor
+2026-01-30T01:27:49: [2026-01-30 01:27:49 +0000] [2423025] [INFO] Shutting down
+2026-01-30T01:27:49: [2026-01-30 01:27:49 +0000] [2423025] [INFO] Error while closing socket [Errno 9] Bad file descriptor
+2026-01-30T01:27:49: [2026-01-30 01:27:49 +0000] [2423022] [INFO] Shutting down
+2026-01-30T01:27:49: [2026-01-30 01:27:49 +0000] [2423022] [INFO] Error while closing socket [Errno 9] Bad file descriptor
+2026-01-30T01:27:49: [2026-01-30 01:27:49 +0000] [2423023] [INFO] Shutting down
+2026-01-30T01:27:49: [2026-01-30 01:27:49 +0000] [2423023] [INFO] Error while closing socket [Errno 9] Bad file descriptor
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423027] [INFO] Waiting for application shutdown.
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423027] [INFO] Application shutdown complete.
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423027] [INFO] Finished server process [2423027]
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423025] [INFO] Waiting for application shutdown.
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423025] [INFO] Application shutdown complete.
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423025] [INFO] Finished server process [2423025]
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423022] [INFO] Waiting for application shutdown.
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423022] [INFO] Application shutdown complete.
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423022] [INFO] Finished server process [2423022]
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423023] [INFO] Waiting for application shutdown.
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423023] [INFO] Application shutdown complete.
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2423023] [INFO] Finished server process [2423023]
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2422999] [WARNING] Worker (pid:2423022) was sent SIGINT!
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2422999] [WARNING] Worker (pid:2423023) was sent SIGINT!
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2422999] [WARNING] Worker (pid:2423025) was sent SIGINT!
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2422999] [WARNING] Worker (pid:2423027) was sent SIGINT!
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2422999] [INFO] Shutting down: Master
+2026-01-30T01:27:50: [2026-01-30 01:27:50 +0000] [2422999] [INFO] Shutting down: Master
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424280] [INFO] Starting gunicorn 24.1.1
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424280] [INFO] Starting DentC Backend server
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424280] [INFO] Listening at: http://0.0.0.0:8000 (2424280)
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424280] [INFO] Using worker: uvicorn.workers.UvicornWorker
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424280] [INFO] DentC Backend server is ready. Spawning workers
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424720] [INFO] Booting worker with pid: 2424720
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424720] [INFO] Worker spawned (pid: 2424720)
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424720] [INFO] Worker initialized (pid: 2424720)
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424720] [INFO] Started server process [2424720]
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424720] [INFO] Waiting for application startup.
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424720] [INFO] Application startup complete.
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424723] [INFO] Booting worker with pid: 2424723
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424723] [INFO] Worker spawned (pid: 2424723)
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424723] [INFO] Worker initialized (pid: 2424723)
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424723] [INFO] Started server process [2424723]
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424723] [INFO] Waiting for application startup.
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424723] [INFO] Application startup complete.
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424725] [INFO] Booting worker with pid: 2424725
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424725] [INFO] Worker spawned (pid: 2424725)
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424725] [INFO] Worker initialized (pid: 2424725)
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424725] [INFO] Started server process [2424725]
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424725] [INFO] Waiting for application startup.
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424725] [INFO] Application startup complete.
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424727] [INFO] Booting worker with pid: 2424727
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424727] [INFO] Worker spawned (pid: 2424727)
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424727] [INFO] Worker initialized (pid: 2424727)
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424727] [INFO] Started server process [2424727]
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424727] [INFO] Waiting for application startup.
+2026-01-30T01:34:41: [2026-01-30 01:34:41 +0000] [2424727] [INFO] Application startup complete.
+2026-01-30T01:35:00: [2026-01-30 01:35:00 +0000] [2424720] [WARNING] Invalid HTTP request received.
+2026-01-30T01:35:00: [2026-01-30 01:35:00 +0000] [2424720] [WARNING] Invalid HTTP request received.

@@ -1,0 +1,287 @@
+-- public.user_offices definition
+
+-- Drop table
+
+-- DROP TABLE public.user_offices;
+
+CREATE TABLE public.user_offices (
+	id serial4 NOT NULL,
+	user_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	role_id int4 NULL,
+	is_primary bool DEFAULT false NULL,
+	is_active bool DEFAULT true NULL,
+	created_at timestamp DEFAULT now() NULL,
+	CONSTRAINT user_offices_pkey PRIMARY KEY (id),
+	CONSTRAINT user_offices_user_id_office_id_key UNIQUE (user_id, office_id)
+);
+CREATE UNIQUE INDEX uq_user_single_home_office ON public.user_offices USING btree (user_id) WHERE (is_primary = true);
+
+
+-- public.user_offices foreign keys
+
+ALTER TABLE public.user_offices ADD CONSTRAINT user_offices_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id) ON DELETE CASCADE;
+ALTER TABLE public.user_offices ADD CONSTRAINT user_offices_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id);
+ALTER TABLE public.user_offices ADD CONSTRAINT user_offices_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+
+-- public.offices definition
+
+-- Drop table
+
+-- DROP TABLE public.offices;
+
+CREATE TABLE public.offices ( id serial4 NOT NULL, tenant_id int4 NULL, office_name varchar(255) NULL, timezone varchar(50) NULL, office_code varchar(20) NOT NULL, address_line1 varchar(255) NULL, city varchar(100) NULL, state varchar(50) NULL, zip varchar(20) NULL, phone1 varchar(20) NULL, phone2 varchar(20) NULL, fax varchar(20) NULL, email varchar(255) NULL, is_active bool DEFAULT true NULL, created_at timestamp DEFAULT now() NULL, updated_at timestamp DEFAULT now() NULL, CONSTRAINT offices_office_code_key UNIQUE (office_code), CONSTRAINT offices_pkey PRIMARY KEY (id));
+
+
+-- public.offices foreign keys
+
+ALTER TABLE public.offices ADD CONSTRAINT offices_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+
+-- public.office_statements definition
+
+-- Drop table
+
+-- DROP TABLE public.office_statements;
+
+CREATE TABLE public.office_statements ( office_id int4 NOT NULL, general_message text NULL, current_message text NULL, msg_30_day text NULL, msg_60_day text NULL, msg_90_day text NULL, msg_120_day text NULL, correspondence_name varchar(255) NULL, statement_address varchar(255) NULL, statement_city_state_zip varchar(255) NULL, statement_phone varchar(20) NULL, logo_url text NULL, CONSTRAINT office_statements_pkey PRIMARY KEY (office_id));
+
+
+-- public.office_statements foreign keys
+
+ALTER TABLE public.office_statements ADD CONSTRAINT office_statements_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+
+-- public.office_smartassist_items definition
+
+-- Drop table
+
+-- DROP TABLE public.office_smartassist_items;
+
+CREATE TABLE public.office_smartassist_items ( id serial4 NOT NULL, office_id int4 NULL, item_code varchar(50) NULL, frequency varchar(50) NULL, sms_template text NULL, is_enabled bool DEFAULT true NULL, CONSTRAINT office_smartassist_items_pkey PRIMARY KEY (id));
+
+
+-- public.office_smartassist_items foreign keys
+
+ALTER TABLE public.office_smartassist_items ADD CONSTRAINT office_smartassist_items_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+
+-- public.office_smartassist definition
+
+-- Drop table
+
+-- DROP TABLE public.office_smartassist;
+
+CREATE TABLE public.office_smartassist ( office_id int4 NOT NULL, enabled bool DEFAULT false NULL, CONSTRAINT office_smartassist_pkey PRIMARY KEY (office_id));
+
+
+-- public.office_smartassist foreign keys
+
+ALTER TABLE public.office_smartassist ADD CONSTRAINT office_smartassist_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+-- public.office_schedules definition
+
+-- Drop table
+
+-- DROP TABLE public.office_schedules;
+
+CREATE TABLE public.office_schedules ( id int4 DEFAULT nextval('office_schedule_id_seq'::regclass) NOT NULL, office_id int4 NULL, day_of_week int4 NULL, start_time time NULL, end_time time NULL, lunch_start time NULL, lunch_end time NULL, day_start time NULL, day_end time NULL, CONSTRAINT office_schedule_pkey PRIMARY KEY (id));
+
+
+-- public.office_schedules foreign keys
+
+ALTER TABLE public.office_schedules ADD CONSTRAINT office_schedule_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+
+
+-- public.office_roles definition
+
+-- Drop table
+
+-- DROP TABLE public.office_roles;
+
+CREATE TABLE public.office_roles ( id serial4 NOT NULL, tenant_id int4 NOT NULL, office_id int4 NOT NULL, "name" varchar(100) NOT NULL, "level" int4 NOT NULL, is_system bool DEFAULT false NULL, CONSTRAINT office_roles_pkey PRIMARY KEY (id));
+
+
+-- public.office_roles foreign keys
+
+ALTER TABLE public.office_roles ADD CONSTRAINT office_roles_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_roles ADD CONSTRAINT office_roles_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_role_permissions definition
+
+-- Drop table
+
+-- DROP TABLE public.office_role_permissions;
+
+CREATE TABLE public.office_role_permissions ( role_id int4 NOT NULL, permission_id int4 NOT NULL, office_id int4 NULL, CONSTRAINT office_role_permissions_pkey PRIMARY KEY (role_id, permission_id));
+
+
+-- public.office_role_permissions foreign keys
+
+ALTER TABLE public.office_role_permissions ADD CONSTRAINT office_role_permissions_permission_id_fkey FOREIGN KEY (permission_id) REFERENCES public.office_permissions(id) ON DELETE CASCADE;
+ALTER TABLE public.office_role_permissions ADD CONSTRAINT office_role_permissions_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.office_roles(id) ON DELETE CASCADE;
+
+
+
+-- public.office_permissions definition
+
+-- Drop table
+
+-- DROP TABLE public.office_permissions;
+
+CREATE TABLE public.office_permissions ( id serial4 NOT NULL, code varchar(100) NOT NULL, description text NULL, "module" varchar(50) NULL, "action" varchar(50) NULL, CONSTRAINT office_permissions_code_key UNIQUE (code), CONSTRAINT office_permissions_pkey PRIMARY KEY (id));
+
+-- public.office_other_info definition
+
+-- Drop table
+
+-- DROP TABLE public.office_other_info;
+
+CREATE TABLE public.office_other_info ( office_id int4 NOT NULL, tax_id varchar(50) NULL, insurance_billing_provider varchar(255) NULL, billing_license_type varchar(100) NULL, opening_date date NULL, office_group varchar(100) NULL, default_ucr_fee_schedule varchar(100) NULL, default_fee_schedule varchar(100) NULL, scheduler_interval_minutes int4 DEFAULT 10 NULL, CONSTRAINT office_other_info_pkey PRIMARY KEY (office_id));
+
+
+-- public.office_other_info foreign keys
+
+ALTER TABLE public.office_other_info ADD CONSTRAINT office_other_info_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+
+
+-- public.office_integrations definition
+
+-- Drop table
+
+-- DROP TABLE public.office_integrations;
+
+CREATE TABLE public.office_integrations ( id serial4 NOT NULL, office_id int4 NULL, eclaim_type varchar(50) NULL, edi_username varchar(100) NULL, edi_password text NULL, imaging_system_1 varchar(100) NULL, imaging_system_2 varchar(100) NULL, imaging_system_3 varchar(100) NULL, text_phone varchar(20) NULL, transactional_email varchar(255) NULL, created_at timestamp DEFAULT now() NULL, imaging_mode_1 varchar(50) NULL, imaging_mode_2 varchar(50) NULL, imaging_mode_3 varchar(50) NULL, CONSTRAINT office_integrations_pkey PRIMARY KEY (id));
+
+
+-- public.office_integrations foreign keys
+
+ALTER TABLE public.office_integrations ADD CONSTRAINT office_integrations_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+
+-- public.office_holidays definition
+
+-- Drop table
+
+-- DROP TABLE public.office_holidays;
+
+CREATE TABLE public.office_holidays ( id serial4 NOT NULL, office_id int4 NULL, holiday_date date NULL, description varchar(255) NULL, CONSTRAINT office_holidays_pkey PRIMARY KEY (id));
+
+
+-- public.office_holidays foreign keys
+
+ALTER TABLE public.office_holidays ADD CONSTRAINT office_holidays_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+
+
+-- public.office_advanced_settings definition
+
+-- Drop table
+
+-- DROP TABLE public.office_advanced_settings;
+
+CREATE TABLE public.office_advanced_settings ( office_id int4 NOT NULL, annual_fin_charge numeric(5, 2) NULL, min_balance numeric(10, 2) NULL, min_fin_charge numeric(10, 2) NULL, days_before_fin_charge int4 NULL, sales_tax numeric(5, 2) NULL, search_patients_all_offices bool NULL, insurance_group varchar(100) NULL, scheduler_end_date date NULL, CONSTRAINT office_advanced_settings_pkey PRIMARY KEY (office_id));
+
+
+-- public.office_advanced_settings foreign keys
+
+ALTER TABLE public.office_advanced_settings ADD CONSTRAINT office_advanced_settings_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+
+
+
+#########################################################
+
+CREATE TABLE public.office_operatories (
+    id serial4 PRIMARY KEY,
+    office_id int4 NOT NULL,
+    name varchar(100) NOT NULL,
+    display_order int4 NOT NULL,
+    is_active bool DEFAULT true,
+    has_future_appointments bool DEFAULT false,
+    created_at timestamp DEFAULT now(),
+    CONSTRAINT office_operatories_office_id_fkey
+        FOREIGN KEY (office_id) REFERENCES public.offices(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_operatories_office_id
+ON public.office_operatories (office_id);
+
+CREATE TABLE public.office_payment_methods (
+    id serial4 PRIMARY KEY,
+    office_id int4 NOT NULL,
+    card_type varchar(50) NOT NULL,
+    is_active bool DEFAULT true,
+    CONSTRAINT uq_office_card UNIQUE (office_id, card_type),
+    CONSTRAINT office_payment_methods_office_id_fkey
+        FOREIGN KEY (office_id) REFERENCES public.offices(id) ON DELETE CASCADE
+);
+
+
+ALTER TABLE public.office_schedules
+ADD COLUMN is_closed bool DEFAULT false;
+
+
+ALTER TABLE public.office_smartassist_items
+ADD COLUMN include_balance bool DEFAULT false,
+ADD COLUMN template_name varchar(100) NULL;
+
+
+
+CREATE TABLE public.office_collections (
+    office_id int4 PRIMARY KEY,
+    accelerator_account varchar(100),
+    collections_account varchar(100),
+    user_id varchar(100),
+    password text,
+    aging_days int4,
+    CONSTRAINT office_collections_office_id_fkey
+        FOREIGN KEY (office_id) REFERENCES public.offices(id) ON DELETE CASCADE
+);
+
+
+
+CREATE TABLE public.office_imaging_systems (
+    id serial4 PRIMARY KEY,
+    office_id int4 NOT NULL,
+    system_name varchar(100),
+    link_type varchar(50),
+    mode varchar(50),
+    display_order int4,
+    CONSTRAINT office_imaging_systems_office_id_fkey
+        FOREIGN KEY (office_id) REFERENCES public.offices(id) ON DELETE CASCADE
+);
+
+
+
+CREATE TABLE public.office_patient_urls (
+    office_id int4 PRIMARY KEY,
+    forms_url text,
+    scheduling_url text,
+    financing_url text,
+    custom_url_1 text,
+    custom_url_2 text,
+    CONSTRAINT office_patient_urls_office_id_fkey
+        FOREIGN KEY (office_id) REFERENCES public.offices(id) ON DELETE CASCADE
+);
+
+
+
+
+ALTER TABLE public.office_integrations
+ADD COLUMN text_verified bool DEFAULT false;
+
+
+
+
+ALTER TABLE public.office_statements
+ADD COLUMN statement_city varchar(100),
+ADD COLUMN statement_state varchar(50),
+ADD COLUMN statement_zip varchar(20);
+
+

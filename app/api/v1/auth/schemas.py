@@ -1,11 +1,18 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+
+
+# class LoginRequest(BaseModel):
+#     email: EmailStr
+#     password: str
+#     # tenant_id: int = 1
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    identifier: str = Field(
+        ...,
+        description="Email address or username"
+    )
     password: str
-    tenant_id: int = 1
-
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -25,7 +32,7 @@ class TokenPairResponse(BaseModel):
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str
-    tenant_id: int = "1"
+    # tenant_id: int = "1"
 
 
 class SignupResponse(BaseModel):
