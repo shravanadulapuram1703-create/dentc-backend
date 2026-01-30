@@ -84,9 +84,9 @@ def pre_exec(server):
     """Called just before a new master process is forked."""
     server.log.info("Forking new master process")
 
-def when_ready(server):
-    """Called just after the server is started."""
-    server.log.info("Server is ready. Spawning workers")
+# def when_ready(server):
+#     """Called just after the server is started."""
+#     server.log.info("Server is ready. Spawning workers")
 
 def on_exit(server):
     """Called just before exiting."""
