@@ -27,6 +27,7 @@ except ImportError as e:
     # Runnable is already set to Any above, so no need to redefine
 
 from app.api.v1.ai_chat.state import ConversationState
+from app.api.v1.ai_chat.guides import search_guides, get_guide_by_id, get_all_guides
 from app.api.v1.scheduler.services import (
     create_appointment,
     update_appointment,
@@ -272,6 +273,57 @@ class SchedulerAgent:
                 logger.error(f"Error deleting appointment: {e}")
                 return f"Error deleting appointment: {str(e)}"
         
+        def get_task_guide_tool(query: str) -> str:
+            """Tool to get step-by-step guide for performing a task in the system. Use this when user asks 'how to' questions or wants instructions on how to do something."""
+            try:
+                logger.info(f"[TOOL] get_task_guide_tool called with query: '{query}'")
+                
+                # Handle JSON wrapping
+                search_query = query
+                try:
+                    data = json.loads(query)
+                    if "__arg1" in data and isinstance(data["__arg1"], str):
+                        search_query = data["__arg1"]
+                    elif isinstance(data, dict) and "query" in data:
+                        search_query = data["query"]
+                    elif isinstance(data, str):
+                        search_query = data
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    # Not JSON, use query as-is
+                    pass
+                
+                logger.info(f"[TOOL] Searching guides with query: '{search_query}'")
+                
+                # Search for matching guides
+                guides = search_guides(search_query)
+                
+                if not guides:
+                    # If no matches, try to get all guides and suggest some
+                    all_guides = get_all_guides()
+                    if all_guides:
+                        available_tasks = "\n".join([f"  - {g.title}" for g in all_guides[:10]])
+                        return f"I couldn't find a specific guide for '{search_query}'. Here are some available guides:\n\n{available_tasks}\n\nTry asking about one of these tasks, or rephrase your question."
+                    else:
+                        return f"I couldn't find a guide for '{search_query}'. Please try rephrasing your question or ask about a specific task like 'how to add a procedure' or 'how to create an appointment'."
+                
+                # If multiple matches, return the most relevant one or list them
+                if len(guides) == 1:
+                    guide = guides[0]
+                    logger.info(f"[TOOL] Found guide: {guide.task_id} - {guide.title}")
+                    return guide.format_for_response()
+                else:
+                    # Multiple matches - return the first one with a note about others
+                    guide = guides[0]
+                    other_guides = "\n".join([f"  - {g.title}" for g in guides[1:5]])
+                    response = guide.format_for_response()
+                    if other_guides:
+                        response += f"\n\n**Other related guides:**\n{other_guides}"
+                    return response
+            
+            except Exception as e:
+                logger.error(f"Error getting task guide: {e}", exc_info=True)
+                return f"Error retrieving guide: {str(e)}"
+        
         return [
             Tool(
                 name="create_appointment",
@@ -292,6 +344,11 @@ class SchedulerAgent:
                 name="delete_appointment",
                 func=delete_appointment_tool,
                 description="Delete or cancel an appointment. Input: appointment_id as integer."
+            ),
+            Tool(
+                name="get_task_guide",
+                func=get_task_guide_tool,
+                description="Get step-by-step instructions for how to perform a task in the dental practice management system. Use this tool when the user asks 'how to' questions, wants instructions, or needs guidance on performing a specific task. Examples: 'how to add a procedure', 'how to create a claim', 'how to add a payment', 'how to create an appointment', 'how to search for patients'. Input: A search query string describing the task (e.g., 'add procedure to ledger', 'create claim', 'new patient')."
             ),
         ]
     
@@ -668,9 +725,22 @@ class SchedulerAgent:
                 system_msg = f"""You are a helpful AI assistant for a dental practice management system.
 
                                 You have access to external tools (functions) for:
-                                - create_appointment
-                                - update_appointment
-                                - delete_appointment
+                                - create_appointment: Create new appointments
+                                - update_appointment: Update existing appointments
+                                - delete_appointment: Delete/cancel appointments
+                                - get_appointment: Get appointment details
+                                - get_task_guide: Get step-by-step instructions for how to perform tasks in the system
+
+                                IMPORTANT: When users ask "how to" questions or want instructions on performing a task, you MUST use the get_task_guide tool.
+                                Examples of when to use get_task_guide:
+                                - "How do I add a procedure to a patient's ledger?"
+                                - "How to create a claim?"
+                                - "Show me how to add a payment"
+                                - "I need help creating an appointment"
+                                - "How do I search for patients?"
+                                - Any question asking for step-by-step instructions or guidance
+
+                                For "how to" questions, call get_task_guide with a search query describing the task, then present the guide to the user in a friendly, helpful manner.
 
                                 AVAILABLE OPTIONS (CRITICAL - You MUST use these exact values):
                                 
