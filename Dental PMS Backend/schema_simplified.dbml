@@ -1,0 +1,433 @@
+// ============================================================
+//  DENTAL PMS — SIMPLIFIED MVP SCHEMA
+//  17 tables (down from 60+)
+//  Designed to be workable now, scalable later.
+//
+//  WHAT WAS REMOVED (and why):
+//  - Complex RBAC (office_roles, permissions tables) → just role field on users
+//  - Patient satellite tables merged into patients
+//  - Double-entry ledger → replaced by simple payment + procedure tables
+//  - Reference/lookup tables (genders, titles, states...) → plain varchar fields
+//  - Audit logs, impersonation, IP rules → add in Phase 2
+//  - Smart assist, campaigns, imaging, EDI → Phase 2+
+//  - Time clock → Phase 2
+//  - Office config sub-tables → key fields merged into offices
+//  - Archive/backup tables → removed entirely
+//  - Duplicate tables resolved (refresh_tokens, operatories, providers)
+//  - Treatment plan phases → flattened to plan_items with priority (add phases in Phase 2)
+// ============================================================
+
+
+// ============================================================
+// SECTION 1 — TENANCY & AUTH
+// ============================================================
+
+Table tenants {
+  id            serial        [pk]
+  name          varchar(255)  [not null]
+  code          varchar(80)   [unique, not null, note: 'e.g. CLINIC-001']
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+}
+
+Table users {
+  id              serial        [pk]
+  tenant_id       int           [not null, ref: > tenants.id]
+  email           varchar(255)  [unique, not null]
+  username        varchar(50)   [unique, not null]
+  password_hash   text          [not null]
+  first_name      varchar(100)
+  last_name       varchar(100)
+  phone           varchar(20)
+
+  // Simple role-based access — replace with full RBAC in Phase 2
+  // Values: 'super_admin' | 'admin' | 'provider' | 'front_desk' | 'staff'
+  role            varchar(50)   [not null, default: 'staff']
+
+  is_active       boolean       [default: true]
+  must_change_password boolean  [default: false]
+  last_login_at   timestamp
+  created_at      timestamp     [default: `now()`]
+  updated_at      timestamp
+  created_by      int           [ref: > users.id]
+}
+
+Table refresh_tokens {
+  id            serial        [pk]
+  user_id       int           [not null, ref: > users.id]
+  token_hash    varchar(255)  [not null]
+  expires_at    timestamp     [not null]
+  revoked       boolean       [default: false]
+  created_at    timestamp     [default: `now()`]
+}
+
+
+// ============================================================
+// SECTION 2 — OFFICES & PROVIDERS
+// ============================================================
+
+Table offices {
+  id            serial        [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  office_code   varchar(20)   [unique, not null, note: 'e.g. O-1']
+  name          varchar(255)  [not null]
+
+  // Location
+  address_line1 varchar(255)
+  address_line2 varchar(255)
+  city          varchar(100)
+  state         varchar(50)
+  zip           varchar(20)
+
+  // Contact
+  phone         varchar(20)
+  fax           varchar(20)
+  email         varchar(255)
+  timezone      varchar(50)   [default: 'America/New_York']
+
+  // Scheduler settings (from scheduler_config — merged here for simplicity)
+  schedule_start_hour   int   [default: 8]
+  schedule_end_hour     int   [default: 17]
+  slot_interval_minutes int   [default: 10]
+
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+  updated_at    timestamp
+  created_by    int           [ref: > users.id]
+}
+
+Table providers {
+  // Consolidates office_providers + scheduler_providers into one table.
+  id            varchar(50)   [pk]
+  office_id     int           [not null, ref: > offices.id]
+  name          varchar(255)  [not null]
+  // Values: 'dentist' | 'hygienist' | 'orthodontist' | 'assistant' | 'other'
+  role          varchar(50)   [default: 'dentist']
+  npi           varchar(50)
+  license       varchar(100)
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+}
+
+Table operatories {
+  // Consolidates office_operatories + scheduler_operatories into one table.
+  id            varchar(50)   [pk]
+  office_id     int           [not null, ref: > offices.id]
+  name          varchar(100)  [not null]
+  display_order int           [default: 0]
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+}
+
+Table user_offices {
+  // Which offices a user can access.
+  id            serial    [pk]
+  user_id       int       [not null, ref: > users.id]
+  office_id     int       [not null, ref: > offices.id]
+  is_primary    boolean   [default: false]
+  created_at    timestamp [default: `now()`]
+
+  indexes {
+    (user_id, office_id) [unique]
+  }
+}
+
+
+// ============================================================
+// SECTION 3 — PATIENTS
+// ============================================================
+
+Table patients {
+  // Core patient record.
+  // contact_info + addresses merged in — no satellite tables for MVP.
+  // Split them out in Phase 2 when multi-address or multi-contact support is needed.
+  id            serial        [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  home_office_id int          [ref: > offices.id]
+  chart_no      varchar(50)   [unique]
+
+  // Demographics
+  first_name    varchar(100)
+  last_name     varchar(100)
+  preferred_name varchar(100)
+  dob           date
+  gender        varchar(20)
+  ssn           varchar(20)   // encrypt in application layer
+
+  // Contact (from patient_contact_info — merged)
+  phone         varchar(20)
+  cell_phone    varchar(20)
+  work_phone    varchar(20)
+  email         varchar(255)
+  // 'phone' | 'cell' | 'email' | 'text'
+  preferred_contact varchar(50)
+
+  // Address (from patient_addresses — merged, single address for MVP)
+  address_line1 varchar(255)
+  address_line2 varchar(255)
+  city          varchar(100)
+  state         varchar(50)
+  zip           varchar(20)
+
+  // Preferences
+  preferred_provider_id varchar(50)  [ref: > providers.id]
+  preferred_language    varchar(50)  [default: 'English']
+
+  // Clinical summary (from patient_clinical_info — merged)
+  first_visit   date
+  last_visit    date
+  next_recall   date
+
+  // Flags
+  is_active     boolean   [default: true]
+  hipaa_agreement boolean [default: false]
+  no_auto_email boolean   [default: false]
+  no_auto_sms   boolean   [default: false]
+
+  // Guardian (for minors — keep inline)
+  guardian_name  varchar(255)
+  guardian_phone varchar(20)
+
+  // Referral
+  referral_type varchar(50)
+  referred_by   varchar(255)
+
+  patient_notes text
+
+  created_at    timestamp     [default: `now()`]
+  updated_at    timestamp
+  created_by    int           [ref: > users.id]
+}
+
+Table patient_insurance {
+  id                    serial        [pk]
+  patient_id            int           [not null, ref: > patients.id]
+  // 'primary' | 'secondary'
+  insurance_type        varchar(20)   [not null]
+  carrier_name          varchar(255)
+  plan_name             varchar(255)
+  group_number          varchar(100)
+  subscriber_id         varchar(100)
+  subscriber_name       varchar(255)
+  // 'self' | 'spouse' | 'child' | 'other'
+  relationship          varchar(50)
+  carrier_phone         varchar(20)
+  // Remaining benefits — update periodically or via eligibility check
+  deductible_remaining  numeric(10,2)
+  max_remaining         numeric(10,2)
+  is_active boolean  [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    (patient_id, insurance_type) [unique]
+  }
+}
+
+Table patient_alerts {
+  // Simplified from patient_medical_alerts.
+  id          serial    [pk]
+  patient_id  int       [not null, ref: > patients.id]
+  alert       text      [not null]
+  created_at  timestamp [default: `now()`]
+}
+
+
+// ============================================================
+// SECTION 4 — PROCEDURE CODES (Reference Data)
+// ============================================================
+
+Table procedure_codes {
+  code              varchar(20)   [pk]
+  description       varchar(500)  [not null]
+  // e.g. 'Diagnostic' | 'Preventive' | 'Restorative' | 'Endodontics'
+  //      'Periodontics' | 'Prosthodontics' | 'Oral Surgery' | 'Orthodontics'
+  category          varchar(100)  [not null]
+  default_fee       numeric(10,2) [not null]
+  default_duration_minutes int
+  requires_tooth    boolean       [default: false]
+  requires_surface  boolean       [default: false]
+  requires_quadrant boolean       [default: false]
+  is_active         boolean       [default: true]
+}
+
+
+// ============================================================
+// SECTION 5 — SCHEDULING
+// ============================================================
+
+Table appointments {
+  id              serial        [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  provider_id     varchar(50)   [not null, ref: > providers.id]
+  operatory_id    varchar(50)   [ref: > operatories.id]
+  office_id       int           [not null, ref: > offices.id]
+
+  date            date          [not null]
+  start_time      time          [not null]
+  end_time        time          [not null]
+  duration        int           [not null, note: 'minutes']
+
+  // 'Scheduled' | 'Confirmed' | 'In Reception' | 'In Operatory'
+  // 'Checked Out' | 'Missed' | 'Cancelled'
+  status          varchar(30)   [not null, default: 'Scheduled']
+
+  // Display label for the calendar (e.g. 'Cleaning', 'Crown Prep')
+  procedure_label varchar(200)
+
+  // Optional link back to a treatment plan
+  treatment_plan_id varchar(50) [ref: > treatment_plans.id]
+
+  notes           text
+  created_at      timestamp     [default: `now()`]
+  updated_at      timestamp
+
+  indexes {
+    (date, office_id)     [name: 'idx_appt_date_office']
+    (patient_id, date)    [name: 'idx_appt_patient_date']
+    (provider_id, date)   [name: 'idx_appt_provider_date']
+    (operatory_id, date)  [name: 'idx_appt_operatory_date']
+    status                [name: 'idx_appt_status']
+  }
+}
+
+
+// ============================================================
+// SECTION 6 — CLINICAL
+// ============================================================
+
+Table treatment_plans {
+  id          varchar(50)   [pk]
+  patient_id  int           [not null, ref: > patients.id]
+  name        varchar(200)  [not null]
+  // 'Active' | 'Accepted' | 'Rejected' | 'Completed'
+  status      varchar(20)   [default: 'Active']
+  created_at  timestamp     [default: `now()`]
+  updated_at  timestamp
+  created_by  int           [ref: > users.id]
+
+  indexes {
+    patient_id [name: 'idx_tx_plan_patient']
+  }
+}
+
+Table treatment_plan_items {
+  // Flattened from treatment_plan_phases + treatment_plan_procedures.
+  // Use 'priority' to order/group items. Add a separate phases table in Phase 2.
+  id                  varchar(50)   [pk]
+  plan_id             varchar(50)   [not null, ref: > treatment_plans.id]
+  procedure_code      varchar(20)   [not null, ref: > procedure_codes.code]
+  description         varchar(500)
+  tooth               varchar(10)
+  surface             varchar(50)
+  priority            int           [default: 1, note: 'Ordering within the plan']
+
+  fee                 numeric(10,2) [not null]
+  insurance_estimate  numeric(10,2) [default: 0]
+
+  // 'Planned' | 'Scheduled' | 'Completed' | 'Rejected'
+  status              varchar(20)   [default: 'Planned']
+  diagnosed_by        varchar(200)
+
+  created_at          timestamp     [default: `now()`]
+  updated_at          timestamp
+
+  indexes {
+    plan_id [name: 'idx_tx_item_plan']
+    status  [name: 'idx_tx_item_status']
+  }
+}
+
+Table patient_procedures {
+  // A procedure actually performed (linked to an appointment).
+  id                varchar(50)   [pk]
+  patient_id        int           [not null, ref: > patients.id]
+  appointment_id    int           [ref: > appointments.id]
+  procedure_code    varchar(20)   [not null, ref: > procedure_codes.code]
+  date_of_service   date          [not null]
+  provider_id       varchar(50)   [not null, ref: > providers.id]
+  office_id         int           [not null, ref: > offices.id]
+
+  tooth             varchar(10)
+  surface           varchar(20)
+  quadrant          varchar(10)
+
+  fee               numeric(12,2) [not null]
+  insurance_estimate numeric(12,2) [default: 0]
+  patient_estimate  numeric(12,2) [default: 0]
+
+  // 'not_billed' | 'billed' | 'partially_paid' | 'paid' | 'written_off'
+  billing_status    varchar(30)   [default: 'not_billed']
+
+  // Set when this procedure is attached to a claim
+  claim_id          varchar(50)   [ref: > insurance_claims.id]
+
+  notes             text
+  created_at        timestamp     [default: `now()`]
+  created_by        int           [ref: > users.id]
+
+  indexes {
+    (patient_id, date_of_service) [name: 'idx_proc_patient_dos']
+    claim_id                      [name: 'idx_proc_claim']
+  }
+}
+
+
+// ============================================================
+// SECTION 7 — BILLING (SIMPLIFIED)
+// ============================================================
+
+Table patient_payments {
+  // All money received — from patient or from insurance.
+  // Payment-to-procedure application table deferred to Phase 2.
+  id              varchar(50)   [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  payment_date    date          [not null]
+  amount          numeric(12,2) [not null]
+
+  // 'patient' | 'insurance'
+  payment_type    varchar(20)   [not null]
+
+  // 'cash' | 'card' | 'check' | 'ach' | 'other'
+  payment_method  varchar(50)
+  check_number    varchar(100)
+
+  notes           text
+  created_by      int           [ref: > users.id]
+  created_at      timestamp     [default: `now()`]
+
+  indexes {
+    (patient_id, payment_date) [name: 'idx_payment_patient_date']
+  }
+}
+
+Table insurance_claims {
+  // Simplified from patient_claims.
+  // Attachments, EDI batching, and claim events deferred to Phase 2.
+  id              varchar(50)   [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  claim_number    varchar(50)   [unique, not null]
+
+  // 'draft' | 'submitted' | 'pending' | 'paid' | 'denied' | 'closed'
+  status          varchar(30)   [default: 'draft']
+
+  // 'primary' | 'secondary'
+  claim_type      varchar(20)   [not null, default: 'primary']
+
+  date_of_service_from date [not null]
+  date_of_service_to   date [not null]
+
+  total_billed    numeric(12,2) [default: 0]
+  total_paid      numeric(12,2) [default: 0]
+
+  submitted_date  date
+  paid_date       date
+
+  notes           text
+  created_at      timestamp     [default: `now()`]
+  created_by      int           [ref: > users.id]
+
+  indexes {
+    (patient_id, status) [name: 'idx_claim_patient_status']
+  }
+}

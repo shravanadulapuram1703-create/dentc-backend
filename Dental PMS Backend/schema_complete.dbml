@@ -1,0 +1,1133 @@
+// ============================================================
+//  DENTAL PMS — COMPLETE SCHEMA
+//  Covers every non-empty source file from the Denticon export.
+//  Source: Excel Dental (PGID 2829), 12 offices
+//
+//  ORGANIZED INTO 10 DOMAINS:
+//  1.  Core Infrastructure   (tenants, users, offices, providers, operatories)
+//  2.  Insurance             (carriers, employers, plans, subscribers, coverage rules)
+//  3.  Patients              (patients, insurance links, alerts, signatures, account notes)
+//  4.  Clinical Reference    (procedure codes, fee schedules, code bundles, note macros, materials)
+//  5.  Scheduling            (appointments, appointment_procedures)
+//  6.  Clinical Records      (treatment plans, procedures, chart conditions, progress notes,
+//                             perio exams, prescriptions)
+//  7.  Billing               (payments, ledger insurance detail, payment allocations,
+//                             claims, claim submissions)
+//  8.  Communication         (sms_messages, letter_templates, postcard_templates)
+//  9.  Staff & Operations    (time_clock, referrals)
+//  10. Config & Reference    (definitions, chart_colors, chart_materials, imaging_templates,
+//                             questionnaires, perio_chart_settings)
+//
+//  LEGACY ID CONVENTION:
+//  Every migrated table has a `legacy_id` varchar column that stores
+//  the original Denticon ID. Build lookup dicts on this during migration.
+//
+//  EMPTY SOURCE FILES (skipped — no data to migrate):
+//  ChartPerioActivity, COLAGENCY, IMAGEDETAIL, IMAGEGROUP, InsCustCoverage,
+//  OGROUP, PatCariesRisk1340, PatContractBilling, PatInsContractBilling,
+//  PATORTHOPLAN, PatRegPlan, PATSECINSCONTRACTBILLING, PROVIDERINSID,
+//  PROVIDERROUTESLIP, REFERRALDEMOGD, REFERRALDEMOGH
+// ============================================================
+
+
+// ============================================================
+// DOMAIN 1 — CORE INFRASTRUCTURE
+// ============================================================
+
+Table tenants {
+  // SOURCE: PGroup.txt
+  id            serial        [pk]
+  legacy_id     varchar(20)   [unique, note: 'Denticon PGID e.g. 2829']
+  name          varchar(255)  [not null]
+  code          varchar(80)   [unique, not null, note: 'e.g. CLINIC-2829']
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+}
+
+Table users {
+  // Derived from CREATEDBY/MODIFIEDBY strings + Providers.txt (for clinical staff).
+  // No dedicated user export exists — staff logins are embedded in audit fields.
+  id              serial        [pk]
+  tenant_id       int           [not null, ref: > tenants.id]
+  legacy_id       varchar(50)   [note: 'Denticon SHORTID or login username string']
+  email           varchar(255)  [unique, not null]
+  username        varchar(50)   [unique, not null]
+  password_hash   text          [not null]
+  first_name      varchar(100)
+  last_name       varchar(100)
+  phone           varchar(20)
+  // 'super_admin' | 'admin' | 'provider' | 'front_desk' | 'staff'
+  role            varchar(50)   [not null, default: 'staff']
+  is_active       boolean       [default: true]
+  must_change_password boolean  [default: false]
+  last_login_at   timestamp
+  created_at      timestamp     [default: `now()`]
+  updated_at      timestamp
+  created_by      int           [ref: > users.id]
+}
+
+Table refresh_tokens {
+  id            serial        [pk]
+  user_id       int           [not null, ref: > users.id]
+  token_hash    varchar(255)  [not null]
+  expires_at    timestamp     [not null]
+  revoked       boolean       [default: false]
+  created_at    timestamp     [default: `now()`]
+}
+
+Table offices {
+  // SOURCE: Office.txt
+  id            serial        [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  legacy_id     varchar(20)   [unique, note: 'Denticon OID e.g. 100, 101...']
+  office_code   varchar(20)   [unique, not null, note: 'e.g. O-100']
+  name          varchar(255)  [not null]
+  // SOURCE: Office.txt → SHORTID
+  short_id      varchar(20)
+  address_line1 varchar(255)
+  address_line2 varchar(255)
+  city          varchar(100)
+  state         varchar(50)
+  zip           varchar(20)
+  phone         varchar(20)
+  fax           varchar(20)
+  email         varchar(255)
+  timezone      varchar(50)   [default: 'America/New_York']
+  // SOURCE: Office.txt → APPINTERVAL
+  slot_interval_minutes int   [default: 10]
+  // Derived from Office.txt MONSTART/MONEND etc.
+  schedule_start_hour   int   [default: 8]
+  schedule_end_hour     int   [default: 17]
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+  updated_at    timestamp
+  created_by    int           [ref: > users.id]
+}
+
+Table providers {
+  // SOURCE: Providers.txt
+  id            varchar(50)   [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  office_id     int           [not null, ref: > offices.id]
+  legacy_id     varchar(20)   [note: 'Denticon PROVIDERID']
+  name          varchar(255)  [not null]
+  title         varchar(20)
+  short_id      varchar(20)   // SOURCE: SHORTID (display/login code)
+  // SOURCE: PROVIDERTYPE: 1=dentist, 2=hygienist/staff
+  role          varchar(50)   [default: 'dentist']
+  npi           varchar(50)
+  license       varchar(100)
+  tax_id        varchar(50)
+  dea_id        varchar(50)
+  specialty     varchar(100)
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+}
+
+Table operatories {
+  // SOURCE: Operatory.txt
+  id            varchar(50)   [pk]
+  office_id     int           [not null, ref: > offices.id]
+  legacy_id     varchar(20)   [note: 'Denticon OPERATORYID']
+  name          varchar(100)  [not null]
+  display_order int           [default: 0]
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+}
+
+Table user_offices {
+  id            serial    [pk]
+  user_id       int       [not null, ref: > users.id]
+  office_id     int       [not null, ref: > offices.id]
+  is_primary    boolean   [default: false]
+  created_at    timestamp [default: `now()`]
+  indexes { (user_id, office_id) [unique] }
+}
+
+
+// ============================================================
+// DOMAIN 2 — INSURANCE
+// ============================================================
+
+Table employers {
+  // SOURCE: Employers.txt — companies linked to insurance plans
+  id          serial        [pk]
+  tenant_id   int           [not null, ref: > tenants.id]
+  legacy_id   varchar(20)   [note: 'Denticon EMPID']
+  name        varchar(255)  [not null]
+  address     varchar(255)
+  city        varchar(100)
+  state       varchar(50)
+  zip         varchar(20)
+  phone       varchar(20)
+  created_at  timestamp     [default: `now()`]
+}
+
+Table insurance_carriers {
+  // SOURCE: Carrier.txt
+  id            serial        [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  legacy_id     varchar(20)   [note: 'Denticon CARRIERID']
+  name          varchar(255)  [not null]
+  payer_id      varchar(50)   // Electronic payer ID for EDI
+  phone         varchar(20)
+  phone2        varchar(20)
+  address       varchar(255)
+  city          varchar(100)
+  state         varchar(50)
+  zip           varchar(20)
+  website       varchar(255)
+  notes         text
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+}
+
+Table insurance_plans {
+  // SOURCE: InsPlans.txt
+  id                    serial        [pk]
+  tenant_id             int           [not null, ref: > tenants.id]
+  carrier_id            int           [not null, ref: > insurance_carriers.id]
+  employer_id           int           [ref: > employers.id]
+  legacy_id             varchar(20)   [note: 'Denticon INSPLANID']
+  group_number          varchar(100)
+  // SOURCE: PLANTYPE: 1=PPO, 2=HMO, 3=Medicaid, 4=Indemnity, 5=Cap/Prepaid
+  plan_type             varchar(50)
+  is_prepaid            boolean       [default: false]
+  individual_max        numeric(10,2)
+  individual_deductible numeric(10,2)
+  ortho_max             numeric(10,2)
+  family_max            numeric(10,2)
+  family_deductible     numeric(10,2)
+  // SOURCE: ANNIVDATE (benefit year anniversary)
+  anniversary_date      date
+  // SOURCE: COVERAGETYPE ('I'=in-network, 'O'=out-of-network, 'U'=unknown)
+  coverage_type         varchar(10)
+  is_active             boolean       [default: true]
+  created_at            timestamp     [default: `now()`]
+}
+
+Table insurance_subscribers {
+  // SOURCE: RespInsplan.txt
+  // The subscriber record — links a responsible party to a specific insurance plan.
+  // Contains subscriber demographics, group number, eligibility info, and family benefits.
+  // One RPID can be a subscriber for multiple plans (primary + secondary).
+  id                    serial        [pk]
+  tenant_id             int           [not null, ref: > tenants.id]
+  legacy_id             varchar(20)   [note: 'Denticon RESPPLANID']
+  ins_plan_id           int           [not null, ref: > insurance_plans.id]
+  // The responsible party who is the subscriber
+  subscriber_patient_id int           [ref: > patients.id]
+  office_id             int           [ref: > offices.id]
+
+  // Subscriber demographics (may differ from the patient)
+  // SOURCE: SUBFNAME, SUBLNAME, SUBMI, SUBADDRESS*, SUBBIRTHDATE, SEX
+  sub_first_name        varchar(100)
+  sub_last_name         varchar(100)
+  sub_mi                varchar(10)
+  sub_address           varchar(255)
+  sub_city              varchar(100)
+  sub_state             varchar(50)
+  sub_zip               varchar(20)
+  sub_dob               date
+  sub_gender            varchar(10)
+  sub_ssn               varchar(20)
+  // SOURCE: SUBID (member/subscriber ID)
+  sub_member_id         varchar(100)
+  // SOURCE: GROUPNO
+  group_number          varchar(100)
+  // SOURCE: SUBPLANEFFDATE, SUBPLANTERMDATE
+  effective_date        date
+  term_date             date
+  // Remaining family benefits
+  // SOURCE: FAMMAXREM, FAMORTHOREM, FAMDEDREM
+  family_max_remaining  numeric(10,2)
+  family_ded_remaining  numeric(10,2)
+  ortho_remaining       numeric(10,2)
+  // SOURCE: ANNIVDATE
+  anniversary_date      date
+  // Eligibility verification
+  // SOURCE: ELIGVERIFIED, ELIGVERIFIEDBY, ELIGVERIFIEDON, ELIGNOTES
+  elig_status           varchar(20)   // 'U'=unknown, 'Y'=verified, 'N'=not eligible
+  elig_verified_on      timestamp
+  elig_verified_by      varchar(100)
+  elig_notes            text
+  notes                 text
+  is_active             boolean       [default: true]
+  created_at            timestamp     [default: `now()`]
+  updated_at            timestamp
+}
+
+Table insurance_coverage_rules {
+  // SOURCE: INSCOVERAGE/*.txt (11 split files — same structure, concat all)
+  // Per-plan coverage rules: what % is covered for each ADA code range.
+  // e.g. Plan 105: codes D0100-D0999 (Diagnostic) = 100%, deductible waived
+  id              serial        [pk]
+  ins_plan_id     int           [not null, ref: > insurance_plans.id]
+  legacy_id       varchar(20)   [note: 'Denticon INSCOVERAGEID']
+  // SOURCE: STARTCODE, ENDCODE (ADA code range)
+  start_code      varchar(20)   [not null]
+  end_code        varchar(20)   [not null]
+  // SOURCE: INSCATEGORY (0=diagnostic, 1=preventive, etc.)
+  category        varchar(100)
+  description     varchar(255)
+  // SOURCE: PCT (coverage percentage 0-100)
+  coverage_pct    numeric(5,2)
+  // SOURCE: DEDWAIVED ('1'=yes, '0'=no)
+  ded_waived      boolean       [default: false]
+  // SOURCE: FREQLIMIT (how many times per year)
+  freq_limit      varchar(50)
+  // SOURCE: AGELIMIT
+  age_limit       varchar(50)
+  // SOURCE: WAITPERIOD
+  wait_period     varchar(50)
+  created_at      timestamp     [default: `now()`]
+}
+
+Table fee_schedules {
+  // SOURCE: FeeScheH.txt (header)
+  id            serial        [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  legacy_id     varchar(20)   [note: 'Denticon FEEID']
+  name          varchar(255)  [not null]
+  // SOURCE: FEETYPE: 1=UCR, 2=assign-to-plan, 3=assign-to-carrier
+  fee_type      varchar(50)
+  ins_plan_id   int           [ref: > insurance_plans.id]
+  office_id     int           [ref: > offices.id]
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+}
+
+Table fee_schedule_entries {
+  // SOURCE: FeeScheD.txt (detail)
+  id            serial        [pk]
+  fee_schedule_id int         [not null, ref: > fee_schedules.id]
+  procedure_code varchar(20)  [not null, ref: > procedure_codes.code]
+  // SOURCE: PATAMT, INSAMT
+  patient_fee   numeric(10,2)
+  insurance_fee numeric(10,2)
+  effective_date date
+  created_at    timestamp     [default: `now()`]
+  indexes { (fee_schedule_id, procedure_code) [unique] }
+}
+
+
+// ============================================================
+// DOMAIN 3 — PATIENTS
+// ============================================================
+
+Table patients {
+  // SOURCE: RespParty.txt (RPID = the account holder / responsible party)
+  // NOTE: Every RPID in Denticon is a unique person. RPID == PATID means
+  // the patient is their own guarantor. Migrate all RPIDs as patients.
+  id              serial        [pk]
+  tenant_id       int           [not null, ref: > tenants.id]
+  home_office_id  int           [ref: > offices.id]
+  legacy_id       varchar(20)   [note: 'Denticon RPID / PATID']
+  chart_no        varchar(50)   [unique]
+  first_name      varchar(100)
+  last_name       varchar(100)
+  preferred_name  varchar(100)  // SOURCE: NICKNAME
+  title           varchar(20)
+  middle_initial  varchar(10)
+  dob             date
+  gender          varchar(20)   // SOURCE: SEX ('M'/'F')
+  ssn             varchar(20)   // ⚠️ Encrypt in app layer
+  marital_status  varchar(20)   // SOURCE: MSTATUS
+  // Contact
+  phone           varchar(20)   // SOURCE: HOMEPHONE
+  cell_phone      varchar(20)
+  work_phone      varchar(20)
+  email           varchar(255)
+  preferred_contact varchar(50)
+  // Address
+  address_line1   varchar(255)
+  address_line2   varchar(255)
+  city            varchar(100)
+  state           varchar(50)
+  zip             varchar(20)
+  // Preferences
+  preferred_provider_id varchar(50) [ref: > providers.id]
+  preferred_language    varchar(50) [default: 'English']
+  // Clinical summary (populated during migration from appointment dates)
+  first_visit     date
+  last_visit      date
+  next_recall     date
+  // Billing flags — SOURCE: ISFINCHARGE, ISSENDSTMT, ISSENDCOLL
+  is_finance_charge  boolean   [default: false]
+  send_statements    boolean   [default: true]
+  send_collections   boolean   [default: false]
+  // Communication flags — SOURCE: NOEMAILSTMT, ISLOCKED
+  no_auto_email   boolean     [default: false]
+  no_auto_sms     boolean     [default: false]
+  is_locked       boolean     [default: false]
+  hipaa_agreement boolean     [default: false]
+  // Guardian
+  guardian_name   varchar(255)
+  guardian_phone  varchar(20)
+  // Referral
+  referral_type   varchar(50)
+  referred_by     varchar(255)
+  patient_notes   text
+  is_active       boolean     [default: true]
+  created_at      timestamp   [default: `now()`]
+  updated_at      timestamp
+  created_by      int         [ref: > users.id]
+}
+
+Table patient_insurance {
+  // SOURCE: PatInsPlans.txt — links patient to an insurance plan
+  id                    serial        [pk]
+  patient_id            int           [not null, ref: > patients.id]
+  ins_plan_id           int           [ref: > insurance_plans.id]
+  // Link to the subscriber record in RespInsplan
+  subscriber_id         int           [ref: > insurance_subscribers.id]
+  legacy_plan_type      varchar(5)    [note: 'Denticon PLANTYPE (D=dental)']
+  // 'primary' | 'secondary' | 'tertiary'
+  insurance_type        varchar(20)   [not null]
+  // SOURCE: RELTOPAT ('P'=self, 'S'=spouse, 'C'=child)
+  relationship          varchar(50)
+  // Remaining individual benefits (patient-level, from PatInsPlans)
+  deductible_remaining  numeric(10,2)
+  max_remaining         numeric(10,2)
+  ortho_remaining       numeric(10,2)
+  is_active             boolean       [default: true]
+  created_at            timestamp     [default: `now()`]
+  updated_at            timestamp
+  indexes { (patient_id, insurance_type) [unique] }
+}
+
+Table patient_alerts {
+  // SOURCE: PatFlashAlerts.txt
+  id              serial      [pk]
+  patient_id      int         [not null, ref: > patients.id]
+  legacy_id       varchar(20) [note: 'Denticon FLASHALERTID']
+  alert           text        [not null]
+  blocks_charges  boolean     [default: false]
+  is_active       boolean     [default: true]
+  deactivated_on  timestamp
+  created_at      timestamp   [default: `now()`]
+  created_by      int         [ref: > users.id]
+}
+
+Table account_notes {
+  // SOURCE: RESPNOTES.txt — notes on the responsible party / account
+  // e.g. "Letter 'CL021 - Promise to Pay' printed on 09/23/2016"
+  id              serial      [pk]
+  patient_id      int         [not null, ref: > patients.id]
+  legacy_id       varchar(20) [note: 'Denticon RESPNOTESID']
+  // SOURCE: NTYPE ('R'=regular note, etc.)
+  note_type       varchar(10)
+  notes           text        [not null]
+  is_struck_off   boolean     [default: false]
+  created_at      timestamp   [default: `now()`]
+  created_by      int         [ref: > users.id]
+}
+
+Table patient_signatures {
+  // SOURCE: PATSIGNATURE.txt — digital signature capture (consent forms etc.)
+  id              serial      [pk]
+  patient_id      int         [not null, ref: > patients.id]
+  legacy_id       varchar(20) [note: 'Denticon SIGNATUREID']
+  // SOURCE: SIGNATURE (encoded binary stroke data — large string)
+  signature_data  text
+  signature_len   int
+  // SOURCE: DEVICESOURCE ('0'=device, etc.)
+  device_source   varchar(20)
+  is_user_sig     boolean     [default: false]
+  created_at      timestamp   [default: `now()`]
+  created_by      int         [ref: > users.id]
+}
+
+Table medical_history_records {
+  // SOURCE: PatMedicalHistoryH.txt — header record for each medical history form submission
+  // Full medical history answers are stored in a separate forms system (not exported here)
+  id              serial      [pk]
+  patient_id      int         [not null, ref: > patients.id]
+  legacy_id       varchar(20) [note: 'Denticon PATMEDICALHISTORYID']
+  signature_id    int         [ref: > patient_signatures.id]
+  is_archived     boolean     [default: false]
+  created_at      timestamp   [default: `now()`]
+  created_by      int         [ref: > users.id]
+}
+
+Table referrals {
+  // SOURCE: Referrals.txt
+  id              serial      [pk]
+  tenant_id       int         [not null, ref: > tenants.id]
+  office_id       int         [ref: > offices.id]
+  legacy_id       varchar(20) [note: 'Denticon REFERRALID']
+  // SOURCE: TYPE ('0'=patient referral, else provider referral)
+  referral_type   varchar(10)
+  // The patient who referred or was referred
+  patient_id      int         [ref: > patients.id]
+  // Referral person demographics (may be external, not a patient)
+  first_name      varchar(100)
+  last_name       varchar(100)
+  address         varchar(255)
+  city            varchar(100)
+  state           varchar(50)
+  zip             varchar(20)
+  phone           varchar(20)
+  email           varchar(255)
+  npi             varchar(50)
+  // SOURCE: SPECIALTYID
+  specialty       varchar(100)
+  // SOURCE: TYPE2 (referral reason code e.g. 'R003')
+  reason_code     varchar(20)
+  notes           text
+  created_at      timestamp   [default: `now()`]
+  created_by      int         [ref: > users.id]
+}
+
+
+// ============================================================
+// DOMAIN 4 — CLINICAL REFERENCE DATA
+// ============================================================
+
+Table procedure_codes {
+  // SOURCE: Codes.txt
+  code              varchar(20)   [pk]
+  legacy_code       varchar(20)   [note: 'Same as code — kept for reference']
+  description       varchar(500)  [not null]
+  // ADA category (derived from INSCATEGORYID)
+  category          varchar(100)  [not null]
+  default_fee       numeric(10,2) [not null, default: 0]
+  default_duration_minutes int
+  requires_tooth    boolean       [default: false]
+  requires_surface  boolean       [default: false]
+  requires_quadrant boolean       [default: false]
+  // SOURCE: LABREQ
+  requires_lab      boolean       [default: false]
+  // SOURCE: ISORTHO
+  is_ortho          boolean       [default: false]
+  // SOURCE: BILLINGORDER ('D'=primary, 'S'=secondary)
+  billing_order     varchar(10)
+  // SOURCE: RECALLINT, RECALLUNIT (for recall scheduling)
+  recall_interval   int
+  recall_unit       varchar(10)   // 'mm', 'days', 'weeks'
+  is_active         boolean       [default: true]
+  created_at        timestamp     [default: `now()`]
+}
+
+Table chart_materials {
+  // SOURCE: ChartMaterials.txt — material types used in charting (amalgam, composite, ceramic...)
+  id            serial        [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  legacy_id     varchar(20)   [note: 'Denticon MATERIALID']
+  name          varchar(100)  [not null]
+  // SOURCE: MATPATTERN, MATCOLOR (display rendering)
+  pattern       varchar(100)
+  color         varchar(50)
+  created_at    timestamp     [default: `now()`]
+}
+
+Table note_macros {
+  // SOURCE: ChartNotesMacros.txt — reusable clinical note templates
+  id            serial        [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  legacy_id     varchar(20)   [note: 'Denticon MACROID']
+  name          varchar(100)  [not null]
+  content       text          [not null]
+  category      varchar(100)  // SOURCE: Macrocat
+  created_at    timestamp     [default: `now()`]
+  created_by    int           [ref: > users.id]
+}
+
+Table code_bundles {
+  // SOURCE: CODESEXPLOSIONH.txt — named bundles of codes for quick entry
+  // e.g. "New Pt Exam" bundle = D0150 + D0274 + D1110
+  id            serial        [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  legacy_id     varchar(20)   [note: 'Denticon CODESEXPLOSIONID']
+  name          varchar(100)  [not null]
+  display_code  varchar(50)   // SOURCE: CODE (the bundle shortcut code)
+  description   varchar(255)
+  // SOURCE: SAMETOOTHNO (apply all codes to same tooth)
+  same_tooth    boolean       [default: false]
+  created_at    timestamp     [default: `now()`]
+  created_by    int           [ref: > users.id]
+}
+
+Table code_bundle_items {
+  // SOURCE: CODESEXPLOSIOND.txt — individual codes in each bundle
+  id              serial        [pk]
+  bundle_id       int           [not null, ref: > code_bundles.id]
+  legacy_id       varchar(20)   [note: 'Denticon CODESEXPLOSIONDID']
+  procedure_code  varchar(20)   [not null, ref: > procedure_codes.code]
+  // SOURCE: TH (tooth number if pre-filled)
+  tooth           varchar(10)
+  sort_order      int           [default: 1]
+  created_at      timestamp     [default: `now()`]
+}
+
+Table prescription_library {
+  // SOURCE: PGRX.txt — practice-level drug reference library (reusable Rx templates)
+  id            serial        [pk]
+  tenant_id     int           [not null, ref: > tenants.id]
+  legacy_id     varchar(20)   [note: 'Denticon RXRefID']
+  drug_name     varchar(255)  [not null]
+  dispense      varchar(255)
+  sig           varchar(500)
+  refills       int           [default: 0]
+  is_as_written boolean       [default: false]
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+  updated_at    timestamp
+}
+
+
+// ============================================================
+// DOMAIN 5 — SCHEDULING
+// ============================================================
+
+Table appointments {
+  // SOURCE: AppointmentHeader.txt + APPTH_ARCHIVE/*.txt (same columns)
+  id              serial        [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  provider_id     varchar(50)   [not null, ref: > providers.id]
+  operatory_id    varchar(50)   [ref: > operatories.id]
+  office_id       int           [not null, ref: > offices.id]
+  legacy_id       varchar(20)   [note: 'Denticon APPTID']
+  is_archived     boolean       [default: false, note: 'true = from APPTH_ARCHIVE']
+  date            date          [not null]
+  start_time      time          [not null]
+  end_time        time          [not null]
+  duration        int           [not null, note: 'minutes']
+  // STATUS mapping: 1=Scheduled, 2=Unconfirmed, 3=Confirmed, 4=Left Message,
+  // 5=In Reception, 6=Available, 7=In Operatory, 8=Checked Out, X/posted=Checked Out
+  status          varchar(30)   [not null, default: 'Scheduled']
+  is_missed       boolean       [default: false]
+  is_cancelled    boolean       [default: false]
+  is_posted       boolean       [default: false]
+  // SOURCE: PRODTYPE (procedure category display label for calendar)
+  procedure_label varchar(200)
+  is_new_patient  boolean       [default: false]
+  notes           text
+  // Lab work
+  has_lab         boolean       [default: false]
+  lab_cost        numeric(10,2)
+  lab_sent_on     date
+  lab_due_on      date
+  lab_received_on date
+  // SOURCE: ISBLOCKED (blocked time on calendar, PATID=0)
+  is_blocked      boolean       [default: false]
+  // SOURCE: CAMPAIGN
+  campaign_id     varchar(100)
+  treatment_plan_id varchar(50) [ref: > treatment_plans.id]
+  // Confirmation/check-in timestamps (from ST* fields)
+  confirmed_on    timestamp
+  checked_in_on   timestamp
+  checked_out_on  timestamp
+  created_at      timestamp     [default: `now()`]
+  updated_at      timestamp
+  indexes {
+    legacy_id               [name: 'idx_appt_legacy']
+    (date, office_id)       [name: 'idx_appt_date_office']
+    (patient_id, date)      [name: 'idx_appt_patient_date']
+    (provider_id, date)     [name: 'idx_appt_provider_date']
+    (operatory_id, date)    [name: 'idx_appt_operatory_date']
+    status                  [name: 'idx_appt_status']
+    is_archived             [name: 'idx_appt_archived']
+  }
+}
+
+Table appointment_procedures {
+  // SOURCE: AppointmentDetails.txt + AppointmentDetail_ARCHIVE.txt
+  id              serial        [pk]
+  appointment_id  int           [not null, ref: > appointments.id]
+  procedure_code  varchar(20)   [not null, ref: > procedure_codes.code]
+  provider_id     varchar(50)   [ref: > providers.id]
+  treatment_plan_id varchar(50) [ref: > treatment_plans.id]
+  tooth           varchar(10)
+  surface         varchar(20)
+  description     varchar(500)
+  fee             numeric(12,2) [not null, default: 0]
+  insurance_estimate numeric(12,2) [default: 0]
+  billing_order   varchar(10)   // SOURCE: BILLINGORDER
+  // SOURCE: STATUS ('C'=Completed, 'S'=Scheduled, 'TP'=Tx Plan)
+  status          varchar(20)   [default: 'Planned']
+  material_id     int           [ref: > chart_materials.id]
+  notes           text
+  is_archived     boolean       [default: false]
+  created_at      timestamp     [default: `now()`]
+}
+
+
+// ============================================================
+// DOMAIN 6 — CLINICAL RECORDS
+// ============================================================
+
+Table treatment_plans {
+  // SOURCE: TREATPLANID referenced in AppointmentDetails + LEDGER
+  // No standalone export — plans are identified by TREATPLANID being non-zero
+  id          varchar(50)   [pk]
+  patient_id  int           [not null, ref: > patients.id]
+  office_id   int           [ref: > offices.id]
+  legacy_id   varchar(20)   [note: 'Denticon TREATPLANID']
+  name        varchar(200)  [not null]
+  status      varchar(20)   [default: 'Active']
+  created_at  timestamp     [default: `now()`]
+  updated_at  timestamp
+  created_by  int           [ref: > users.id]
+  indexes { patient_id [name: 'idx_txplan_patient'] }
+}
+
+Table treatment_plan_items {
+  // Flattened from appointment procedures with TREATPLANID != 0
+  id                  varchar(50)   [pk]
+  plan_id             varchar(50)   [not null, ref: > treatment_plans.id]
+  procedure_code      varchar(20)   [not null, ref: > procedure_codes.code]
+  description         varchar(500)
+  tooth               varchar(10)
+  surface             varchar(50)
+  priority            int           [default: 1]
+  fee                 numeric(10,2) [not null]
+  insurance_estimate  numeric(10,2) [default: 0]
+  // 'Planned' | 'Scheduled' | 'Completed' | 'Rejected'
+  status              varchar(20)   [default: 'Planned']
+  diagnosed_by        varchar(200)
+  created_at          timestamp     [default: `now()`]
+  updated_at          timestamp
+  indexes { plan_id [name: 'idx_txitem_plan'] }
+}
+
+Table patient_procedures {
+  // SOURCE: LEDGER/*.txt rows where LTYPE = 'C' (charges)
+  // Also: Ledger_archive.txt (same structure, older records)
+  id                varchar(50)   [pk]
+  patient_id        int           [not null, ref: > patients.id]
+  appointment_id    int           [ref: > appointments.id]
+  procedure_code    varchar(20)   [not null, ref: > procedure_codes.code]
+  legacy_id         varchar(20)   [note: 'Denticon LEDGERID']
+  is_archived       boolean       [default: false, note: 'true = from Ledger_archive']
+  date_of_service   date          [not null]
+  provider_id       varchar(50)   [not null, ref: > providers.id]
+  office_id         int           [not null, ref: > offices.id]
+  tooth             varchar(10)
+  surface           varchar(20)
+  quadrant          varchar(10)
+  fee               numeric(12,2) [not null]
+  ucr_fee           numeric(12,2)  // SOURCE: UCRFEE (usual/customary rate)
+  insurance_estimate numeric(12,2) [default: 0]
+  patient_estimate  numeric(12,2) [default: 0]
+  // SOURCE: APPLYTO ('P'=patient, 'I'=insurance, 'CA'=capitation)
+  apply_to          varchar(5)
+  // SOURCE: BILLINGORDER ('D   '=primary, 'S   '=secondary — trim whitespace)
+  billing_order     varchar(10)
+  // SOURCE: RESPTYPE ('NU'=not used, 'CA'=capitation)
+  resp_type         varchar(10)
+  // 'not_billed' | 'billed' | 'partially_paid' | 'paid' | 'written_off'
+  billing_status    varchar(30)   [default: 'not_billed']
+  claim_id          varchar(50)   [ref: > insurance_claims.id]
+  // SOURCE: ISHOLDCLAIM
+  hold_claim        boolean       [default: false]
+  // SOURCE: ISVOID
+  is_void           boolean       [default: false]
+  material_id       int           [ref: > chart_materials.id]
+  notes             text
+  created_at        timestamp     [default: `now()`]
+  created_by        int           [ref: > users.id]
+  indexes {
+    legacy_id                     [name: 'idx_proc_legacy']
+    (patient_id, date_of_service) [name: 'idx_proc_patient_dos']
+    claim_id                      [name: 'idx_proc_claim']
+    is_void                       [name: 'idx_proc_void']
+  }
+}
+
+Table chart_conditions {
+  // SOURCE: ChartActivity.txt — tooth conditions/findings
+  id              serial        [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  office_id       int           [ref: > offices.id]
+  legacy_id       varchar(20)   [note: 'Denticon CHARTID']
+  activity_date   date
+  tooth           varchar(10)
+  surface         varchar(20)
+  region          varchar(20)
+  area            varchar(20)
+  description     varchar(500)
+  condition_code  varchar(50)
+  procedure_code  varchar(20)   [ref: > procedure_codes.code]
+  provider_id     varchar(50)   [ref: > providers.id]
+  material_id     int           [ref: > chart_materials.id]
+  // SOURCE: CHARTAS ('0'=existing, '1'=treatment, '2'=completed condition...)
+  chart_as        varchar(20)
+  is_inactive     boolean       [default: false]
+  notes           text
+  created_at      timestamp     [default: `now()`]
+  indexes { (patient_id, tooth) [name: 'idx_chart_cond_patient_tooth'] }
+}
+
+Table progress_notes {
+  // SOURCE: ProgressNotes_Archive.txt
+  id              serial        [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  office_id       int           [ref: > offices.id]
+  legacy_id       varchar(20)   [note: 'Denticon PROGNOTESID']
+  note_date       date
+  notes           text
+  notes_html      text
+  tooth           varchar(10)
+  is_deleted      boolean       [default: false]
+  created_at      timestamp     [default: `now()`]
+  created_by      int           [ref: > users.id]
+  indexes { (patient_id, note_date) [name: 'idx_pnote_patient_date'] }
+}
+
+Table perio_exams {
+  // SOURCE: PERIOCHARTHEADER.txt
+  id              serial        [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  office_id       int           [ref: > offices.id]
+  legacy_id       varchar(20)   [note: 'Denticon PerioExamID']
+  exam_date       date          [not null]
+  notes           text
+  is_voided       boolean       [default: false]
+  created_at      timestamp     [default: `now()`]
+  created_by      int           [ref: > users.id]
+  indexes { (patient_id, exam_date) [name: 'idx_perio_patient_date'] }
+}
+
+Table perio_exam_details {
+  // SOURCE: PERIOCHARTDETAIL.txt — per-tooth measurements
+  id              serial        [pk]
+  exam_id         int           [not null, ref: > perio_exams.id]
+  tooth_no        varchar(10)   [not null]
+  // Probing depths (6 per tooth: MB, B, DB, ML, L, DL)
+  pd1 int  pd2 int  pd3 int  pd4 int  pd5 int  pd6 int
+  // Free gingival margin
+  fgm1 int  fgm2 int  fgm3 int  fgm4 int  fgm5 int  fgm6 int
+  // Mucogingival junction
+  mgj1 int  mgj2 int  mgj3 int  mgj4 int  mgj5 int  mgj6 int
+  // Bleeding on probing (boolean per point)
+  bleed1 boolean  bleed2 boolean  bleed3 boolean
+  bleed4 boolean  bleed5 boolean  bleed6 boolean
+  // Suppuration
+  supp1 boolean  supp2 boolean  supp3 boolean
+  supp4 boolean  supp5 boolean  supp6 boolean
+  // Furcation
+  furc1 int  furc2 int  furc3 int
+  furc4 int  furc5 int  furc6 int
+  mobility_buccal int
+  mobility_lingual int
+}
+
+Table prescriptions {
+  // SOURCE: PatRx.txt — per-patient prescriptions
+  id              serial        [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  office_id       int           [ref: > offices.id]
+  legacy_id       varchar(20)   [note: 'Denticon PATRXID']
+  // Link to library entry if created from template
+  library_rx_id   int           [ref: > prescription_library.id]
+  rx_date         date
+  drug_name       varchar(255)  [not null]
+  dispense        varchar(255)
+  sig             varchar(500)
+  refills         int           [default: 0]
+  is_as_written   boolean       [default: false]
+  provider_id     varchar(50)   [ref: > providers.id]
+  notes           text
+  is_active       boolean       [default: true]
+  // DoseSpot e-prescribe fields (for future e-Rx integration)
+  dosespot_rx_id  varchar(50)
+  dosespot_status varchar(50)
+  created_at      timestamp     [default: `now()`]
+  created_by      int           [ref: > users.id]
+  indexes { (patient_id, rx_date) [name: 'idx_rx_patient_date'] }
+}
+
+
+// ============================================================
+// DOMAIN 7 — BILLING
+// ============================================================
+
+Table patient_payments {
+  // SOURCE: LEDGER/*.txt rows where LTYPE IN ('P', 'I', 'A')
+  // P=patient payment, I=insurance payment, A=adjustment
+  id              varchar(50)   [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  office_id       int           [ref: > offices.id]
+  legacy_id       varchar(20)   [note: 'Denticon LEDGERID for payment rows']
+  is_archived     boolean       [default: false]
+  payment_date    date          [not null]
+  amount          numeric(12,2) [not null]
+  // 'patient' | 'insurance' | 'adjustment'
+  payment_type    varchar(20)   [not null]
+  // SOURCE: TYPE2 ('CA'=cash, 'CK'=check, 'CC'=credit card, 'EFT'=ACH)
+  payment_method  varchar(50)
+  check_number    varchar(100)
+  provider_id     varchar(50)   [ref: > providers.id]
+  notes           text
+  is_void         boolean       [default: false]
+  created_by      int           [ref: > users.id]
+  created_at      timestamp     [default: `now()`]
+  indexes {
+    legacy_id                  [name: 'idx_payment_legacy']
+    (patient_id, payment_date) [name: 'idx_payment_patient_date']
+  }
+}
+
+Table ledger_insurance_details {
+  // SOURCE: LedgerInsDetail_Archive.txt
+  // Per-procedure insurance payment breakdown (primary/secondary/tertiary splits).
+  // This is the source of truth for how much each insurance tier paid per procedure.
+  id                    serial        [pk]
+  patient_id            int           [not null, ref: > patients.id]
+  procedure_id          varchar(50)   [ref: > patient_procedures.id]
+  legacy_ledger_id      varchar(20)   [note: 'Denticon LEDGERID']
+  claim_id              varchar(50)   [ref: > insurance_claims.id]
+  office_id             int           [ref: > offices.id]
+  // Primary insurance
+  prim_estimated        numeric(12,2)
+  prim_ind_max          numeric(12,2)
+  prim_deductible       numeric(12,2)
+  prim_ins_paid         numeric(12,2)
+  prim_ins_adjust       numeric(12,2)
+  // Secondary insurance
+  sec_estimated         numeric(12,2)
+  sec_ins_paid          numeric(12,2)
+  sec_ins_adjust        numeric(12,2)
+  // Tertiary insurance
+  ter_ins_paid          numeric(12,2)
+  // Insurance plan references
+  prim_ins_plan_id      int           [ref: > insurance_plans.id]
+  sec_ins_plan_id       int           [ref: > insurance_plans.id]
+  ter_ins_plan_id       int           [ref: > insurance_plans.id]
+  // Whether insurance was actually posted
+  prim_posted           boolean       [default: false]
+  sec_posted            boolean       [default: false]
+  created_at            timestamp     [default: `now()`]
+}
+
+Table payment_allocations {
+  // SOURCE: LedgerPymtAllocation_Archive.txt
+  // Links payment ledger entries to specific procedure ledger entries.
+  // This is how you know which payment paid for which procedure.
+  id                serial        [pk]
+  patient_id        int           [not null, ref: > patients.id]
+  legacy_id         varchar(20)   [note: 'Denticon PAYALLOCID']
+  procedure_id      varchar(50)   [ref: > patient_procedures.id]
+  payment_id        varchar(50)   [ref: > patient_payments.id]
+  claim_id          varchar(50)   [ref: > insurance_claims.id]
+  ins_plan_id       int           [ref: > insurance_plans.id]
+  provider_id       varchar(50)   [ref: > providers.id]
+  alloc_date        date
+  amount            numeric(12,2) [not null]
+  // SOURCE: LTYPE ('P'=patient, 'I'=insurance, 'A'=adjustment)
+  alloc_type        varchar(5)
+  created_at        timestamp     [default: `now()`]
+}
+
+Table insurance_claims {
+  // SOURCE: CLAIMH/*.txt (2 files — concat both)
+  id              varchar(50)   [pk]
+  patient_id      int           [not null, ref: > patients.id]
+  office_id       int           [ref: > offices.id]
+  legacy_id       varchar(20)   [unique, note: 'Denticon CLAIMID']
+  claim_number    varchar(50)   [unique, not null]
+  // 'draft' | 'submitted' | 'pending' | 'paid' | 'denied' | 'closed'
+  status          varchar(30)   [default: 'draft']
+  // 'primary' | 'secondary'
+  claim_type      varchar(20)   [not null, default: 'primary']
+  billing_order   varchar(10)
+  date_of_service_from  date
+  date_of_service_to    date
+  total_billed    numeric(12,2) [default: 0]
+  total_paid      numeric(12,2) [default: 0]
+  est_insurance   numeric(12,2) [default: 0]
+  submitted_date  date
+  paid_date       date
+  close_date      date
+  // Provider references
+  billing_provider_id  varchar(50) [ref: > providers.id]
+  treating_provider_id varchar(50) [ref: > providers.id]
+  carrier_id      int           [ref: > insurance_carriers.id]
+  ins_plan_id     int           [ref: > insurance_plans.id]
+  is_preauth      boolean       [default: false]
+  notes           text
+  is_active       boolean       [default: true]
+  created_at      timestamp     [default: `now()`]
+  created_by      int           [ref: > users.id]
+  indexes {
+    legacy_id            [name: 'idx_claim_legacy']
+    (patient_id, status) [name: 'idx_claim_patient_status']
+  }
+}
+
+Table claim_submissions {
+  // SOURCE: ClaimsDetail.txt — EDI claim text and batch tracking
+  // Stores the actual EDI/electronic claim text sent to clearinghouse
+  id              serial        [pk]
+  claim_id        varchar(50)   [not null, ref: > insurance_claims.id]
+  legacy_id       varchar(20)   [note: 'Denticon CLAIMID (same as claim)']
+  // SOURCE: CLAIMBATCHID (batch sent together)
+  batch_id        varchar(50)
+  // SOURCE: ISPREAUTH
+  is_preauth      boolean       [default: false]
+  total_charges   numeric(12,2)
+  num_lines       int
+  // SOURCE: STATUS ('N'=new/not processed)
+  submission_status varchar(10)
+  // SOURCE: CLAIMTEXT (raw EDI X12/proprietary text — can be large)
+  claim_text      text
+  created_at      timestamp     [default: `now()`]
+  created_by      int           [ref: > users.id]
+}
+
+
+// ============================================================
+// DOMAIN 8 — COMMUNICATION
+// ============================================================
+
+Table sms_messages {
+  // SOURCE: SMS.txt
+  id              serial        [pk]
+  tenant_id       int           [not null, ref: > tenants.id]
+  office_id       int           [ref: > offices.id]
+  patient_id      int           [ref: > patients.id]
+  appointment_id  int           [ref: > appointments.id]
+  legacy_id       varchar(20)   [note: 'Denticon SMSMSGID']
+  // SOURCE: SENTTEXT
+  sent_text       text
+  sent_phone      varchar(20)
+  // SOURCE: SENTSTATUS ('Success', 'Failed')
+  send_status     varchar(50)
+  delivered_on    timestamp
+  // SOURCE: REPLYTEXT, REPLYPHONE, REPLYRECEIVEDON
+  reply_text      text
+  reply_phone     varchar(20)
+  reply_received_on timestamp
+  // SOURCE: MESSAGETYPE, ISREAD
+  message_type    varchar(50)
+  is_read         boolean       [default: false]
+  created_at      timestamp     [default: `now()`]
+  created_by      int           [ref: > users.id]
+  indexes { (patient_id, created_at) [name: 'idx_sms_patient'] }
+}
+
+Table letter_templates {
+  // SOURCE: LETTERS.txt — HTML letter templates with merge fields
+  id              serial        [pk]
+  tenant_id       int           [not null, ref: > tenants.id]
+  legacy_id       varchar(20)   [note: 'Denticon LETTERID']
+  name            varchar(255)  [not null]
+  // SOURCE: TYPE ('A'=appointment, 'R'=recall, 'C'=collection, etc.)
+  letter_type     varchar(10)
+  // SOURCE: LType ('L'=letter, 'E'=email)
+  channel         varchar(5)
+  title           varchar(255)
+  // SOURCE: BODY (full HTML with #MERGE_FIELDS#)
+  body_html       text
+  is_editable     boolean       [default: true]
+  is_active       boolean       [default: true]
+  created_at      timestamp     [default: `now()`]
+}
+
+Table postcard_templates {
+  // SOURCE: POSTCARDS.txt — recall/reminder postcard templates
+  id              serial        [pk]
+  tenant_id       int           [not null, ref: > tenants.id]
+  office_id       int           [ref: > offices.id]
+  legacy_id       varchar(20)   [note: 'Denticon PCID']
+  name            varchar(255)  [not null]
+  // SOURCE: TYPE ('R'=recall)
+  card_type       varchar(10)
+  body            text
+  created_at      timestamp     [default: `now()`]
+}
+
+
+// ============================================================
+// DOMAIN 9 — STAFF & OPERATIONS
+// ============================================================
+
+Table time_clock_entries {
+  // SOURCE: TCLOCK.txt
+  id              serial        [pk]
+  tenant_id       int           [not null, ref: > tenants.id]
+  office_id       int           [ref: > offices.id]
+  // SOURCE: USERID (login username string — maps to users.legacy_id)
+  user_id         int           [not null, ref: > users.id]
+  legacy_id       varchar(20)   [note: 'Denticon TCLOCKID']
+  clock_in        timestamp     [not null]
+  clock_out       timestamp
+  // SOURCE: LTOTAL (total hours decimal e.g. 5.3667)
+  total_hours     numeric(5,2)
+  created_at      timestamp     [default: `now()`]
+  indexes { (user_id, clock_in) [name: 'idx_tclock_user_date'] }
+}
+
+
+// ============================================================
+// DOMAIN 10 — CONFIG & REFERENCE DATA
+// ============================================================
+
+Table definitions {
+  // SOURCE: DEFINITIONS.txt — system reference data (ADA categories, balance status codes,
+  // cancellation reasons, appointment types, etc.)
+  id              serial        [pk]
+  tenant_id       int           [not null, ref: > tenants.id]
+  legacy_id       varchar(20)   [note: 'Denticon DEFINITIONSID']
+  // SOURCE: DEFGROUP (e.g. 'ADACATEGORIES', 'CANCELLATIONREASONS', 'BALANCESTATUS')
+  group_code      varchar(50)   [not null]
+  key1            varchar(50)   [not null]
+  key2            varchar(50)
+  description     varchar(255)  [not null]
+  is_active       boolean       [default: true]
+  is_flash_alert  boolean       [default: false]
+  blocks_charges  boolean       [default: false]
+  created_at      timestamp     [default: `now()`]
+  indexes { (tenant_id, group_code) [name: 'idx_def_group'] }
+}
+
+Table imaging_templates {
+  // SOURCE: IMAGETEMPLATE.txt — X-ray/imaging layout templates
+  id              serial        [pk]
+  office_id       int           [not null, ref: > offices.id]
+  legacy_id       varchar(20)   [note: 'Denticon TEMPLATEID']
+  name            varchar(255)  [not null]
+  // SOURCE: TEMPLATETYPE (0=standard)
+  template_type   varchar(20)
+  // SOURCE: DENTITION ('A'=adult, 'P'=pediatric)
+  dentition       varchar(5)
+  created_at      timestamp     [default: `now()`]
+}
+
+Table perio_chart_settings {
+  // SOURCE: CHARTPERIOSETUP.txt — per-user perio chart display preferences
+  id              serial        [pk]
+  user_id         int           [not null, ref: > users.id]
+  is_forward      boolean       [default: true]
+  is_indicator    boolean       [default: true]
+  is_mgj          boolean       [default: true]
+  // Threshold levels for color coding
+  pd_level        int           [default: 4]
+  bp_level        int           [default: 2]
+  ip_level        int           [default: 3]
+  created_at      timestamp     [default: `now()`]
+  indexes { user_id [unique] }
+}
+
+Table questionnaire_headers {
+  // SOURCE: QALISTH.txt — clinical questionnaire templates (tooth selection lists)
+  id              serial        [pk]
+  tenant_id       int           [not null, ref: > tenants.id]
+  legacy_id       varchar(20)   [note: 'Denticon QALISTID']
+  description     varchar(255)  [not null]
+  is_multi_select boolean       [default: false]
+  is_active       boolean       [default: true]
+  created_at      timestamp     [default: `now()`]
+}
+
+Table questionnaire_options {
+  // SOURCE: QALISTD.txt — answer options for each questionnaire
+  id              serial        [pk]
+  questionnaire_id int          [not null, ref: > questionnaire_headers.id]
+  legacy_id       varchar(20)   [note: 'Denticon QALISTDID']
+  answer_code     varchar(20)   [not null]
+  sort_order      int           [default: 1]
+  is_active       boolean       [default: true]
+  created_at      timestamp     [default: `now()`]
+}

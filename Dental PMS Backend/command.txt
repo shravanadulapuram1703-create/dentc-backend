@@ -1,0 +1,53 @@
+cd "Dental PMS Backend"
+pip install -r migration/requirements.txt
+cp migration/.env.example migration/.env
+copy migration\.env.example migration\.env
+# Edit migration/.env with your Postgres credentials
+
+
+python migration/run_schema.py           # safe: creates tables + applies constraints
+python migration/run_schema.py --drop    # wipe and recreate (asks for confirmation)
+python migration/run_schema.py --check   # test connection only
+python migration/run_schema.py --verify  # confirm all 75 are present
+
+# After migration code updates, re-run schema once to apply new DB constraints:
+python migration/run_schema.py
+
+
+python migration/run_migration.py               # all rows (full migration)
+python migration/run_migration.py --sample      # max 5000 source rows per table
+python migration/run_migration.py --max-rows 1000   # custom cap per table
+python migration/run_migration.py --all         # full load (ignore env limit)
+python migration/run_migration.py --dry-run     # count source rows, no DB writes
+python migration/run_migration.py --dry-run --sample
+python migration/run_migration.py --from 18     # resume from step 18 (prescription_library)
+python migration/run_migration.py --from 19     # resume from step 19 (patients)
+python migration/run_migration.py --from 7 --steps 7-11 --sample   # insurance + fee schedules (needed before step 20)
+python migration/run_migration.py --from 20 --sample               # resume patient insurance onward
+python migration/run_migration.py --step 30 --sample          # run ONLY step 30 (treatment_plan_items)
+python migration/run_migration.py --from 30 --sample        # run steps 30 through 55
+python migration/run_migration.py --steps 29-30 --sample    # run steps 29 and 30 only
+python migration/run_migration.py --step 28     # one step only (procedures)
+python migration/run_migration.py --steps 1-10  # range
+python migration/run_migration.py --step 1
+
+
+# 1. Install the new dependency
+pip install sqlparse --break-system-packages
+
+# 2. Drop the existing 48 partial tables and recreate all 75 cleanly
+python migration/run_schema.py --drop
+
+
+# 3. Confirm all 75 are present
+python migration/run_schema.py --verify
+
+
+# List all past runs with status + row totals
+python migration/show_logs.py
+
+# Full detail for one run (steps, timings, table counts)
+python migration/show_logs.py --run 2026-05-30_14-22-05
+
+# Compare two runs — shows which tables changed and by how much
+python migration/show_logs.py --diff 2026-05-30_09-00-00 2026-05-30_14-22-05

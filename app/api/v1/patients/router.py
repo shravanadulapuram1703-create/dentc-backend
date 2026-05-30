@@ -30,6 +30,8 @@ from app.api.v1.patients.schemas import (
 )
 from app.api.v1.patients import service
 
+
+
 router = APIRouter(prefix="/patients", tags=["Patients"])
 
 
@@ -437,3 +439,6 @@ def delete_patient(
         "message": "Patient deleted successfully",
         "status": "success"
     }
+
+
+

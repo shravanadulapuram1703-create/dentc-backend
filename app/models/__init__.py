@@ -125,6 +125,7 @@ from app.models.ip_addresses import IPAddress
 from app.models.refresh_token import RefreshToken
 from app.models.audit_log import AuditLog
 from app.models.impersonation_session import ImpersonationSession
+from app.models.account_setup import AccountSetup
 from app.models.patient_ledger import (
     PatientLedgerEntry,
     PatientProcedure,
