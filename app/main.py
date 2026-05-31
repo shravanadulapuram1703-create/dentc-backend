@@ -1,167 +1,102 @@
-import logging
-import logging.config
+"""Application entry point and factory.
 
+Wiring order: logging → app → CORS → request-context middleware → exception
+handlers → routers → OpenAPI customisation. Tenancy is column-based (no tenant
+middleware). Run locally with: ``uvicorn app.main:app --reload --port 8000``.
+"""
 
+from __future__ import annotations
 
-from fastapi import FastAPI, Request
-from fastapi import HTTPException
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from collections import Counter
+from contextlib import asynccontextmanager
 
-from app.api.v1.router import api_router
-from app.core.config import settings
-from app.middleware.tenant_middleware import TenantMiddleware
-# import app.models  # ensures metadata is registered
-# from app.core.logging import LOGGING_CONFIG
-
-from app.core.logging import setup_logging
-
-from app.middleware.logging import request_logging_middleware
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 
-# from app.core.config import settings  # or os.environ
+from app.api.router import api_router
+from app.core.config import settings
+from app.core.exceptions import register_exception_handlers
+from app.core.logging import get_logger, setup_logging
+from app.middleware.audit import AuditMiddleware
+from app.middleware.request_context import RequestContextMiddleware
 
-
-# import app.models  # forces model registration
-
-
-#  Setup logging FIRST (before app creation)
-# try:
-#     logging.config.dictConfig(LOGGING_CONFIG)
-# except Exception:
-#     logging.basicConfig(level=logging.INFO)
-#     logging.getLogger(__name__).exception("Failed to setup logging config")
-
-logger = setup_logging()
-logger = logging.getLogger(__name__)
-logger.info("Starting DentC Backend application")
+setup_logging(settings.LOG_LEVEL, settings.LOG_JSON)
+logger = get_logger("app")
 
 
-# Create FastAPI app
-app = FastAPI(
-    title=settings.APP_NAME,
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-)
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    logger.info("Starting %s (env=%s)", settings.APP_NAME, settings.ENV)
+    yield
+    logger.info("Shutting down %s", settings.APP_NAME)
 
 
-# ==================================================
-# Global error format (contract: {"error": {...}})
-# ==================================================
-
-def _error_payload(code: str, message: str, details=None):
-    return {"error": {"code": code, "message": message, "details": details}}
-
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    # Map common status codes to contract error codes
-    status_code = exc.status_code
-    code_map = {
-        400: "VALIDATION_ERROR",
-        401: "FORBIDDEN",
-        403: "FORBIDDEN",
-        404: "NOT_FOUND",
-        422: "BUSINESS_RULE_VIOLATION",
-        500: "INTERNAL_SERVER_ERROR",
-    }
-    err_code = code_map.get(status_code, "INTERNAL_SERVER_ERROR")
-
-    if isinstance(exc.detail, dict) and "error" in exc.detail:
-        payload = exc.detail
-    else:
-        payload = _error_payload(err_code, str(exc.detail), None)
-
-    return JSONResponse(status_code=status_code, content=payload)
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # Pydantic validation errors
-    return JSONResponse(
-        status_code=400,
-        content=_error_payload(
-            "VALIDATION_ERROR",
-            "Request validation failed",
-            details=exc.errors(),
-        ),
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title=settings.APP_NAME,
+        version="1.0.0",
+        description="Dental PMS REST API. Column-tenant-scoped; snake_case; Orval-ready.",
+        openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
-#  CORS must come first
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000","http://16.176.134.94:5173/","http://16.176.134.94:5173","http://localhost:5173/","http://localhost:5173","http://34.66.199.55:5173","http://34.66.199.55:5173/"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["X-Request-ID", "X-Process-Time"],
+    )
+    app.add_middleware(RequestContextMiddleware)
+    # Outermost: records authenticated mutations after the handler resolves.
+    app.add_middleware(AuditMiddleware)
+
+    register_exception_handlers(app)
+
+    app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+    @app.get("/health", tags=["Meta"], operation_id="health_check")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "service": settings.APP_NAME}
+
+    _assert_unique_operation_ids(app)
+    _customise_openapi(app)
+    return app
 
 
-# if not settings.DEV_MODE:
-app.add_middleware(TenantMiddleware)
+def _assert_unique_operation_ids(app: FastAPI) -> None:
+    """Fail fast if two routes share an operation_id (would break Orval)."""
+    ids = [r.operation_id for r in app.routes if getattr(r, "operation_id", None)]
+    dupes = [oid for oid, n in Counter(ids).items() if n > 1]
+    if dupes:
+        raise RuntimeError(f"Duplicate operation_id(s): {dupes}")
 
 
-#  Then your custom middlewares
-# app.add_middleware(TenantMiddleware)
+def _customise_openapi(app: FastAPI) -> None:
+    def custom_openapi() -> dict:
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        # Single global bearer security scheme → typed, auth-aware Orval client.
+        schema.setdefault("components", {}).setdefault("securitySchemes", {})["BearerAuth"] = {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+        schema["security"] = [{"BearerAuth": []}]
+        app.openapi_schema = schema
+        return schema
 
-from app.middleware.performance import PerformanceMiddleware
-
-# Add performance monitoring middleware
-app.add_middleware(PerformanceMiddleware)
-
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    return await request_logging_middleware(request, call_next)
-
-# origins = [
-#     "http://localhost:5173",
-#     "http://16.176.134.94:5173",  # your EC2 frontend
-#     "http://16.176.134.94:5173/",
-#     "*"
-
-# ]
-
-
-#  Routers
-app.include_router(api_router, prefix="/api/v1")
+    app.openapi = custom_openapi  # type: ignore[method-assign]
 
 
-
-
-#  Startup event
-@app.on_event("startup")
-async def on_startup():
-    logger.info("DentC Backend startup complete")
-
-
-#  Routes
-@app.get("/")
-def root():
-    logger.info("Root endpoint called")
-    return {"message": "DentC Backend is running"}
-
-
-@app.get("/health")
-def health_check():
-    logger.info("Health check endpoint called")
-    return {"status": "ok"}
-
-
-
-
-# eaxmple usages for require_permission
-
-# @router.get(
-#     "/{patient_id}",
-#     dependencies=[Depends(require_permission("PATIENT_VIEW"))]
-# )
-# def get_patient(patient_id: int):
-#     ...
-
-# @router.post("/")
-# def create_patient(
-#     current_user=Depends(require_permission("PATIENT_CREATE"))
-# ):
-#     return {"created_by": current_user.id}
+app = create_app()

@@ -1,41 +1,94 @@
+"""Password hashing and JWT encode/decode primitives.
 
-# token_store.py
+This module is intentionally dependency-light and stateless. Token *storage*
+(refresh-token whitelist, access-token blacklist) lives in
+``app.integrations.redis`` so this stays a pure crypto helper.
+"""
 
-from datetime import timedelta
-from app.core.redis import redis_client
+from __future__ import annotations
 
-REFRESH_PREFIX = "refresh_token"
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
-def store_refresh_token(
-    user_id: int,
-    jti: str,
-    token: str,
-    expires_in: int,
-):
-    key = f"{REFRESH_PREFIX}:{user_id}:{jti}"
-    redis_client.setex(key, expires_in, token)
+from app.core.config import settings
+from app.core.exceptions import UnauthorizedError
 
+_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def validate_refresh_token(user_id: int, jti: str) -> bool:
-    key = f"{REFRESH_PREFIX}:{user_id}:{jti}"
-    return redis_client.exists(key) == 1
-
-
-def revoke_refresh_token(user_id: int, jti: str):
-    key = f"{REFRESH_PREFIX}:{user_id}:{jti}"
-    redis_client.delete(key)
-
-# token_blacklist.py
-
-BLACKLIST_PREFIX = "blacklist:access"
+ACCESS_TOKEN_TYPE = "access"
+REFRESH_TOKEN_TYPE = "refresh"
 
 
-def blacklist_access_token(jti: str, expires_in: int):
-    key = f"{BLACKLIST_PREFIX}:{jti}"
-    redis_client.setex(key, expires_in, "true")
+# ── Passwords ──────────────────────────────────────────────────────────────
+def hash_password(plain: str) -> str:
+    return _pwd_context.hash(plain)
 
 
-def is_access_token_blacklisted(jti: str) -> bool:
-    key = f"{BLACKLIST_PREFIX}:{jti}"
-    return redis_client.exists(key) == 1
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return _pwd_context.verify(plain, hashed)
+    except ValueError:
+        return False
+
+
+# ── Tokens ─────────────────────────────────────────────────────────────────
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _create_token(
+    subject: str | int,
+    token_type: str,
+    expires_delta: timedelta,
+    extra_claims: dict[str, Any] | None = None,
+) -> tuple[str, str]:
+    """Return ``(encoded_jwt, jti)``."""
+    jti = uuid.uuid4().hex
+    now = _now()
+    payload: dict[str, Any] = {
+        "sub": str(subject),
+        "type": token_type,
+        "jti": jti,
+        "iat": int(now.timestamp()),
+        "exp": int((now + expires_delta).timestamp()),
+    }
+    if extra_claims:
+        payload.update(extra_claims)
+    encoded = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return encoded, jti
+
+
+def create_access_token(
+    subject: str | int, extra_claims: dict[str, Any] | None = None
+) -> tuple[str, str]:
+    return _create_token(
+        subject,
+        ACCESS_TOKEN_TYPE,
+        timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        extra_claims,
+    )
+
+
+def create_refresh_token(
+    subject: str | int, extra_claims: dict[str, Any] | None = None
+) -> tuple[str, str]:
+    return _create_token(
+        subject,
+        REFRESH_TOKEN_TYPE,
+        timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        extra_claims,
+    )
+
+
+def decode_token(token: str, *, expected_type: str | None = None) -> dict[str, Any]:
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    except JWTError as exc:
+        raise UnauthorizedError("Invalid or expired token", code="invalid_token") from exc
+    if expected_type and payload.get("type") != expected_type:
+        raise UnauthorizedError("Wrong token type", code="invalid_token")
+    return payload

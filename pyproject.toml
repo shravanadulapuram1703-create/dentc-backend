@@ -1,0 +1,23 @@
+[project]
+name = "dental-pms-backend"
+version = "1.0.0"
+description = "Dental PMS REST API — FastAPI, SQLAlchemy 2.x, Pydantic v2; column-tenant-scoped, Orval-ready."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ANN", "S"]
+ignore = ["ANN101", "ANN102", "ANN401", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "ANN"]
+"scripts/*" = ["S101", "ANN"]
+"alembic/*" = ["ANN"]
