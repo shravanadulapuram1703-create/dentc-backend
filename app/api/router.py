@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.v1 import audit, auth, balances, billing, treatment, users
+from app.api.v1 import audit, auth, balances, billing, ledger, treatment, users
 from app.api.v1.registry import build_entity_router
 
 api_router = APIRouter()
@@ -14,5 +14,6 @@ api_router.include_router(users.router)
 api_router.include_router(billing.router)
 api_router.include_router(treatment.router)
 api_router.include_router(balances.router)
+api_router.include_router(ledger.router)
 api_router.include_router(audit.router)
 api_router.include_router(build_entity_router())

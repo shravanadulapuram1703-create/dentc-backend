@@ -10,10 +10,11 @@ The dynamic ``body: cfg.create_schema`` parameter annotation must evaluate to th
 real Pydantic class at definition time so FastAPI can build the request model.
 """
 
-from dataclasses import dataclass
-from typing import Annotated, Any
+import inspect
+from dataclasses import dataclass, field
+from typing import Annotated, Any, Optional
 
-from fastapi import APIRouter, Depends, Path, Request, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 from sqlalchemy import inspect as sa_inspect
 
 from app.api.deps import DbSession, PageParams, TenantId, get_current_user
@@ -36,28 +37,89 @@ class CrudConfig:
     search_fields: tuple[str, ...] = ()
     sortable_fields: tuple[str, ...] = ()
     filter_fields: tuple[str, ...] = ()
+    range_fields: tuple[str, ...] = ()  # emit {f}_from / {f}_to typed query params
     default_sort: str = "created_at"
     soft_delete_field: str | None = "is_active"
     soft_delete_value: bool = False
 
 
-def _coerce(model: type, fields: tuple[str, ...], request: Request) -> dict[str, Any]:
-    """Pull whitelisted filter values from the query string, cast to column type."""
-    columns = sa_inspect(model).columns
-    out: dict[str, Any] = {}
-    for f in fields:
-        raw = request.query_params.get(f)
-        if raw is None or f not in columns:
-            continue
-        try:
-            pytype = columns[f].type.python_type
-        except Exception:  # noqa: BLE001
-            pytype = str
-        try:
-            out[f] = {"True": True, "true": True, "False": False, "false": False}[raw] if pytype is bool else pytype(raw)
-        except (ValueError, KeyError):
-            out[f] = raw
-    return out
+def _col_pytype(columns, name: str) -> type | None:  # noqa: ANN001
+    col = columns.get(name)
+    if col is None:
+        return None
+    try:
+        return col.type.python_type
+    except Exception:  # noqa: BLE001
+        return str
+
+
+def _make_list_endpoint(cfg: "CrudConfig", crud: CRUDBase, plural: str):
+    """Build a list handler whose signature declares one typed, OpenAPI-visible
+    ``Query`` param per filter field (+ ``{f}_from``/``{f}_to`` per range field),
+    so Orval generates typed filter arguments. Values are FastAPI-coerced."""
+    columns = sa_inspect(cfg.model).columns
+    eq_fields = [f for f in cfg.filter_fields if f in columns]
+    rng_fields = [f for f in cfg.range_fields if f in columns]
+
+    def list_items(db, tenant_id, page, **kwargs):  # noqa: ANN001
+        filters = {f: kwargs.get(f) for f in eq_fields}
+        range_filters: dict[str, dict[str, Any]] = {}
+        for f in rng_fields:
+            lo, hi = kwargs.get(f"{f}_from"), kwargs.get(f"{f}_to")
+            if lo is not None or hi is not None:
+                range_filters[f] = {}
+                if lo is not None:
+                    range_filters[f]["ge"] = lo
+                if hi is not None:
+                    range_filters[f]["le"] = hi
+        items, total = crud.list(
+            db,
+            tenant_id=tenant_id,
+            page=page.page,
+            size=page.size,
+            sort=page.sort,
+            order=page.order,
+            search=page.search,
+            filters=filters,
+            range_filters=range_filters,
+        )
+        return PaginatedResponse.build(items, total, page.page, page.size)
+
+    params = [
+        inspect.Parameter("db", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=DbSession),
+        inspect.Parameter("tenant_id", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=TenantId),
+        inspect.Parameter("page", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=PageParams),
+    ]
+    for f in eq_fields:
+        pytype = _col_pytype(columns, f) or str
+        params.append(
+            inspect.Parameter(
+                f,
+                inspect.Parameter.KEYWORD_ONLY,
+                default=Query(None, description=f"Filter by {f}"),
+                annotation=Optional[pytype],
+            )
+        )
+    for f in rng_fields:
+        pytype = _col_pytype(columns, f) or str
+        params.append(
+            inspect.Parameter(
+                f"{f}_from",
+                inspect.Parameter.KEYWORD_ONLY,
+                default=Query(None, description=f"{f} >= (inclusive lower bound)"),
+                annotation=Optional[pytype],
+            )
+        )
+        params.append(
+            inspect.Parameter(
+                f"{f}_to",
+                inspect.Parameter.KEYWORD_ONLY,
+                default=Query(None, description=f"{f} <= (inclusive upper bound)"),
+                annotation=Optional[pytype],
+            )
+        )
+    list_items.__signature__ = inspect.Signature(params)
+    return list_items
 
 
 _ERRORS = {
@@ -87,25 +149,12 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
     )
     PkPath = Annotated[cfg.pk_type, Path(description=f"{cfg.singular} identifier")]
 
-    @router.get(
+    router.get(
         "",
         response_model=PaginatedResponse[cfg.read_schema],
         operation_id=f"list_{plural}",
         summary=f"List {plural.replace('_', ' ')}",
-    )
-    def list_items(db: DbSession, tenant_id: TenantId, page: PageParams, request: Request):
-        filters = _coerce(cfg.model, cfg.filter_fields, request)
-        items, total = crud.list(
-            db,
-            tenant_id=tenant_id,
-            page=page.page,
-            size=page.size,
-            sort=page.sort,
-            order=page.order,
-            search=page.search,
-            filters=filters,
-        )
-        return PaginatedResponse.build(items, total, page.page, page.size)
+    )(_make_list_endpoint(cfg, crud, plural))
 
     @router.post(
         "",

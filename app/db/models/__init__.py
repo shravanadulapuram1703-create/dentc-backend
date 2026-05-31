@@ -4,6 +4,12 @@ Importing this package registers every ORM class on ``Base.metadata`` (needed by
 Alembic autogenerate and by the app at startup). Add new domain modules here.
 """
 
+from app.db.models.access import (
+    UserGroup,
+    UserGroupMembership,
+    UserIpRule,
+    UserPreference,
+)
 from app.db.models.audit import AuditLog
 from app.db.models.billing import (
     ClaimSubmission,
@@ -97,6 +103,8 @@ from app.db.models.treatment import (
 __all__ = [
     # audit
     "AuditLog",
+    # access (Phase 4 net-new)
+    "UserPreference", "UserGroup", "UserGroupMembership", "UserIpRule",
     # identity
     "Tenant", "User", "RefreshToken", "Office", "Provider", "Operatory",
     "UserOffice", "OfficeGroup",

@@ -13,17 +13,18 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import ConflictError, UnauthorizedError
 from app.core.security import (
     REFRESH_TOKEN_TYPE,
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
     verify_password,
 )
-from app.db.models import User
+from app.db.models import Tenant, User
 from app.integrations import redis_store
-from app.schemas.auth import TokenResponse
+from app.schemas.auth import SignupRequest, TokenResponse
 
 
 def _access_ttl_seconds() -> int:
@@ -61,6 +62,40 @@ def login(db: Session, username: str, password: str) -> TokenResponse:
     user = authenticate(db, username, password)
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
+    return issue_tokens(user)
+
+
+def signup(db: Session, data: SignupRequest) -> TokenResponse:
+    """Self-service registration: provision a NEW tenant + its admin user.
+
+    Joining an existing practice is intentionally NOT supported here (that path
+    is invite-only via ``POST /users``), which avoids the tenant-assignment
+    security gate of injecting unauthenticated callers into an existing tenant.
+    """
+    if db.execute(select(Tenant.id).where(Tenant.code == data.practice_code)).scalar_one_or_none():
+        raise ConflictError("A practice with this code already exists", code="tenant_exists")
+    if db.execute(
+        select(User.id).where(or_(User.email == data.email, User.username == data.username))
+    ).scalar_one_or_none():
+        raise ConflictError("Email or username already in use", code="user_exists")
+
+    tenant = Tenant(name=data.practice_name, code=data.practice_code, is_active=True)
+    db.add(tenant)
+    db.flush()  # assign tenant.id without a second round-trip
+
+    user = User(
+        tenant_id=tenant.id,
+        email=data.email,
+        username=data.username,
+        password_hash=hash_password(data.password),
+        first_name=data.first_name,
+        last_name=data.last_name,
+        role="admin",
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return issue_tokens(user)
 
 

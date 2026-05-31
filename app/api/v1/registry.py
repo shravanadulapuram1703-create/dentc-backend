@@ -33,6 +33,7 @@ def _cfg(
     search: tuple[str, ...] = (),
     sortable: tuple[str, ...] = _DEFAULT_SORT,
     filters: tuple[str, ...] = (),
+    ranges: tuple[str, ...] = (),
     soft_field: str | None = "is_active",
     soft_value: bool = False,
     default_sort: str = "created_at",
@@ -53,6 +54,7 @@ def _cfg(
         search_fields=search,
         sortable_fields=sortable,
         filter_fields=filters,
+        range_fields=ranges,
         soft_delete_field=soft_field,
         soft_delete_value=soft_value,
         default_sort=default_sort,
@@ -80,7 +82,7 @@ _PATIENTS = [
     _cfg(m.Patient, "Patient", "patients", "Patients", "patient", "patients",
          search=("first_name", "last_name", "chart_no", "email", "phone"),
          sortable=("created_at", "id", "last_name", "first_name"),
-         filters=("home_office_id", "is_active", "preferred_provider_id")),
+         filters=("home_office_id", "is_active", "preferred_provider_id", "chart_no")),
     _cfg(m.PatientInsurance, "PatientInsurance", "patient-insurance", "Patients",
          "patient_insurance", "patient_insurance",
          filters=("patient_id", "insurance_type", "ins_plan_id")),
@@ -153,7 +155,7 @@ _SCHEDULING = [
          "appointment", "appointments", pk_type=str,
          search=("procedure_label", "notes"), sortable=("date", "start_time", "created_at"),
          filters=("patient_id", "provider_id", "operatory_id", "office_id", "date", "status"),
-         soft_field="is_archived", soft_value=True),
+         ranges=("date",), soft_field="is_archived", soft_value=True),
     _cfg(m.AppointmentProcedure, "AppointmentProcedure", "appointment-procedures", "Appointments",
          "appointment_procedure", "appointment_procedures",
          filters=("appointment_id", "procedure_code", "provider_id"),
@@ -177,7 +179,7 @@ _CLINICAL = [
          sortable=("date_of_service", "created_at"),
          filters=("patient_id", "appointment_id", "provider_id", "procedure_code",
                   "claim_id", "billing_status", "is_void"),
-         soft_field="is_void", soft_value=True),
+         ranges=("date_of_service",), soft_field="is_void", soft_value=True),
     _cfg(m.ChartCondition, "ChartCondition", "chart-conditions", "Clinical",
          "chart_condition", "chart_conditions",
          filters=("patient_id", "tooth", "provider_id"),
@@ -206,7 +208,7 @@ _BILLING = [
          "patient_payment", "patient_payments", pk_type=str,
          sortable=("payment_date", "created_at"),
          filters=("patient_id", "payment_type", "provider_id", "is_void"),
-         soft_field="is_void", soft_value=True),
+         ranges=("payment_date",), soft_field="is_void", soft_value=True),
     _cfg(m.InsuranceClaim, "InsuranceClaim", "insurance-claims", "Billing",
          "insurance_claim", "insurance_claims", pk_type=str, search=("claim_number",),
          filters=("patient_id", "status", "claim_type", "carrier_id", "ins_plan_id", "is_active")),
@@ -311,9 +313,22 @@ _MISC = [
          filters=("referral_id", "demog_header_id"), soft_field=None),
 ]
 
+# ── User access sub-resources (Phase 4, net-new) ───────────────────────────
+_ACCESS = [
+    _cfg(m.UserPreference, "UserPreference", "user-preferences", "Staff",
+         "user_preference", "user_preferences", filters=("user_id", "pref_key"), soft_field=None),
+    _cfg(m.UserGroup, "UserGroup", "user-groups", "Staff",
+         "user_group", "user_groups", search=("name",), filters=("is_active",)),
+    _cfg(m.UserGroupMembership, "UserGroupMembership", "user-group-memberships", "Staff",
+         "user_group_membership", "user_group_memberships",
+         filters=("user_id", "group_id"), soft_field=None),
+    _cfg(m.UserIpRule, "UserIpRule", "user-ip-rules", "Staff",
+         "user_ip_rule", "user_ip_rules", filters=("user_id", "rule_type", "is_active")),
+]
+
 ALL_CONFIGS: list[CrudConfig] = [
     *_ORG, *_PATIENTS, *_INSURANCE, *_CODES, *_SCHEDULING, *_TREATMENT,
-    *_CLINICAL, *_BILLING, *_REFERENCE, *_COMMS, *_STAFF, *_MISC,
+    *_CLINICAL, *_BILLING, *_REFERENCE, *_COMMS, *_STAFF, *_MISC, *_ACCESS,
 ]
 
 

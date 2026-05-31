@@ -111,8 +111,17 @@ statement timeout are set there. Models register on `Base.metadata` via
 Phase 1 (org/patients/insurance/scheduling/treatment/codes), Phase 2 (clinical,
 billing, reference, comms, staff, imaging + service overrides), and Phase 3
 (audit logging + cached balances) are **implemented** — all 75 migrated tables
-modelled, 73 exposed as CRUD, plus the `audit_logs` table (added by Alembic
-revision `a1b2c3d4e5f6`, not part of the Denticon migration).
+modelled, plus `audit_logs` (Alembic `a1b2c3d4e5f6`) and the Phase-4 user-access
+tables `user_preferences`/`user_groups`/`user_group_memberships`/`user_ip_rules`
+(Alembic `b2c3d4e5f6a7`) — **77 entities exposed as CRUD**.
+
+**Frontend-alignment work** (see [docs/BACKEND_IMPLEMENTATION_PLAN.md](docs/BACKEND_IMPLEMENTATION_PLAN.md))
+is implemented: list endpoints expose **typed, OpenAPI-visible filter params**
+(generated from `filter_fields` via a dynamic signature in `router_factory.py`)
+plus `{field}_from`/`{field}_to` date ranges; `GET /definitions?group_code=` drives
+all dropdowns; `GET /patients/{id}/balance` is enriched (aging/estimates/recent
+activity) and `GET /patients/{id}/ledger` gives a running-balance feed;
+`POST /auth/signup` (new tenant + admin) and `GET /auth/me-full` round out auth.
 
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))

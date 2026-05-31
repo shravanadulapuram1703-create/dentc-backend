@@ -70,6 +70,7 @@ class CRUDBase(Generic[ModelT]):
         order: str = "desc",
         search: str | None = None,
         filters: dict[str, Any] | None = None,
+        range_filters: dict[str, dict[str, Any]] | None = None,
     ) -> tuple[list[ModelT], int]:
         stmt = self._scope_tenant(select(self.model), tenant_id)
 
@@ -77,6 +78,16 @@ class CRUDBase(Generic[ModelT]):
         for field, value in (filters or {}).items():
             if value is not None and hasattr(self.model, field):
                 stmt = stmt.where(getattr(self.model, field) == value)
+
+        # range filters: {field: {"ge": lo, "le": hi}} (either bound optional)
+        for field, bounds in (range_filters or {}).items():
+            if not hasattr(self.model, field):
+                continue
+            column = getattr(self.model, field)
+            if bounds.get("ge") is not None:
+                stmt = stmt.where(column >= bounds["ge"])
+            if bounds.get("le") is not None:
+                stmt = stmt.where(column <= bounds["le"])
 
         # free-text search across declared columns
         if search and self.search_fields:
