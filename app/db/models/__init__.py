@@ -10,7 +10,22 @@ from app.db.models.access import (
     UserIpRule,
     UserPreference,
 )
+from app.db.models.account import (
+    AccountCommunications,
+    AccountConsent,
+    AccountHoliday,
+    AccountSettings,
+    OfficePhoneAssignment,
+)
 from app.db.models.audit import AuditLog
+from app.db.models.office_setup import (
+    OfficeAdvancedSettings,
+    OfficeIntegrations,
+    OfficeScheduleDay,
+    OfficeSmartAssist,
+    OfficeSmartAssistItem,
+    OfficeStatementSettings,
+)
 from app.db.models.billing import (
     ClaimSubmission,
     InsuranceClaim,
@@ -105,6 +120,12 @@ __all__ = [
     "AuditLog",
     # access (Phase 4 net-new)
     "UserPreference", "UserGroup", "UserGroupMembership", "UserIpRule",
+    # account information (Setup -> Account Info)
+    "AccountSettings", "AccountCommunications", "OfficePhoneAssignment",
+    "AccountHoliday", "AccountConsent",
+    # office setup (Setup -> Offices)
+    "OfficeStatementSettings", "OfficeIntegrations", "OfficeScheduleDay",
+    "OfficeAdvancedSettings", "OfficeSmartAssist", "OfficeSmartAssistItem",
     # identity
     "Tenant", "User", "RefreshToken", "Office", "Provider", "Operatory",
     "UserOffice", "OfficeGroup",

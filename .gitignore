@@ -5,3 +5,5 @@ venv/
 *.pyc
 .idea/
 .vscode/
+.claude/
+uploads/

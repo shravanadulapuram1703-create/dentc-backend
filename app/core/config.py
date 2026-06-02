@@ -62,6 +62,16 @@ class Settings(BaseSettings):
     # ── CORS ───────────────────────────────────────────────────────────────
     CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["*"])
 
+    # ── Encryption (EIN, AI-assist secret, …) ────────────────────────────────
+    # A urlsafe-base64 32-byte Fernet key. If unset, derived from JWT_SECRET_KEY.
+    ENCRYPTION_KEY: str | None = None
+
+    # ── Uploads (account logo) ───────────────────────────────────────────────
+    UPLOAD_DIR: str = "uploads"
+    UPLOAD_URL_BASE: str = "/uploads"
+    LOGO_MAX_BYTES: int = 2 * 1024 * 1024  # 2 MB
+    LOGO_ALLOWED_TYPES: list[str] = Field(default_factory=lambda: ["image/jpeg", "image/png"])
+
     # ── Logging ────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
     LOG_JSON: bool = False

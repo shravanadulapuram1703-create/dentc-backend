@@ -123,6 +123,17 @@ all dropdowns; `GET /patients/{id}/balance` is enriched (aging/estimates/recent
 activity) and `GET /patients/{id}/ledger` gives a running-balance feed;
 `POST /auth/signup` (new tenant + admin) and `GET /auth/me-full` round out auth.
 
+**Account Information module** (Setup → Account Info; see
+[docs/setup/account-info/ACCOUNT_INFO_IMPLEMENTATION.md](docs/setup/account-info/ACCOUNT_INFO_IMPLEMENTATION.md))
+adds 5 tenant-scoped tables (`account_settings` 1:1, `account_communications` 1:1,
+`office_phone_assignments`, `account_holidays`, `account_consents`; Alembic
+`c3d4e5f6a7b8`) and routes under `/tenants/{tenant_id}/…`
+([app/api/v1/account.py](app/api/v1/account.py)): account-settings, logo,
+communications (+verify-telecom), phone-assignments, holidays (+federal/range/bulk),
+consents (versioned + sanitized). Secrets (AI-assist secret, EIN) encrypted via
+[app/core/crypto.py](app/core/crypto.py). Dropdown `group_code`s seeded by
+`scripts/seed_account_definitions.py`.
+
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))
   records authenticated 2xx mutations (POST/PUT/PATCH/DELETE) to `audit_logs` via

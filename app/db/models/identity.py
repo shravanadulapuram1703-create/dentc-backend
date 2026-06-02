@@ -71,6 +71,16 @@ class Office(Base, IntPKMixin, TimestampMixin):
     schedule_start_hour: Mapped[int] = mapped_column(Integer, default=8)
     schedule_end_hour: Mapped[int] = mapped_column(Integer, default=17)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # ── Billing configuration (Office Setup -> Info tab, gap #11) ─────────────
+    phone_2: Mapped[str | None] = mapped_column(String(20))
+    phone_ext: Mapped[str | None] = mapped_column(String(10))
+    tax_id: Mapped[str | None] = mapped_column(String(50))
+    billing_provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
+    use_billing_license: Mapped[bool] = mapped_column(Boolean, default=False)
+    office_group_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("office_groups.id"))
+    opening_date: Mapped[date | None]
+    default_fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
+    default_ucr_fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 

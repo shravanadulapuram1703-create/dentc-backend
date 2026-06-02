@@ -59,6 +59,13 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+    # Serve uploaded assets (e.g. account logos). Swap for object storage in prod.
+    import os
+    from fastapi.staticfiles import StaticFiles
+
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    app.mount(settings.UPLOAD_URL_BASE, StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+
     @app.get("/health", tags=["Meta"], operation_id="health_check")
     def health() -> dict[str, str]:
         return {"status": "ok", "service": settings.APP_NAME}
