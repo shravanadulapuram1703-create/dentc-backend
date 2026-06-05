@@ -8,7 +8,9 @@ from app.db.models.access import (
     UserGroup,
     UserGroupMembership,
     UserIpRule,
+    UserLoginRestriction,
     UserPreference,
+    UserTimeClockConfig,
 )
 from app.db.models.account import (
     AccountCommunications,
@@ -18,6 +20,16 @@ from app.db.models.account import (
     OfficePhoneAssignment,
 )
 from app.db.models.audit import AuditLog
+from app.db.models.office_assignment import (
+    OfficeCodeBundle,
+    OfficeLetterTemplate,
+    OfficeNoteMacro,
+    OfficePrescriptionLibrary,
+    OfficeProcedureCode,
+    OfficeProductionType,
+    ProductionType,
+    ProviderOffice,
+)
 from app.db.models.office_setup import (
     OfficeAdvancedSettings,
     OfficeIntegrations,
@@ -120,12 +132,17 @@ __all__ = [
     "AuditLog",
     # access (Phase 4 net-new)
     "UserPreference", "UserGroup", "UserGroupMembership", "UserIpRule",
+    "UserTimeClockConfig", "UserLoginRestriction",
     # account information (Setup -> Account Info)
     "AccountSettings", "AccountCommunications", "OfficePhoneAssignment",
     "AccountHoliday", "AccountConsent",
     # office setup (Setup -> Offices)
     "OfficeStatementSettings", "OfficeIntegrations", "OfficeScheduleDay",
     "OfficeAdvancedSettings", "OfficeSmartAssist", "OfficeSmartAssistItem",
+    # office assignment (Setup -> Offices -> Office Assignment)
+    "ProductionType", "OfficeProcedureCode", "OfficeCodeBundle",
+    "OfficeProductionType", "ProviderOffice", "OfficeNoteMacro",
+    "OfficePrescriptionLibrary", "OfficeLetterTemplate",
     # identity
     "Tenant", "User", "RefreshToken", "Office", "Provider", "Operatory",
     "UserOffice", "OfficeGroup",

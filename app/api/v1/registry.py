@@ -326,9 +326,17 @@ _ACCESS = [
          "user_ip_rule", "user_ip_rules", filters=("user_id", "rule_type", "is_active")),
 ]
 
+# ── Office Assignment catalog (Setup -> Offices -> Office Assignment) ────────
+_OFFICE_CATALOG = [
+    _cfg(m.ProductionType, "ProductionType", "production-types", "Office Setup",
+         "production_type", "production_types", search=("name",),
+         filters=("is_active", "is_inactive")),
+]
+
 ALL_CONFIGS: list[CrudConfig] = [
     *_ORG, *_PATIENTS, *_INSURANCE, *_CODES, *_SCHEDULING, *_TREATMENT,
     *_CLINICAL, *_BILLING, *_REFERENCE, *_COMMS, *_STAFF, *_MISC, *_ACCESS,
+    *_OFFICE_CATALOG,
 ]
 
 

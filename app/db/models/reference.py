@@ -21,6 +21,10 @@ class Definition(Base, IntPKMixin, CreatedAtMixin):
     key1: Mapped[str] = mapped_column(String(50))
     key2: Mapped[str | None] = mapped_column(String(50))
     description: Mapped[str] = mapped_column(String(255))
+    # Scheduler gap #4: centralised color + ordering for definition-driven dropdowns
+    # (e.g. appointment status colors).
+    color: Mapped[str | None] = mapped_column(String(20))
+    sort_order: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_flash_alert: Mapped[bool] = mapped_column(Boolean, default=False)
     blocks_charges: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Query, status
 from pydantic import BaseModel, EmailStr, Field
 
 from app.api.deps import DbSession, PageParams, TenantId, require_roles
@@ -17,6 +17,7 @@ from app.crud.base import CRUDBase
 from app.db.models import User
 from app.schemas.auth import UserRead
 from app.schemas.common import ErrorResponse, PaginatedResponse
+from app.services import user_admin_service
 
 router = APIRouter(
     prefix="/users",
@@ -55,10 +56,24 @@ class UserUpdate(BaseModel):
 
 @router.get("", response_model=PaginatedResponse[UserRead], operation_id="list_users",
             summary="List users")
-def list_users(db: DbSession, tenant_id: TenantId, page: PageParams):
+def list_users(
+    db: DbSession,
+    tenant_id: TenantId,
+    page: PageParams,
+    office_id: Annotated[int | None, Query(description="Filter by assigned office")] = None,
+    role: Annotated[str | None, Query()] = None,
+    is_active: Annotated[bool | None, Query()] = None,
+):
+    # Gap 6: office_id filters via the user_offices join; role/is_active are columns.
+    id_in = None
+    if office_id is not None:
+        id_in = user_admin_service.office_user_ids(db, office_id)
+        if not id_in:
+            return PaginatedResponse.build([], 0, page.page, page.size)
     items, total = _crud.list(
         db, tenant_id=tenant_id, page=page.page, size=page.size,
         sort=page.sort, order=page.order, search=page.search,
+        filters={"role": role, "is_active": is_active}, id_in=id_in,
     )
     return PaginatedResponse.build(items, total, page.page, page.size)
 

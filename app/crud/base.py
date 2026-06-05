@@ -71,8 +71,13 @@ class CRUDBase(Generic[ModelT]):
         search: str | None = None,
         filters: dict[str, Any] | None = None,
         range_filters: dict[str, dict[str, Any]] | None = None,
+        id_in: list[Any] | None = None,
     ) -> tuple[list[ModelT], int]:
         stmt = self._scope_tenant(select(self.model), tenant_id)
+
+        # restrict to an explicit id set (e.g. join-derived membership)
+        if id_in is not None:
+            stmt = stmt.where(self._pk.in_(id_in))
 
         # equality filters on whitelisted columns
         for field, value in (filters or {}).items():

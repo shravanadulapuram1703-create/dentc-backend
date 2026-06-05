@@ -59,6 +59,9 @@ class Patient(Base, IntPKMixin, TimestampMixin):
     referral_type: Mapped[str | None] = mapped_column(String(50))
     referred_by: Mapped[str | None] = mapped_column(String(255))
     patient_notes: Mapped[str | None] = mapped_column(Text)
+    # Scheduler gap #8: responsible-party link + patient type (general/ortho).
+    responsible_party_id: Mapped[str | None] = mapped_column(String(50))
+    patient_type: Mapped[str | None] = mapped_column(String(50))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 

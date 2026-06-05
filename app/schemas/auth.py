@@ -34,10 +34,12 @@ class UserRead(ORMModel):
     last_name: str | None = None
     phone: str | None = None
     role: str
+    patient_access_level: str | None = None
     is_active: bool
     must_change_password: bool
     last_login_at: datetime | None = None
     created_at: datetime
+    created_by: int | None = None
 
 
 class SignupRequest(BaseModel):

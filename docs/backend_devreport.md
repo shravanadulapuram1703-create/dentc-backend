@@ -280,6 +280,61 @@ Schedule/Holidays/Advanced/SmartAssist tabs). Core list/open/create/update + ope
 already migrated to `/api/v1/offices` and `/api/v1/operatories`. Gaps below cover the remaining tabs
 and a few field-level misalignments. Full analysis: `docs/setup/offices/OFFICES_INTEGRATION.md`.
 
+> ## ⚠️ DEPLOYMENT CHECK — 2026-06-01: gaps #12–#17, #22, #23 are STILL NOT LIVE
+> A request to "integrate all Office Setup tabs" was made on the basis that the backend team had
+> shipped these gaps. I re-pulled the spec (`npm run api:fetch`) and probed the running backend at
+> `http://127.0.0.1:8000`. **None of the gap endpoints/fields are present:**
+> - The freshly fetched `openapi.json` is **byte-for-byte identical** (SHA256 match, 856,127 bytes) to
+>   the version already in the repo — Orval regeneration yields **zero** changes.
+> - The only office sub-path in the spec is `/api/v1/offices/{item_id}`. Live probes:
+>   `GET /api/v1/offices/1/{statement-settings,schedule,integrations,advanced-settings,smart-assist,holidays}`
+>   → **all 404**.
+> - `OfficeRead` props are unchanged → still **no `updated_by`** (gap #22 open). `updated_by` exists only
+>   on `AccountCommunicationsRead`/`AccountSettingsRead`.
+> - `OperatoryRead`/`OperatoryCreate`/`OperatoryUpdate` have **no `default_provider_id`** (gap #23 open).
+> - No new schemas (`OfficeStatementSettings*`, `OfficeSchedule*`, `OfficeIntegrations*`,
+>   `OfficeAdvancedSettings*`, `OfficeSmartAssist*`, office `Holiday*`) exist.
+>
+> **Conclusion:** the frontend is built and gated, but cannot be flipped on. The work is either not
+> deployed to this backend instance, or the OpenAPI schema was not regenerated after the change. **Action
+> for the backend team:** deploy + confirm the routes appear in `GET /api/v1/openapi.json`. **Go-live then
+> takes minutes** (see each gap's "go-live" note + `OFFICES_INTEGRATION.md` §10): `npm run api:sync`, swap
+> each per-tab raw-axios service for the regenerated client, flip the `OFFICE_*_BACKEND_READY` flag.
+
+> ## ✅ RESOLVED — 2026-06-01 (later same day): gaps #12–#17 DEPLOYED + INTEGRATED
+> A subsequent `npm run api:fetch` returned a **changed** spec (897,270 bytes; SHA256 differs) and the
+> live probes now return **401** (auth required) instead of 404 — the routes exist. After
+> `npm run api:sync` the generated client gained the office-setup endpoints and models, and the frontend
+> was fully wired:
+> - **#12 Statement** → `getOfficeStatementSettings`/`updateOfficeStatementSettings` + `…/statement-logo`
+>   (`OfficeStatementSettingsRead/Update`).
+> - **#13 Integration** → `getOfficeIntegrations`/`updateOfficeIntegrations` (`OfficeIntegrationsRead/Update`).
+> - **#14 Schedule** → `getOfficeSchedule`/`setOfficeSchedule` (`OfficeScheduleDayRead`, `ScheduleReplace`/`ScheduleDayInput`).
+> - **#15 Holidays** → `listOfficeHolidays` + create/update/delete/bulk-delete/federal/range (reuses `AccountHoliday*`).
+> - **#16 Advanced** → `getOfficeAdvancedSettings`/`updateOfficeAdvancedSettings` (`OfficeAdvancedSettingsRead/Update`).
+> - **#17 SmartAssist** → `getOfficeSmartAssist`/`updateOfficeSmartAssist` (`SmartAssistRead/Update`, `OfficeSmartAssistItemRead`/`SmartAssistItemInput`).
+>
+> All six per-tab services now wrap the generated client (no raw axios); all six `OFFICE_*_BACKEND_READY`
+> flags are `true`. `tsc -b` + `eslint` clean. **Bonus:** `/api/v1/offices/metadata` (gap #10) and rich
+> `OfficeRead` billing fields — `tax_id`, `billing_provider_id`, `use_billing_license`, `office_group_id`,
+> `opening_date`, `default_fee_schedule_id`, `default_ucr_fee_schedule_id` (gap #11) — also shipped (Info-tab
+> wiring of these is a follow-up, see below).
+>
+> **STILL OPEN after this deploy (verified against the new spec):**
+> - **#22** — `OfficeRead` STILL has **no `updated_by`** (only `created_by`/`created_at`/`updated_at`). "Updated By" stays "—".
+> - **#23** — `OperatoryRead`/`Create`/`Update` STILL have **no `default_provider_id`**. The provider dropdown populates but can't persist.
+> - **#10/#11 — RESOLVED on the frontend (2026-06-02):** the Info tab now reads/writes the billing FKs
+>   (`tax_id`, `billing_provider_id`, `use_billing_license`, `office_group_id`, `opening_date`,
+>   `default_fee_schedule_id`, `default_ucr_fee_schedule_id`) through `buildOfficeBody` → `OfficeUpdate`,
+>   with the Office Group select sourced from `listOfficeGroups` and fee-schedule/provider selects from
+>   `listFeeSchedules`/`listProviders`. (Office Setup was also migrated fully to the snake_case generated
+>   models — the camelCase `Office` form shape was dropped.)
+>
+> **Items for the backend to confirm (UI made reasonable assumptions):** the canonical string values for
+> `logo_option`/`address_source` (UI assumes `OFFICE`/`CUSTOM`/`NONE`); the `accepted_cards` token format
+> (UI serializes `"AMEX,MC,VISA,DISC"`); the SmartAssist `item_code` vocabulary and any constrained
+> `frequency`/`sms_template_id` values; and that schedule `day_of_week` is `0=Mon … 6=Sun`.
+
 ## Missing API — #10 Office metadata aggregate
 
 Module: Setup
@@ -703,3 +758,96 @@ Expected Request/Response Model:
 Reason Required:
 Per-operatory default provider can't round-trip without the field; the frontend already loads providers
 and captures the selection in form state, ready to send once the column lands.
+
+---
+
+# Setup → Office Assignment
+
+Screen: `src/components/setup/offices/OfficeAssignment.tsx` (tabs: Procedures, Exp Codes, Prod Types,
+Users). Full per-tab analysis and request models: `docs/setup/offices/office_assignment_backend_devreport.md`.
+Only the **Users** tab has backend support today; the other three are gated ("pending backend").
+
+## Missing API — #24 Office ↔ procedure-code assignment
+
+Module: Setup → Office Assignment
+Screen: Procedures tab.
+Business Requirement: Assign a subset of procedure codes to a specific office.
+Current Status: Master list `listProcedureCodes` works, but no office-scoped list/assign/unassign
+endpoint, no `office_id` on `ProcedureCodeRead`/params, no `OfficeProcedureCode` link model.
+Suggested Endpoint: `GET` + bulk `PUT /api/v1/offices/{office_id}/procedure-codes` (or POST/DELETE pair).
+Impact on Frontend: Procedures tab gated; UI + dual-list ready to wire on availability.
+
+## Missing API — #25 Explosion (Exp) Codes resource + office assignment
+
+Module: Setup → Office Assignment
+Screen: Exp Codes tab.
+Business Requirement: Catalog of explosion codes assignable per office.
+Current Status: Entire resource absent — no path, model, or endpoint anywhere in `openapi.json`.
+Suggested Endpoint: `GET /api/v1/explosion-codes` + `GET`/bulk `PUT /api/v1/offices/{office_id}/exp-codes`.
+Impact on Frontend: Exp Codes tab gated.
+
+## Missing API — #26 Production Types resource + office assignment
+
+Module: Setup → Office Assignment
+Screen: Prod Types tab.
+Business Requirement: Catalog of production types (color, AppointNow visibility/duration, inactive) per office.
+Current Status: Entire resource absent — the only "production" hits are unrelated account-settings booleans.
+Suggested Endpoint: `GET /api/v1/production-types` + `GET`/bulk `PUT /api/v1/offices/{office_id}/production-types`.
+Impact on Frontend: Prod Types tab gated.
+
+## Degraded (not blocked) — #27 Users tab: bulk/copy endpoints + `created_by`
+
+Module: Setup → Office Assignment
+Screen: Users tab (shipped).
+Current Status: Works via `listUsers` + `user-offices` CRUD, but with client-side glue: no bulk
+"set assignments" endpoint (Save fires N POST/DELETE), no "copy from office" endpoint (emulated),
+no `office_id`/`is_active` filter on `listUsers` (client-side), and `UserRead` has no `created_by`
+(Created-By column omitted; twin of #22/#21).
+Suggested Endpoint: bulk `PUT /api/v1/offices/{office_id}/users`; denormalized `GET /api/v1/offices/{office_id}/users`;
+add `created_by` to `UserRead`.
+Impact on Frontend: None blocking; bulk endpoint would simplify `src/services/officeUserAssignmentApi.ts`.
+
+## Missing API — #28 Provider ↔ office is single-office (no M:N) + `name`/`created_by`
+
+Module: Setup → Office Assignment
+Screen: Providers tab (shipped read-only).
+Current Status: `listProviders({office_id})` reads the office's providers, but `ProviderRead.office_id`
+is a single FK (no `provider_offices` link, no assign/unassign endpoint) — a dual-list editor would
+destructively reassign `office_id`. `ProviderRead` also has a single `name` (no first/last split) and no
+`created_by`, so those legacy columns can't be reproduced.
+Suggested Endpoint: `provider_offices` link table + `user-offices`-style endpoints if multi-office;
+add `first_name`/`last_name`/`created_by` to `ProviderRead`.
+Impact on Frontend: Providers tab ships read-only; DualListPicker ready if M:N lands.
+
+## Missing API — #29 Office ↔ note-macro assignment
+
+Module: Setup → Office Assignment
+Screen: Notes Macros tab (shipped read-only preview).
+Current Status: `listNoteMacros` is tenant-wide — no `office_id` filter, no office route, no link table.
+Suggested Endpoint: `GET` + bulk `PUT /api/v1/offices/{office_id}/note-macros` + link model.
+Impact on Frontend: Read-only tenant-wide preview until office-scoping lands.
+
+## Missing API — #30 Office ↔ prescription (RX) assignment
+
+Module: Setup → Office Assignment
+Screen: RX tab (shipped read-only preview).
+Current Status: `listPrescriptionLibrary` is tenant-wide — no `office_id` filter/route/link table.
+(Patient-level `/prescriptions` has `office_id` but is a per-patient clinical record, not the catalog.)
+Suggested Endpoint: `GET` + bulk `PUT /api/v1/offices/{office_id}/prescription-library` + link model.
+Impact on Frontend: Read-only tenant-wide preview until office-scoping lands.
+
+## Missing API — #31 Office ↔ letter-template assignment
+
+Module: Setup → Office Assignment
+Screen: Letters tab (shipped read-only preview).
+Current Status: `listLetterTemplates` is tenant-wide — no `office_id` filter/route/link table.
+Suggested Endpoint: `GET` + bulk `PUT /api/v1/offices/{office_id}/letter-templates` + link model.
+Impact on Frontend: Read-only tenant-wide preview until office-scoping lands.
+
+## Missing API — #32 Ortho Misc Setup resource
+
+Module: Setup → Office Assignment
+Screen: Ortho Misc Setup tab (gated; legacy screen is empty).
+Current Status: No `ortho_misc` resource anywhere. The only ortho resource is patient-level `ortho-plans`.
+Suggested Endpoint: Define the resource (columns unknown) + `GET`/`PUT /api/v1/offices/{office_id}/ortho-misc`.
+Impact on Frontend: Tab gated; needs requirements + backend resource.

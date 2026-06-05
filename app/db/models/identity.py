@@ -35,6 +35,8 @@ class User(Base, IntPKMixin, TimestampMixin):
     last_name: Mapped[str | None] = mapped_column(String(100))
     phone: Mapped[str | None] = mapped_column(String(20))
     role: Mapped[str] = mapped_column(String(50), default="staff")
+    # Security tab (Users module gap #4): scalar patient-data access level.
+    patient_access_level: Mapped[str | None] = mapped_column(String(50))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     last_login_at: Mapped[datetime | None]
@@ -101,6 +103,10 @@ class Provider(Base, CreatedAtMixin):
     dea_id: Mapped[str | None] = mapped_column(String(50))
     specialty: Mapped[str | None] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Office Assignment -> Providers grid (gap #28): legacy split-name + audit columns.
+    first_name: Mapped[str | None] = mapped_column(String(100))
+    last_name: Mapped[str | None] = mapped_column(String(100))
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class Operatory(Base, CreatedAtMixin):
@@ -111,6 +117,8 @@ class Operatory(Base, CreatedAtMixin):
     legacy_id: Mapped[str | None] = mapped_column(String(20), index=True)
     name: Mapped[str] = mapped_column(String(100))
     display_order: Mapped[int] = mapped_column(Integer, default=0)
+    # Scheduler gap #1: default provider shown in the operatory column header.
+    provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 

@@ -75,6 +75,42 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
         ("draft", "Draft"), ("submitted", "Submitted"), ("paid", "Paid"),
         ("denied", "Denied"), ("closed", "Closed"),
     ],
+    # Security -> Users module (gaps #2/#5)
+    "user_role": [
+        ("admin", "Administrator"), ("provider", "Provider"), ("front_desk", "Front Desk"),
+        ("staff", "Staff"), ("super_admin", "Super Admin"),
+    ],
+    "patient_access_level": [
+        ("full", "Full Access"), ("limited", "Limited"), ("read_only", "Read Only"),
+        ("none", "No Access"),
+    ],
+    "overtime_method": [
+        ("none", "None"), ("weekly_40", "Weekly (40h)"), ("daily_8", "Daily (8h)"),
+        ("california", "California"),
+    ],
+    # Scheduler module (gaps #4/#10) — appt_status carries a color (3rd element).
+    "appt_status": [
+        ("scheduled", "Scheduled", "#6B7280"),
+        ("confirmed", "Confirmed", "#10B981"),
+        ("in_reception", "In Reception", "#3B82F6"),
+        ("in_chair", "In Chair", "#8B5CF6"),
+        ("checked_out", "Checked Out", "#0EA5E9"),
+        ("completed", "Completed", "#22C55E"),
+        ("cancelled", "Cancelled", "#EF4444"),
+        ("no_show", "No Show", "#F59E0B"),
+        ("missed", "Missed", "#DC2626"),
+        ("rescheduled", "Rescheduled", "#A855F7"),
+    ],
+    "appt_type": [
+        ("recall", "Recall"), ("new_patient", "New Patient"), ("emergency", "Emergency"),
+        ("consultation", "Consultation"), ("treatment", "Treatment"), ("hygiene", "Hygiene"),
+        ("follow_up", "Follow Up"),
+    ],
+    "procedure_type": [
+        ("cleaning", "Cleaning"), ("exam", "Exam"), ("filling", "Filling"),
+        ("crown", "Crown"), ("extraction", "Extraction"), ("root_canal", "Root Canal"),
+        ("ortho", "Ortho"),
+    ],
 }
 
 
@@ -87,12 +123,14 @@ def seed_for_tenant(db, tenant_id: int) -> int:  # noqa: ANN001
     }
     added = 0
     for group_code, options in GROUPS.items():
-        for key1, label in options:
+        for idx, option in enumerate(options):
+            key1, label = option[0], option[1]
+            color = option[2] if len(option) > 2 else None  # optional 3rd element
             if (group_code, key1) in existing:
                 continue
             db.add(Definition(
                 tenant_id=tenant_id, group_code=group_code, key1=key1,
-                description=label, is_active=True,
+                description=label, color=color, sort_order=idx, is_active=True,
             ))
             added += 1
     db.commit()
