@@ -20,6 +20,12 @@ from app.db.models.account import (
     OfficePhoneAssignment,
 )
 from app.db.models.audit import AuditLog
+from app.db.models.patient_extra import (
+    ClaimAttachment,
+    PatientAdjustment,
+    PatientDocument,
+    PatientEmergencyContact,
+)
 from app.db.models.office_assignment import (
     OfficeCodeBundle,
     OfficeLetterTemplate,
@@ -133,6 +139,8 @@ __all__ = [
     # access (Phase 4 net-new)
     "UserPreference", "UserGroup", "UserGroupMembership", "UserIpRule",
     "UserTimeClockConfig", "UserLoginRestriction",
+    # patients module net-new
+    "PatientDocument", "PatientEmergencyContact", "PatientAdjustment", "ClaimAttachment",
     # account information (Setup -> Account Info)
     "AccountSettings", "AccountCommunications", "OfficePhoneAssignment",
     "AccountHoliday", "AccountConsent",

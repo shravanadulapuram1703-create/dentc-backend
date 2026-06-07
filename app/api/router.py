@@ -13,6 +13,7 @@ from app.api.v1 import (
     ledger,
     office_assignment,
     office_setup,
+    patients_extra,
     scheduler,
     treatment,
     users,
@@ -44,4 +45,10 @@ api_router.include_router(account.router)
 api_router.include_router(office_setup.router)
 # Office Assignment (Setup -> Offices -> Office Assignment), nested /offices/{id}/*.
 api_router.include_router(office_assignment.router)
+# Patients module supplemental: documents, claim detail/lifecycle/attachments,
+# progress-note sign, duplicate-check (before generic CRUD for literal paths).
+api_router.include_router(patients_extra.documents_router)
+api_router.include_router(patients_extra.claims_router)
+api_router.include_router(patients_extra.progress_router)
+api_router.include_router(patients_extra.dup_router)
 api_router.include_router(build_entity_router())

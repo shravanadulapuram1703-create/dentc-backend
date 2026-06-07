@@ -1,0 +1,53 @@
+name: Deploy backend to Cloud Run
+
+# Fires when a PR is merged into (or any push lands on) `dev`.
+on:
+  push:
+    branches: [feature/phase_data_migration]
+
+# Required for keyless auth (Workload Identity Federation).
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: reckon-dental
+  REGION: us-central1
+  REPO: dentc
+  SERVICE: dentc-backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: reckon-dental
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+
+      - name: Build & push image
+        run: |
+          IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$SERVICE:${{ github.sha }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      # Only the image is updated. Env vars, secrets, the Cloud SQL connection and
+      # scaling set on the FIRST (manual) deploy are retained across revisions.
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy $SERVICE \
+            --image "$IMAGE" \
+            --region $REGION \
+            --project $PROJECT_ID

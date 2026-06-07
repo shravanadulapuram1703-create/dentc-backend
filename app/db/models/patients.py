@@ -31,6 +31,7 @@ class Patient(Base, IntPKMixin, TimestampMixin):
     dob: Mapped[date | None]
     gender: Mapped[str | None] = mapped_column(String(20))
     ssn: Mapped[str | None] = mapped_column(String(20))
+    medicaid_id: Mapped[str | None] = mapped_column(String(50))  # Patients gap: field-specific search
     marital_status: Mapped[str | None] = mapped_column(String(20))
     phone: Mapped[str | None] = mapped_column(String(20))
     cell_phone: Mapped[str | None] = mapped_column(String(20))
@@ -162,6 +163,7 @@ class PatientNote(Base, IntPKMixin, TimestampMixin):
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class PatientRecall(Base, IntPKMixin, TimestampMixin):

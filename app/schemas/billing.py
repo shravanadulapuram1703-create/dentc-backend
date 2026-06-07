@@ -59,6 +59,8 @@ class BalanceRecentActivity(BaseModel):
     today: float = Field(0, description="Sum of today's non-void payments")
     last_ins: str | None = Field(None, description="Date of most recent insurance payment")
     last_pat: str | None = Field(None, description="Date of most recent patient payment")
+    last_ins_amount: float = Field(0, description="Amount of the most recent insurance payment")
+    last_pat_amount: float = Field(0, description="Amount of the most recent patient payment")
 
 
 class LedgerEntry(BaseModel):
@@ -99,6 +101,8 @@ class PatientBalance(BaseModel):
     estimated_insurance: float = Field(0, examples=[400.00])
     estimated_patient: float = Field(0, examples=[250.00])
     patient_balance: float = Field(0, description="Charges − payments − estimated insurance")
+    insurance_balance: float = Field(0, description="Outstanding expected-insurance portion")
+    today_charges: float = Field(0, description="Sum of today's non-void procedure charges")
     aging: BalanceAging = Field(default_factory=BalanceAging)
     recent_activity: BalanceRecentActivity = Field(default_factory=BalanceRecentActivity)
     as_of: str = Field(..., description="UTC timestamp the balance was computed")

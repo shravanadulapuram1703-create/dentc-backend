@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Virtualenvs
+dentc-env/
+venv/
+.venv/
+
+# Local secrets / state — NEVER bake into the image
+.env
+.env.*
+uploads/
+
+# Reference-only trees (large, not part of the runtime)
+legacy_app/
+denticon_migration/
+docs/
+
+# Git / editor / OS
+.git/
+.gitignore
+.vscode/
+.idea/
+*.log
+.DS_Store

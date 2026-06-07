@@ -111,6 +111,25 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
         ("crown", "Crown"), ("extraction", "Extraction"), ("root_canal", "Root Canal"),
         ("ortho", "Ortho"),
     ],
+    # Patients module dropdowns (replaces the legacy /patients/metadata surface)
+    "gender": [("M", "Male"), ("F", "Female"), ("O", "Other"), ("U", "Unknown")],
+    "title": [("mr", "Mr."), ("mrs", "Mrs."), ("ms", "Ms."), ("dr", "Dr."), ("mx", "Mx.")],
+    "marital_status": [
+        ("single", "Single"), ("married", "Married"), ("divorced", "Divorced"),
+        ("widowed", "Widowed"), ("separated", "Separated"),
+    ],
+    "referral_type": [
+        ("patient", "Existing Patient"), ("doctor", "Doctor"), ("insurance", "Insurance"),
+        ("online", "Online"), ("walk_in", "Walk-in"), ("other", "Other"),
+    ],
+    "pronoun": [("he_him", "He/Him"), ("she_her", "She/Her"), ("they_them", "They/Them")],
+    "contact_pref": [
+        ("phone", "Phone"), ("email", "Email"), ("sms", "Text/SMS"), ("mail", "Mail"),
+    ],
+    "resp_party_rel": [
+        ("self", "Self"), ("spouse", "Spouse"), ("parent", "Parent"),
+        ("guardian", "Guardian"), ("child", "Child"), ("other", "Other"),
+    ],
 }
 
 

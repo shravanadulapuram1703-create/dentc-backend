@@ -6,10 +6,10 @@ perio_exam_details · prescriptions · perio_chart_settings · perio_chart_activ
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin
@@ -77,6 +77,12 @@ class ProgressNote(Base, IntPKMixin, CreatedAtMixin):
     notes: Mapped[str | None] = mapped_column(Text)
     notes_html: Mapped[str | None] = mapped_column(Text)
     tooth: Mapped[str | None] = mapped_column(String(255))
+    # Patients gap: structured charting + sign workflow.
+    surface: Mapped[str | None] = mapped_column(String(50))
+    region: Mapped[str | None] = mapped_column(String(50))
+    signed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    is_struck_off: Mapped[bool] = mapped_column(Boolean, default=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 

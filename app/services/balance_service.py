@@ -72,16 +72,25 @@ def _recent_activity(db: Session, patient_id: int, today: date) -> dict:
         PatientPayment.payment_type.ilike("ins%"),
         PatientPayment.payment_type.ilike("%insurance%"),
     )
-    last_ins = db.execute(
-        select(func.max(PatientPayment.payment_date)).where(*base, is_ins)
-    ).scalar_one()
-    last_pat = db.execute(
-        select(func.max(PatientPayment.payment_date)).where(*base, ~is_ins)
-    ).scalar_one()
+
+    def _last(cond) -> tuple:  # noqa: ANN001 — (date, amount) of the most recent payment
+        row = db.execute(
+            select(PatientPayment.payment_date, PatientPayment.amount)
+            .where(*base, cond)
+            .order_by(PatientPayment.payment_date.desc(), PatientPayment.id.desc())
+            .limit(1)
+        ).first()
+        return (row[0], row[1]) if row else (None, None)
+
+    last_ins_date, last_ins_amt = _last(is_ins)
+    last_pat_date, last_pat_amt = _last(~is_ins)
     return {
         "today": _f(today_total),
-        "last_ins": last_ins.isoformat() if last_ins else None,
-        "last_pat": last_pat.isoformat() if last_pat else None,
+        "last_ins": last_ins_date.isoformat() if last_ins_date else None,
+        "last_pat": last_pat_date.isoformat() if last_pat_date else None,
+        # Patients gap: amounts alongside dates.
+        "last_ins_amount": _f(last_ins_amt),
+        "last_pat_amount": _f(last_pat_amt),
     }
 
 
@@ -117,6 +126,15 @@ def get_patient_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
         )
     ).scalar_one()
 
+    today_charges = db.execute(
+        select(func.coalesce(func.sum(PatientProcedure.fee), 0)).where(
+            PatientProcedure.patient_id == patient_id,
+            PatientProcedure.is_void.is_(False),
+            PatientProcedure.is_archived.is_(False),
+            PatientProcedure.date_of_service == today,
+        )
+    ).scalar_one()
+
     balance = Decimal(charged) - Decimal(paid)
     patient_responsible = Decimal(charged) - Decimal(paid) - Decimal(est_ins)
 
@@ -131,6 +149,9 @@ def get_patient_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
         "estimated_insurance": _f(est_ins),
         "estimated_patient": _f(est_pat),
         "patient_balance": _f(patient_responsible),
+        # Patients gap: outstanding expected-insurance portion + today's charges.
+        "insurance_balance": _f(est_ins),
+        "today_charges": _f(today_charges),
         "aging": _aging(db, patient_id, today),
         "recent_activity": _recent_activity(db, patient_id, today),
         "as_of": datetime.now(timezone.utc).isoformat(),
