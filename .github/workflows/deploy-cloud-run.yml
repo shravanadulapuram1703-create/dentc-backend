@@ -1,11 +1,10 @@
 name: Deploy backend to Cloud Run
 
-# Fires when a PR is merged into (or any push lands on) `dev`.
 on:
   push:
-    branches: [feature/phase_data_migration]
+    branches:
+      - feature/phase_data_migration
 
-# Required for keyless auth (Workload Identity Federation).
 permissions:
   contents: read
   id-token: write
@@ -19,8 +18,18 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Debug GitHub Context
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Repository Owner: ${{ github.repository_owner }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "WIF_PROVIDER set: ${{ secrets.WIF_PROVIDER != '' }}"
+          echo "WIF_SERVICE_ACCOUNT set: ${{ secrets.WIF_SERVICE_ACCOUNT != '' }}"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -31,23 +40,25 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: reckon-dental
+          project_id: ${{ env.PROJECT_ID }}
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+        run: |
+          gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 
-      - name: Build & push image
+      - name: Build & Push Image
         run: |
           IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$SERVICE:${{ github.sha }}"
+          echo "Building $IMAGE"
+
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
+
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
-      # Only the image is updated. Env vars, secrets, the Cloud SQL connection and
-      # scaling set on the FIRST (manual) deploy are retained across revisions.
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy $SERVICE \
             --image "$IMAGE" \
-            --region $REGION \
-            --project $PROJECT_ID
+            --region "$REGION" \
+            --project "$PROJECT_ID"
