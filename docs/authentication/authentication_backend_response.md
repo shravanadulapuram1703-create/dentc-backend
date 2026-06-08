@@ -124,6 +124,37 @@ here. The 423 account-lockout above covers the brute-force-on-one-account case.
   `auth_action_tokens`. Raw values are never persisted.
 - Logout already revokes/blacklists tokens (unchanged).
 
+## CORS — deployed login failure (follow-up fix)
+
+The reported browser error —
+`Access to XMLHttpRequest at '…/api/v1/auth/login' … blocked by CORS policy: No
+'Access-Control-Allow-Origin' header is present` — had **two** causes, both now fixed:
+
+1. **Origin not allowed.** Default `CORS_ORIGINS` was `["*"]`, which a browser
+   rejects for credentialed requests, and the Cloud Run frontend origin wasn't
+   explicitly listed. Fixed by:
+   - `CORS_ORIGINS` now defaults to the local dev origins (exact match), and
+   - a new `CORS_ORIGIN_REGEX` (default `https://.*\.run\.app`) that matches the
+     Cloud Run frontend (whose URL carries a project-number hash). With
+     credentials enabled, the server now echoes the **specific** origin +
+     `Access-Control-Allow-Credentials: true` (never `*`).
+2. **CORS headers missing on error responses.** The CORS middleware was added
+   *first* (innermost), so when `/auth/login` 500'd (it did — see below), the
+   error response carried no `Access-Control-Allow-Origin`, surfacing in the
+   browser as a CORS error. CORS is now the **outermost** middleware, so even
+   4xx/5xx responses carry the header.
+
+### Root cause of the underlying 500
+The deployed DB was at Alembic `b8c9d0e1f2a3`; the auth migration adding
+`users.is_legacy_user` (et al.) had **not** been applied, so every user query
+(including login) failed with `UndefinedColumn`. **Applied `b9c0d1e2f3a4` to the
+dev DB** (`recondental_migrated`) — login now returns a clean `401` with CORS
+headers.
+
+> **Deploy checklist:** (a) ship this backend build; (b) ensure
+> `alembic upgrade head` has run against the target DB; (c) for any non-Cloud-Run
+> frontend host, set `CORS_ORIGINS` (comma-separated) on the backend service.
+
 ## Summary
 
 | § | Item | Status |

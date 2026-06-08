@@ -43,17 +43,21 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # NOTE: Starlette runs the LAST-added middleware OUTERMOST. CORS must be
+    # outermost so that preflight (OPTIONS) requests and error responses from the
+    # inner middleware/handlers still carry the Access-Control-* headers — so the
+    # CORS middleware is added *last* below.
+    app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(AuditMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
+        allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["X-Request-ID", "X-Process-Time"],
     )
-    app.add_middleware(RequestContextMiddleware)
-    # Outermost: records authenticated mutations after the handler resolves.
-    app.add_middleware(AuditMiddleware)
 
     register_exception_handlers(app)
 

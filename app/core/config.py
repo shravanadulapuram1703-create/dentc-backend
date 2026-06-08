@@ -71,7 +71,20 @@ class Settings(BaseSettings):
     REDIS_ENABLED: bool = True
 
     # ── CORS ───────────────────────────────────────────────────────────────
-    CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["*"])
+    # Explicit allowed origins (exact match). With credentials enabled, the
+    # browser rejects a "*" response, so list real origins here. Local dev ports
+    # are allowed by default; set CORS_ORIGINS in prod for any non-Cloud-Run host.
+    CORS_ORIGINS: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://localhost:8080",
+        ]
+    )
+    # Regex fallback for origins that vary per deploy (e.g. Cloud Run URLs carry a
+    # project-number hash). Matches any *.run.app frontend by default. Set to a
+    # tighter pattern (or "" to disable) in production.
+    CORS_ORIGIN_REGEX: str | None = r"https://.*\.run\.app"
 
     # ── Encryption (EIN, AI-assist secret, …) ────────────────────────────────
     # A urlsafe-base64 32-byte Fernet key. If unset, derived from JWT_SECRET_KEY.
