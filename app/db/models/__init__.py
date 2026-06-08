@@ -80,6 +80,7 @@ from app.db.models.codes import (
 )
 from app.db.models.comms import LetterTemplate, PostcardTemplate, SmsMessage
 from app.db.models.identity import (
+    AuthActionToken,
     Office,
     OfficeGroup,
     Operatory,
@@ -152,8 +153,8 @@ __all__ = [
     "OfficeProductionType", "ProviderOffice", "OfficeNoteMacro",
     "OfficePrescriptionLibrary", "OfficeLetterTemplate",
     # identity
-    "Tenant", "User", "RefreshToken", "Office", "Provider", "Operatory",
-    "UserOffice", "OfficeGroup",
+    "Tenant", "User", "RefreshToken", "AuthActionToken", "Office", "Provider",
+    "Operatory", "UserOffice", "OfficeGroup",
     # insurance
     "Employer", "InsuranceCarrier", "InsurancePlan", "InsuranceSubscriber",
     "InsuranceCoverageRule", "InsCustomCoverage", "FeeScheduleAssignment",

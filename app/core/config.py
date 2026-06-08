@@ -52,6 +52,17 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
+    # ── Login throttling (failed-attempt lockout → HTTP 423) ─────────────────
+    # Redis-backed; degrades to "no lockout" when Redis is unavailable.
+    LOGIN_MAX_FAILED_ATTEMPTS: int = 5
+    LOGIN_LOCKOUT_MINUTES: int = 15
+
+    # ── Password reset / legacy activation tokens ────────────────────────────
+    PASSWORD_RESET_TOKEN_TTL_MINUTES: int = 60
+    LEGACY_ACTIVATION_TOKEN_TTL_MINUTES: int = 1440  # 24h
+    # Base URL the emailed reset link points at (frontend route).
+    PASSWORD_RESET_URL_BASE: str = "http://localhost:5173/reset-password"
+
     # ── Redis (token store / blacklist) ────────────────────────────────────
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379

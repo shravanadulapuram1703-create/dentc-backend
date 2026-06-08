@@ -71,6 +71,18 @@ class ForbiddenError(AppError):
     code = "forbidden"
 
 
+class LockedError(AppError):
+    """Resource/account temporarily locked (e.g. too many failed logins)."""
+
+    status_code = status.HTTP_423_LOCKED
+    code = "account_locked"
+
+
+class RateLimitError(AppError):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "rate_limited"
+
+
 def _error_body(code: str, message: str, details: Any = None) -> dict[str, Any]:
     return {"error": {"code": code, "message": message, "details": details}}
 
@@ -83,6 +95,8 @@ _STATUS_CODE_MAP = {
     status.HTTP_404_NOT_FOUND: "not_found",
     status.HTTP_409_CONFLICT: "conflict",
     status.HTTP_422_UNPROCESSABLE_ENTITY: "validation_error",
+    status.HTTP_423_LOCKED: "account_locked",
+    status.HTTP_429_TOO_MANY_REQUESTS: "rate_limited",
 }
 
 

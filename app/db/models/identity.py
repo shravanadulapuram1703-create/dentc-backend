@@ -40,6 +40,10 @@ class User(Base, IntPKMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     last_login_at: Mapped[datetime | None]
+    # Authentication module (login dev-report §3): legacy onboarding gates.
+    is_legacy_user: Mapped[bool] = mapped_column(Boolean, default=False)
+    legacy_activation_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    password_created_at: Mapped[datetime | None]
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
@@ -50,6 +54,24 @@ class RefreshToken(Base, IntPKMixin, CreatedAtMixin):
     token_hash: Mapped[str] = mapped_column(String(255))
     expires_at: Mapped[datetime]
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class AuthActionToken(Base, IntPKMixin, CreatedAtMixin):
+    """Single-use, TTL-bounded token for password-reset & legacy activation.
+
+    Authentication module (login dev-report §2.1–2.5 / §4). DB-backed (not Redis)
+    so the flows work reliably regardless of cache availability. Only the SHA-256
+    of the raw token is stored; the raw value is delivered to the user (emailed
+    for reset, returned by the legacy-verify endpoint for activation).
+    """
+
+    __tablename__ = "auth_action_tokens"
+
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    purpose: Mapped[str] = mapped_column(String(30))  # password_reset | legacy_activation
+    expires_at: Mapped[datetime] = mapped_column()
+    used_at: Mapped[datetime | None]
 
 
 class Office(Base, IntPKMixin, TimestampMixin):

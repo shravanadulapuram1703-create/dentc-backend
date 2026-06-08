@@ -14,6 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_current_user, get_tenant_id
+from app.core.config import settings
 from app.core.security import hash_password
 from app.db.base import Base
 from app.db.models import Tenant, User
@@ -21,6 +22,10 @@ from app.db.session import get_db
 from app.main import app
 
 TEST_PASSWORD = "test1234"
+
+# No Redis in CI/local test runs: degrade to the in-process safe path so cache
+# helpers (balances/ledger/reports) don't pay connection timeouts.
+settings.REDIS_ENABLED = False
 
 
 @pytest.fixture

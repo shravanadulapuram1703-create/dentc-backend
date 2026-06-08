@@ -14,6 +14,7 @@ from app.api.v1 import (
     office_assignment,
     office_setup,
     patients_extra,
+    reports,
     scheduler,
     treatment,
     users,
@@ -34,6 +35,8 @@ api_router.include_router(treatment.router)
 api_router.include_router(balances.router)
 api_router.include_router(ledger.router)
 api_router.include_router(audit.router)
+# Reports module: practice-wide aggregation (summary/trends/AR/aging).
+api_router.include_router(reports.router)
 # Scheduler module: denormalized feed + status transition + patient context.
 # Before generic CRUD so /appointments/scheduler & /patients/{id}/context win.
 api_router.include_router(scheduler.appt_router)

@@ -13,7 +13,12 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import ConflictError, UnauthorizedError
+from app.core.exceptions import (
+    ConflictError,
+    ForbiddenError,
+    LockedError,
+    UnauthorizedError,
+)
 from app.core.security import (
     REFRESH_TOKEN_TYPE,
     create_access_token,
@@ -35,14 +40,39 @@ def _refresh_ttl_seconds() -> int:
     return settings.REFRESH_TOKEN_EXPIRE_DAYS * 86_400
 
 
+def _lockout_key(username: str) -> str:
+    return f"login:fail:{(username or '').strip().lower()}"
+
+
+def _assert_not_locked(username: str) -> None:
+    """Raise 423 if this identifier has too many recent failed attempts.
+
+    Redis-backed; when Redis is unavailable the counter reads 0 → no lockout
+    (degrade open so an outage never blocks all logins).
+    """
+    if redis_store.get_counter(_lockout_key(username)) >= settings.LOGIN_MAX_FAILED_ATTEMPTS:
+        raise LockedError(
+            "Account temporarily locked due to too many failed attempts. "
+            "Try again later or reset your password.",
+            code="account_locked",
+        )
+
+
+def _register_failed_attempt(username: str) -> None:
+    redis_store.incr_counter(_lockout_key(username), settings.LOGIN_LOCKOUT_MINUTES * 60)
+
+
 def authenticate(db: Session, username: str, password: str) -> User:
+    _assert_not_locked(username)
     user = db.execute(
         select(User).where(or_(User.username == username, User.email == username))
     ).scalar_one_or_none()
     if user is None or not verify_password(password, user.password_hash):
+        _register_failed_attempt(username)
         raise UnauthorizedError("Invalid credentials", code="invalid_credentials")
     if not user.is_active:
-        raise UnauthorizedError("User is inactive", code="inactive_user")
+        # Distinct from bad credentials: the account exists but is disabled (403).
+        raise ForbiddenError("This account is disabled", code="account_disabled")
     return user
 
 
@@ -60,6 +90,7 @@ def issue_tokens(user: User) -> TokenResponse:
 
 def login(db: Session, username: str, password: str) -> TokenResponse:
     user = authenticate(db, username, password)
+    redis_store.cache_delete(_lockout_key(username))  # reset lockout on success
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
     return issue_tokens(user)

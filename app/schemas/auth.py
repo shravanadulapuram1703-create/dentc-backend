@@ -38,6 +38,10 @@ class UserRead(ORMModel):
     is_active: bool
     must_change_password: bool
     last_login_at: datetime | None = None
+    # Authentication module (login dev-report §3): legacy onboarding state.
+    is_legacy_user: bool = False
+    legacy_activation_completed: bool = False
+    password_created_at: datetime | None = None
     created_at: datetime
     created_by: int | None = None
 
@@ -78,3 +82,47 @@ class MeFull(BaseModel):
     user: UserRead
     tenant: TenantBrief | None = None
     offices: list[OfficeAssignment] = []
+
+
+# ── Forgot / reset password (login dev-report §2.1–2.3) ──────────────────────
+class MessageResponse(BaseModel):
+    message: str = Field(..., examples=["If the account exists, a reset link was sent."])
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(..., examples=["jdoe@practice.com"])
+
+
+class ResetTokenValidateRequest(BaseModel):
+    token: str
+
+
+class ResetTokenValidateResponse(BaseModel):
+    valid: bool
+    email: str | None = Field(None, description="Account email, for display when valid")
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+
+# ── Legacy activation (login dev-report §2.4–2.5) ────────────────────────────
+class LegacyVerifyRequest(BaseModel):
+    username_or_email: str
+
+
+class LegacyVerifyResponse(BaseModel):
+    eligible: bool
+    legacy_activation_completed: bool = False
+    verification_method: str | None = Field(
+        None, description='One of "email" | "otp" | "magic_link"'
+    )
+    masked_email: str | None = None
+    activation_token: str | None = Field(None, description="Returned only when eligible")
+
+
+class LegacyCreatePasswordRequest(BaseModel):
+    username_or_email: str
+    new_password: str = Field(..., min_length=8)
+    activation_token: str
