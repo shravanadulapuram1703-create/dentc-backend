@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from app.db.models import (
     Appointment,
     InsuranceClaim,
+    InsuranceSubscriber,
     Patient,
     PatientAdjustment,
     PatientPayment,
@@ -40,6 +41,10 @@ _CACHE_TTL = 60
 # the canonical vocabulary documented back to the FE team. Anything not in this
 # set with a positive (billed − paid) remainder counts as outstanding.
 _CLAIM_SETTLED = {"paid", "closed", "denied", "rejected", "void", "voided", "cancelled", "canceled"}
+
+# Subscriber elig_status values considered VERIFIED (INS-11). Everything else
+# (incl. NULL/blank/"unknown"/"pending") counts as a pending verification.
+_ELIG_VERIFIED = {"verified", "active", "confirmed", "eligible"}
 
 
 def _f(value) -> float:  # noqa: ANN001
@@ -406,4 +411,43 @@ def get_trends(db: Session, tenant_id: int, office_id: int | None,
         "as_of": datetime.now(timezone.utc).isoformat(),
     }
     redis_store.cache_set(key, json.dumps(result), _CACHE_TTL)
+    return result
+
+
+# ── insurance eligibility-verification summary (INS-11) ───────────
+def get_insurance_verification_summary(
+    db: Session, tenant_id: int, office_id: int | None
+) -> dict:
+    """Count active subscribers grouped by ``elig_status`` (single GROUP BY)."""
+    cached = redis_store.cache_get(_cache_key("elig", tenant_id, office_id))
+    if cached:
+        return json.loads(cached)
+
+    label = func.coalesce(func.nullif(InsuranceSubscriber.elig_status, ""), "unknown")
+    stmt = (
+        select(label, func.count())
+        .where(
+            InsuranceSubscriber.tenant_id == tenant_id,
+            InsuranceSubscriber.is_active.is_(True),
+        )
+        .group_by(label)
+    )
+    if office_id is not None:
+        stmt = stmt.where(InsuranceSubscriber.office_id == office_id)
+
+    by_status: dict[str, int] = {}
+    for status, count in db.execute(stmt).all():
+        by_status[str(status)] = by_status.get(str(status), 0) + int(count)
+
+    total = sum(by_status.values())
+    verified = sum(c for s, c in by_status.items() if s.strip().lower() in _ELIG_VERIFIED)
+    result = {
+        "by_status": by_status,
+        "total": total,
+        "verified": verified,
+        "pending": total - verified,
+        "office_id": office_id,
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+    redis_store.cache_set(_cache_key("elig", tenant_id, office_id), json.dumps(result), _CACHE_TTL)
     return result

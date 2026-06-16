@@ -29,6 +29,13 @@ def load_maps_from_db(conn) -> dict:
     maps["bundle_map"] = _legacy_map(cur, "code_bundles")
     maps["rx_lib_map"] = _legacy_map(cur, "prescription_library")
     maps["patient_map"] = _legacy_map(cur, "patients")
+    # RPID → guarantor's primary patient (lowest patient id on the account),
+    # for account-level steps keyed by the responsible party.
+    cur.execute(
+        "SELECT responsible_party_id, MIN(id) FROM patients "
+        "WHERE responsible_party_id IS NOT NULL GROUP BY responsible_party_id"
+    )
+    maps["rp_patient_map"] = {str(r[0]): r[1] for r in cur.fetchall()}
     maps["sub_map"] = _legacy_map(cur, "insurance_subscribers")
     maps["sig_map"] = _legacy_map(cur, "patient_signatures")
     maps["txplan_map"] = _legacy_map(cur, "treatment_plans")

@@ -232,9 +232,13 @@ Once the frontend has a URL, point the backend at it and redeploy a revision:
 ```powershell
 gcloud run services update dentc-backend `
   --region us-central1 `
-  --update-env-vars "CORS_ORIGINS=https://dentc-frontend-xxxxxxxx-uc.a.run.app"
+  --update-env-vars "CORS_ORIGINS=https://dentc-frontend-477406612596.us-central1.run.app"
 ```
 (Comma-separate multiple origins. With `allow_credentials=True`, a `*` origin is rejected by browsers — always list exact origins.)
+
+gcloud run services update dentc-backend --region us-central1 --update-env-vars "CORS_ORIGINS=https://dentc-frontend-477406612596.us-central1.run.app"
+
+
 
 ---
 

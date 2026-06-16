@@ -1,0 +1,2327 @@
+Administrators (100) :-
+
+This Group has the following rights
+Appointments - Add Appointment In Other Office
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - Move Existing Appointment
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Appointments - Post Existing Appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - Schedule Appointments for Locked Account
+Appointments - Short call list
+Appointments - Short notice list
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Appointments - Weekly View - Full Control
+Appointments - Weekly View by Provider - Full Control
+Appointments - Weekly View by User View - Full Control
+AthenaNet - Search AthenaNet Patients
+Charting - AI Assist Screen Full Control
+Denticon Mobile Access
+Denticon Practice Analytics - Collection Analysis Full Control
+Denticon Practice Analytics - Executive Dashboard Full Control
+Denticon Practice Analytics - Front Office Full Control
+Denticon Practice Analytics - Hygiene Recall Full Control
+Denticon Practice Analytics - Morning Huddle Full Control
+Denticon Practice Analytics - Patient Visit Analysis Full Control
+Denticon Practice Analytics - Production Analysis Full Control
+Denticon Practice Analytics - Provider Breakdown Full Control
+Denticon Practice Analytics - Referral Analytics Full Control
+Denticon Practice Analytics - Treatment Plan Analysis Full Control
+EHR - User can edit instructions and bibliography information
+EHR - User can see and access the Infobutton
+EHR - User will see CDS interventions based on Allergies
+EHR - User will see CDS interventions based on Demographic information
+EHR - User will see CDS interventions based on Lab Results
+EHR - User will see CDS interventions based on Medications
+EHR - User will see CDS interventions based on Problems
+EHR - User will see CDS interventions based on Vital Signs
+EHR - User will see CDS interventions for allowed categories
+Help - Access Invoices
+Help - Submit Feature Request Access
+HelpAndSupport - API Access Full Control
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Access SSN Value
+Patient - Add New Flash Alerts
+Patient - Add New Member - Quick Save
+Patient - Add New Member Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add New Patient Full Control
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Delete Ortho Payment Plan
+Patient - Delete Patient Information
+Patient - Delete Patient Insurance Plan Information
+Patient - Delete Regular Payment Plan
+Patient - Dental Insurance Fill-Out Form Full Control
+Patient - Edit Or Deactivate Existing Flash Alerts
+Patient - Edit progress notes
+Patient - Email Or Text Message Full Control
+Patient - Insurance Plan Information Screen Full Control
+Patient - Link Patient Full Control
+Patient - Link Patient View Only
+Patient - Medical History Full Control
+Patient - Medical History View Only
+Patient - Medical Insurance Fill-Out Form Full Control
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Move Patient
+Patient - Online Registration Existing Full Control
+Patient - Online Registration New Full Control
+Patient - Ortho Payment Plan Screen Full Control
+Patient - Patient Information Screen Full Control
+Patient - Patient Notes Add
+Patient - Patient Notes Delete
+Patient - Patient Notes Edit
+Patient - Patient Overview Screen Full Control
+Patient - Prescription Screen Full Control
+Patient - Prescription Strike Off
+Patient - Reallocate Screen Full Control
+Patient - Recall Due Dates Screen Full Control
+Patient - Regular Payment Plan Screen Full Control
+Patient - Responsible Party - Locked Account
+Patient - Responsible Party - Statement/Collection Rights
+Patient - Responsible Party Information Screen Full Control
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Patient - Unarchive Online Registered Patients Screen Full Control
+Patient - Unarchive Online Registered Patients Screen View Only
+Patient - Unclose Account Statement Screen Full Control
+Patient - View Progress notes
+Report - Batch Schedule Report - Add Schedule
+Report - Batch Schedule Report - Delete Schedule
+Report - Batch Schedule Report Access Full Control
+Report - Batch Schedule Report View Only
+Reports - Appointment Reports Screen Full Control
+Reports - Batch Collection Letters Full Control
+Reports - Batch Collection Letters View Only
+Reports - Blank Insurance Form Screen Full Control
+Reports - Custom Letter Full Control
+Reports - Custom Postcard Full Control
+Reports - Daily Reports Screen Full Control
+Reports - DHA Reports Screen Full Control
+Reports - Excel Reports Full Control
+Reports - Group Reports - Appointment Reports Full Control
+Reports - Group Reports - Appointment Reports View Only
+Reports - Group Reports - Batch Reports Full Control
+Reports - Group Reports - Batch Reports View Only
+Reports - Group Reports - Other Reports Full Control
+Reports - Group Reports - Other Reports View Only
+Reports - Group Reports - Referral Reports Full Control
+Reports - Group Reports - Referral Reports View Only
+Reports - Group Reports Daily Screen Full Control
+Reports - Group Reports Ins Screen Full Control
+Reports - Group Reports Mang Screen Full Control
+Reports - Insurance Reports Screen Full Control
+Reports - Labels Screen Full Control
+Reports - Ledger Reports Screen Full Control
+Reports - Letters Screen Full Control
+Reports - Lists - Employer List Screen Full Control
+Reports - Lists - Office List Screen Full Control
+Reports - Lists - Patient List Screen Full Control
+Reports - Lists - Prescription List Screen Full Control
+Reports - Lists - Procedure/Fee List Screen Full Control
+Reports - Lists - Provider List Screen Full Control
+Reports - Lists - Responsible Party List Screen Full Control
+Reports - Lists - Security List Rpts Screen Full C
+Reports - Lists - Setup List Rpts Screen Full Cont
+Reports - Management Reports Screen Full Control
+Reports - Monthly Reports Screen Full Control
+Reports - Monthly Reports Screen View Only
+Reports - My Reports - Full Control
+Reports - My Reports - View
+Reports - Office Reports - ADRpts Screen Full Con
+Reports - Office Reports - BNRpts Screen Full Cont
+Reports - Office Reports - CHI St. Joseph Children's Health Reports Full Control
+Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only
+Reports - Office Reports - Dental Care Access
+Reports - Office Reports - GreatHillsRpts Access
+Reports - Office Reports - HawaiiRpts Full Control
+Reports - Office Reports - Healthcare Network Access Full Control
+Reports - Office Reports - Kane Dental Access
+Reports - Office Reports - Kane Dental View
+Reports - Office Reports - Kansas Rpts Full Contro
+Reports - Office Reports - Lumina Reports Full Control
+Reports - Office Reports - Lumina Reports View Only
+Reports - Office Reports - NEDMRpts Screen Full Co
+Reports - Office Reports - OHC Reports Full Contro
+Reports - Office Reports - OttawaReports Access
+Reports - Office Reports - Premier Perio Full Cont
+Reports - Office Reports - SGKReports Screen Full Control
+Reports - Office Reports - SGKReports Screen View Only
+Reports - Office Reports - Tru Family Rpts Full Control
+Reports - Office Reports - UOP Reports Full Contro
+Reports - Office Reports - VHRpts Screen Full Con
+Reports - Office Reports - Village Family Dental Reports Full Control
+Reports - Office Reports - Village Family Dental Reports View Only
+Reports - Office Reports-AbbeyDental Full Control
+Reports - Office Reports-HealthySmilesKids Full Co
+Reports - Ortho Reports Access Full Control
+Reports - Pat Reg./Medical Info Forms Full Control
+Reports - Pat Reg./Medical Info Forms View Only
+Reports - Postcards Full Control
+Reports - Postcards View Only
+Reports - Recall Reports Screen Full Control
+Reports - Referral Reports Screen Full Control
+Reports - Statement - Allow updating statement dates
+Reports - Statements Screen Full Control
+Reports - Treatment Plan Reports Screen Full Control
+Reports - Voice Charting Adoption Full Control
+Setup - > Emergency Now
+Setup - Access Core Labs Page
+Setup - Account Screen Full Control
+Setup - CDT to CPT Cross Coder Screen Full Control
+Setup - CDT to ICD Cross Coder Screen Full Control
+Setup - CDT to ICD Cross Coder Screen View Only
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Close Out All Offices
+Setup - Close Out Full Control
+Setup - Code Bundling - Full Control
+Setup - Code Bundling - View Only
+Setup - Collection Agencies Screen Full Control
+Setup - CPT to ICD Cross Coder Screen Full Control
+Setup - Delete Notes Macros
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Dentigram Downloads Full Control
+Setup - EHR - CDS Rules
+Setup - Explosion Codes Screen Full Control
+Setup - External API Settings Screen Full Control
+Setup - External API Settings Screen View Only
+Setup - Fee Schedule Assignments (Bulk) Screen Full Control
+Setup - Fee Schedule Assignments (Bulk) Screen View Only
+Setup - Fee Schedules Assignments - (New) Screen Full Control
+Setup - Fee Schedules Assignments - (New) Screen View Only
+Setup - Fee Schedules Assignments Screen Full Control
+Setup - Fee Schedules Assignments Screen View Only
+Setup - Fee Schedules Screen Full Control
+Setup - Frequency Limit Code Group - Full Control
+Setup - Frequency Limit Code Group - View Only
+Setup - ICD Codes Screen Full Control
+Setup - Insurance Custom Coverage Screen Full Control
+Setup - Insurance Dental Carriers Screen Full Control
+Setup - Insurance Employers Screen Full Control
+Setup - Insurance Medical Carriers Screen Full Control
+Setup - Insurance Plans Screen - Add Carrier
+Setup - Insurance Plans Screen - Add Employer
+Setup - Insurance Plans Screen Edit Locked Plan
+Setup - Insurance Plans Screen Full Control
+Setup - Labs Screen Full Control
+Setup - Medical Alert Setup Full Control
+Setup - Medical Alerts Screen Full Control
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Setup - Misc. Screen Full Control
+Setup - Modifier Codes Screen Full Control
+Setup - Modify Vendor Access
+Setup - Notes Macros Full Control
+Setup - Notes Macros View Only
+Setup - Office Groups Screen Full Control
+Setup - Office Screen Full Control
+Setup - Ortho Misc Setup Full Control
+Setup - Ortho Misc Setup View Only
+Setup - Ortho Questionnaire Full Control
+Setup - Ortho Questionnaire View Only
+Setup - Payment Types Screen Full Control
+Setup - Perio Setup Template Screen Full Control
+Setup - PickList Full Control
+Setup - Place of Service Codes Screen Full Control
+Setup - Prescriptions Screen Full Control
+Setup - Procedure Codes Screen Full Control
+Setup - Provider Goals Screen Full Control
+Setup - Provider Goals Screen View Only
+Setup - Provider Per Office Screen Full Control
+Setup - Provider Screen Edit Provider
+Setup - Provider Screen Full Control
+Setup - Referral Demographics Screen Full Control
+Setup - Referrals Screen Full Control
+Setup - Reset Benefits for All Offices in PGID
+Setup - Reset Benefits for Current Office Only
+Setup - Scheduler Template Screen Edit Scheduler Template
+Setup - Scheduler Template Screen Full Control
+Setup - Scheduler Template Screen View Only
+Setup - Scheduler Views Screen Full Control
+Setup - Security Custom Toolbar Screen Full Control
+Setup - Security Custom Toolbar Screen View Only
+Setup - Security Groups Screen Full Control
+Setup - Security Multi PGID Users Screen Full Control
+Setup - Security User Per Office Screen Full Control
+Setup - Security Users Screen Full Control
+Setup - SSO Users Setup Screen Full Control
+Setup - SSO Users Setup Screen View Only
+Setup - Type of Service Codes Screen Full Control
+Setup - View Core Labs Page
+Transaction - Batch Insurance Payment Dentical Full Control
+Transactions - Add Pre-Existing Conditions
+Transactions - Add Procedure
+Transactions - Add/Post Adjustments
+Transactions - Add/Post Batch Insurance Payments
+Transactions - Add/Post Batch Insurance Payments 835
+Transactions - Add/Post Batch Patient Payments
+Transactions - Add/Post Capitation Payments
+Transactions - Add/Post Insurance Payments
+Transactions - Add/Post Patient Payments
+Transactions - Allow Add Delete BackDated Payment Between CloseOut Date And Yesterday
+Transactions - Batch Insurance Payments 835 View Only
+Transactions - Change/Update Insurance Payments
+Transactions - Change/Update Patient Payments
+Transactions - Change/Update Procedure Insurance Benefits
+Transactions - Change/Update Procedure Insurance Benefits in Treatment Plan
+Transactions - Delete Care Credit Payment/Adjustment
+Transactions - Delete Cash Payments
+Transactions - Delete Insurance Claims
+Transactions - Delete Insurance Payments
+Transactions - Delete Patient Payments
+Transactions - Delete Pre-Authorizations
+Transactions - Delete Procedure
+Transactions - Edit Fee - Ledger
+Transactions - Generate Pre-Authorizations Full Control
+Transactions - Insurance Claims Details Full Control
+Transactions - Ledger Note Delete
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Ledger Screen Full Control
+Transactions - Patient Payment View Only
+Transactions - Post New Charges for Locked Account
+Transactions - Post Payments or Adjustments for Locked Account
+Transactions - Pre-Authorizations List Full Control
+Transactions - Transaction Entry Screen Full Control
+Transactions - Treatment Plan Add
+Transactions - Treatment Plan Change Status or IDs
+Transactions - Treatment Plan Delete
+Transactions - Treatment Plan Discount
+Transactions - Treatment Plan Edit Fee
+Transactions - Treatment Plan Post to Ledger
+Transactions - Treatment Plan Re-Estimate
+Transactions - Treatment Plan Screen Full Control
+Transactions - Update or Change Procedure
+Transactions - View Insurance Payments
+Utilities - 835 Hub - Full Control
+Utilities - 835 Hub - View Only
+Utilities - Access to Dentilytics Enterprise
+Utilities - Advanced Utilities Full Control
+Utilities - Automated Campaigns Ad-hoc Campaign Management
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Ad-hoc Campaign View Only
+Utilities - Automated Campaigns Appointment Campaign Management
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign View Only
+Utilities - Automated Campaigns Dashboard Full Control
+Utilities - Automated Campaigns Dashboard View Only
+Utilities - Automated Campaigns Mailing List Management
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Mailing List View Only
+Utilities - Automated Campaigns Patient Care Campaign Management
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Patient Care Campaign View Only
+Utilities - Automated Campaigns Recurring Campaign Management
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign View Only
+Utilities - Automated Campaigns Template Management
+Utilities - Automated Campaigns Template User Specific
+Utilities - Automated Campaigns Template View Only
+Utilities - Batch Claim Processing Screen Full Control
+Utilities - Batch Eligibility Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - View Only
+Utilities - Change Patient Fee Schedule Full Control
+Utilities - Change Patient Home Office Full Control
+Utilities - Change Patients Provider
+Utilities - Consolidate Carriers Full Control
+Utilities - Consolidate Carriers View Only
+Utilities - Copy Letters Full Control
+Utilities - Copy Notes Macros Full Control
+Utilities - Copy Notes Macros View Only
+Utilities - Data Conversion Mapping - Full Control
+Utilities - Denticon Download Full Control
+Utilities - Dentigram Download Full Control
+Utilities - DHAClaims837- Full Control
+Utilities - Direct Claims Full Control
+Utilities - DldFeeScheXls Download Full Control
+Utilities - Download837 - Full Control
+Utilities - Eclaims Management Screen Full Control
+Utilities - Encounter Download Full Control
+Utilities - EncounterDownload - Full Control
+Utilities - Launch Mouthwatch (Teledentistry)
+Utilities - Office Specific - DCA - Close Out Claims Full Control
+Utilities - Office-DHA-Close Mananged Full Control
+Utilities - Post Patient Ortho Payment Plan Charges Full Control
+Utilities - Post Payment Plan Charges by Practice
+Utilities - Post Regular Payment Plan Charges
+Utilities - Radius Global Full Access
+Utilities - Referral Management - Edit Status
+Utilities - Referral Management Full Control
+Utilities - Referral Management View Only
+Utilities - Replace Carriers Full Control
+Utilities - Replace Insurance Plans Full Control
+Utilities - Replace Procedure Code Full Control
+Utilities - Scheduled Reallocation List
+Utilities - Task Manager - Access
+Utilities - Task Manager - Assign Task
+Utilities - Task Manager - Change Action of Task
+Utilities - Task Manager - Create Task
+Utilities - Task Manager - Delete Task
+Utilities - Task Manager - Supervisor User
+Utilities - Text Message Details Full Control
+Utilities - Text Message Details View Only
+Utilities - Tickler Full Control
+Utilities - Time Clock Editor Full Control
+Utilities - Time Clock Full Control
+Utilities - Transworld Full Access
+Utilities - Two Way Communication Full Control
+Utilities - Two Way Communication View Only
+Utilities->EHR-EHRReport-FullControl
+Utilities-Office Specific-DHA-StatementXMLDld Full
+Utilities-Office Specific-Mid Atlantic-BatchAddFlashAlerts Full
+Utilities-Office Specific-Mid Atlantic-BatchAddFlashAlerts View
+Utilities-Office Specific-Mid Atlantic-BatchDeactivateFlashAlerts Full
+Utilities-Office Specific-Mid Atlantic-BatchDeactivateFlashAlerts View
+
+Administrators 2 (106) :-
+
+This Group has the following rights
+Modified On:
+Modified By:
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - Move Existing Appointment
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - Short call list
+Appointments - Short notice list
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Appointments - Weekly View - Full Control
+Appointments - Weekly View by Provider - Full Control
+Appointments - Weekly View by User View - Full Control
+Denticon Mobile Access
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Access SSN Value
+Patient - Add New Flash Alerts
+Patient - Add New Member Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add New Patient Full Control
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Delete Ortho Payment Plan
+Patient - Delete Patient Information
+Patient - Delete Patient Insurance Plan Information
+Patient - Delete Regular Payment Plan
+Patient - Dental Insurance Fill-Out Form Full Control
+Patient - Dental Insurance Fill-Out Form View Only
+Patient - Edit Or Deactivate Existing Flash Alerts
+Patient - Edit progress notes
+Patient - Email Or Text Message Full Control
+Patient - Email Or Text Message View Only
+Patient - Insurance Plan Information Screen Full Control
+Patient - Insurance Plan Information View Only
+Patient - Link Patient View Only
+Patient - Medical History Full Control
+Patient - Medical History View Only
+Patient - Medical Insurance Fill-Out Form Full Control
+Patient - Medical Insurance Fill-Out Form View Only
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Move Patient
+Patient - Online Registration Existing Full Control
+Patient - Online Registration Existing View Only
+Patient - Online Registration New Control Only
+Patient - Online Registration New Full Control
+Patient - Ortho Payment Plan Screen Full Control
+Patient - Ortho Payment Plan View Only
+Patient - Patient Information Screen Full Control
+Patient - Patient Information View Only
+Patient - Patient Notes Add
+Patient - Patient Notes Delete
+Patient - Patient Notes Edit
+Patient - Patient Notes View Only
+Patient - Patient Overview Screen Full Control
+Patient - Patient Overview View Only
+Patient - Prescription Screen Full Control
+Patient - Prescription Strike Off
+Patient - Prescription View Only
+Patient - Reallocate Screen Full Control
+Patient - Recall Due Dates Screen Full Control
+Patient - Recall Due Dates View Only
+Patient - Regular Payment Plan Screen Full Control
+Patient - Regular Payment Plan View Only
+Patient - Responsible Party - Statement/Collection Rights
+Patient - Responsible Party Information Screen Full Control
+Patient - Responsible Party Information View Only
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Patient - View Progress notes
+Reports - Appointment Reports Screen Full Control
+Reports - Appointment Reports Screen View Only
+Reports - Batch Collection Letters Full Control
+Reports - Batch Collection Letters View Only
+Reports - Blank Insurance Form Screen Full Control
+Reports - Blank Insurance Form Screen View Only
+Reports - Custom Letter Full Control
+Reports - Custom Letter Screen View Only
+Reports - Custom Postcard Full Control
+Reports - Custom Postcard Screen View Only
+Reports - Daily Reports Screen Full Control
+Reports - Daily Reports Screen View Only
+Reports - DHA Reports Screen Full Control
+Reports - DHA Reports Screen View Only
+Reports - Excel Reports Full Control
+Reports - Excel Reports View Only
+Reports - Group Reports - Appointment Reports Full Control
+Reports - Group Reports - Appointment Reports View Only
+Reports - Group Reports - Batch Reports Full Control
+Reports - Group Reports - Batch Reports View Only
+Reports - Group Reports - Other Reports Full Control
+Reports - Group Reports - Other Reports View Only
+Reports - Group Reports - Referral Reports Full Control
+Reports - Group Reports - Referral Reports View Only
+Reports - Group Reports Ins Screen Full Control
+Reports - Group Reports Ins Screen View Only
+Reports - Group Reports Mang Screen Full Control
+Reports - Group Reports Mang Screen View Only
+Reports - Insurance Reports Screen Full Control
+Reports - Insurance Reports Screen View Only
+Reports - Labels Screen Full Control
+Reports - Labels Screen View Only
+Reports - Ledger Reports Screen Full Control
+Reports - Ledger Reports Screen View Only
+Reports - Letters Screen Full Control
+Reports - Letters Screen View Only
+Reports - Lists - Employer List Screen Full Control
+Reports - Lists - Employer List Screen View Only
+Reports - Lists - Office List Screen Full Control
+Reports - Lists - Office List Screen View Only
+Reports - Lists - Patient List Screen Full Control
+Reports - Lists - Patient List Screen View Only
+Reports - Lists - Prescription List Screen Full Control
+Reports - Lists - Prescription List Screen View Only
+Reports - Lists - Procedure/Fee List Screen Full Control
+Reports - Lists - Procedure/Fee List Screen View Only
+Reports - Lists - Provider List Screen Full Control
+Reports - Lists - Provider List Screen View Only
+Reports - Lists - Responsible Party List Screen Full Control
+Reports - Lists - Responsible Party List Screen View Only
+Reports - Lists - Security List Rpts Screen Full C
+Reports - Lists - Setup List Rpts Screen Full Cont
+Reports - Management Reports Screen Full Control
+Reports - Management Reports Screen View Only
+Reports - My Reports - Full Control
+Reports - Office Reports - ADRpts Screen Full Con
+Reports - Office Reports - ADRpts Screen View Only
+Reports - Office Reports - BNRpts Screen Full Cont
+Reports - Office Reports - BNRpts Screen View Only
+Reports - Office Reports - CHI St. Joseph Children's Health Reports Full Control
+Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only
+Reports - Office Reports - HawaiiRpts Full Control
+Reports - Office Reports - HawaiiRpts View Only
+Reports - Office Reports - Kansas Rpts Full Contro
+Reports - Office Reports - Lumina Reports Full Control
+Reports - Office Reports - Lumina Reports View Only
+Reports - Office Reports - NEDMRpts Screen Full Co
+Reports - Office Reports - NEDMRpts Screen View On
+Reports - Office Reports - OHC Reports Full Contro
+Reports - Office Reports - SGKReports Screen Full Control
+Reports - Office Reports - UOP Reports Full Contro
+Reports - Office Reports - VHRpts Screen Full Con
+Reports - Office Reports - VHRpts Screen View Only
+Reports - Office Reports - Village Family Dental Reports Full Control
+Reports - Office Reports - Village Family Dental Reports View Only
+Reports - Ortho Reports Access Full Control
+Reports - Ortho Reports View Only
+Reports - Pat Reg./Medical Info Forms Full Control
+Reports - Pat Reg./Medical Info Forms View Only
+Reports - Postcards Full Control
+Reports - Postcards View Only
+Reports - Recall Reports Screen Full Control
+Reports - Recall Reports Screen View Only
+Reports - Referral Reports Screen Full Control
+Reports - Referral Reports Screen View Only
+Reports - Statement - Allow updating statement dates
+Reports - Statements Screen Full Control
+Reports - Statements Screen View Only
+Reports - Treatment Plan Reports Screen View Only
+Reports - Treatment Plan Reports Screen Full Control
+Reports - Voice Charting Adoption Full Control
+Setup - Account Screen Full Control
+Setup - Account Screen View Only
+Setup - CDT to CPT Cross Coder Screen Full Control
+Setup - CDT to CPT Cross Coder Screen View Only
+Setup - CDT to ICD Cross Coder Screen View Only
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Close Out All Offices
+Setup - Close Out Full Control
+Setup - Close Out View Only
+Setup - Collection Agencies Screen Full Control
+Setup - Collection Agencies Screen View Only
+Setup - CPT to ICD Cross Coder Screen Full Control
+Setup - CPT to ICD Cross Coder Screen View Only
+Setup - Delete Notes Macros
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Dentigram Downloads Full Control
+Setup - Dentigram Downloads View Only
+Setup - Explosion Codes Screen Full Control
+Setup - Explosion Codes Screen View Only
+Setup - Fee Schedules Screen View Only
+Setup - ICD Codes Screen Full Control
+Setup - ICD Codes Screen View Only
+Setup - Insurance Custom Coverage Screen View Only
+Setup - Insurance Dental Carriers Screen View Only
+Setup - Insurance Employers Screen View Only
+Setup - Insurance Medical Carriers Screen View Only
+Setup - Insurance Plans Screen View Only
+Setup - Labs Screen Full Control
+Setup - Labs Screen View Only
+Setup - Medical Alert Setup Full Control
+Setup - Medical Alert Setup View Only
+Setup - Medical Alerts Screen Full Control
+Setup - Medical Alerts View Only
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Setup - Misc. Screen Full Control
+Setup - Misc. Screen View Only
+Setup - Modifier Codes Screen Full Control
+Setup - Modifier Codes Screen View Only
+Setup - Notes Macros Full Control
+Setup - Office Groups Screen Full Control
+Setup - Office Groups Screen View Only
+Setup - Office Screen Full Control
+Setup - Office Screen View Only
+Setup - Ortho Misc Setup Full Control
+Setup - Ortho Misc Setup View Only
+Setup - Ortho Questionnaire Full Control
+Setup - Ortho Questionnaire View Only
+Setup - Payment Types Screen Full Control
+Setup - Payment Types Screen View Only
+Setup - Place of Service Codes Screen Full Control
+Setup - Place of Service Codes Screen View Only
+Setup - Prescriptions Screen Full Control
+Setup - Prescriptions Screen View Only
+Setup - Procedure Codes Screen Full Control
+Setup - Procedure Codes Screen View Only
+Setup - Provider Goals Screen View Only
+Setup - Provider Screen Full Control
+Setup - Provider Screen View Only
+Setup - Referral Demographics Screen Full Control
+Setup - Referral Demographics Screen View Only
+Setup - Referrals Screen Full Control
+Setup - Referrals Screen View Only
+Setup - Reset Benefits for Current Office Only
+Setup - Reset Benefits View Only
+Setup - Scheduler Views Screen Full Control
+Setup - Scheduler Views Screen View Only
+Setup - Security Groups Screen Full Control
+Setup - Security Groups Screen View Only
+Setup - Security User Per Office Screen Full Control
+Setup - Security User Per Office Screen View Only
+Setup - Security Users Screen Full Control
+Setup - Security Users Screen View Only
+Setup - Type of Service Codes Screen Full Control
+Setup - Type of Service Codes Screen View Only
+Transactions - Add Pre-Existing Conditions
+Transactions - Add Procedure
+Transactions - Add/Post Adjustments
+Transactions - Add/Post Batch Insurance Payments
+Transactions - Add/Post Batch Insurance Payments 835
+Transactions - Add/Post Batch Patient Payments
+Transactions - Add/Post Capitation Payments
+Transactions - Add/Post Insurance Payments
+Transactions - Add/Post Patient Payments
+Transactions - Allow Add Delete BackDated Payment Between CloseOut Date And Yesterday
+Transactions - Batch Insurance Payments 835 View Only
+Transactions - Batch Insurance Payments View Only
+Transactions - Batch Patient Payments View Only
+Transactions - Change/Update Insurance Payments
+Transactions - Change/Update Patient Payments
+Transactions - Change/Update Procedure Insurance Benefits
+Transactions - Change/Update Procedure Insurance Benefits in Treatment Plan
+Transactions - Delete Cash Payments
+Transactions - Delete Insurance Claims
+Transactions - Delete Insurance Payments
+Transactions - Delete Patient Payments
+Transactions - Delete Pre-Authorizations
+Transactions - Delete Procedure
+Transactions - Edit Fee - Ledger
+Transactions - Generate Pre-Authorizations Full Control
+Transactions - Insurance Claims Details Full Control
+Transactions - Insurance Claims Details View Only
+Transactions - Ledger Note Delete
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Ledger Screen Full Control
+Transactions - Patient Ledger View Only
+Transactions - Patient Payment View Only
+Transactions - Pre-Authorizations Detail View Only
+Transactions - Pre-Authorizations List Full Control
+Transactions - Pre-Authorizations List View Only
+Transactions - Transaction Entry Screen Full Control
+Transactions - Transaction Entry View Only
+Transactions - Treatment Plan Add
+Transactions - Treatment Plan Change Status or IDs
+Transactions - Treatment Plan Delete
+Transactions - Treatment Plan Discount
+Transactions - Treatment Plan Edit Fee
+Transactions - Treatment Plan Post to Ledger
+Transactions - Treatment Plan Re-Estimate
+Transactions - Treatment Plan Screen Full Control
+Transactions - Treatment Plan View Only
+Transactions - Update or Change Procedure
+Transactions - View Insurance Payments
+Utilities - Advanced Utilities Full Control
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Batch Claim Processing Screen Full Control
+Utilities - Batch Claim Processing Screen View Only
+Utilities - Batch Eligibility Full Control
+Utilities - Batch Eligibility View Only
+Utilities - Change Future Appointments, Patients, Tx by Provider - Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - View Only
+Utilities - Copy Letters Full Control
+Utilities - Copy Letters View Control
+Utilities - Copy Notes Macros Full Control
+Utilities - Denticon Download Full Control
+Utilities - Denticon Download View Only
+Utilities - Dentigram Download Full Control
+Utilities - Dentigram Download View Only
+Utilities - DHAClaims837- Full Control
+Utilities - DHAClaims837- View Only
+Utilities - Direct Claims Full Control
+Utilities - Direct Claims View Only
+Utilities - DldFeeScheXls Download Full Control
+Utilities - DldFeeScheXls Download View Only
+Utilities - Download837 - Full Control
+Utilities - Download837 - View Only
+Utilities - Eclaims Management Screen Full Control
+Utilities - Encounter Download Full Control
+Utilities - Encounter Download View Only
+Utilities - EncounterDownload - Full Control
+Utilities - EncounterDownload - View Only
+Utilities - Office-DHA-Close Mananged Full Control
+Utilities - Office-DHA-Close Mananged View Only
+Utilities - Post Ortho Payment Plan Charges View Only
+Utilities - Post Patient Ortho Payment Plan Charges Full Control
+Utilities - Post Regular Payment Plan Charges
+Utilities - Post Regular Payment Plan Charges View Only
+Utilities - Radius Global Full Access
+Utilities - Replace Carriers Full Control
+Utilities - Replace Carriers View Only
+Utilities - Replace Insurance Plans Full Control
+Utilities - Replace Insurance Plans View Only
+Utilities - Replace Procedure Code Full Control
+Utilities - Replace Procedure Code View Only
+Utilities - Text Message Details Full Control
+Utilities - Text Message Details View Only
+Utilities - Tickler Full Control
+Utilities - Tickler View Only Control
+Utilities - Time Clock Editor Full Control
+Utilities - Time Clock Editor View Only
+Utilities - Time Clock Full Control
+Utilities - Time Clock View Only
+Utilities - Transworld Full Access
+Utilities - Two Way Communication Full Control
+Utilities - Two Way Communication View Only
+Utilities-Office Specific-DHA-StatementXMLDld Full
+Utilities-Office Specific-DHA-StatementXMLDld View
+
+
+Assistant (161):-
+
+This Group has the following rights
+Modified On: 3/13/2025 10:05:00 AM PT
+Modified By: ELIZABETHH
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - Move Existing Appointment
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Appointments - Post Existing Appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - Short call list
+Appointments - Short notice list
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Appointments - Weekly View - Full Control
+Appointments - Weekly View by Provider - Full Control
+Appointments - Weekly View by User View - Full Control
+Denticon Mobile Access
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Add New Flash Alerts
+Patient - Add New Member Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add New Patient Full Control
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Delete Ortho Payment Plan
+Patient - Delete Patient Insurance Plan Information
+Patient - Edit Or Deactivate Existing Flash Alerts
+Patient - Edit progress notes
+Patient - Email Or Text Message Full Control
+Patient - Email Or Text Message View Only
+Patient - Insurance Plan Information Screen Full Control
+Patient - Link Patient View Only
+Patient - Medical History Full Control
+Patient - Medical Insurance Fill-Out Form Full Control
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Move Patient
+Patient - Online Registration Existing Full Control
+Patient - Online Registration Existing View Only
+Patient - Online Registration New Control Only
+Patient - Online Registration New Full Control
+Patient - Patient Information Screen Full Control
+Patient - Patient Information View Only
+Patient - Patient Notes Add
+Patient - Patient Notes Delete
+Patient - Patient Notes Edit
+Patient - Patient Notes View Only
+Patient - Patient Overview Screen Full Control
+Patient - Patient Overview View Only
+Patient - Prescription Screen Full Control
+Patient - Prescription Strike Off
+Patient - Prescription View Only
+Patient - Reallocate Screen Full Control
+Patient - Reallocate View Only
+Patient - Recall Due Dates Screen Full Control
+Patient - Recall Due Dates View Only
+Patient - Regular Payment Plan Screen Full Control
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Patient - View Progress notes
+Reports - Appointment Reports Screen Full Control
+Reports - Appointment Reports Screen View Only
+Reports - Group Reports - Appointment Reports Full Control
+Reports - Group Reports - Appointment Reports View Only
+Reports - Office Reports - CHI St. Joseph Children's Health Reports Full Control
+Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only
+Reports - Ortho Reports Access Full Control
+Reports - Ortho Reports View Only
+Reports - Voice Charting Adoption Full Control
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Medical Alerts Screen Full Control
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Setup - Ortho Misc Setup Full Control
+Setup - Ortho Misc Setup View Only
+Setup - Ortho Questionnaire Full Control
+Setup - Ortho Questionnaire View Only
+Setup - Provider Goals Screen View Only
+Transactions - Add Pre-Existing Conditions
+Transactions - Add Procedure
+Transactions - Add/Post Adjustments
+Transactions - Add/Post Insurance Payments
+Transactions - Add/Post Patient Payments
+Transactions - Change/Update Procedure Insurance Benefits
+Transactions - Delete Procedure
+Transactions - Edit Fee - Ledger
+Transactions - Ledger Note Delete
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Ledger Screen Full Control
+Transactions - Patient Payment View Only
+Transactions - Transaction Entry Screen Full Control
+Transactions - Treatment Plan Add
+Transactions - Treatment Plan Change Status or IDs
+Transactions - Treatment Plan Delete
+Transactions - Treatment Plan Edit Fee
+Transactions - Treatment Plan Post to Ledger
+Transactions - Treatment Plan Screen Full Control
+Transactions - Update or Change Procedure
+Transactions - View Insurance Payments
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Change Future Appointments, Patients, Tx by Provider - Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - View Only
+Utilities - Text Message Details Full Control
+Utilities - Text Message Details View Only
+Utilities - Time Clock View Only
+Utilities - Two Way Communication Full Control
+Utilities - Two Way Communication View Only
+
+
+Billing (183):-
+
+This Group has the following rights
+Modified On:
+Modified By:
+Denticon Mobile Access
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Add New Flash Alerts
+Patient - Addresses View Only
+Patient - Dental Insurance Fill-Out Form Full Control
+Patient - Insurance Plan Information Screen Full Control
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Patient Notes View Only
+Patient - Responsible Party Information Screen Full Control
+Patient - Un-attach Patient Insurance Plan Information
+Patient - View Progress notes
+Reports - Voice Charting Adoption Full Control
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Transaction - Batch Insurance Payment Dentical Full Control
+Transactions - Add Procedure
+Transactions - Add/Post Adjustments
+Transactions - Add/Post Batch Insurance Payments
+Transactions - Add/Post Batch Insurance Payments 835
+Transactions - Add/Post Insurance Payments
+Transactions - Change/Update Insurance Payments
+Transactions - Change/Update Patient Payments
+Transactions - Delete Insurance Payments
+Transactions - Edit Fee - Ledger
+Transactions - Insurance Claims Details Full Control
+Transactions - Ledger Note View Only
+Transactions - Update or Change Procedure
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+
+
+Claims (268) :- 
+
+This Group has the following rights
+Modified On:
+Modified By:
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Reports - Voice Charting Adoption Full Control
+Transactions - Add/Post Insurance Payments
+Transactions - Delete Insurance Claims
+Transactions - Delete Insurance Payments
+Transactions - Delete Pre-Authorizations
+Transactions - Insurance Claims Details Full Control
+
+
+
+Clerical (104) :- 
+
+This Group has the following rights
+Modified On: 9/23/2025 6:30:00 AM PT
+Modified By: ELIZABETHH
+Appointments - Add Appointment In Other Office
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - Move Existing Appointment
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Appointments - Post Existing Appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - Short call list
+Appointments - Short notice list
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Appointments - Weekly View - Full Control
+Appointments - Weekly View by Provider - Full Control
+Appointments - Weekly View by User View - Full Control
+Denticon Mobile Access
+EHR - User will see CDS interventions based on Allergies
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Access SSN Value
+Patient - Add New Flash Alerts
+Patient - Add New Member Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add New Patient Full Control
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Delete Patient Information
+Patient - Delete Patient Insurance Plan Information
+Patient - Dental Insurance Fill-Out Form Full Control
+Patient - Dental Insurance Fill-Out Form View Only
+Patient - Edit Or Deactivate Existing Flash Alerts
+Patient - Edit progress notes
+Patient - Email Or Text Message Full Control
+Patient - Insurance Plan Information Screen Full Control
+Patient - Link Patient View Only
+Patient - Medical History Full Control
+Patient - Medical Insurance Fill-Out Form Full Control
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Move Patient
+Patient - Online Registration Existing Full Control
+Patient - Online Registration Existing View Only
+Patient - Online Registration New Control Only
+Patient - Online Registration New Full Control
+Patient - Ortho Payment Plan Screen Full Control
+Patient - Patient Information Screen Full Control
+Patient - Patient Information View Only
+Patient - Patient Notes Add
+Patient - Patient Notes Delete
+Patient - Patient Notes Edit
+Patient - Patient Notes View Only
+Patient - Patient Overview Screen Full Control
+Patient - Patient Overview View Only
+Patient - Prescription Screen Full Control
+Patient - Prescription View Only
+Patient - Reallocate Screen Full Control
+Patient - Recall Due Dates Screen Full Control
+Patient - Recall Due Dates View Only
+Patient - Regular Payment Plan Screen Full Control
+Patient - Responsible Party - Statement/Collection Rights
+Patient - Responsible Party Information Screen Full Control
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Patient - View Progress notes
+Reports - Appointment Reports Screen Full Control
+Reports - Batch Collection Letters Full Control
+Reports - Batch Collection Letters View Only
+Reports - Blank Insurance Form Screen Full Control
+Reports - Custom Letter Screen View Only
+Reports - Custom Postcard Screen View Only
+Reports - Daily Reports Screen Full Control
+Reports - Group Reports - Appointment Reports Full Control
+Reports - Group Reports - Appointment Reports View Only
+Reports - Group Reports - Batch Reports Full Control
+Reports - Group Reports - Batch Reports View Only
+Reports - Group Reports - Other Reports Full Control
+Reports - Group Reports - Other Reports View Only
+Reports - Group Reports - Referral Reports Full Control
+Reports - Group Reports - Referral Reports View Only
+Reports - Insurance Reports Screen Full Control
+Reports - Labels Screen Full Control
+Reports - Ledger Reports Screen Full Control
+Reports - Letters Screen Full Control
+Reports - Lists - Employer List Screen Full Control
+Reports - Lists - Office List Screen Full Control
+Reports - Lists - Patient List Screen Full Control
+Reports - Lists - Procedure/Fee List Screen Full Control
+Reports - Lists - Responsible Party List Screen Full Control
+Reports - My Reports - Full Control
+Reports - My Reports - View
+Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only
+Reports - Office Reports - Village Family Dental Reports Full Control
+Reports - Office Reports - Village Family Dental Reports View Only
+Reports - Ortho Reports Access Full Control
+Reports - Ortho Reports View Only
+Reports - Pat Reg./Medical Info Forms Full Control
+Reports - Pat Reg./Medical Info Forms View Only
+Reports - Postcards Full Control
+Reports - Postcards View Only
+Reports - Recall Reports Screen Full Control
+Reports - Referral Reports Screen Full Control
+Reports - Statement - Allow updating statement dates
+Reports - Statements Screen View Only
+Reports - Treatment Plan Reports Screen Full Control
+Reports - Voice Charting Adoption Full Control
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Insurance Custom Coverage Screen Full Control
+Setup - Insurance Dental Carriers Screen Full Control
+Setup - Insurance Employers Screen Full Control
+Setup - Insurance Plans Screen - Add Carrier
+Setup - Insurance Plans Screen - Add Employer
+Setup - Insurance Plans Screen Full Control
+Setup - Medical Alerts Screen Full Control
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Transactions - Add Pre-Existing Conditions
+Transactions - Add Procedure
+Transactions - Add/Post Adjustments
+Transactions - Add/Post Capitation Payments
+Transactions - Add/Post Insurance Payments
+Transactions - Add/Post Patient Payments
+Transactions - Change/Update Procedure Insurance Benefits
+Transactions - Change/Update Procedure Insurance Benefits in Treatment Plan
+Transactions - Generate Pre-Authorizations Full Control
+Transactions - Insurance Claims Details Full Control
+Transactions - Ledger Note Delete
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Ledger Screen Full Control
+Transactions - Patient Payment View Only
+Transactions - Pre-Authorizations Detail View Only
+Transactions - Pre-Authorizations List Full Control
+Transactions - Pre-Authorizations List View Only
+Transactions - Transaction Entry Screen Full Control
+Transactions - Treatment Plan Add
+Transactions - Treatment Plan Change Status or IDs
+Transactions - Treatment Plan Delete
+Transactions - Treatment Plan Discount
+Transactions - Treatment Plan Edit Fee
+Transactions - Treatment Plan Post to Ledger
+Transactions - Treatment Plan Re-Estimate
+Transactions - Treatment Plan Screen Full Control
+Transactions - Update or Change Procedure
+Transactions - View Insurance Payments
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Batch Claim Processing Screen Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - View Only
+Utilities - Change Patient Home Office Full Control
+Utilities - Text Message Details Full Control
+Utilities - Text Message Details View Only
+Utilities - Time Clock View Only
+Utilities - Two Way Communication Full Control
+
+Clinical 105 :-
+
+This Group has the following rights
+Modified On: 4/3/2025 10:34:00 AM PT
+Modified By: ELIZABETHH
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - Move Existing Appointment
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Appointments - Post Existing Appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - Short call list
+Appointments - Short notice list
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Appointments - Weekly View - Full Control
+Appointments - Weekly View by Provider - Full Control
+Appointments - Weekly View by User View - Full Control
+Denticon Mobile Access
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Access SSN Value
+Patient - Add New Flash Alerts
+Patient - Add New Member Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add New Patient Full Control
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Dental Insurance Fill-Out Form Full Control
+Patient - Edit Or Deactivate Existing Flash Alerts
+Patient - Edit progress notes
+Patient - Email Or Text Message Full Control
+Patient - Email Or Text Message View Only
+Patient - Insurance Plan Information View Only
+Patient - Link Patient View Only
+Patient - Medical History Full Control
+Patient - Medical Insurance Fill-Out Form Full Control
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Move Patient
+Patient - Online Registration Existing Full Control
+Patient - Online Registration Existing View Only
+Patient - Online Registration New Control Only
+Patient - Online Registration New Full Control
+Patient - Ortho Payment Plan View Only
+Patient - Patient Information View Only
+Patient - Patient Notes Add
+Patient - Patient Notes Edit
+Patient - Patient Overview View Only
+Patient - Prescription Screen Full Control
+Patient - Prescription View Only
+Patient - Recall Due Dates Screen Full Control
+Patient - Regular Payment Plan View Only
+Patient - Responsible Party - Statement/Collection Rights
+Patient - Responsible Party Information View Only
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Patient - View Progress notes
+Reports - Appointment Reports Screen Full Control
+Reports - Batch Collection Letters Full Control
+Reports - Batch Collection Letters View Only
+Reports - Custom Letter Screen View Only
+Reports - Custom Postcard Screen View Only
+Reports - Daily Reports Screen Full Control
+Reports - Group Reports - Appointment Reports Full Control
+Reports - Group Reports - Appointment Reports View Only
+Reports - Group Reports - Batch Reports Full Control
+Reports - Group Reports - Batch Reports View Only
+Reports - Group Reports - Other Reports Full Control
+Reports - Group Reports - Other Reports View Only
+Reports - Group Reports - Referral Reports Full Control
+Reports - Group Reports - Referral Reports View Only
+Reports - Lists - Provider List Screen Full Control
+Reports - My Reports - Full Control
+Reports - Office Reports - CHI St. Joseph Children's Health Reports Full Control
+Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only
+Reports - Office Reports - Lumina Reports Full Control
+Reports - Office Reports - Lumina Reports View Only
+Reports - Office Reports - Village Family Dental Reports Full Control
+Reports - Office Reports - Village Family Dental Reports View Only
+Reports - Ortho Reports Access Full Control
+Reports - Ortho Reports View Only
+Reports - Pat Reg./Medical Info Forms Full Control
+Reports - Pat Reg./Medical Info Forms View Only
+Reports - Postcards Full Control
+Reports - Postcards View Only
+Reports - Recall Reports Screen Full Control
+Reports - Referral Reports Screen View Only
+Reports - Statement - Allow updating statement dates
+Reports - Treatment Plan Reports Screen View Only
+Reports - Voice Charting Adoption Full Control
+Setup - CDT to ICD Cross Coder Screen View Only
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Insurance Plans Screen View Only
+Setup - Medical Alerts Screen Full Control
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Setup - Ortho Misc Setup Full Control
+Setup - Ortho Misc Setup View Only
+Setup - Ortho Questionnaire Full Control
+Setup - Ortho Questionnaire View Only
+Setup - Provider Goals Screen View Only
+Transactions - Add Pre-Existing Conditions
+Transactions - Add Procedure
+Transactions - Add/Post Adjustments
+Transactions - Add/Post Patient Payments
+Transactions - Change/Update Procedure Insurance Benefits
+Transactions - Change/Update Procedure Insurance Benefits in Treatment Plan
+Transactions - Delete Procedure
+Transactions - Generate Pre-Authorizations Full Control
+Transactions - Insurance Claims Details View Only
+Transactions - Ledger Note Delete
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Ledger View Only
+Transactions - Patient Payment View Only
+Transactions - Pre-Authorizations Detail View Only
+Transactions - Pre-Authorizations List View Only
+Transactions - Transaction Entry Screen Full Control
+Transactions - Treatment Plan Add
+Transactions - Treatment Plan Change Status or IDs
+Transactions - Treatment Plan Delete
+Transactions - Treatment Plan Discount
+Transactions - Treatment Plan Post to Ledger
+Transactions - Treatment Plan Re-Estimate
+Transactions - Treatment Plan Screen Full Control
+Transactions - Update or Change Procedure
+Transactions - View Insurance Payments
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Change Future Appointments, Patients, Tx by Provider - Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - View Only
+Utilities - Text Message Details Full Control
+Utilities - Text Message Details View Only
+Utilities - Time Clock View Only
+Utilities - Two Way Communication Full Control
+Utilities - Two Way Communication View Only
+
+Doctor(149) :-
+
+This Group has the following rights
+Modified On: 6/3/2026 11:09:00 AM PT
+Modified By: DHILEEP.JIN2829
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Post Existing Appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Appointments - Weekly View - Full Control
+Appointments - Weekly View by Provider - Full Control
+Denticon Mobile Access
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Add New Flash Alerts
+Patient - Add New Patient - Quick Save
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Edit progress notes
+Patient - Link Patient View Only
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Patient Notes Add
+Patient - Patient Overview View Only
+Patient - Prescription Screen Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Reports - Voice Charting Adoption Full Control
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Setup - Ortho Misc Setup Full Control
+Setup - Ortho Misc Setup View Only
+Setup - Ortho Questionnaire Full Control
+Setup - Ortho Questionnaire View Only
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Payment View Only
+Transactions - Treatment Plan Delete
+Transactions - Treatment Plan Discount
+Transactions - Treatment Plan Edit Fee
+Transactions - Treatment Plan Screen Full Control
+Transactions - Update or Change Procedure
+Transactions - View Insurance Payments
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign Management
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Dashboard Full Control
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Dentigram Download Full Control
+Utilities - Two Way Communication Full Control
+
+
+FrontDesk 182 :-
+
+This Group has the following rights
+Modified On: 3/18/2026 7:05:00 AM PT
+Modified By: ELIZABETHH
+Appointments - Add Appointment In Other Office
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - Move Existing Appointment
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Appointments - Post Existing Appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - Schedule Appointments for Locked Account
+Appointments - Short call list
+Appointments - Short notice list
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Appointments - Weekly View - Full Control
+Appointments - Weekly View by Provider - Full Control
+Appointments - Weekly View by User View - Full Control
+AthenaNet - Search AthenaNet Patients
+Denticon Mobile Access
+EHR - User can edit instructions and bibliography information
+EHR - User can see and access the Infobutton
+EHR - User will see CDS interventions based on Allergies
+EHR - User will see CDS interventions based on Demographic information
+EHR - User will see CDS interventions based on Lab Results
+EHR - User will see CDS interventions based on Medications
+EHR - User will see CDS interventions based on Problems
+EHR - User will see CDS interventions based on Vital Signs
+EHR - User will see CDS interventions for allowed categories
+Help - Access Invoices
+Help - Submit Feature Request Access
+HelpAndSupport - API Access Full Control
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Access SSN Value
+Patient - Add New Flash Alerts
+Patient - Add New Member Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add New Patient Full Control
+Patient - Add progress notes
+Patient - Assign To Restricted User Full Control
+Patient - Caries Risk Assessment Full Control
+Patient - Change Patient Home Office Full Control
+Patient - Delete Patient Insurance Plan Information
+Patient - Dental Insurance Fill-Out Form Full Control
+Patient - Edit Or Deactivate Existing Flash Alerts
+Patient - Email Or Text Message Full Control
+Patient - Insurance Plan Information Screen Full Control
+Patient - Insurance Plan Information View Only
+Patient - Link Patient Full Control
+Patient - Medical History Full Control
+Patient - Medical Insurance Fill-Out Form Full Control
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Move Patient
+Patient - Online Registration Existing Full Control
+Patient - Online Registration New Full Control
+Patient - Patient Information Screen Full Control
+Patient - Patient Notes Add
+Patient - Patient Overview Screen Full Control
+Patient - Prescription Screen Full Control
+Patient - Prescription Strike Off
+Patient - Reallocate Screen Full Control
+Patient - Recall Due Dates Screen Full Control
+Patient - Regular Payment Plan Screen Full Control
+Patient - Responsible Party - Statement/Collection Rights
+Patient - Responsible Party Information Screen Full Control
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Un-attach Patient Insurance Plan Information
+Patient - Unarchive Online Registered Patients Screen Full Control
+Patient - Unclose Account Statement Screen Full Control
+Patient - View Progress notes
+Reports - Insurance Reports Screen Full Control
+Reports - Insurance Reports Screen View Only
+Reports - Voice Charting Adoption Full Control
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Fee Schedule Assignments (Bulk) Screen Full Control
+Setup - Fee Schedules Assignments - (New) Screen Full Control
+Setup - Fee Schedules Assignments Screen Full Control
+Setup - Frequency Limit Code Group - Full Control
+Setup - Frequency Limit Code Group - View Only
+Setup - Insurance Custom Coverage Screen Full Control
+Setup - Insurance Custom Coverage Screen View Only
+Setup - Insurance Dental Carriers Screen Full Control
+Setup - Insurance Dental Carriers Screen View Only
+Setup - Insurance Employers Screen Full Control
+Setup - Insurance Employers Screen View Only
+Setup - Insurance Medical Carriers Screen Full Control
+Setup - Insurance Medical Carriers Screen View Only
+Setup - Insurance Plans Screen - Add Carrier
+Setup - Insurance Plans Screen - Add Employer
+Setup - Insurance Plans Screen Edit Locked Plan
+Setup - Insurance Plans Screen Full Control
+Setup - Insurance Plans Screen View Only
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Transactions - Add Pre-Existing Conditions
+Transactions - Add Procedure
+Transactions - Change/Update Procedure Insurance Benefits
+Transactions - Change/Update Procedure Insurance Benefits in Treatment Plan
+Transactions - Delete Pre-Authorizations
+Transactions - Delete Procedure
+Transactions - Generate Pre-Authorizations Full Control
+Transactions - Insurance Claims Details Full Control
+Transactions - Insurance Claims Details View Only
+Transactions - Ledger Note View Only
+Transactions - Patient Ledger Screen Full Control
+Transactions - Pre-Authorizations List Full Control
+Transactions - Transaction Entry Screen Full Control
+Transactions - Treatment Plan Add
+Transactions - Treatment Plan Change Status or IDs
+Transactions - Treatment Plan Delete
+Transactions - Treatment Plan Discount
+Transactions - Treatment Plan Edit Fee
+Transactions - Treatment Plan Post to Ledger
+Transactions - Treatment Plan Re-Estimate
+Transactions - Treatment Plan Screen Full Control
+Transactions - Update or Change Procedure
+Transactions - View Insurance Payments
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Change Patients Provider
+Utilities - Eclaims Management Screen Full Control
+Utilities - Replace Insurance Plans Full Control
+Utilities - Time Clock Full Control
+Utilities - Time Clock View Only
+
+
+Office Manger (101):-
+
+This Group has the following rights
+Modified On: 9/23/2025 6:43:00 AM PT
+Modified By: ELIZABETHH
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - Move Existing Appointment
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - Short call list
+Appointments - Short notice list
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Appointments - Weekly View - Full Control
+Appointments - Weekly View by Provider - Full Control
+Appointments - Weekly View by User View - Full Control
+Denticon Mobile Access
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Access SSN Value
+Patient - Add New Flash Alerts
+Patient - Add New Member Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add New Patient Full Control
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Delete Ortho Payment Plan
+Patient - Delete Patient Information
+Patient - Delete Patient Insurance Plan Information
+Patient - Delete Regular Payment Plan
+Patient - Dental Insurance Fill-Out Form Full Control
+Patient - Edit Or Deactivate Existing Flash Alerts
+Patient - Edit progress notes
+Patient - Email Or Text Message Full Control
+Patient - Insurance Plan Information Screen Full Control
+Patient - Link Patient View Only
+Patient - Medical History Full Control
+Patient - Medical Insurance Fill-Out Form Full Control
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Move Patient
+Patient - Online Registration Existing Full Control
+Patient - Online Registration Existing View Only
+Patient - Online Registration New Control Only
+Patient - Online Registration New Full Control
+Patient - Ortho Payment Plan Screen Full Control
+Patient - Patient Information Screen Full Control
+Patient - Patient Notes Add
+Patient - Patient Notes Delete
+Patient - Patient Overview Screen Full Control
+Patient - Prescription Screen Full Control
+Patient - Prescription Strike Off
+Patient - Reallocate Screen Full Control
+Patient - Recall Due Dates Screen Full Control
+Patient - Regular Payment Plan Screen Full Control
+Patient - Responsible Party - Statement/Collection Rights
+Patient - Responsible Party Information Screen Full Control
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Patient - View Progress notes
+Reports - Appointment Reports Screen Full Control
+Reports - Batch Collection Letters Full Control
+Reports - Batch Collection Letters View Only
+Reports - Blank Insurance Form Screen Full Control
+Reports - Custom Letter Full Control
+Reports - Custom Postcard Full Control
+Reports - Daily Reports Screen Full Control
+Reports - DHA Reports Screen Full Control
+Reports - Excel Reports Full Control
+Reports - Group Reports - Appointment Reports Full Control
+Reports - Group Reports - Appointment Reports View Only
+Reports - Group Reports - Batch Reports Full Control
+Reports - Group Reports - Batch Reports View Only
+Reports - Group Reports - Other Reports Full Control
+Reports - Group Reports - Other Reports View Only
+Reports - Group Reports - Referral Reports Full Control
+Reports - Group Reports - Referral Reports View Only
+Reports - Group Reports Ins Screen Full Control
+Reports - Insurance Reports Screen Full Control
+Reports - Labels Screen Full Control
+Reports - Ledger Reports Screen Full Control
+Reports - Letters Screen Full Control
+Reports - Lists - Employer List Screen Full Control
+Reports - Lists - Office List Screen Full Control
+Reports - Lists - Patient List Screen Full Control
+Reports - Lists - Prescription List Screen Full Control
+Reports - Lists - Procedure/Fee List Screen Full Control
+Reports - Lists - Provider List Screen Full Control
+Reports - Lists - Responsible Party List Screen Full Control
+Reports - Management Reports Screen Full Control
+Reports - My Reports - Full Control
+Reports - My Reports - View
+Reports - Office Reports - CHI St. Joseph Children's Health Reports Full Control
+Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only
+Reports - Office Reports - Lumina Reports Full Control
+Reports - Office Reports - Lumina Reports View Only
+Reports - Office Reports - Village Family Dental Reports Full Control
+Reports - Office Reports - Village Family Dental Reports View Only
+Reports - Ortho Reports Access Full Control
+Reports - Ortho Reports View Only
+Reports - Pat Reg./Medical Info Forms Full Control
+Reports - Pat Reg./Medical Info Forms View Only
+Reports - Postcards Full Control
+Reports - Postcards View Only
+Reports - Recall Reports Screen Full Control
+Reports - Referral Reports Screen Full Control
+Reports - Statement - Allow updating statement dates
+Reports - Statements Screen Full Control
+Reports - Treatment Plan Reports Screen Full Control
+Reports - Voice Charting Adoption Full Control
+Setup - CDT to ICD Cross Coder Screen View Only
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Collection Agencies Screen Full Control
+Setup - Dental Questionnaire View Only
+Setup - Explosion Codes Screen Full Control
+Setup - Fee Schedules Screen Full Control
+Setup - Insurance Custom Coverage Screen Full Control
+Setup - Insurance Dental Carriers Screen Full Control
+Setup - Insurance Employers Screen Full Control
+Setup - Insurance Medical Carriers Screen Full Control
+Setup - Insurance Plans Screen - Add Carrier
+Setup - Insurance Plans Screen - Add Employer
+Setup - Insurance Plans Screen Full Control
+Setup - Labs Screen Full Control
+Setup - Medical Alert Setup Full Control
+Setup - Medical Alerts Screen Full Control
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Setup - Misc. Screen Full Control
+Setup - Office Screen Full Control
+Setup - Ortho Misc Setup Full Control
+Setup - Ortho Misc Setup View Only
+Setup - Ortho Questionnaire Full Control
+Setup - Ortho Questionnaire View Only
+Setup - Payment Types Screen Full Control
+Setup - PickList Full Control
+Setup - Place of Service Codes Screen Full Control
+Setup - Prescriptions Screen Full Control
+Setup - Prescriptions Screen View Only
+Setup - Procedure Codes Screen Full Control
+Setup - Provider Goals Screen View Only
+Setup - Provider Per Office Screen Full Control
+Setup - Provider Screen Full Control
+Setup - Referral Demographics Screen Full Control
+Setup - Referrals Screen Full Control
+Setup - Reset Benefits for Current Office Only
+Setup - Scheduler Template Screen Edit Scheduler Template
+Setup - Scheduler Template Screen Full Control
+Setup - Scheduler Views Screen Full Control
+Setup - Security Groups Screen View Only
+Setup - Security Multi PGID Users Screen Full Control
+Setup - Security User Per Office Screen Full Control
+Setup - Security Users Screen Full Control
+Setup - Type of Service Codes Screen Full Control
+Transactions - Add Pre-Existing Conditions
+Transactions - Add Procedure
+Transactions - Add/Post Adjustments
+Transactions - Add/Post Batch Insurance Payments
+Transactions - Add/Post Batch Patient Payments
+Transactions - Add/Post Capitation Payments
+Transactions - Add/Post Insurance Payments
+Transactions - Add/Post Patient Payments
+Transactions - Allow Add Delete BackDated Payment Between CloseOut Date And Yesterday
+Transactions - Change/Update Insurance Payments
+Transactions - Change/Update Patient Payments
+Transactions - Change/Update Procedure Insurance Benefits
+Transactions - Change/Update Procedure Insurance Benefits in Treatment Plan
+Transactions - Delete Insurance Claims
+Transactions - Delete Insurance Payments
+Transactions - Delete Pre-Authorizations
+Transactions - Delete Procedure
+Transactions - Edit Fee - Ledger
+Transactions - Generate Pre-Authorizations Full Control
+Transactions - Insurance Claims Details Full Control
+Transactions - Ledger Note Delete
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Ledger Screen Full Control
+Transactions - Patient Payment View Only
+Transactions - Pre-Authorizations List Full Control
+Transactions - Transaction Entry Screen Full Control
+Transactions - Treatment Plan Add
+Transactions - Treatment Plan Change Status or IDs
+Transactions - Treatment Plan Delete
+Transactions - Treatment Plan Discount
+Transactions - Treatment Plan Edit Fee
+Transactions - Treatment Plan Post to Ledger
+Transactions - Treatment Plan Re-Estimate
+Transactions - Treatment Plan Screen Full Control
+Transactions - Update or Change Procedure
+Transactions - View Insurance Payments
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Batch Claim Processing Screen Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - View Only
+Utilities - Copy Letters Full Control
+Utilities - Eclaims Management Screen Full Control
+Utilities - Post Patient Ortho Payment Plan Charges Full Control
+Utilities - Post Regular Payment Plan Charges
+Utilities - Text Message Details Full Control
+Utilities - Text Message Details View Only
+Utilities - Time Clock Full Control
+Utilities - Two Way Communication Full Control
+
+
+Time clock only (109):-
+
+This Group has the following rights
+Modified On: 6/17/2016 6:40:00 PM PT
+Modified By: DHILEEP.JIN2829
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Denticon Mobile Access
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Edit progress notes
+Patient - Link Patient View Only
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Online Registration Existing Full Control
+Patient - Online Registration Existing View Only
+Patient - Online Registration New Control Only
+Patient - Online Registration New Full Control
+Patient - Responsible Party - Statement/Collection Rights
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Patient - View Progress notes
+Reports - Batch Collection Letters Full Control
+Reports - Batch Collection Letters View Only
+Reports - Group Reports - Appointment Reports Full Control
+Reports - Group Reports - Appointment Reports View Only
+Reports - Group Reports - Batch Reports Full Control
+Reports - Group Reports - Batch Reports View Only
+Reports - Group Reports - Other Reports Full Control
+Reports - Group Reports - Other Reports View Only
+Reports - Group Reports - Referral Reports Full Control
+Reports - Group Reports - Referral Reports View Only
+Reports - Office Reports - CHI St. Joseph Children's Health Reports Full Control
+Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only
+Reports - Office Reports - Lumina Reports Full Control
+Reports - Office Reports - Lumina Reports View Only
+Reports - Office Reports - Village Family Dental Reports Full Control
+Reports - Office Reports - Village Family Dental Reports View Only
+Reports - Ortho Reports Access Full Control
+Reports - Ortho Reports View Only
+Reports - Pat Reg./Medical Info Forms Full Control
+Reports - Pat Reg./Medical Info Forms View Only
+Reports - Postcards Full Control
+Reports - Postcards View Only
+Reports - Statement - Allow updating statement dates
+Reports - Voice Charting Adoption Full Control
+Setup - CDT to ICD Cross Coder Screen View Only
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Setup - Ortho Misc Setup Full Control
+Setup - Ortho Misc Setup View Only
+Setup - Ortho Questionnaire Full Control
+Setup - Ortho Questionnaire View Only
+Setup - Provider Goals Screen View Only
+Transactions - Allow Add Delete BackDated Payment Between CloseOut Date And Yesterday
+Transactions - Ledger Note Delete
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Payment View Only
+Transactions - View Insurance Payments
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Change Future Appointments, Patients, Tx by Provider - Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - View Only
+Utilities - Text Message Details Full Control
+Utilities - Text Message Details View Only
+Utilities - Time Clock Full Control
+
+
+VBS-call center (107) :-
+
+This Group has the following rights
+Modified On: 1/14/2022 6:09:00 AM PT
+Modified By: DHILEEP.JIN2829
+Appointments - Add Appointment In Other Office
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - Move Existing Appointment
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Appointments - Post Existing Appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - Schedule Appointments for Locked Account
+Appointments - Short call list
+Appointments - Short notice list
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Appointments - Weekly View - Full Control
+Appointments - Weekly View by Provider - Full Control
+Appointments - Weekly View by User View - Full Control
+Denticon Mobile Access
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Access SSN Value
+Patient - Add New Flash Alerts
+Patient - Add New Member Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add New Patient Full Control
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Delete Patient Insurance Plan Information
+Patient - Edit Or Deactivate Existing Flash Alerts
+Patient - Edit progress notes
+Patient - Email Or Text Message Full Control
+Patient - Email Or Text Message View Only
+Patient - Insurance Plan Information Screen Full Control
+Patient - Link Patient View Only
+Patient - Medical History Full Control
+Patient - Medical History View Only
+Patient - Medical Insurance Fill-Out Form View Only
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Move Patient
+Patient - Online Registration Existing Full Control
+Patient - Online Registration Existing View Only
+Patient - Online Registration New Control Only
+Patient - Online Registration New Full Control
+Patient - Ortho Payment Plan View Only
+Patient - Patient Information Screen Full Control
+Patient - Patient Notes Add
+Patient - Patient Notes Edit
+Patient - Patient Overview Screen Full Control
+Patient - Prescription View Only
+Patient - Recall Due Dates View Only
+Patient - Regular Payment Plan View Only
+Patient - Responsible Party - Statement/Collection Rights
+Patient - Responsible Party Information Screen Full Control
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Patient - View Progress notes
+Reports - Batch Collection Letters Full Control
+Reports - Batch Collection Letters View Only
+Reports - Group Reports - Appointment Reports Full Control
+Reports - Group Reports - Appointment Reports View Only
+Reports - Group Reports - Batch Reports Full Control
+Reports - Group Reports - Batch Reports View Only
+Reports - Group Reports - Other Reports Full Control
+Reports - Group Reports - Other Reports View Only
+Reports - Group Reports - Referral Reports Full Control
+Reports - Group Reports - Referral Reports View Only
+Reports - Office Reports - CHI St. Joseph Children's Health Reports Full Control
+Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only
+Reports - Office Reports - Lumina Reports Full Control
+Reports - Office Reports - Lumina Reports View Only
+Reports - Office Reports - Village Family Dental Reports Full Control
+Reports - Office Reports - Village Family Dental Reports View Only
+Reports - Ortho Reports Access Full Control
+Reports - Ortho Reports View Only
+Reports - Pat Reg./Medical Info Forms Full Control
+Reports - Pat Reg./Medical Info Forms View Only
+Reports - Postcards Full Control
+Reports - Postcards View Only
+Reports - Statement - Allow updating statement dates
+Reports - Voice Charting Adoption Full Control
+Setup - CDT to ICD Cross Coder Screen View Only
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Fee Schedules Screen View Only
+Setup - Insurance Custom Coverage Screen View Only
+Setup - Insurance Plans Screen View Only
+Setup - Medical Alerts View Only
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Setup - Office Screen View Only
+Setup - Ortho Misc Setup Full Control
+Setup - Ortho Misc Setup View Only
+Setup - Ortho Questionnaire Full Control
+Setup - Ortho Questionnaire View Only
+Setup - Provider Goals Screen View Only
+Setup - Referral Demographics Screen View Only
+Setup - Referrals Screen View Only
+Transactions - Add/Post Patient Payments
+Transactions - Allow Add Delete BackDated Payment Between CloseOut Date And Yesterday
+Transactions - Insurance Claims Details View Only
+Transactions - Ledger Note Delete
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Ledger View Only
+Transactions - Patient Payment View Only
+Transactions - Pre-Authorizations Detail View Only
+Transactions - Pre-Authorizations List View Only
+Transactions - Transaction Entry View Only
+Transactions - Treatment Plan View Only
+Transactions - View Insurance Payments
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Change Future Appointments, Patients, Tx by Provider - Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - View Only
+Utilities - Text Message Details Full Control
+Utilities - Text Message Details View Only
+Utilities - Two Way Communication View Only
+
+
+VBS-iNSURANCE DEPARTMENT (108):-
+
+This Group has the following rights
+Modified On:
+Modified By:
+Appointments - Add New Appointment
+Appointments - Add new patient from Appointments
+Appointments - Add new procedures
+Appointments - Add/Edit - Allow Quick Add Tx Plans
+Appointments - Change Appointment Status
+Appointments - Daily View - Full Control
+Appointments - Daily View by Provider - Full Control
+Appointments - Daily View by User View - Full Control
+Appointments - Delete Appointment Procedures
+Appointments - Delete Existing Appointment
+Appointments - DPS Ins Verification - DPS Submit Button
+Appointments - DPS Ins Verification - Reports
+Appointments - Edit Existing Appointment
+Appointments - Find Existing Appointment
+Appointments - Find slot
+Appointments - Move Existing Appointment
+Appointments - New Patient - Option
+Appointments - Override lunch and closed times to add appointment
+Appointments - Override reserved slots to add appointment
+Appointments - Reschedule Appointment
+Appointments - Save Existing Appointment
+Appointments - Save Existing Appointment Procedures
+Appointments - Short call list
+Appointments - Short notice list
+Appointments - View Existing Appointment Details
+Appointments - View Existing Appointment Procedure
+Denticon Mobile Access
+MyTooth – Assign Forms/Packets from Scheduler Full Control
+MyTooth – Assign Forms/Packets from TWC or Messaging Hub Full Control
+MyTooth – Check the Activity Report Full Control
+Patient - Access SSN Value
+Patient - Add New Flash Alerts
+Patient - Add New Member Full Control
+Patient - Add New Patient - Quick Save
+Patient - Add New Patient Full Control
+Patient - Add progress notes
+Patient - Addresses View Only
+Patient - Assign To Restricted User Full Control
+Patient - Assign To Restricted User View Only
+Patient - Caries Risk Assessment Full Control
+Patient - Caries Risk Assessment View Only
+Patient - Change Patient Home Office Full Control
+Patient - Change Patient Home Office View Only
+Patient - Change Patient Portal Signups View Only
+Patient - Dental Insurance Fill-Out Form Full Control
+Patient - Edit Or Deactivate Existing Flash Alerts
+Patient - Edit progress notes
+Patient - Email Or Text Message Full Control
+Patient - Insurance Plan Information Screen Full Control
+Patient - Link Patient View Only
+Patient - Medical History Full Control
+Patient - Medical Insurance Fill-Out Form Full Control
+Patient - Messaging Hub User Full Control
+Patient - Messaging Hub View Only
+Patient - Online Registration Existing Full Control
+Patient - Online Registration Existing View Only
+Patient - Online Registration New Control Only
+Patient - Online Registration New Full Control
+Patient - Ortho Payment Plan Screen Full Control
+Patient - Patient Information Screen Full Control
+Patient - Patient Notes Add
+Patient - Patient Notes Edit
+Patient - Patient Overview Screen Full Control
+Patient - Prescription View Only
+Patient - Recall Due Dates Screen Full Control
+Patient - Regular Payment Plan Screen Full Control
+Patient - Responsible Party - Statement/Collection Rights
+Patient - Responsible Party Information Screen Full Control
+Patient - Search Patient Full Control
+Patient - Status Tracker Full Control
+Patient - Status Tracker View Only
+Patient - Un-attach Patient Insurance Plan Information
+Patient - View Progress notes
+Reports - Appointment Reports Screen Full Control
+Reports - Batch Collection Letters Full Control
+Reports - Batch Collection Letters View Only
+Reports - Blank Insurance Form Screen Full Control
+Reports - Daily Reports Screen Full Control
+Reports - DHA Reports Screen Full Control
+Reports - Excel Reports Full Control
+Reports - Group Reports - Appointment Reports Full Control
+Reports - Group Reports - Appointment Reports View Only
+Reports - Group Reports - Batch Reports Full Control
+Reports - Group Reports - Batch Reports View Only
+Reports - Group Reports - Other Reports Full Control
+Reports - Group Reports - Other Reports View Only
+Reports - Group Reports - Referral Reports Full Control
+Reports - Group Reports - Referral Reports View Only
+Reports - Group Reports Ins Screen Full Control
+Reports - Group Reports Mang Screen Full Control
+Reports - Insurance Reports Screen Full Control
+Reports - Ledger Reports Screen Full Control
+Reports - Lists - Employer List Screen Full Control
+Reports - Lists - Office List Screen Full Control
+Reports - Lists - Patient List Screen Full Control
+Reports - Lists - Prescription List Screen Full Control
+Reports - Lists - Procedure/Fee List Screen Full Control
+Reports - Lists - Provider List Screen Full Control
+Reports - Lists - Responsible Party List Screen Full Control
+Reports - Management Reports Screen Full Control
+Reports - Office Reports - ADRpts Screen Full Con
+Reports - Office Reports - BNRpts Screen Full Cont
+Reports - Office Reports - CHI St. Joseph Children's Health Reports Full Control
+Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only
+Reports - Office Reports - HawaiiRpts Full Control
+Reports - Office Reports - Lumina Reports Full Control
+Reports - Office Reports - Lumina Reports View Only
+Reports - Office Reports - NEDMRpts Screen Full Co
+Reports - Office Reports - VHRpts Screen Full Con
+Reports - Office Reports - Village Family Dental Reports Full Control
+Reports - Office Reports - Village Family Dental Reports View Only
+Reports - Ortho Reports Access Full Control
+Reports - Ortho Reports View Only
+Reports - Pat Reg./Medical Info Forms Full Control
+Reports - Pat Reg./Medical Info Forms View Only
+Reports - Postcards Full Control
+Reports - Postcards View Only
+Reports - Recall Reports Screen Full Control
+Reports - Referral Reports Screen Full Control
+Reports - Statement - Allow updating statement dates
+Reports - Treatment Plan Reports Screen Full Control
+Reports - Voice Charting Adoption Full Control
+Setup - CDT to ICD Cross Coder Screen View Only
+Setup - Chart Materials Screen Full Control
+Setup - Chart Materials Screen View Only
+Setup - Charting Color Screen Full Control
+Setup - Charting Color Screen View Only
+Setup - Dental Questionnaire Full Control
+Setup - Dental Questionnaire View Only
+Setup - Fee Schedules Screen Full Control
+Setup - Insurance Custom Coverage Screen Full Control
+Setup - Insurance Dental Carriers Screen Full Control
+Setup - Insurance Employers Screen Full Control
+Setup - Insurance Medical Carriers Screen Full Control
+Setup - Insurance Plans Screen - Add Carrier
+Setup - Insurance Plans Screen - Add Employer
+Setup - Insurance Plans Screen Full Control
+Setup - Medical Alerts Screen Full Control
+Setup - Medical Questionnaire Full Control
+Setup - Medical Questionnaire View Only
+Setup - Ortho Misc Setup Full Control
+Setup - Ortho Misc Setup View Only
+Setup - Ortho Questionnaire Full Control
+Setup - Ortho Questionnaire View Only
+Setup - Provider Goals Screen View Only
+Setup - Referral Demographics Screen Full Control
+Setup - Referrals Screen Full Control
+Transactions - Add Pre-Existing Conditions
+Transactions - Add Procedure
+Transactions - Add/Post Adjustments
+Transactions - Add/Post Batch Insurance Payments
+Transactions - Add/Post Capitation Payments
+Transactions - Add/Post Insurance Payments
+Transactions - Add/Post Patient Payments
+Transactions - Allow Add Delete BackDated Payment Between CloseOut Date And Yesterday
+Transactions - Change/Update Insurance Payments
+Transactions - Change/Update Procedure Insurance Benefits in Treatment Plan
+Transactions - Delete Insurance Claims
+Transactions - Delete Insurance Payments
+Transactions - Delete Pre-Authorizations
+Transactions - Generate Pre-Authorizations Full Control
+Transactions - Insurance Claims Details Full Control
+Transactions - Ledger Note Delete
+Transactions - Ledger Note View Only
+Transactions - Ortho Treatment Card Full Control
+Transactions - Ortho Treatment Card View Only
+Transactions - Patient Ledger Screen Full Control
+Transactions - Patient Payment View Only
+Transactions - Pre-Authorizations List Full Control
+Transactions - Transaction Entry Screen Full Control
+Transactions - Treatment Plan Add
+Transactions - Treatment Plan Change Status or IDs
+Transactions - Treatment Plan Delete
+Transactions - Treatment Plan Discount
+Transactions - Treatment Plan Re-Estimate
+Transactions - Treatment Plan Screen Full Control
+Transactions - Update or Change Procedure
+Transactions - View Insurance Payments
+Utilities - Automated Campaigns Ad-hoc Campaign User Specific
+Utilities - Automated Campaigns Appointment Campaign User Specific
+Utilities - Automated Campaigns Mailing List User Specific
+Utilities - Automated Campaigns Patient Care Campaign User Specific
+Utilities - Automated Campaigns Recurring Campaign User Specific
+Utilities - Automated Campaigns Template User Specific
+Utilities - Batch Claim Processing Screen Full Control
+Utilities - Batch Eligibility Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - Full Control
+Utilities - Change Future Appointments, Patients, Tx by Provider - View Only
+Utilities - Eclaims Management Screen Full Control
+Utilities - Post Regular Payment Plan Charges
+Utilities - Replace Carriers Full Control
+Utilities - Replace Insurance Plans Full Control
+Utilities - Replace Procedure Code Full Control
+Utilities - Text Message Details Full Control
+Utilities - Text Message Details View Only
+Utilities - Two Way Communication Full Control
+
+
+Overall Avaiable :-
+
+Available Rights
+
+Appointments - Add Appointment In Other OfficeAppointments - Add New AppointmentAppointments - Add new patient from AppointmentsAppointments - Add new proceduresAppointments - Add/Edit - Allow Quick Add Tx PlansAppointments - Change Appointment StatusAppointments - Daily View - Full ControlAppointments - Daily View by Provider - Full ControlAppointments - Daily View by User View - Full ControlAppointments - Delete Appointment ProceduresAppointments - Delete Existing AppointmentAppointments - DPS Ins Verification - DPS Submit ButtonAppointments - DPS Ins Verification - ReportsAppointments - Edit Existing AppointmentAppointments - Find Existing AppointmentAppointments - Find slotAppointments - Move Existing AppointmentAppointments - New Patient - OptionAppointments - Override lunch and closed times to add appointmentAppointments - Override reserved slots to add appointmentAppointments - Post Existing AppointmentAppointments - Reschedule AppointmentAppointments - Save Existing AppointmentAppointments - Save Existing Appointment ProceduresAppointments - Schedule Appointments for Locked AccountAppointments - Short call listAppointments - Short notice listAppointments - View Existing Appointment DetailsAppointments - View Existing Appointment ProcedureAppointments - Weekly View - Full ControlAppointments - Weekly View by Provider - Full ControlAppointments - Weekly View by User View - Full ControlAthenaNet - Search AthenaNet PatientsCharting - AI Assist Screen Full ControlDenticon Mobile AccessDenticon Practice Analytics - Collection Analysis Full ControlDenticon Practice Analytics - Executive Dashboard Full ControlDenticon Practice Analytics - Front Office Full ControlDenticon Practice Analytics - Hygiene Recall Full ControlDenticon Practice Analytics - Morning Huddle Full ControlDenticon Practice Analytics - Patient Visit Analysis Full ControlDenticon Practice Analytics - Production Analysis Full ControlDenticon Practice Analytics - Provider Breakdown Full ControlDenticon Practice Analytics - Referral Analytics Full ControlDenticon Practice Analytics - Treatment Plan Analysis Full ControlEHR - User can edit instructions and bibliography informationEHR - User can see and access the InfobuttonEHR - User will see CDS interventions based on AllergiesEHR - User will see CDS interventions based on Demographic informationEHR - User will see CDS interventions based on Lab ResultsEHR - User will see CDS interventions based on MedicationsEHR - User will see CDS interventions based on ProblemsEHR - User will see CDS interventions based on Vital SignsEHR - User will see CDS interventions for allowed categoriesHelp - Access InvoicesHelp - Submit Feature Request AccessHelpAndSupport - API Access Full ControlMyTooth – Assign Forms/Packets from Scheduler Full ControlMyTooth – Assign Forms/Packets from TWC or Messaging Hub Full ControlMyTooth – Check the Activity Report Full ControlPatient - Access SSN ValuePatient - Add New Flash AlertsPatient - Add New Member - Quick SavePatient - Add New Member Full ControlPatient - Add New Patient - Quick SavePatient - Add New Patient Full ControlPatient - Add progress notesPatient - Addresses View OnlyPatient - Assign To Restricted User Full ControlPatient - Assign To Restricted User View OnlyPatient - Caries Risk Assessment Full ControlPatient - Caries Risk Assessment View OnlyPatient - Change Patient Home Office Full ControlPatient - Change Patient Home Office View OnlyPatient - Change Patient Portal Signups View OnlyPatient - Delete Ortho Payment PlanPatient - Delete Patient InformationPatient - Delete Patient Insurance Plan InformationPatient - Delete Regular Payment PlanPatient - Dental Insurance Fill-Out Form Full ControlPatient - Dental Insurance Fill-Out Form View OnlyPatient - Edit Or Deactivate Existing Flash AlertsPatient - Edit progress notesPatient - Email Or Text Message Full ControlPatient - Email Or Text Message View OnlyPatient - Insurance Plan Information Screen Full ControlPatient - Insurance Plan Information View OnlyPatient - Link Patient Full ControlPatient - Link Patient View OnlyPatient - Medical History Full ControlPatient - Medical History View OnlyPatient - Medical Insurance Fill-Out Form Full ControlPatient - Medical Insurance Fill-Out Form View OnlyPatient - Messaging Hub User Full ControlPatient - Messaging Hub View OnlyPatient - Move PatientPatient - Online Registration Existing Full ControlPatient - Online Registration Existing View OnlyPatient - Online Registration New Control OnlyPatient - Online Registration New Full ControlPatient - Ortho Payment Plan Screen Full ControlPatient - Ortho Payment Plan View OnlyPatient - Patient Information Screen Full ControlPatient - Patient Information View OnlyPatient - Patient Notes AddPatient - Patient Notes DeletePatient - Patient Notes EditPatient - Patient Notes View OnlyPatient - Patient Overview Screen Full ControlPatient - Patient Overview View OnlyPatient - Prescription Screen Full ControlPatient - Prescription Strike OffPatient - Prescription View OnlyPatient - Reallocate Screen Full ControlPatient - Reallocate View OnlyPatient - Recall Due Dates Screen Full ControlPatient - Recall Due Dates View OnlyPatient - Regular Payment Plan Screen Full ControlPatient - Regular Payment Plan View OnlyPatient - Responsible Party - Locked AccountPatient - Responsible Party - Statement/Collection RightsPatient - Responsible Party Information Screen Full ControlPatient - Responsible Party Information View OnlyPatient - Search Patient Full ControlPatient - Status Tracker Full ControlPatient - Status Tracker View OnlyPatient - Un-attach Patient Insurance Plan InformationPatient - Unarchive Online Registered Patients Screen Full ControlPatient - Unarchive Online Registered Patients Screen View OnlyPatient - Unclose Account Statement Screen Full ControlPatient - Unclose Account Statement View OnlyPatient - View Progress notesReport - Batch Schedule Report - Add ScheduleReport - Batch Schedule Report - Delete ScheduleReport - Batch Schedule Report Access Full ControlReport - Batch Schedule Report View OnlyReports - Appointment Reports Screen Full ControlReports - Appointment Reports Screen View OnlyReports - Batch Collection Letters Full ControlReports - Batch Collection Letters View OnlyReports - Blank Insurance Form Screen Full ControlReports - Blank Insurance Form Screen View OnlyReports - Custom Letter Full ControlReports - Custom Letter Screen View OnlyReports - Custom Postcard Full ControlReports - Custom Postcard Screen View OnlyReports - Daily Reports Screen Full ControlReports - Daily Reports Screen View OnlyReports - DHA Reports Screen Full ControlReports - DHA Reports Screen View OnlyReports - Excel Reports Full ControlReports - Excel Reports View OnlyReports - Group Reports - Appointment Reports Full ControlReports - Group Reports - Appointment Reports View OnlyReports - Group Reports - Batch Reports Full ControlReports - Group Reports - Batch Reports View OnlyReports - Group Reports - Other Reports Full ControlReports - Group Reports - Other Reports View OnlyReports - Group Reports - Referral Reports Full ControlReports - Group Reports - Referral Reports View OnlyReports - Group Reports Daily Screen Full ControlReports - Group Reports Daily Screen View OnlyReports - Group Reports Ins Screen Full ControlReports - Group Reports Ins Screen View OnlyReports - Group Reports Mang Screen Full ControlReports - Group Reports Mang Screen View OnlyReports - Insurance Reports Screen Full ControlReports - Insurance Reports Screen View OnlyReports - Labels Screen Full ControlReports - Labels Screen View OnlyReports - Ledger Reports Screen Full ControlReports - Ledger Reports Screen View OnlyReports - Letters Screen Full ControlReports - Letters Screen View OnlyReports - Lists - Employer List Screen Full ControlReports - Lists - Employer List Screen View OnlyReports - Lists - Office List Screen Full ControlReports - Lists - Office List Screen View OnlyReports - Lists - Patient List Screen Full ControlReports - Lists - Patient List Screen View OnlyReports - Lists - Prescription List Screen Full ControlReports - Lists - Prescription List Screen View OnlyReports - Lists - Procedure/Fee List Screen Full ControlReports - Lists - Procedure/Fee List Screen View OnlyReports - Lists - Provider List Screen Full ControlReports - Lists - Provider List Screen View OnlyReports - Lists - Responsible Party List Screen Full ControlReports - Lists - Responsible Party List Screen View OnlyReports - Lists - Security List Rpts Screen Full CReports - Lists - Security List Rpts Screen View CReports - Lists - Setup List Rpts Screen Full ContReports - Lists - Setup List Rpts Screen View ContReports - Management Reports Screen Full ControlReports - Management Reports Screen View OnlyReports - Monthly Reports Screen Full ControlReports - Monthly Reports Screen View OnlyReports - My Reports - Full ControlReports - My Reports - ViewReports - Office Reports - ADRpts Screen Full ConReports - Office Reports - ADRpts Screen View OnlyReports - Office Reports - BNRpts Screen Full ContReports - Office Reports - BNRpts Screen View OnlyReports - Office Reports - CHI St. Joseph Children's Health Reports Full ControlReports - Office Reports - CHI St. Joseph Children's Health Reports View OnlyReports - Office Reports - Dental Care AccessReports - Office Reports - Dental Care ViewReports - Office Reports - GreatHillsRpts AccessReports - Office Reports - GreatHillsRpts ViewReports - Office Reports - HawaiiRpts Full ControlReports - Office Reports - HawaiiRpts View OnlyReports - Office Reports - Healthcare Network Access Full ControlReports - Office Reports - Healthcare Network View OnlyReports - Office Reports - Kane Dental AccessReports - Office Reports - Kane Dental ViewReports - Office Reports - Kansas Rpts Full ControReports - Office Reports - Kansas Rpts View ControReports - Office Reports - Lumina Reports Full ControlReports - Office Reports - Lumina Reports View OnlyReports - Office Reports - NEDMRpts Screen Full CoReports - Office Reports - NEDMRpts Screen View OnReports - Office Reports - OHC Reports Full ControReports - Office Reports - OHC Reports View ControReports - Office Reports - OttawaReports AccessReports - Office Reports - OttawaReports ViewReports - Office Reports - Premier Perio Full ContReports - Office Reports - Premier Perio ViewReports - Office Reports - SGKReports Screen Full ControlReports - Office Reports - SGKReports Screen View OnlyReports - Office Reports - Tru Family Rpts Full ControlReports - Office Reports - Tru Family Rpts View OnlyReports - Office Reports - UOP Reports Full ControReports - Office Reports - UOP Reports View ControReports - Office Reports - VHRpts Screen Full ConReports - Office Reports - VHRpts Screen View OnlyReports - Office Reports - Village Family Dental Reports Full ControlReports - Office Reports - Village Family Dental Reports View OnlyReports - Office Reports-AbbeyDental Full ControlReports - Office Reports-AbbeyDental View OnlyReports - Office Reports-HealthySmilesKids Full CoReports - Office Reports-HealthySmilesKids View OnReports - Ortho Reports Access Full ControlReports - Ortho Reports View OnlyReports - Pat Reg./Medical Info Forms Full ControlReports - Pat Reg./Medical Info Forms View OnlyReports - Postcards Full ControlReports - Postcards View OnlyReports - Recall Reports Screen Full ControlReports - Recall Reports Screen View OnlyReports - Referral Reports Screen Full ControlReports - Referral Reports Screen View OnlyReports - Statement - Allow updating statement datesReports - Statements Screen Full ControlReports - Statements Screen View OnlyReports - Treatment Plan Reports Screen View OnlyReports - Treatment Plan Reports Screen Full ControlReports - Voice Charting Adoption Full ControlSetup - > Emergency NowSetup - Access Core Labs PageSetup - Account Screen Full ControlSetup - Account Screen View OnlySetup - CDT to CPT Cross Coder Screen Full ControlSetup - CDT to CPT Cross Coder Screen View OnlySetup - CDT to ICD Cross Coder Screen Full ControlSetup - CDT to ICD Cross Coder Screen View OnlySetup - Chart Materials Screen Full ControlSetup - Chart Materials Screen View OnlySetup - Charting Color Screen Full ControlSetup - Charting Color Screen View OnlySetup - Close Out All OfficesSetup - Close Out Full ControlSetup - Close Out View OnlySetup - Code Bundling - Full ControlSetup - Code Bundling - View OnlySetup - Collection Agencies Screen Full ControlSetup - Collection Agencies Screen View OnlySetup - CPT to ICD Cross Coder Screen Full ControlSetup - CPT to ICD Cross Coder Screen View OnlySetup - Delete Notes MacrosSetup - Dental Questionnaire Full ControlSetup - Dental Questionnaire View OnlySetup - Dentigram Downloads Full ControlSetup - Dentigram Downloads View OnlySetup - EHR - CDS RulesSetup - Explosion Codes Screen Full ControlSetup - Explosion Codes Screen View OnlySetup - External API Settings Screen Full ControlSetup - External API Settings Screen View OnlySetup - Fee Schedule Assignments (Bulk) Screen Full ControlSetup - Fee Schedule Assignments (Bulk) Screen View OnlySetup - Fee Schedules Assignments - (New) Screen Full ControlSetup - Fee Schedules Assignments - (New) Screen View OnlySetup - Fee Schedules Assignments Screen Full ControlSetup - Fee Schedules Assignments Screen View OnlySetup - Fee Schedules Screen Full ControlSetup - Fee Schedules Screen View OnlySetup - Frequency Limit Code Group - Full ControlSetup - Frequency Limit Code Group - View OnlySetup - ICD Codes Screen Full ControlSetup - ICD Codes Screen View OnlySetup - Insurance Custom Coverage Screen Full ControlSetup - Insurance Custom Coverage Screen View OnlySetup - Insurance Dental Carriers Screen Full ControlSetup - Insurance Dental Carriers Screen View OnlySetup - Insurance Employers Screen Full ControlSetup - Insurance Employers Screen View OnlySetup - Insurance Medical Carriers Screen Full ControlSetup - Insurance Medical Carriers Screen View OnlySetup - Insurance Plans Screen - Add CarrierSetup - Insurance Plans Screen - Add EmployerSetup - Insurance Plans Screen Edit Locked PlanSetup - Insurance Plans Screen Full ControlSetup - Insurance Plans Screen View OnlySetup - Labs Screen Full ControlSetup - Labs Screen View OnlySetup - Medical Alert Setup Full ControlSetup - Medical Alert Setup View OnlySetup - Medical Alerts Screen Full ControlSetup - Medical Alerts View OnlySetup - Medical Questionnaire Full ControlSetup - Medical Questionnaire View OnlySetup - Misc. Screen Full ControlSetup - Misc. Screen View OnlySetup - Modifier Codes Screen Full ControlSetup - Modifier Codes Screen View OnlySetup - Modify Vendor AccessSetup - Notes Macros Full ControlSetup - Notes Macros View OnlySetup - Office Groups Screen Full ControlSetup - Office Groups Screen View OnlySetup - Office Screen Full ControlSetup - Office Screen View OnlySetup - Ortho Misc Setup Full ControlSetup - Ortho Misc Setup View OnlySetup - Ortho Questionnaire Full ControlSetup - Ortho Questionnaire View OnlySetup - Payment Types Screen Full ControlSetup - Payment Types Screen View OnlySetup - Perio Setup Template Screen Full ControlSetup - Perio Setup Template Screen View OnlySetup - PickList Full ControlSetup - PickList View OnlySetup - Place of Service Codes Screen Full ControlSetup - Place of Service Codes Screen View OnlySetup - Prescriptions Screen Full ControlSetup - Prescriptions Screen View OnlySetup - Procedure Codes Screen Full ControlSetup - Procedure Codes Screen View OnlySetup - Provider Goals Screen Full ControlSetup - Provider Goals Screen View OnlySetup - Provider Per Office Screen Full ControlSetup - Provider Per Office Screen View OnlySetup - Provider Screen Edit ProviderSetup - Provider Screen Full ControlSetup - Provider Screen View OnlySetup - Referral Demographics Screen Full ControlSetup - Referral Demographics Screen View OnlySetup - Referrals Screen Full ControlSetup - Referrals Screen View OnlySetup - Reset Benefits for All Offices in PGIDSetup - Reset Benefits for Current Office OnlySetup - Reset Benefits View OnlySetup - Scheduler Template Screen Edit Scheduler TemplateSetup - Scheduler Template Screen Full ControlSetup - Scheduler Template Screen View OnlySetup - Scheduler Views Screen Full ControlSetup - Scheduler Views Screen View OnlySetup - Security Custom Toolbar Screen Full ControlSetup - Security Custom Toolbar Screen View OnlySetup - Security Groups Screen Full ControlSetup - Security Groups Screen View OnlySetup - Security Multi PGID Users Screen Full ControlSetup - Security User Per Office Screen Full ControlSetup - Security User Per Office Screen View OnlySetup - Security Users Screen Full ControlSetup - Security Users Screen View OnlySetup - SSO Users Setup Screen Full ControlSetup - SSO Users Setup Screen View OnlySetup - Type of Service Codes Screen Full ControlSetup - Type of Service Codes Screen View OnlySetup - View Core Labs PageTransaction - Batch Insurance Payment Dentical View OnlyTransaction - Batch Insurance Payment Dentical Full ControlTransactions - Add Pre-Existing ConditionsTransactions - Add ProcedureTransactions - Add/Post AdjustmentsTransactions - Add/Post Batch Insurance PaymentsTransactions - Add/Post Batch Insurance Payments 835Transactions - Add/Post Batch Patient PaymentsTransactions - Add/Post Capitation PaymentsTransactions - Add/Post Insurance PaymentsTransactions - Add/Post Patient PaymentsTransactions - Allow Add Delete BackDated Payment Between CloseOut Date And YesterdayTransactions - Batch Insurance Payments 835 View OnlyTransactions - Batch Insurance Payments View OnlyTransactions - Batch Patient Payments View OnlyTransactions - Change/Update Insurance PaymentsTransactions - Change/Update Patient PaymentsTransactions - Change/Update Procedure Insurance BenefitsTransactions - Change/Update Procedure Insurance Benefits in Treatment PlanTransactions - Delete Care Credit Payment/AdjustmentTransactions - Delete Cash PaymentsTransactions - Delete Insurance ClaimsTransactions - Delete Insurance PaymentsTransactions - Delete Patient PaymentsTransactions - Delete Pre-AuthorizationsTransactions - Delete ProcedureTransactions - Edit Fee - LedgerTransactions - Generate Pre-Authorizations Full ControlTransactions - Insurance Claims Details Full ControlTransactions - Insurance Claims Details View OnlyTransactions - Ledger Note DeleteTransactions - Ledger Note View OnlyTransactions - Ortho Treatment Card Full ControlTransactions - Ortho Treatment Card View OnlyTransactions - Patient Ledger Screen Full ControlTransactions - Patient Ledger View OnlyTransactions - Patient Payment View OnlyTransactions - Post New Charges for Locked AccountTransactions - Post Payments or Adjustments for Locked AccountTransactions - Pre-Authorizations Detail View OnlyTransactions - Pre-Authorizations List Full ControlTransactions - Pre-Authorizations List View OnlyTransactions - Transaction Entry Screen Full ControlTransactions - Transaction Entry View OnlyTransactions - Transfer CreditsTransactions - Treatment Plan AddTransactions - Treatment Plan Change Status or IDsTransactions - Treatment Plan DeleteTransactions - Treatment Plan DiscountTransactions - Treatment Plan Edit FeeTransactions - Treatment Plan Post to LedgerTransactions - Treatment Plan Re-EstimateTransactions - Treatment Plan Screen Full ControlTransactions - Treatment Plan View OnlyTransactions - Update or Change ProcedureTransactions - View Insurance PaymentsUtilities - 835 Hub - Full ControlUtilities - 835 Hub - View OnlyUtilities - Access to Dentilytics EnterpriseUtilities - Advanced Utilities Full ControlUtilities - Automated Campaigns Ad-hoc Campaign ManagementUtilities - Automated Campaigns Ad-hoc Campaign User SpecificUtilities - Automated Campaigns Ad-hoc Campaign View OnlyUtilities - Automated Campaigns Appointment Campaign ManagementUtilities - Automated Campaigns Appointment Campaign User SpecificUtilities - Automated Campaigns Appointment Campaign View OnlyUtilities - Automated Campaigns Dashboard Full ControlUtilities - Automated Campaigns Dashboard View OnlyUtilities - Automated Campaigns Mailing List ManagementUtilities - Automated Campaigns Mailing List User SpecificUtilities - Automated Campaigns Mailing List View OnlyUtilities - Automated Campaigns Patient Care Campaign ManagementUtilities - Automated Campaigns Patient Care Campaign User SpecificUtilities - Automated Campaigns Patient Care Campaign View OnlyUtilities - Automated Campaigns Recurring Campaign ManagementUtilities - Automated Campaigns Recurring Campaign User SpecificUtilities - Automated Campaigns Recurring Campaign View OnlyUtilities - Automated Campaigns Template ManagementUtilities - Automated Campaigns Template User SpecificUtilities - Automated Campaigns Template View OnlyUtilities - Batch Claim Processing Screen Full ControlUtilities - Batch Claim Processing Screen View OnlyUtilities - Batch Eligibility Full ControlUtilities - Batch Eligibility View OnlyUtilities - Change Future Appointments, Patients, Tx by Provider - Full ControlUtilities - Change Future Appointments, Patients, Tx by Provider - View OnlyUtilities - Change Patient Fee Schedule Full ControlUtilities - Change Patient Home Office Full ControlUtilities - Change Patients ProviderUtilities - Consolidate Carriers Full ControlUtilities - Consolidate Carriers View OnlyUtilities - Copy Letters Full ControlUtilities - Copy Letters View ControlUtilities - Copy Notes Macros Full ControlUtilities - Copy Notes Macros View OnlyUtilities - Data Conversion Mapping - Full ControlUtilities - Denticon Download Full ControlUtilities - Denticon Download View OnlyUtilities - Dentigram Download Full ControlUtilities - Dentigram Download View OnlyUtilities - DHAClaims837- Full ControlUtilities - DHAClaims837- View OnlyUtilities - Direct Claims Full ControlUtilities - Direct Claims View OnlyUtilities - DldFeeScheXls Download Full ControlUtilities - DldFeeScheXls Download View OnlyUtilities - Download837 - Full ControlUtilities - Download837 - View OnlyUtilities - Eclaims Management Screen Full ControlUtilities - Encounter Download Full ControlUtilities - Encounter Download View OnlyUtilities - EncounterDownload - Full ControlUtilities - EncounterDownload - View OnlyUtilities - Launch Mouthwatch (Teledentistry)Utilities - Office Specific - DCA - Close Out Claims Full ControlUtilities - Office-DHA-Close Mananged Full ControlUtilities - Office-DHA-Close Mananged View OnlyUtilities - Post Ortho Payment Plan Charges View OnlyUtilities - Post Patient Ortho Payment Plan Charges Full ControlUtilities - Post Payment Plan Charges by PracticeUtilities - Post Regular Payment Plan ChargesUtilities - Post Regular Payment Plan Charges View OnlyUtilities - Radius Global Full AccessUtilities - Radius Global View OnlyUtilities - Referral Management - Edit StatusUtilities - Referral Management Full ControlUtilities - Referral Management View OnlyUtilities - Replace Carriers Full ControlUtilities - Replace Carriers View OnlyUtilities - Replace Insurance Plans Full ControlUtilities - Replace Insurance Plans View OnlyUtilities - Replace Procedure Code Full ControlUtilities - Replace Procedure Code View OnlyUtilities - Scheduled Reallocation ListUtilities - Task Manager - AccessUtilities - Task Manager - Assign TaskUtilities - Task Manager - Change Action of TaskUtilities - Task Manager - Create TaskUtilities - Task Manager - Delete TaskUtilities - Task Manager - Supervisor UserUtilities - Text Message Details Full ControlUtilities - Text Message Details View OnlyUtilities - Tickler Full ControlUtilities - Tickler View Only ControlUtilities - Time Clock Editor Full ControlUtilities - Time Clock Editor View OnlyUtilities - Time Clock Full ControlUtilities - Time Clock View OnlyUtilities - Transworld Full AccessUtilities - Transworld ViewOnlyUtilities - Two Way Communication Full ControlUtilities - Two Way Communication View OnlyUtilities->EHR-EHRReport-FullControlUtilities-Office Specific-DHA-StatementXMLDld FullUtilities-Office Specific-DHA-StatementXMLDld ViewUtilities-Office Specific-Mid Atlantic-BatchAddFlashAlerts FullUtilities-Office Specific-Mid Atlantic-BatchAddFlashAlerts ViewUtilities-Office Specific-Mid Atlantic-BatchDeactivateFlashAlerts FullUtilities-Office Specific-Mid Atlantic-BatchDeactivateFlashAlerts View

@@ -125,6 +125,110 @@ def test_change_my_password(client):
     assert ok.status_code == 204
 
 
+def test_create_user_complete_persists_structural_fields(client, db_session):
+    """users_missing_fields dev-report gaps 1-4 round-trip through /complete."""
+    body = {
+        "email": "kri@x.com", "username": "kriuda", "password": "secret12",
+        "short_id": "KRIUDA", "custom_1": "C1", "custom_2": "C2",
+        "signature_data": "data:image/png;base64,AAAA",
+    }
+    r = client.post("/api/v1/users/complete", json=body)
+    assert r.status_code == 201, r.text
+    out = r.json()
+    assert out["short_id"] == "KRIUDA"
+    assert out["custom_1"] == "C1" and out["custom_2"] == "C2"
+    assert out["signature_data"].startswith("data:image/png")
+    assert out["image_url"] is None
+
+
+def test_audit_fields_created_and_updated(client, db_session):
+    """Gap #8: created/updated *_by ids + resolved names on UserRead."""
+    admin_id = db_session._admin.id
+    created = client.post("/api/v1/users", json={
+        "email": "audit@x.com", "username": "audituser", "password": "secret12",
+    }).json()
+    uid = created["id"]
+    # On create: created_by + name set; updated_* still empty.
+    assert created["created_by"] == admin_id
+    assert created["created_by_name"] == "admin"
+    assert created["updated_at"] is None
+    assert created["updated_by"] is None and created["updated_by_name"] is None
+
+    # On update (PATCH): updated_by + name + timestamp populated.
+    upd = client.patch(f"/api/v1/users/{uid}", json={"first_name": "Aud"}).json()
+    assert upd["updated_by"] == admin_id
+    assert upd["updated_by_name"] == "admin"
+    assert upd["updated_at"] is not None
+    assert upd["created_by"] == admin_id  # unchanged
+
+    # get + list also carry the resolved names.
+    got = client.get(f"/api/v1/users/{uid}").json()
+    assert got["updated_by_name"] == "admin" and got["created_by_name"] == "admin"
+    listing = client.get("/api/v1/users").json()
+    row = next(u for u in listing["items"] if u["id"] == uid)
+    assert row["created_by_name"] == "admin"
+
+
+def test_audit_updated_by_via_complete(client, db_session):
+    """Gap #8: PUT /users/{id}/complete records the editing actor."""
+    admin_id = db_session._admin.id
+    uid = client.post("/api/v1/users/complete", json={
+        "email": "ac@x.com", "username": "ac_complete", "password": "secret12",
+    }).json()["id"]
+    r = client.put(f"/api/v1/users/{uid}/complete", json={"first_name": "Edited"})
+    assert r.status_code == 200, r.text
+    assert r.json()["updated_by"] == admin_id
+    assert r.json()["updated_by_name"] == "admin"
+
+
+def test_short_id_unique_per_tenant(client):
+    """Gap #1: short_id must be unique within a tenant -> 409 on collision."""
+    base = {"password": "secret12", "short_id": "ABC123"}
+    assert client.post("/api/v1/users/complete",
+                       json={**base, "email": "a@x.com", "username": "alpha"}).status_code == 201
+    dup = client.post("/api/v1/users/complete",
+                      json={**base, "email": "b@x.com", "username": "bravo"})
+    assert dup.status_code == 409, dup.text
+
+
+def test_user_patch_sets_structural_fields(client, db_session):
+    u = User(tenant_id=db_session._tenant_id, email="p@x.com", username="patchme",
+             password_hash="x", role="staff", is_active=True)
+    db_session.add(u)
+    db_session.commit()
+    db_session.refresh(u)
+    r = client.patch(f"/api/v1/users/{u.id}",
+                     json={"short_id": "ZZZ999", "custom_1": "hi"})
+    assert r.status_code == 200, r.text
+    assert r.json()["short_id"] == "ZZZ999" and r.json()["custom_1"] == "hi"
+
+
+def test_user_image_upload_and_delete(client, db_session):
+    """Gap #5: avatar upload sets image_url; delete clears it."""
+    u = User(tenant_id=db_session._tenant_id, email="img@x.com", username="imguser",
+             password_hash="x", role="staff", is_active=True)
+    db_session.add(u)
+    db_session.commit()
+    db_session.refresh(u)
+    # 1x1 PNG.
+    png = bytes.fromhex(
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+        "0000000a49444154789c6360000002000154a24f5f0000000049454e44ae426082"
+    )
+    up = client.post(f"/api/v1/users/{u.id}/image",
+                     files={"file": ("a.png", png, "image/png")})
+    assert up.status_code == 200, up.text
+    assert up.json()["image_url"]
+    assert client.get(f"/api/v1/users/{u.id}").json()["image_url"]
+    # Wrong type rejected (ValidationError -> 422).
+    bad = client.post(f"/api/v1/users/{u.id}/image",
+                      files={"file": ("a.txt", b"nope", "text/plain")})
+    assert bad.status_code == 422
+    # Delete clears it.
+    assert client.delete(f"/api/v1/users/{u.id}/image").status_code == 204
+    assert client.get(f"/api/v1/users/{u.id}").json()["image_url"] is None
+
+
 def test_list_users_office_and_role_filter(client, db_session, office_and_group):
     office, _ = office_and_group
     client.post("/api/v1/users/complete", json={

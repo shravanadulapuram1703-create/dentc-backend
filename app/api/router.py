@@ -10,10 +10,15 @@ from app.api.v1 import (
     auth,
     balances,
     billing,
+    fee_schedules,
+    groups,
+    icd_codes,
     ledger,
     office_assignment,
     office_setup,
     patients_extra,
+    procedure_codes,
+    provider_setup,
     reports,
     scheduler,
     treatment,
@@ -29,9 +34,16 @@ api_router.include_router(auth.router)
 api_router.include_router(users_extended.router)
 api_router.include_router(users_extended.roles_router)
 api_router.include_router(users.router)
+# Security -> Groups: rights catalog + group->rights assignment + copy.
+# Before generic CRUD so /user-groups/{id}/rights & /{id}/copy win over /user-groups/{item_id}.
+api_router.include_router(groups.permissions_router)
+api_router.include_router(groups.groups_router)
 # Service endpoints registered before generic CRUD (more specific paths first).
 api_router.include_router(billing.router)
 api_router.include_router(treatment.router)
+# Fee Schedule supplements (restore / new-version). Before generic CRUD so
+# /fee-schedules/{id}/restore & /new-version win over /fee-schedules/{item_id}.
+api_router.include_router(fee_schedules.router)
 api_router.include_router(balances.router)
 api_router.include_router(ledger.router)
 api_router.include_router(audit.router)
@@ -48,6 +60,15 @@ api_router.include_router(account.router)
 api_router.include_router(office_setup.router)
 # Office Assignment (Setup -> Offices -> Office Assignment), nested /offices/{id}/*.
 api_router.include_router(office_assignment.router)
+# Provider Setup module (Setup -> Providers). Before generic CRUD so
+# /providers/{id}/schedule|holidays|watermarks|referral-offices|user win over /providers/{item_id}.
+api_router.include_router(provider_setup.router)
+api_router.include_router(provider_setup.carrier_router)
+# Procedure Code supplements (stats / per-code insurance-rules). Before generic
+# CRUD so /procedure-codes/stats wins over /procedure-codes/{item_id} (the code).
+api_router.include_router(procedure_codes.router)
+# ICD codes bulk-status. Before generic CRUD so /icd-codes/bulk-status wins.
+api_router.include_router(icd_codes.router)
 # Patients module supplemental: documents, claim detail/lifecycle/attachments,
 # progress-note sign, duplicate-check (before generic CRUD for literal paths).
 api_router.include_router(patients_extra.documents_router)

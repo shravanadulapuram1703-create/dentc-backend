@@ -1,0 +1,4298 @@
+-- DROP SCHEMA public;
+
+CREATE SCHEMA public AUTHORIZATION dentc_dev_user;
+
+-- DROP SEQUENCE public.account_communications_id_seq;
+
+CREATE SEQUENCE public.account_communications_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.account_consents_id_seq;
+
+CREATE SEQUENCE public.account_consents_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.account_holidays_id_seq;
+
+CREATE SEQUENCE public.account_holidays_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.account_notes_id_seq;
+
+CREATE SEQUENCE public.account_notes_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.account_settings_id_seq;
+
+CREATE SEQUENCE public.account_settings_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.appointment_procedures_id_seq;
+
+CREATE SEQUENCE public.appointment_procedures_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.audit_logs_id_seq;
+
+CREATE SEQUENCE public.audit_logs_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 9223372036854775807
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.auth_action_tokens_id_seq;
+
+CREATE SEQUENCE public.auth_action_tokens_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.caries_risk_assessments_id_seq;
+
+CREATE SEQUENCE public.caries_risk_assessments_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.chart_colors_id_seq;
+
+CREATE SEQUENCE public.chart_colors_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.chart_conditions_id_seq;
+
+CREATE SEQUENCE public.chart_conditions_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.chart_materials_id_seq;
+
+CREATE SEQUENCE public.chart_materials_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.claim_attachments_id_seq;
+
+CREATE SEQUENCE public.claim_attachments_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.claim_submissions_id_seq;
+
+CREATE SEQUENCE public.claim_submissions_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.code_bundle_items_id_seq;
+
+CREATE SEQUENCE public.code_bundle_items_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.code_bundles_id_seq;
+
+CREATE SEQUENCE public.code_bundles_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.codes_view_id_seq;
+
+CREATE SEQUENCE public.codes_view_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.collection_agencies_id_seq;
+
+CREATE SEQUENCE public.collection_agencies_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.definition_groups_id_seq;
+
+CREATE SEQUENCE public.definition_groups_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.definitions_id_seq;
+
+CREATE SEQUENCE public.definitions_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.employers_id_seq;
+
+CREATE SEQUENCE public.employers_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.fee_schedule_assignments_id_seq;
+
+CREATE SEQUENCE public.fee_schedule_assignments_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.fee_schedule_entries_id_seq;
+
+CREATE SEQUENCE public.fee_schedule_entries_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.fee_schedules_id_seq;
+
+CREATE SEQUENCE public.fee_schedules_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.image_details_id_seq;
+
+CREATE SEQUENCE public.image_details_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.image_groups_id_seq;
+
+CREATE SEQUENCE public.image_groups_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.imaging_templates_id_seq;
+
+CREATE SEQUENCE public.imaging_templates_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.ins_custom_coverage_id_seq;
+
+CREATE SEQUENCE public.ins_custom_coverage_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.insurance_carriers_id_seq;
+
+CREATE SEQUENCE public.insurance_carriers_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.insurance_coverage_rules_id_seq;
+
+CREATE SEQUENCE public.insurance_coverage_rules_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.insurance_plans_id_seq;
+
+CREATE SEQUENCE public.insurance_plans_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.insurance_subscribers_id_seq;
+
+CREATE SEQUENCE public.insurance_subscribers_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.ledger_insurance_details_id_seq;
+
+CREATE SEQUENCE public.ledger_insurance_details_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.letter_templates_id_seq;
+
+CREATE SEQUENCE public.letter_templates_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.medical_history_details_id_seq;
+
+CREATE SEQUENCE public.medical_history_details_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.medical_history_records_id_seq;
+
+CREATE SEQUENCE public.medical_history_records_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.note_macros_id_seq;
+
+CREATE SEQUENCE public.note_macros_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_advanced_settings_id_seq;
+
+CREATE SEQUENCE public.office_advanced_settings_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_code_bundles_id_seq;
+
+CREATE SEQUENCE public.office_code_bundles_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_groups_id_seq;
+
+CREATE SEQUENCE public.office_groups_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_integrations_id_seq;
+
+CREATE SEQUENCE public.office_integrations_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_letter_templates_id_seq;
+
+CREATE SEQUENCE public.office_letter_templates_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_note_macros_id_seq;
+
+CREATE SEQUENCE public.office_note_macros_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_phone_assignments_id_seq;
+
+CREATE SEQUENCE public.office_phone_assignments_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_prescription_library_id_seq;
+
+CREATE SEQUENCE public.office_prescription_library_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_procedure_codes_id_seq;
+
+CREATE SEQUENCE public.office_procedure_codes_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_production_types_id_seq;
+
+CREATE SEQUENCE public.office_production_types_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_schedule_days_id_seq;
+
+CREATE SEQUENCE public.office_schedule_days_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_smart_assist_id_seq;
+
+CREATE SEQUENCE public.office_smart_assist_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_smart_assist_items_id_seq;
+
+CREATE SEQUENCE public.office_smart_assist_items_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.office_statement_settings_id_seq;
+
+CREATE SEQUENCE public.office_statement_settings_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.offices_id_seq;
+
+CREATE SEQUENCE public.offices_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.ortho_plans_id_seq;
+
+CREATE SEQUENCE public.ortho_plans_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_adjustments_id_seq;
+
+CREATE SEQUENCE public.patient_adjustments_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_alerts_id_seq;
+
+CREATE SEQUENCE public.patient_alerts_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_documents_id_seq;
+
+CREATE SEQUENCE public.patient_documents_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_emergency_contacts_id_seq;
+
+CREATE SEQUENCE public.patient_emergency_contacts_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_ins_payment_plans_id_seq;
+
+CREATE SEQUENCE public.patient_ins_payment_plans_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_insurance_id_seq;
+
+CREATE SEQUENCE public.patient_insurance_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_notes_id_seq;
+
+CREATE SEQUENCE public.patient_notes_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_payment_plans_id_seq;
+
+CREATE SEQUENCE public.patient_payment_plans_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_recalls_id_seq;
+
+CREATE SEQUENCE public.patient_recalls_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_reg_plans_id_seq;
+
+CREATE SEQUENCE public.patient_reg_plans_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_sec_ins_payment_plans_id_seq;
+
+CREATE SEQUENCE public.patient_sec_ins_payment_plans_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patient_signatures_id_seq;
+
+CREATE SEQUENCE public.patient_signatures_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.patients_id_seq;
+
+CREATE SEQUENCE public.patients_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.payment_allocations_id_seq;
+
+CREATE SEQUENCE public.payment_allocations_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.perio_chart_activity_id_seq;
+
+CREATE SEQUENCE public.perio_chart_activity_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.perio_chart_settings_id_seq;
+
+CREATE SEQUENCE public.perio_chart_settings_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.perio_exam_details_id_seq;
+
+CREATE SEQUENCE public.perio_exam_details_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.perio_exams_id_seq;
+
+CREATE SEQUENCE public.perio_exams_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.postcard_templates_id_seq;
+
+CREATE SEQUENCE public.postcard_templates_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.prescription_library_id_seq;
+
+CREATE SEQUENCE public.prescription_library_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.prescriptions_id_seq;
+
+CREATE SEQUENCE public.prescriptions_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.production_types_id_seq;
+
+CREATE SEQUENCE public.production_types_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.progress_notes_id_seq;
+
+CREATE SEQUENCE public.progress_notes_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.provider_insurance_ids_id_seq;
+
+CREATE SEQUENCE public.provider_insurance_ids_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.provider_offices_id_seq;
+
+CREATE SEQUENCE public.provider_offices_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.provider_route_slips_id_seq;
+
+CREATE SEQUENCE public.provider_route_slips_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.questionnaire_headers_id_seq;
+
+CREATE SEQUENCE public.questionnaire_headers_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.questionnaire_options_id_seq;
+
+CREATE SEQUENCE public.questionnaire_options_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.referral_demog_details_id_seq;
+
+CREATE SEQUENCE public.referral_demog_details_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.referral_demog_headers_id_seq;
+
+CREATE SEQUENCE public.referral_demog_headers_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.referrals_id_seq;
+
+CREATE SEQUENCE public.referrals_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.refresh_tokens_id_seq;
+
+CREATE SEQUENCE public.refresh_tokens_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.sms_messages_id_seq;
+
+CREATE SEQUENCE public.sms_messages_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.tenants_id_seq;
+
+CREATE SEQUENCE public.tenants_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.time_clock_entries_id_seq;
+
+CREATE SEQUENCE public.time_clock_entries_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.treatment_plan_insurance_details_id_seq;
+
+CREATE SEQUENCE public.treatment_plan_insurance_details_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.user_group_memberships_id_seq;
+
+CREATE SEQUENCE public.user_group_memberships_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.user_groups_id_seq;
+
+CREATE SEQUENCE public.user_groups_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.user_ip_rules_id_seq;
+
+CREATE SEQUENCE public.user_ip_rules_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.user_login_restrictions_id_seq;
+
+CREATE SEQUENCE public.user_login_restrictions_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.user_offices_id_seq;
+
+CREATE SEQUENCE public.user_offices_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.user_preferences_id_seq;
+
+CREATE SEQUENCE public.user_preferences_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.user_time_clock_config_id_seq;
+
+CREATE SEQUENCE public.user_time_clock_config_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
+-- DROP SEQUENCE public.users_id_seq;
+
+CREATE SEQUENCE public.users_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;-- public.alembic_version definition
+
+-- Drop table
+
+-- DROP TABLE public.alembic_version;
+
+CREATE TABLE public.alembic_version (
+	version_num varchar(32) NOT NULL,
+	CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+);
+
+
+-- public.audit_logs definition
+
+-- Drop table
+
+-- DROP TABLE public.audit_logs;
+
+CREATE TABLE public.audit_logs (
+	id bigserial NOT NULL,
+	tenant_id int4 NULL,
+	user_id int4 NULL,
+	"action" varchar(20) NOT NULL,
+	resource_type varchar(100) NULL,
+	resource_id varchar(100) NULL,
+	"method" varchar(10) NOT NULL,
+	"path" varchar(500) NOT NULL,
+	status_code int4 NULL,
+	ip_address varchar(64) NULL,
+	request_id varchar(64) NULL,
+	details json NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_audit_logs PRIMARY KEY (id)
+);
+CREATE INDEX ix_audit_logs_created_at ON public.audit_logs USING btree (created_at);
+CREATE INDEX ix_audit_logs_resource_type ON public.audit_logs USING btree (resource_type);
+CREATE INDEX ix_audit_logs_tenant_id ON public.audit_logs USING btree (tenant_id);
+CREATE INDEX ix_audit_logs_user_id ON public.audit_logs USING btree (user_id);
+
+
+-- public.procedure_codes definition
+
+-- Drop table
+
+-- DROP TABLE public.procedure_codes;
+
+CREATE TABLE public.procedure_codes (
+	code varchar(20) NOT NULL,
+	legacy_code varchar(20) NULL,
+	description varchar(500) NOT NULL,
+	category varchar(100) NOT NULL,
+	default_fee numeric(10, 2) DEFAULT 0 NOT NULL,
+	default_duration_minutes int4 NULL,
+	requires_tooth bool DEFAULT false NOT NULL,
+	requires_surface bool DEFAULT false NOT NULL,
+	requires_quadrant bool DEFAULT false NOT NULL,
+	requires_lab bool DEFAULT false NOT NULL,
+	is_ortho bool DEFAULT false NOT NULL,
+	billing_order varchar(10) NULL,
+	recall_interval int4 NULL,
+	recall_unit varchar(10) NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT procedure_codes_pkey PRIMARY KEY (code)
+);
+CREATE INDEX idx_proc_codes_category ON public.procedure_codes USING btree (category);
+
+
+-- public.tenants definition
+
+-- Drop table
+
+-- DROP TABLE public.tenants;
+
+CREATE TABLE public.tenants (
+	id serial4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	code varchar(80) NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT tenants_code_key UNIQUE (code),
+	CONSTRAINT tenants_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT tenants_pkey PRIMARY KEY (id)
+);
+
+
+-- public.chart_colors definition
+
+-- Drop table
+
+-- DROP TABLE public.chart_colors;
+
+CREATE TABLE public.chart_colors (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	category_type int4 NULL,
+	"name" varchar(100) NOT NULL,
+	stroke_color varchar(50) NULL,
+	fill_type varchar(20) NULL,
+	fill_color varchar(50) NULL,
+	fill_color2 varchar(50) NULL,
+	fill_pattern text NULL,
+	gradient_angle varchar(20) NULL,
+	gradient_method varchar(20) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT chart_colors_pkey PRIMARY KEY (id),
+	CONSTRAINT chart_colors_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+CREATE INDEX idx_chart_colors_tenant ON public.chart_colors USING btree (tenant_id);
+
+
+-- public.chart_materials definition
+
+-- Drop table
+
+-- DROP TABLE public.chart_materials;
+
+CREATE TABLE public.chart_materials (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(100) NOT NULL,
+	pattern varchar(100) NULL,
+	color varchar(50) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT chart_materials_pkey PRIMARY KEY (id),
+	CONSTRAINT chart_materials_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.collection_agencies definition
+
+-- Drop table
+
+-- DROP TABLE public.collection_agencies;
+
+CREATE TABLE public.collection_agencies (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	address varchar(255) NULL,
+	address2 varchar(255) NULL,
+	city varchar(100) NULL,
+	state varchar(50) NULL,
+	zip varchar(20) NULL,
+	phone varchar(20) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT collection_agencies_pkey PRIMARY KEY (id),
+	CONSTRAINT collection_agencies_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.definition_groups definition
+
+-- Drop table
+
+-- DROP TABLE public.definition_groups;
+
+CREATE TABLE public.definition_groups (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(50) NULL,
+	group_code varchar(50) NOT NULL,
+	description varchar(255) NOT NULL,
+	key1_label varchar(100) NULL,
+	key2_label varchar(100) NULL,
+	is_editable bool DEFAULT true NOT NULL,
+	can_add bool DEFAULT true NOT NULL,
+	group_type varchar(10) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT definition_groups_pkey PRIMARY KEY (id),
+	CONSTRAINT definition_groups_tenant_id_group_code_key UNIQUE (tenant_id, group_code),
+	CONSTRAINT definition_groups_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.definitions definition
+
+-- Drop table
+
+-- DROP TABLE public.definitions;
+
+CREATE TABLE public.definitions (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	group_code varchar(50) NOT NULL,
+	key1 varchar(50) NOT NULL,
+	key2 varchar(50) NULL,
+	description varchar(255) NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	is_flash_alert bool DEFAULT false NOT NULL,
+	blocks_charges bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	color varchar(20) NULL,
+	sort_order int4 NULL,
+	CONSTRAINT definitions_pkey PRIMARY KEY (id),
+	CONSTRAINT definitions_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+CREATE INDEX idx_def_group ON public.definitions USING btree (tenant_id, group_code);
+
+
+-- public.employers definition
+
+-- Drop table
+
+-- DROP TABLE public.employers;
+
+CREATE TABLE public.employers (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	address varchar(255) NULL,
+	city varchar(100) NULL,
+	state varchar(50) NULL,
+	zip varchar(20) NULL,
+	phone varchar(20) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT employers_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT employers_pkey PRIMARY KEY (id),
+	CONSTRAINT employers_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+CREATE INDEX idx_employers_legacy ON public.employers USING btree (legacy_id);
+
+
+-- public.ins_custom_coverage definition
+
+-- Drop table
+
+-- DROP TABLE public.ins_custom_coverage;
+
+CREATE TABLE public.ins_custom_coverage (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	start_code varchar(20) NOT NULL,
+	end_code varchar(20) NOT NULL,
+	description varchar(255) NULL,
+	coverage_pct numeric(5, 2) NULL,
+	ded_waived bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT ins_custom_coverage_pkey PRIMARY KEY (id),
+	CONSTRAINT ins_custom_coverage_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.insurance_carriers definition
+
+-- Drop table
+
+-- DROP TABLE public.insurance_carriers;
+
+CREATE TABLE public.insurance_carriers (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	payer_id varchar(50) NULL,
+	phone varchar(20) NULL,
+	phone2 varchar(20) NULL,
+	address varchar(255) NULL,
+	city varchar(100) NULL,
+	state varchar(50) NULL,
+	zip varchar(20) NULL,
+	website varchar(255) NULL,
+	notes text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT insurance_carriers_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT insurance_carriers_pkey PRIMARY KEY (id),
+	CONSTRAINT insurance_carriers_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+CREATE INDEX idx_carriers_legacy ON public.insurance_carriers USING btree (legacy_id);
+
+
+-- public.insurance_plans definition
+
+-- Drop table
+
+-- DROP TABLE public.insurance_plans;
+
+CREATE TABLE public.insurance_plans (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	carrier_id int4 NOT NULL,
+	employer_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	group_number varchar(100) NULL,
+	plan_type varchar(50) NULL,
+	is_prepaid bool DEFAULT false NOT NULL,
+	individual_max numeric(10, 2) NULL,
+	individual_deductible numeric(10, 2) NULL,
+	ortho_max numeric(10, 2) NULL,
+	family_max numeric(10, 2) NULL,
+	family_deductible numeric(10, 2) NULL,
+	anniversary_date date NULL,
+	coverage_type varchar(10) NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT insurance_plans_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT insurance_plans_pkey PRIMARY KEY (id),
+	CONSTRAINT insurance_plans_carrier_id_fkey FOREIGN KEY (carrier_id) REFERENCES public.insurance_carriers(id),
+	CONSTRAINT insurance_plans_employer_id_fkey FOREIGN KEY (employer_id) REFERENCES public.employers(id),
+	CONSTRAINT insurance_plans_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+CREATE INDEX idx_ins_plans_carrier ON public.insurance_plans USING btree (carrier_id);
+CREATE INDEX idx_ins_plans_legacy ON public.insurance_plans USING btree (legacy_id);
+
+
+-- public.letter_templates definition
+
+-- Drop table
+
+-- DROP TABLE public.letter_templates;
+
+CREATE TABLE public.letter_templates (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	letter_type varchar(10) NULL,
+	channel varchar(20) NULL,
+	title varchar(255) NULL,
+	body_html text NULL,
+	is_editable bool DEFAULT true NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT letter_templates_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT letter_templates_pkey PRIMARY KEY (id),
+	CONSTRAINT letter_templates_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.office_groups definition
+
+-- Drop table
+
+-- DROP TABLE public.office_groups;
+
+CREATE TABLE public.office_groups (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	address varchar(255) NULL,
+	address2 varchar(255) NULL,
+	city varchar(100) NULL,
+	state varchar(50) NULL,
+	zip varchar(20) NULL,
+	phone varchar(20) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT office_groups_pkey PRIMARY KEY (id),
+	CONSTRAINT office_groups_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.prescription_library definition
+
+-- Drop table
+
+-- DROP TABLE public.prescription_library;
+
+CREATE TABLE public.prescription_library (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	drug_name varchar(255) NOT NULL,
+	dispense varchar(255) NULL,
+	sig varchar(500) NULL,
+	refills int4 DEFAULT 0 NOT NULL,
+	is_as_written bool DEFAULT false NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT prescription_library_pkey PRIMARY KEY (id),
+	CONSTRAINT prescription_library_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.production_types definition
+
+-- Drop table
+
+-- DROP TABLE public.production_types;
+
+CREATE TABLE public.production_types (
+	tenant_id int4 NOT NULL,
+	"name" varchar(100) NOT NULL,
+	color varchar(50) NULL,
+	description text NULL,
+	appointnow_visible bool NOT NULL,
+	appointnow_duration int4 NULL,
+	is_inactive bool NOT NULL,
+	is_active bool NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_production_types PRIMARY KEY (id),
+	CONSTRAINT fk_production_types_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+CREATE INDEX ix_production_types_tenant_id ON public.production_types USING btree (tenant_id);
+
+
+-- public.questionnaire_headers definition
+
+-- Drop table
+
+-- DROP TABLE public.questionnaire_headers;
+
+CREATE TABLE public.questionnaire_headers (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	description varchar(255) NOT NULL,
+	is_multi_select bool DEFAULT false NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT questionnaire_headers_pkey PRIMARY KEY (id),
+	CONSTRAINT questionnaire_headers_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.questionnaire_options definition
+
+-- Drop table
+
+-- DROP TABLE public.questionnaire_options;
+
+CREATE TABLE public.questionnaire_options (
+	id serial4 NOT NULL,
+	questionnaire_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	answer_code varchar(20) NOT NULL,
+	sort_order int4 DEFAULT 1 NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT questionnaire_options_pkey PRIMARY KEY (id),
+	CONSTRAINT questionnaire_options_questionnaire_id_fkey FOREIGN KEY (questionnaire_id) REFERENCES public.questionnaire_headers(id)
+);
+CREATE INDEX idx_q_opts_q ON public.questionnaire_options USING btree (questionnaire_id);
+
+
+-- public.referral_demog_headers definition
+
+-- Drop table
+
+-- DROP TABLE public.referral_demog_headers;
+
+CREATE TABLE public.referral_demog_headers (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	description varchar(255) NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT referral_demog_headers_pkey PRIMARY KEY (id),
+	CONSTRAINT referral_demog_headers_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.user_groups definition
+
+-- Drop table
+
+-- DROP TABLE public.user_groups;
+
+CREATE TABLE public.user_groups (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	"name" varchar(255) NOT NULL,
+	description text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_user_groups PRIMARY KEY (id),
+	CONSTRAINT fk_user_groups_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+CREATE INDEX ix_user_groups_tenant_id ON public.user_groups USING btree (tenant_id);
+
+
+-- public.users definition
+
+-- Drop table
+
+-- DROP TABLE public.users;
+
+CREATE TABLE public.users (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(50) NULL,
+	email varchar(255) NOT NULL,
+	username varchar(50) NOT NULL,
+	password_hash text NOT NULL,
+	first_name varchar(100) NULL,
+	last_name varchar(100) NULL,
+	phone varchar(20) NULL,
+	"role" varchar(50) DEFAULT 'staff'::character varying NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	must_change_password bool DEFAULT false NOT NULL,
+	last_login_at timestamp NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	created_by int4 NULL,
+	patient_access_level varchar(50) NULL,
+	is_legacy_user bool DEFAULT false NOT NULL,
+	legacy_activation_completed bool DEFAULT false NOT NULL,
+	password_created_at timestamp NULL,
+	CONSTRAINT users_email_key UNIQUE (email),
+	CONSTRAINT users_pkey PRIMARY KEY (id),
+	CONSTRAINT users_username_key UNIQUE (username),
+	CONSTRAINT users_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+	CONSTRAINT users_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+CREATE INDEX idx_users_email ON public.users USING btree (email);
+CREATE INDEX idx_users_legacy ON public.users USING btree (legacy_id);
+CREATE INDEX idx_users_tenant ON public.users USING btree (tenant_id);
+
+
+-- public.account_communications definition
+
+-- Drop table
+
+-- DROP TABLE public.account_communications;
+
+CREATE TABLE public.account_communications (
+	tenant_id int4 NOT NULL,
+	comm_number_type varchar(20) NULL,
+	business_name varchar(255) NULL,
+	region_of_operations varchar(255) NULL,
+	comm_country varchar(2) NOT NULL,
+	comm_address_1 varchar(255) NULL,
+	comm_address_2 varchar(255) NULL,
+	comm_city varchar(100) NULL,
+	comm_state varchar(50) NULL,
+	comm_zip varchar(20) NULL,
+	ein_enc text NULL,
+	website varchar(500) NULL,
+	comm_contact_first_name varchar(100) NULL,
+	comm_contact_last_name varchar(100) NULL,
+	business_title varchar(100) NULL,
+	"position" varchar(100) NULL,
+	comm_contact_email varchar(255) NULL,
+	comm_contact_phone varchar(20) NULL,
+	business_type varchar(50) NULL,
+	company_status varchar(50) NULL,
+	stock_symbol varchar(20) NULL,
+	stock_exchange varchar(50) NULL,
+	business_identity varchar(255) NULL,
+	business_industry varchar(100) NULL,
+	telecom_status varchar(30) NULL,
+	telecom_verified_at timestamp NULL,
+	telecom_verified_by int4 NULL,
+	updated_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_account_communications PRIMARY KEY (id),
+	CONSTRAINT uq_account_communications_tenant UNIQUE (tenant_id),
+	CONSTRAINT fk_account_communications_telecom_verified_by_users FOREIGN KEY (telecom_verified_by) REFERENCES public.users(id),
+	CONSTRAINT fk_account_communications_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id),
+	CONSTRAINT fk_account_communications_updated_by_users FOREIGN KEY (updated_by) REFERENCES public.users(id)
+);
+CREATE INDEX ix_account_communications_tenant_id ON public.account_communications USING btree (tenant_id);
+
+
+-- public.account_consents definition
+
+-- Drop table
+
+-- DROP TABLE public.account_consents;
+
+CREATE TABLE public.account_consents (
+	tenant_id int4 NOT NULL,
+	version_number int4 NOT NULL,
+	"header" varchar(500) NOT NULL,
+	body_html text NOT NULL,
+	is_active bool NOT NULL,
+	effective_date date NULL,
+	created_by int4 NULL,
+	archived_at timestamp NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_account_consents PRIMARY KEY (id),
+	CONSTRAINT fk_account_consents_created_by_users FOREIGN KEY (created_by) REFERENCES public.users(id),
+	CONSTRAINT fk_account_consents_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+CREATE INDEX ix_account_consents_is_active ON public.account_consents USING btree (is_active);
+CREATE INDEX ix_account_consents_tenant_id ON public.account_consents USING btree (tenant_id);
+
+
+-- public.auth_action_tokens definition
+
+-- Drop table
+
+-- DROP TABLE public.auth_action_tokens;
+
+CREATE TABLE public.auth_action_tokens (
+	user_id int4 NOT NULL,
+	token_hash varchar(64) NOT NULL,
+	purpose varchar(30) NOT NULL,
+	expires_at timestamp NOT NULL,
+	used_at timestamp NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_auth_action_tokens PRIMARY KEY (id),
+	CONSTRAINT fk_auth_action_tokens_user_id_users FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE UNIQUE INDEX ix_auth_action_tokens_token_hash ON public.auth_action_tokens USING btree (token_hash);
+CREATE INDEX ix_auth_action_tokens_user_id ON public.auth_action_tokens USING btree (user_id);
+
+
+-- public.code_bundles definition
+
+-- Drop table
+
+-- DROP TABLE public.code_bundles;
+
+CREATE TABLE public.code_bundles (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(100) NOT NULL,
+	display_code varchar(50) NULL,
+	description varchar(255) NULL,
+	same_tooth bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT code_bundles_pkey PRIMARY KEY (id),
+	CONSTRAINT code_bundles_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+	CONSTRAINT code_bundles_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.insurance_coverage_rules definition
+
+-- Drop table
+
+-- DROP TABLE public.insurance_coverage_rules;
+
+CREATE TABLE public.insurance_coverage_rules (
+	id serial4 NOT NULL,
+	ins_plan_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	start_code varchar(20) NOT NULL,
+	end_code varchar(20) NOT NULL,
+	category varchar(100) NULL,
+	description varchar(255) NULL,
+	coverage_pct numeric(5, 2) NULL,
+	ded_waived bool DEFAULT false NOT NULL,
+	freq_limit varchar(50) NULL,
+	age_limit varchar(50) NULL,
+	wait_period varchar(50) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT insurance_coverage_rules_pkey PRIMARY KEY (id),
+	CONSTRAINT insurance_coverage_rules_ins_plan_id_fkey FOREIGN KEY (ins_plan_id) REFERENCES public.insurance_plans(id)
+);
+CREATE INDEX idx_cov_rules_plan ON public.insurance_coverage_rules USING btree (ins_plan_id);
+
+
+-- public.note_macros definition
+
+-- Drop table
+
+-- DROP TABLE public.note_macros;
+
+CREATE TABLE public.note_macros (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(100) NOT NULL,
+	"content" text NOT NULL,
+	category varchar(100) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT note_macros_pkey PRIMARY KEY (id),
+	CONSTRAINT note_macros_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+	CONSTRAINT note_macros_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)
+);
+
+
+-- public.perio_chart_settings definition
+
+-- Drop table
+
+-- DROP TABLE public.perio_chart_settings;
+
+CREATE TABLE public.perio_chart_settings (
+	id serial4 NOT NULL,
+	user_id int4 NOT NULL,
+	is_forward bool DEFAULT true NOT NULL,
+	is_indicator bool DEFAULT true NOT NULL,
+	is_mgj bool DEFAULT true NOT NULL,
+	pd_level int4 DEFAULT 4 NOT NULL,
+	bp_level int4 DEFAULT 2 NOT NULL,
+	ip_level int4 DEFAULT 3 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT perio_chart_settings_pkey PRIMARY KEY (id),
+	CONSTRAINT perio_chart_settings_user_id_key UNIQUE (user_id),
+	CONSTRAINT perio_chart_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+
+
+-- public.refresh_tokens definition
+
+-- Drop table
+
+-- DROP TABLE public.refresh_tokens;
+
+CREATE TABLE public.refresh_tokens (
+	id serial4 NOT NULL,
+	user_id int4 NOT NULL,
+	token_hash varchar(255) NOT NULL,
+	expires_at timestamp NOT NULL,
+	revoked bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id),
+	CONSTRAINT refresh_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE INDEX idx_rtoken_user ON public.refresh_tokens USING btree (user_id);
+
+
+-- public.user_group_memberships definition
+
+-- Drop table
+
+-- DROP TABLE public.user_group_memberships;
+
+CREATE TABLE public.user_group_memberships (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	user_id int4 NOT NULL,
+	group_id int4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_user_group_memberships PRIMARY KEY (id),
+	CONSTRAINT uq_user_group_memberships_user_group UNIQUE (user_id, group_id),
+	CONSTRAINT fk_user_group_memberships_group_id_user_groups FOREIGN KEY (group_id) REFERENCES public.user_groups(id),
+	CONSTRAINT fk_user_group_memberships_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id),
+	CONSTRAINT fk_user_group_memberships_user_id_users FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE INDEX ix_user_group_memberships_group_id ON public.user_group_memberships USING btree (group_id);
+CREATE INDEX ix_user_group_memberships_tenant_id ON public.user_group_memberships USING btree (tenant_id);
+CREATE INDEX ix_user_group_memberships_user_id ON public.user_group_memberships USING btree (user_id);
+
+
+-- public.user_ip_rules definition
+
+-- Drop table
+
+-- DROP TABLE public.user_ip_rules;
+
+CREATE TABLE public.user_ip_rules (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	user_id int4 NOT NULL,
+	ip_address varchar(45) NOT NULL,
+	rule_type varchar(10) DEFAULT 'allow'::character varying NOT NULL,
+	description varchar(255) NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_user_ip_rules PRIMARY KEY (id),
+	CONSTRAINT fk_user_ip_rules_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id),
+	CONSTRAINT fk_user_ip_rules_user_id_users FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE INDEX ix_user_ip_rules_tenant_id ON public.user_ip_rules USING btree (tenant_id);
+CREATE INDEX ix_user_ip_rules_user_id ON public.user_ip_rules USING btree (user_id);
+
+
+-- public.user_login_restrictions definition
+
+-- Drop table
+
+-- DROP TABLE public.user_login_restrictions;
+
+CREATE TABLE public.user_login_restrictions (
+	tenant_id int4 NOT NULL,
+	user_id int4 NOT NULL,
+	is_24_7 bool NOT NULL,
+	allowed_days varchar(50) NULL,
+	start_time time NULL,
+	end_time time NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_user_login_restrictions PRIMARY KEY (id),
+	CONSTRAINT uq_user_login_restrictions_user UNIQUE (user_id),
+	CONSTRAINT fk_user_login_restrictions_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id),
+	CONSTRAINT fk_user_login_restrictions_user_id_users FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE INDEX ix_user_login_restrictions_tenant_id ON public.user_login_restrictions USING btree (tenant_id);
+CREATE INDEX ix_user_login_restrictions_user_id ON public.user_login_restrictions USING btree (user_id);
+
+
+-- public.user_preferences definition
+
+-- Drop table
+
+-- DROP TABLE public.user_preferences;
+
+CREATE TABLE public.user_preferences (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	user_id int4 NOT NULL,
+	pref_key varchar(100) NOT NULL,
+	pref_value text NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_user_preferences PRIMARY KEY (id),
+	CONSTRAINT uq_user_preferences_user_key UNIQUE (user_id, pref_key),
+	CONSTRAINT fk_user_preferences_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id),
+	CONSTRAINT fk_user_preferences_user_id_users FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE INDEX ix_user_preferences_tenant_id ON public.user_preferences USING btree (tenant_id);
+CREATE INDEX ix_user_preferences_user_id ON public.user_preferences USING btree (user_id);
+
+
+-- public.user_time_clock_config definition
+
+-- Drop table
+
+-- DROP TABLE public.user_time_clock_config;
+
+CREATE TABLE public.user_time_clock_config (
+	tenant_id int4 NOT NULL,
+	user_id int4 NOT NULL,
+	pay_rate numeric(10, 2) NULL,
+	overtime_method varchar(50) NULL,
+	overtime_rate numeric(10, 2) NULL,
+	clock_in_required bool NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_user_time_clock_config PRIMARY KEY (id),
+	CONSTRAINT uq_user_time_clock_config_user UNIQUE (user_id),
+	CONSTRAINT fk_user_time_clock_config_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id),
+	CONSTRAINT fk_user_time_clock_config_user_id_users FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE INDEX ix_user_time_clock_config_tenant_id ON public.user_time_clock_config USING btree (tenant_id);
+CREATE INDEX ix_user_time_clock_config_user_id ON public.user_time_clock_config USING btree (user_id);
+
+
+-- public.code_bundle_items definition
+
+-- Drop table
+
+-- DROP TABLE public.code_bundle_items;
+
+CREATE TABLE public.code_bundle_items (
+	id serial4 NOT NULL,
+	bundle_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	procedure_code varchar(20) NOT NULL,
+	tooth varchar(10) NULL,
+	sort_order int4 DEFAULT 1 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT code_bundle_items_pkey PRIMARY KEY (id),
+	CONSTRAINT code_bundle_items_bundle_id_fkey FOREIGN KEY (bundle_id) REFERENCES public.code_bundles(id),
+	CONSTRAINT code_bundle_items_procedure_code_fkey FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code)
+);
+CREATE INDEX idx_bundle_items_bundle ON public.code_bundle_items USING btree (bundle_id);
+
+
+-- public.account_holidays definition
+
+-- Drop table
+
+-- DROP TABLE public.account_holidays;
+
+CREATE TABLE public.account_holidays (
+	tenant_id int4 NOT NULL,
+	holiday_date date NOT NULL,
+	holiday_name varchar(255) NOT NULL,
+	status varchar(20) NULL,
+	holiday_type varchar(20) NULL,
+	is_recurring bool NOT NULL,
+	created_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	office_id int4 NULL,
+	CONSTRAINT pk_account_holidays PRIMARY KEY (id)
+);
+CREATE INDEX ix_account_holidays_holiday_date ON public.account_holidays USING btree (holiday_date);
+CREATE INDEX ix_account_holidays_office_id ON public.account_holidays USING btree (office_id);
+CREATE INDEX ix_account_holidays_tenant_id ON public.account_holidays USING btree (tenant_id);
+
+
+-- public.account_notes definition
+
+-- Drop table
+
+-- DROP TABLE public.account_notes;
+
+CREATE TABLE public.account_notes (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	note_type varchar(10) NULL,
+	notes text NOT NULL,
+	is_struck_off bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT account_notes_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_acct_notes_patient ON public.account_notes USING btree (patient_id);
+
+
+-- public.account_settings definition
+
+-- Drop table
+
+-- DROP TABLE public.account_settings;
+
+CREATE TABLE public.account_settings (
+	tenant_id int4 NOT NULL,
+	contact_first_name varchar(100) NULL,
+	contact_last_name varchar(100) NULL,
+	corporate_address_1 varchar(255) NULL,
+	corporate_address_2 varchar(255) NULL,
+	corporate_city varchar(100) NULL,
+	corporate_state varchar(50) NULL,
+	corporate_zip varchar(20) NULL,
+	email varchar(255) NULL,
+	phone varchar(20) NULL,
+	phone_2 varchar(20) NULL,
+	culture_code varchar(20) NOT NULL,
+	custom_1 varchar(255) NULL,
+	custom_2 varchar(255) NULL,
+	pgid varchar(50) NULL,
+	"oid" varchar(50) NULL,
+	logo_url varchar(500) NULL,
+	statement_use_corporate bool NOT NULL,
+	statement_address_1 varchar(255) NULL,
+	statement_address_2 varchar(255) NULL,
+	statement_city varchar(100) NULL,
+	statement_state varchar(50) NULL,
+	statement_zip varchar(20) NULL,
+	statement_phone varchar(20) NULL,
+	theme varchar(50) NULL,
+	enable_full_screen bool NOT NULL,
+	ortho_claim_fee_mode varchar(50) NULL,
+	ortho_visit_code varchar(20) NULL,
+	max_treatment_plan_discount numeric(5, 2) NULL,
+	treatment_plan_discount_code varchar(50) NULL,
+	per_visit_copay_code varchar(50) NULL,
+	only_show_office_items bool NOT NULL,
+	statement_close_out_individual bool NOT NULL,
+	statement_close_out_all bool NOT NULL,
+	show_booked_production bool NOT NULL,
+	auto_post_periodic_charges bool NOT NULL,
+	show_flash_alerts_insurance bool NOT NULL,
+	pronoun_field_visible varchar(10) NULL,
+	procedure_color varchar(50) NULL,
+	insurance_payment_color varchar(50) NULL,
+	claim_lines_color varchar(50) NULL,
+	patient_payment_color varchar(50) NULL,
+	adjustment_color varchar(50) NULL,
+	statement_lines_color varchar(50) NULL,
+	notes_lines_color varchar(50) NULL,
+	charting_option varchar(50) NULL,
+	default_charting_tab varchar(50) NULL,
+	show_production_colors bool NOT NULL,
+	model_office_id int4 NULL,
+	default_treatment_plan_filter varchar(50) NULL,
+	credit_ins_overpayment_to_patient bool NOT NULL,
+	password_expiration_days int4 NOT NULL,
+	scheduler_show_non_working_days bool NOT NULL,
+	email_receipts_to_patients bool NOT NULL,
+	default_fee_increase_code varchar(50) NULL,
+	default_fee_decrease_code varchar(50) NULL,
+	default_transfer_code varchar(50) NULL,
+	default_write_off_code varchar(50) NULL,
+	phone_required_mode varchar(20) NULL,
+	dob_required_mode varchar(20) NULL,
+	ssn_required_mode varchar(20) NULL,
+	email_required bool NOT NULL,
+	edi_vendor varchar(50) NULL,
+	transfirst_auto_recurring bool NOT NULL,
+	transworld_all_offices bool NOT NULL,
+	transworld_office_id int4 NULL,
+	transworld_portal_url varchar(500) NULL,
+	xvweb_url varchar(500) NULL,
+	cloud9_url varchar(500) NULL,
+	auto_eligibility bool NOT NULL,
+	payment_portal_posting_office varchar(50) NULL,
+	payment_portal_post_to_rp bool NOT NULL,
+	use_planet_dds_pay bool NOT NULL,
+	ai_assist_org_id varchar(100) NULL,
+	ai_assist_client_id varchar(255) NULL,
+	ai_assist_client_secret_enc text NULL,
+	updated_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_account_settings PRIMARY KEY (id),
+	CONSTRAINT uq_account_settings_tenant UNIQUE (tenant_id)
+);
+CREATE INDEX ix_account_settings_tenant_id ON public.account_settings USING btree (tenant_id);
+
+
+-- public.appointment_procedures definition
+
+-- Drop table
+
+-- DROP TABLE public.appointment_procedures;
+
+CREATE TABLE public.appointment_procedures (
+	id serial4 NOT NULL,
+	appointment_id varchar(50) NOT NULL,
+	procedure_code varchar(20) NOT NULL,
+	provider_id varchar(50) NULL,
+	treatment_plan_id varchar(50) NULL,
+	tooth varchar(10) NULL,
+	surface varchar(20) NULL,
+	description varchar(500) NULL,
+	fee numeric(12, 2) DEFAULT 0 NOT NULL,
+	insurance_estimate numeric(12, 2) DEFAULT 0 NOT NULL,
+	billing_order varchar(10) NULL,
+	status varchar(20) DEFAULT 'Planned'::character varying NOT NULL,
+	material_id int4 NULL,
+	notes text NULL,
+	is_archived bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT appointment_procedures_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_appt_proc_appt ON public.appointment_procedures USING btree (appointment_id);
+
+
+-- public.appointments definition
+
+-- Drop table
+
+-- DROP TABLE public.appointments;
+
+CREATE TABLE public.appointments (
+	id varchar(50) NOT NULL,
+	patient_id int4 NULL,
+	provider_id varchar(50) NOT NULL,
+	operatory_id varchar(50) NULL,
+	office_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	is_archived bool DEFAULT false NOT NULL,
+	"date" date NOT NULL,
+	start_time time NOT NULL,
+	end_time time NOT NULL,
+	duration int4 NOT NULL,
+	status varchar(30) DEFAULT 'Scheduled'::character varying NOT NULL,
+	is_missed bool DEFAULT false NOT NULL,
+	is_cancelled bool DEFAULT false NOT NULL,
+	is_posted bool DEFAULT false NOT NULL,
+	procedure_label varchar(200) NULL,
+	is_new_patient bool DEFAULT false NOT NULL,
+	notes text NULL,
+	has_lab bool DEFAULT false NOT NULL,
+	lab_cost numeric(10, 2) NULL,
+	lab_sent_on date NULL,
+	lab_due_on date NULL,
+	lab_received_on date NULL,
+	is_blocked bool DEFAULT false NOT NULL,
+	campaign_id varchar(100) NULL,
+	treatment_plan_id varchar(50) NULL,
+	confirmed_on timestamp NULL,
+	checked_in_on timestamp NULL,
+	checked_out_on timestamp NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT appointments_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_appt_archived ON public.appointments USING btree (is_archived);
+CREATE INDEX idx_appt_date_office ON public.appointments USING btree (date, office_id);
+CREATE INDEX idx_appt_legacy ON public.appointments USING btree (legacy_id);
+CREATE INDEX idx_appt_operatory_date ON public.appointments USING btree (operatory_id, date);
+CREATE INDEX idx_appt_patient_date ON public.appointments USING btree (patient_id, date);
+CREATE INDEX idx_appt_provider_date ON public.appointments USING btree (provider_id, date);
+CREATE INDEX idx_appt_status ON public.appointments USING btree (status);
+
+
+-- public.caries_risk_assessments definition
+
+-- Drop table
+
+-- DROP TABLE public.caries_risk_assessments;
+
+CREATE TABLE public.caries_risk_assessments (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	risk_date date NULL,
+	vis_cavities bool NULL,
+	les_not_dentin bool NULL,
+	surf_white_spots bool NULL,
+	rest_in_3yrs bool NULL,
+	cav_rad_dentin bool NULL,
+	prox_enamel_les bool NULL,
+	act_white_spot_surf bool NULL,
+	fir_vis_rest_lst_3yrs bool NULL,
+	foll_up_vis_rest_yr bool NULL,
+	vis_plaque bool NULL,
+	freq_snack bool NULL,
+	pits_and_fissures bool NULL,
+	acidic_ph bool NULL,
+	atp bool NULL,
+	xerostomia bool NULL,
+	cari_read_above_1500 bool NULL,
+	vis_heavy_plaque bool NULL,
+	freq_snack_gt3x bool NULL,
+	deep_pits_fissures bool NULL,
+	recreat_drug bool NULL,
+	saliva_flow_reduced bool NULL,
+	ortho_appliance bool NULL,
+	fluoride_toothpaste bool NULL,
+	fluoride_rinse bool NULL,
+	hx_peridex bool NULL,
+	office_flour_6mon bool NULL,
+	live_work_fw_water bool NULL,
+	f_toothpaste_1x bool NULL,
+	f_toothpaste_2x bool NULL,
+	f_mouth_rinse bool NULL,
+	f_toothpaste_5000ppm bool NULL,
+	f_varnish_6mon bool NULL,
+	office_f_topical_6mon bool NULL,
+	chx_1wk_per_mon bool NULL,
+	xylitol_6mon bool NULL,
+	adeaq_saliva_flow bool NULL,
+	risk_level varchar(20) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT caries_risk_assessments_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_caries_risk_patient ON public.caries_risk_assessments USING btree (patient_id, risk_date);
+
+
+-- public.chart_conditions definition
+
+-- Drop table
+
+-- DROP TABLE public.chart_conditions;
+
+CREATE TABLE public.chart_conditions (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	activity_date date NULL,
+	tooth varchar(10) NULL,
+	surface varchar(20) NULL,
+	region varchar(20) NULL,
+	area varchar(20) NULL,
+	description varchar(500) NULL,
+	condition_code varchar(50) NULL,
+	procedure_code varchar(20) NULL,
+	provider_id varchar(50) NULL,
+	material_id int4 NULL,
+	chart_as varchar(20) NULL,
+	is_inactive bool DEFAULT false NOT NULL,
+	notes text NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT chart_conditions_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_chart_cond_patient_tooth ON public.chart_conditions USING btree (patient_id, tooth);
+
+
+-- public.claim_attachments definition
+
+-- Drop table
+
+-- DROP TABLE public.claim_attachments;
+
+CREATE TABLE public.claim_attachments (
+	tenant_id int4 NOT NULL,
+	claim_id varchar(50) NOT NULL,
+	attachment_type varchar(50) NULL,
+	file_name varchar(500) NOT NULL,
+	content_type varchar(100) NULL,
+	file_size int8 NULL,
+	file_path varchar(500) NOT NULL,
+	file_url varchar(500) NOT NULL,
+	is_deleted bool NOT NULL,
+	created_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_claim_attachments PRIMARY KEY (id)
+);
+CREATE INDEX ix_claim_attachments_claim_id ON public.claim_attachments USING btree (claim_id);
+CREATE INDEX ix_claim_attachments_tenant_id ON public.claim_attachments USING btree (tenant_id);
+
+
+-- public.claim_submissions definition
+
+-- Drop table
+
+-- DROP TABLE public.claim_submissions;
+
+CREATE TABLE public.claim_submissions (
+	id serial4 NOT NULL,
+	claim_id varchar(50) NOT NULL,
+	legacy_id varchar(20) NULL,
+	batch_id varchar(50) NULL,
+	is_preauth bool DEFAULT false NOT NULL,
+	total_charges numeric(12, 2) NULL,
+	num_lines int4 NULL,
+	submission_status varchar(10) NULL,
+	claim_text text NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT claim_submissions_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_claim_sub_claim ON public.claim_submissions USING btree (claim_id);
+
+
+-- public.codes_view definition
+
+-- Drop table
+
+-- DROP TABLE public.codes_view;
+
+CREATE TABLE public.codes_view (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	code varchar(20) NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT codes_view_office_id_code_key UNIQUE (office_id, code),
+	CONSTRAINT codes_view_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_codes_view_office ON public.codes_view USING btree (office_id);
+
+
+-- public.fee_schedule_assignments definition
+
+-- Drop table
+
+-- DROP TABLE public.fee_schedule_assignments;
+
+CREATE TABLE public.fee_schedule_assignments (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	ins_plan_id int4 NULL,
+	carrier_id int4 NULL,
+	provider_id varchar(50) NULL,
+	office_id int4 NULL,
+	fee_schedule_id int4 NOT NULL,
+	specialty_id varchar(20) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT fee_schedule_assignments_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_fee_assign_plan ON public.fee_schedule_assignments USING btree (ins_plan_id);
+CREATE INDEX idx_fee_assign_sched ON public.fee_schedule_assignments USING btree (fee_schedule_id);
+
+
+-- public.fee_schedule_entries definition
+
+-- Drop table
+
+-- DROP TABLE public.fee_schedule_entries;
+
+CREATE TABLE public.fee_schedule_entries (
+	id serial4 NOT NULL,
+	fee_schedule_id int4 NOT NULL,
+	procedure_code varchar(20) NOT NULL,
+	patient_fee numeric(10, 2) NULL,
+	insurance_fee numeric(10, 2) NULL,
+	effective_date date NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT fee_schedule_entries_fee_schedule_id_procedure_code_key UNIQUE (fee_schedule_id, procedure_code),
+	CONSTRAINT fee_schedule_entries_pkey PRIMARY KEY (id)
+);
+
+
+-- public.fee_schedules definition
+
+-- Drop table
+
+-- DROP TABLE public.fee_schedules;
+
+CREATE TABLE public.fee_schedules (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	fee_type varchar(50) NULL,
+	ins_plan_id int4 NULL,
+	office_id int4 NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT fee_schedules_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT fee_schedules_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_fee_sched_legacy ON public.fee_schedules USING btree (legacy_id);
+
+
+-- public.image_details definition
+
+-- Drop table
+
+-- DROP TABLE public.image_details;
+
+CREATE TABLE public.image_details (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	office_id int4 NULL,
+	image_group_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	tile_id varchar(20) NULL,
+	filename varchar(500) NULL,
+	notes text NULL,
+	teeth varchar(100) NULL,
+	file_size int8 NULL,
+	is_deleted bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT image_details_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_image_details_group ON public.image_details USING btree (image_group_id);
+
+
+-- public.image_groups definition
+
+-- Drop table
+
+-- DROP TABLE public.image_groups;
+
+CREATE TABLE public.image_groups (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	office_id int4 NULL,
+	patient_id int4 NULL,
+	template_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NULL,
+	group_type varchar(20) NULL,
+	ext_id varchar(50) NULL,
+	"source" varchar(50) NULL,
+	source2 varchar(50) NULL,
+	is_deleted bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT image_groups_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_image_groups_patient ON public.image_groups USING btree (patient_id);
+
+
+-- public.imaging_templates definition
+
+-- Drop table
+
+-- DROP TABLE public.imaging_templates;
+
+CREATE TABLE public.imaging_templates (
+	id serial4 NOT NULL,
+	office_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	template_type varchar(20) NULL,
+	dentition varchar(5) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT imaging_templates_pkey PRIMARY KEY (id)
+);
+
+
+-- public.insurance_claims definition
+
+-- Drop table
+
+-- DROP TABLE public.insurance_claims;
+
+CREATE TABLE public.insurance_claims (
+	id varchar(50) NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	claim_number varchar(50) NOT NULL,
+	status varchar(30) DEFAULT 'draft'::character varying NOT NULL,
+	claim_type varchar(20) DEFAULT 'primary'::character varying NOT NULL,
+	billing_order varchar(10) NULL,
+	date_of_service_from date NULL,
+	date_of_service_to date NULL,
+	total_billed numeric(12, 2) DEFAULT 0 NOT NULL,
+	total_paid numeric(12, 2) DEFAULT 0 NOT NULL,
+	est_insurance numeric(12, 2) DEFAULT 0 NOT NULL,
+	submitted_date date NULL,
+	paid_date date NULL,
+	close_date date NULL,
+	billing_provider_id varchar(50) NULL,
+	treating_provider_id varchar(50) NULL,
+	carrier_id int4 NULL,
+	ins_plan_id int4 NULL,
+	is_preauth bool DEFAULT false NOT NULL,
+	notes text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT insurance_claims_claim_number_key UNIQUE (claim_number),
+	CONSTRAINT insurance_claims_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT insurance_claims_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_claim_legacy ON public.insurance_claims USING btree (legacy_id);
+CREATE INDEX idx_claim_patient_status ON public.insurance_claims USING btree (patient_id, status);
+
+
+-- public.insurance_subscribers definition
+
+-- Drop table
+
+-- DROP TABLE public.insurance_subscribers;
+
+CREATE TABLE public.insurance_subscribers (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	ins_plan_id int4 NOT NULL,
+	subscriber_patient_id int4 NULL,
+	office_id int4 NULL,
+	sub_first_name varchar(100) NULL,
+	sub_last_name varchar(100) NULL,
+	sub_mi varchar(10) NULL,
+	sub_address varchar(255) NULL,
+	sub_city varchar(100) NULL,
+	sub_state varchar(50) NULL,
+	sub_zip varchar(20) NULL,
+	sub_dob date NULL,
+	sub_gender varchar(10) NULL,
+	sub_ssn varchar(20) NULL,
+	sub_member_id varchar(100) NULL,
+	group_number varchar(100) NULL,
+	effective_date date NULL,
+	term_date date NULL,
+	family_max_remaining numeric(10, 2) NULL,
+	family_ded_remaining numeric(10, 2) NULL,
+	ortho_remaining numeric(10, 2) NULL,
+	anniversary_date date NULL,
+	elig_status varchar(20) NULL,
+	elig_verified_on timestamp NULL,
+	elig_verified_by varchar(100) NULL,
+	elig_notes text NULL,
+	notes text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT insurance_subscribers_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT insurance_subscribers_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_ins_sub_legacy ON public.insurance_subscribers USING btree (legacy_id);
+CREATE INDEX idx_ins_sub_plan ON public.insurance_subscribers USING btree (ins_plan_id);
+
+
+-- public.ledger_insurance_details definition
+
+-- Drop table
+
+-- DROP TABLE public.ledger_insurance_details;
+
+CREATE TABLE public.ledger_insurance_details (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	procedure_id varchar(50) NULL,
+	legacy_ledger_id varchar(20) NULL,
+	claim_id varchar(50) NULL,
+	office_id int4 NULL,
+	prim_estimated numeric(12, 2) NULL,
+	prim_ind_max numeric(12, 2) NULL,
+	prim_deductible numeric(12, 2) NULL,
+	prim_ins_paid numeric(12, 2) NULL,
+	prim_ins_adjust numeric(12, 2) NULL,
+	sec_estimated numeric(12, 2) NULL,
+	sec_ins_paid numeric(12, 2) NULL,
+	sec_ins_adjust numeric(12, 2) NULL,
+	ter_ins_paid numeric(12, 2) NULL,
+	prim_ins_plan_id int4 NULL,
+	sec_ins_plan_id int4 NULL,
+	ter_ins_plan_id int4 NULL,
+	prim_posted bool DEFAULT false NOT NULL,
+	sec_posted bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT ledger_insurance_details_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_ledger_ins_legacy ON public.ledger_insurance_details USING btree (legacy_ledger_id);
+CREATE INDEX idx_ledger_ins_proc ON public.ledger_insurance_details USING btree (procedure_id);
+
+
+-- public.medical_history_details definition
+
+-- Drop table
+
+-- DROP TABLE public.medical_history_details;
+
+CREATE TABLE public.medical_history_details (
+	id serial4 NOT NULL,
+	history_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	question_code varchar(50) NOT NULL,
+	question_text text NULL,
+	answer_code varchar(20) NULL,
+	answer_text text NULL,
+	notes text NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT medical_history_details_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_med_hist_detail_header ON public.medical_history_details USING btree (history_id);
+
+
+-- public.medical_history_records definition
+
+-- Drop table
+
+-- DROP TABLE public.medical_history_records;
+
+CREATE TABLE public.medical_history_records (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	signature_id int4 NULL,
+	is_archived bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT medical_history_records_pkey PRIMARY KEY (id)
+);
+
+
+-- public.office_advanced_settings definition
+
+-- Drop table
+
+-- DROP TABLE public.office_advanced_settings;
+
+CREATE TABLE public.office_advanced_settings (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	finance_charge_pct numeric(5, 2) NULL,
+	min_balance numeric(12, 2) NULL,
+	min_charge numeric(12, 2) NULL,
+	days_before_charge int4 NULL,
+	sales_tax_pct numeric(5, 2) NULL,
+	default_appt_duration int4 NULL,
+	scheduler_end_date date NULL,
+	place_of_service varchar(50) NULL,
+	area_code varchar(10) NULL,
+	default_city varchar(100) NULL,
+	default_state varchar(50) NULL,
+	default_zip varchar(20) NULL,
+	preferred_provider_id varchar(50) NULL,
+	is_ortho bool NOT NULL,
+	hipaa_notice text NULL,
+	consent_forms text NULL,
+	send_ecard bool NOT NULL,
+	effective_date date NULL,
+	updated_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_office_advanced_settings PRIMARY KEY (id),
+	CONSTRAINT uq_office_advanced_settings_office UNIQUE (office_id)
+);
+CREATE INDEX ix_office_advanced_settings_office_id ON public.office_advanced_settings USING btree (office_id);
+CREATE INDEX ix_office_advanced_settings_tenant_id ON public.office_advanced_settings USING btree (tenant_id);
+
+
+-- public.office_code_bundles definition
+
+-- Drop table
+
+-- DROP TABLE public.office_code_bundles;
+
+CREATE TABLE public.office_code_bundles (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	bundle_id int4 NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_office_code_bundles PRIMARY KEY (id),
+	CONSTRAINT uq_office_code_bundle UNIQUE (office_id, bundle_id)
+);
+CREATE INDEX ix_office_code_bundles_office_id ON public.office_code_bundles USING btree (office_id);
+CREATE INDEX ix_office_code_bundles_tenant_id ON public.office_code_bundles USING btree (tenant_id);
+
+
+-- public.office_integrations definition
+
+-- Drop table
+
+-- DROP TABLE public.office_integrations;
+
+CREATE TABLE public.office_integrations (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	service_email varchar(255) NULL,
+	service_email_verified bool NOT NULL,
+	ai_assist_enabled bool NOT NULL,
+	patient_comm_url varchar(500) NULL,
+	patient_portal_url varchar(500) NULL,
+	dentiray_storage_format varchar(50) NULL,
+	transfirst_device varchar(100) NULL,
+	dosespot_clinic_id varchar(100) NULL,
+	dosespot_key_enc text NULL,
+	accepted_cards varchar(255) NULL,
+	updated_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_office_integrations PRIMARY KEY (id),
+	CONSTRAINT uq_office_integrations_office UNIQUE (office_id)
+);
+CREATE INDEX ix_office_integrations_office_id ON public.office_integrations USING btree (office_id);
+CREATE INDEX ix_office_integrations_tenant_id ON public.office_integrations USING btree (tenant_id);
+
+
+-- public.office_letter_templates definition
+
+-- Drop table
+
+-- DROP TABLE public.office_letter_templates;
+
+CREATE TABLE public.office_letter_templates (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	letter_template_id int4 NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_office_letter_templates PRIMARY KEY (id),
+	CONSTRAINT uq_office_letter_template UNIQUE (office_id, letter_template_id)
+);
+CREATE INDEX ix_office_letter_templates_office_id ON public.office_letter_templates USING btree (office_id);
+CREATE INDEX ix_office_letter_templates_tenant_id ON public.office_letter_templates USING btree (tenant_id);
+
+
+-- public.office_note_macros definition
+
+-- Drop table
+
+-- DROP TABLE public.office_note_macros;
+
+CREATE TABLE public.office_note_macros (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	note_macro_id int4 NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_office_note_macros PRIMARY KEY (id),
+	CONSTRAINT uq_office_note_macro UNIQUE (office_id, note_macro_id)
+);
+CREATE INDEX ix_office_note_macros_office_id ON public.office_note_macros USING btree (office_id);
+CREATE INDEX ix_office_note_macros_tenant_id ON public.office_note_macros USING btree (tenant_id);
+
+
+-- public.office_phone_assignments definition
+
+-- Drop table
+
+-- DROP TABLE public.office_phone_assignments;
+
+CREATE TABLE public.office_phone_assignments (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	assignment_type varchar(30) NOT NULL,
+	phone_number varchar(20) NULL,
+	is_model_office bool NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_office_phone_assignments PRIMARY KEY (id)
+);
+CREATE INDEX ix_office_phone_assignments_office_id ON public.office_phone_assignments USING btree (office_id);
+CREATE INDEX ix_office_phone_assignments_tenant_id ON public.office_phone_assignments USING btree (tenant_id);
+
+
+-- public.office_prescription_library definition
+
+-- Drop table
+
+-- DROP TABLE public.office_prescription_library;
+
+CREATE TABLE public.office_prescription_library (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	prescription_library_id int4 NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_office_prescription_library PRIMARY KEY (id),
+	CONSTRAINT uq_office_rx UNIQUE (office_id, prescription_library_id)
+);
+CREATE INDEX ix_office_prescription_library_office_id ON public.office_prescription_library USING btree (office_id);
+CREATE INDEX ix_office_prescription_library_tenant_id ON public.office_prescription_library USING btree (tenant_id);
+
+
+-- public.office_procedure_codes definition
+
+-- Drop table
+
+-- DROP TABLE public.office_procedure_codes;
+
+CREATE TABLE public.office_procedure_codes (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	procedure_code varchar(20) NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_office_procedure_codes PRIMARY KEY (id),
+	CONSTRAINT uq_office_procedure_code UNIQUE (office_id, procedure_code)
+);
+CREATE INDEX ix_office_procedure_codes_office_id ON public.office_procedure_codes USING btree (office_id);
+CREATE INDEX ix_office_procedure_codes_tenant_id ON public.office_procedure_codes USING btree (tenant_id);
+
+
+-- public.office_production_types definition
+
+-- Drop table
+
+-- DROP TABLE public.office_production_types;
+
+CREATE TABLE public.office_production_types (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	production_type_id int4 NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_office_production_types PRIMARY KEY (id),
+	CONSTRAINT uq_office_production_type UNIQUE (office_id, production_type_id)
+);
+CREATE INDEX ix_office_production_types_office_id ON public.office_production_types USING btree (office_id);
+CREATE INDEX ix_office_production_types_tenant_id ON public.office_production_types USING btree (tenant_id);
+
+
+-- public.office_schedule_days definition
+
+-- Drop table
+
+-- DROP TABLE public.office_schedule_days;
+
+CREATE TABLE public.office_schedule_days (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	day_of_week int4 NOT NULL,
+	is_closed bool NOT NULL,
+	start_time time NULL,
+	end_time time NULL,
+	lunch_start time NULL,
+	lunch_end time NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_office_schedule_days PRIMARY KEY (id),
+	CONSTRAINT uq_office_schedule_day UNIQUE (office_id, day_of_week)
+);
+CREATE INDEX ix_office_schedule_days_office_id ON public.office_schedule_days USING btree (office_id);
+CREATE INDEX ix_office_schedule_days_tenant_id ON public.office_schedule_days USING btree (tenant_id);
+
+
+-- public.office_smart_assist definition
+
+-- Drop table
+
+-- DROP TABLE public.office_smart_assist;
+
+CREATE TABLE public.office_smart_assist (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	enabled bool NOT NULL,
+	updated_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_office_smart_assist PRIMARY KEY (id),
+	CONSTRAINT uq_office_smart_assist_office UNIQUE (office_id)
+);
+CREATE INDEX ix_office_smart_assist_office_id ON public.office_smart_assist USING btree (office_id);
+CREATE INDEX ix_office_smart_assist_tenant_id ON public.office_smart_assist USING btree (tenant_id);
+
+
+-- public.office_smart_assist_items definition
+
+-- Drop table
+
+-- DROP TABLE public.office_smart_assist_items;
+
+CREATE TABLE public.office_smart_assist_items (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	item_code varchar(50) NOT NULL,
+	description varchar(500) NULL,
+	frequency varchar(30) NULL,
+	sms_template_id varchar(50) NULL,
+	include_unpaid_balance bool NOT NULL,
+	is_enabled bool NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_office_smart_assist_items PRIMARY KEY (id)
+);
+CREATE INDEX ix_office_smart_assist_items_office_id ON public.office_smart_assist_items USING btree (office_id);
+CREATE INDEX ix_office_smart_assist_items_tenant_id ON public.office_smart_assist_items USING btree (tenant_id);
+
+
+-- public.office_statement_settings definition
+
+-- Drop table
+
+-- DROP TABLE public.office_statement_settings;
+
+CREATE TABLE public.office_statement_settings (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	message_general varchar(100) NULL,
+	message_current varchar(100) NULL,
+	message_30 varchar(100) NULL,
+	message_60 varchar(100) NULL,
+	message_90 varchar(100) NULL,
+	message_120 varchar(100) NULL,
+	correspondence_name varchar(255) NULL,
+	logo_option varchar(20) NOT NULL,
+	logo_url varchar(500) NULL,
+	address_source varchar(20) NOT NULL,
+	statement_address_1 varchar(255) NULL,
+	statement_address_2 varchar(255) NULL,
+	statement_city varchar(100) NULL,
+	statement_state varchar(50) NULL,
+	statement_zip varchar(20) NULL,
+	statement_phone varchar(20) NULL,
+	updated_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_office_statement_settings PRIMARY KEY (id),
+	CONSTRAINT uq_office_statement_settings_office UNIQUE (office_id)
+);
+CREATE INDEX ix_office_statement_settings_office_id ON public.office_statement_settings USING btree (office_id);
+CREATE INDEX ix_office_statement_settings_tenant_id ON public.office_statement_settings USING btree (tenant_id);
+
+
+-- public.offices definition
+
+-- Drop table
+
+-- DROP TABLE public.offices;
+
+CREATE TABLE public.offices (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	office_code varchar(20) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	short_id varchar(20) NULL,
+	address_line1 varchar(255) NULL,
+	address_line2 varchar(255) NULL,
+	city varchar(100) NULL,
+	state varchar(50) NULL,
+	zip varchar(20) NULL,
+	phone varchar(20) NULL,
+	fax varchar(20) NULL,
+	email varchar(255) NULL,
+	timezone varchar(50) DEFAULT 'America/New_York'::character varying NOT NULL,
+	slot_interval_minutes int4 DEFAULT 10 NOT NULL,
+	schedule_start_hour int4 DEFAULT 8 NOT NULL,
+	schedule_end_hour int4 DEFAULT 17 NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	created_by int4 NULL,
+	phone_2 varchar(20) NULL,
+	phone_ext varchar(10) NULL,
+	tax_id varchar(50) NULL,
+	billing_provider_id varchar(50) NULL,
+	use_billing_license bool DEFAULT false NULL,
+	office_group_id int4 NULL,
+	opening_date date NULL,
+	default_fee_schedule_id int4 NULL,
+	default_ucr_fee_schedule_id int4 NULL,
+	CONSTRAINT offices_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT offices_office_code_key UNIQUE (office_code),
+	CONSTRAINT offices_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_offices_tenant ON public.offices USING btree (tenant_id);
+
+
+-- public.operatories definition
+
+-- Drop table
+
+-- DROP TABLE public.operatories;
+
+CREATE TABLE public.operatories (
+	id varchar(50) NOT NULL,
+	office_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(100) NOT NULL,
+	display_order int4 DEFAULT 0 NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	provider_id varchar(50) NULL,
+	CONSTRAINT operatories_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_operatories_legacy ON public.operatories USING btree (legacy_id);
+CREATE INDEX idx_operatories_office ON public.operatories USING btree (office_id);
+
+
+-- public.ortho_plans definition
+
+-- Drop table
+
+-- DROP TABLE public.ortho_plans;
+
+CREATE TABLE public.ortho_plans (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	procedure_code varchar(20) NULL,
+	description varchar(255) NULL,
+	total_ortho_amt numeric(12, 2) NULL,
+	ins_share_amt numeric(12, 2) NULL,
+	pat_share_amt numeric(12, 2) NULL,
+	treat_start_date date NULL,
+	treat_end_date date NULL,
+	banding_date date NULL,
+	ins_plan_id int4 NULL,
+	ins_setup_date date NULL,
+	ins_plan_amount numeric(12, 2) NULL,
+	ins_down_pay numeric(12, 2) NULL,
+	ins_interval varchar(20) NULL,
+	ins_num_payments int4 NULL,
+	ins_periodic_amt numeric(12, 2) NULL,
+	ins_rem_payments int4 NULL,
+	ins_rem_amt numeric(12, 2) NULL,
+	ins_first_due_date date NULL,
+	ins_months_remaining int4 NULL,
+	ins_notes text NULL,
+	pat_amt_financed numeric(12, 2) NULL,
+	pat_down_pay numeric(12, 2) NULL,
+	pat_apr numeric(6, 4) NULL,
+	pat_fin_charge numeric(12, 2) NULL,
+	pat_interval varchar(20) NULL,
+	pat_num_payments int4 NULL,
+	pat_periodic_amt numeric(12, 2) NULL,
+	pat_rem_payments int4 NULL,
+	pat_rem_amt numeric(12, 2) NULL,
+	pat_first_due_date date NULL,
+	sec_ins_plan_id int4 NULL,
+	sec_ins_plan_amount numeric(12, 2) NULL,
+	sec_ins_periodic_amt numeric(12, 2) NULL,
+	sec_ins_notes text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT ortho_plans_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_ortho_plans_patient ON public.ortho_plans USING btree (patient_id);
+
+
+-- public.patient_adjustments definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_adjustments;
+
+CREATE TABLE public.patient_adjustments (
+	tenant_id int4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	provider_id varchar(50) NULL,
+	procedure_id varchar(50) NULL,
+	adjustment_date date NOT NULL,
+	amount numeric(12, 2) NOT NULL,
+	adjustment_type varchar(50) NULL,
+	notes text NULL,
+	is_void bool NOT NULL,
+	created_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_patient_adjustments PRIMARY KEY (id)
+);
+CREATE INDEX ix_patient_adjustments_patient_id ON public.patient_adjustments USING btree (patient_id);
+CREATE INDEX ix_patient_adjustments_tenant_id ON public.patient_adjustments USING btree (tenant_id);
+
+
+-- public.patient_alerts definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_alerts;
+
+CREATE TABLE public.patient_alerts (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	alert text NOT NULL,
+	blocks_charges bool DEFAULT false NOT NULL,
+	is_active bool DEFAULT true NOT NULL,
+	deactivated_on timestamp NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT patient_alerts_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_alerts_patient ON public.patient_alerts USING btree (patient_id);
+
+
+-- public.patient_documents definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_documents;
+
+CREATE TABLE public.patient_documents (
+	tenant_id int4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	document_type varchar(50) NULL,
+	file_name varchar(500) NOT NULL,
+	content_type varchar(100) NULL,
+	file_size int8 NULL,
+	file_path varchar(500) NOT NULL,
+	file_url varchar(500) NOT NULL,
+	description varchar(500) NULL,
+	is_deleted bool NOT NULL,
+	created_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_patient_documents PRIMARY KEY (id)
+);
+CREATE INDEX ix_patient_documents_patient_id ON public.patient_documents USING btree (patient_id);
+CREATE INDEX ix_patient_documents_tenant_id ON public.patient_documents USING btree (tenant_id);
+
+
+-- public.patient_emergency_contacts definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_emergency_contacts;
+
+CREATE TABLE public.patient_emergency_contacts (
+	tenant_id int4 NOT NULL,
+	patient_id int4 NOT NULL,
+	"name" varchar(255) NOT NULL,
+	relationship varchar(50) NULL,
+	phone varchar(20) NULL,
+	email varchar(255) NULL,
+	is_active bool NOT NULL,
+	created_by int4 NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT pk_patient_emergency_contacts PRIMARY KEY (id)
+);
+CREATE INDEX ix_patient_emergency_contacts_patient_id ON public.patient_emergency_contacts USING btree (patient_id);
+CREATE INDEX ix_patient_emergency_contacts_tenant_id ON public.patient_emergency_contacts USING btree (tenant_id);
+
+
+-- public.patient_ins_payment_plans definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_ins_payment_plans;
+
+CREATE TABLE public.patient_ins_payment_plans (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	patient_id int4 NOT NULL,
+	legacy_plan_id varchar(20) NULL,
+	periodic_order int4 NULL,
+	periodic_date date NULL,
+	periodic_amt numeric(12, 2) NULL,
+	is_billed bool DEFAULT false NOT NULL,
+	billing_code varchar(50) NULL,
+	ledger_id varchar(20) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT patient_ins_payment_plans_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_pat_ins_payplan_patient ON public.patient_ins_payment_plans USING btree (patient_id);
+
+
+-- public.patient_insurance definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_insurance;
+
+CREATE TABLE public.patient_insurance (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	ins_plan_id int4 NULL,
+	subscriber_id int4 NULL,
+	legacy_plan_type varchar(5) NULL,
+	insurance_type varchar(20) NOT NULL,
+	relationship varchar(50) NULL,
+	deductible_remaining numeric(10, 2) NULL,
+	max_remaining numeric(10, 2) NULL,
+	ortho_remaining numeric(10, 2) NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT patient_insurance_patient_id_insurance_type_key UNIQUE (patient_id, insurance_type),
+	CONSTRAINT patient_insurance_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_pat_ins_patient ON public.patient_insurance USING btree (patient_id);
+
+
+-- public.patient_notes definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_notes;
+
+CREATE TABLE public.patient_notes (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	note_date date NULL,
+	note_type varchar(20) NULL,
+	notes text NOT NULL,
+	notes_html text NULL,
+	is_archived bool DEFAULT false NOT NULL,
+	is_deleted bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	updated_at timestamp NULL,
+	updated_by int4 NULL,
+	CONSTRAINT patient_notes_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_pat_notes_patient ON public.patient_notes USING btree (patient_id, note_date);
+
+
+-- public.patient_payment_plans definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_payment_plans;
+
+CREATE TABLE public.patient_payment_plans (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	plan_bal_amt numeric(12, 2) NULL,
+	tx_plan_number varchar(50) NULL,
+	setup_date date NULL,
+	amt_financed numeric(12, 2) NULL,
+	down_payment numeric(12, 2) NULL,
+	apr numeric(6, 4) NULL,
+	fin_charge numeric(12, 2) NULL,
+	interval_type varchar(20) NULL,
+	num_payments int4 NULL,
+	periodic_amt numeric(12, 2) NULL,
+	first_due_date date NULL,
+	rem_payments int4 NULL,
+	rem_total_amt numeric(12, 2) NULL,
+	notes text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT patient_payment_plans_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_pat_payplan_patient ON public.patient_payment_plans USING btree (patient_id);
+
+
+-- public.patient_payments definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_payments;
+
+CREATE TABLE public.patient_payments (
+	id varchar(50) NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	is_archived bool DEFAULT false NOT NULL,
+	payment_date date NOT NULL,
+	amount numeric(12, 2) NOT NULL,
+	payment_type varchar(20) NOT NULL,
+	payment_method varchar(50) NULL,
+	check_number varchar(100) NULL,
+	provider_id varchar(50) NULL,
+	notes text NULL,
+	is_void bool DEFAULT false NOT NULL,
+	created_by int4 NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT patient_payments_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_payment_legacy ON public.patient_payments USING btree (legacy_id);
+CREATE INDEX idx_payment_patient_date ON public.patient_payments USING btree (patient_id, payment_date);
+
+
+-- public.patient_procedures definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_procedures;
+
+CREATE TABLE public.patient_procedures (
+	id varchar(50) NOT NULL,
+	patient_id int4 NOT NULL,
+	appointment_id varchar(50) NULL,
+	procedure_code varchar(20) NOT NULL,
+	legacy_id varchar(20) NULL,
+	is_archived bool DEFAULT false NOT NULL,
+	date_of_service date NOT NULL,
+	provider_id varchar(50) NOT NULL,
+	office_id int4 NOT NULL,
+	tooth varchar(10) NULL,
+	surface varchar(20) NULL,
+	quadrant varchar(10) NULL,
+	fee numeric(12, 2) NOT NULL,
+	ucr_fee numeric(12, 2) NULL,
+	insurance_estimate numeric(12, 2) DEFAULT 0 NOT NULL,
+	patient_estimate numeric(12, 2) DEFAULT 0 NOT NULL,
+	apply_to varchar(5) NULL,
+	billing_order varchar(10) NULL,
+	resp_type varchar(10) NULL,
+	billing_status varchar(30) DEFAULT 'not_billed'::character varying NOT NULL,
+	claim_id varchar(50) NULL,
+	hold_claim bool DEFAULT false NOT NULL,
+	is_void bool DEFAULT false NOT NULL,
+	material_id int4 NULL,
+	notes text NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT patient_procedures_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_proc_claim ON public.patient_procedures USING btree (claim_id);
+CREATE INDEX idx_proc_legacy ON public.patient_procedures USING btree (legacy_id);
+CREATE INDEX idx_proc_patient_dos ON public.patient_procedures USING btree (patient_id, date_of_service);
+CREATE INDEX idx_proc_void ON public.patient_procedures USING btree (is_void);
+
+
+-- public.patient_recalls definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_recalls;
+
+CREATE TABLE public.patient_recalls (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	recall_type varchar(50) NULL,
+	procedure_code varchar(20) NULL,
+	due_date date NULL,
+	interval_months int4 NULL,
+	last_completed date NULL,
+	status varchar(20) DEFAULT 'due'::character varying NOT NULL,
+	notes text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	updated_at timestamp NULL,
+	CONSTRAINT patient_recalls_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_pat_recall_due ON public.patient_recalls USING btree (due_date, status);
+CREATE INDEX idx_pat_recall_patient ON public.patient_recalls USING btree (patient_id);
+
+
+-- public.patient_reg_plans definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_reg_plans;
+
+CREATE TABLE public.patient_reg_plans (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	setup_date date NULL,
+	amt_financed numeric(12, 2) NULL,
+	down_payment numeric(12, 2) NULL,
+	apr numeric(6, 4) NULL,
+	fin_charge numeric(12, 2) NULL,
+	interval_type varchar(20) NULL,
+	num_payments int4 NULL,
+	periodic_amt numeric(12, 2) NULL,
+	first_due_date date NULL,
+	rem_payments int4 NULL,
+	rem_total_amt numeric(12, 2) NULL,
+	notes text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT patient_reg_plans_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_pat_regplan_patient ON public.patient_reg_plans USING btree (patient_id);
+
+
+-- public.patient_sec_ins_payment_plans definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_sec_ins_payment_plans;
+
+CREATE TABLE public.patient_sec_ins_payment_plans (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	patient_id int4 NOT NULL,
+	legacy_plan_id varchar(20) NULL,
+	periodic_order int4 NULL,
+	periodic_date date NULL,
+	periodic_amt numeric(12, 2) NULL,
+	is_billed bool DEFAULT false NOT NULL,
+	billing_code varchar(50) NULL,
+	ledger_id varchar(20) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT patient_sec_ins_payment_plans_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_pat_sec_ins_payplan_patient ON public.patient_sec_ins_payment_plans USING btree (patient_id);
+
+
+-- public.patient_signatures definition
+
+-- Drop table
+
+-- DROP TABLE public.patient_signatures;
+
+CREATE TABLE public.patient_signatures (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	signature_data text NULL,
+	signature_len int4 NULL,
+	device_source varchar(20) NULL,
+	is_user_sig bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT patient_signatures_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_sigs_patient ON public.patient_signatures USING btree (patient_id);
+
+
+-- public.patients definition
+
+-- Drop table
+
+-- DROP TABLE public.patients;
+
+CREATE TABLE public.patients (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	home_office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	chart_no varchar(50) NULL,
+	first_name varchar(100) NULL,
+	last_name varchar(100) NULL,
+	preferred_name varchar(100) NULL,
+	title varchar(20) NULL,
+	middle_initial varchar(10) NULL,
+	dob date NULL,
+	gender varchar(20) NULL,
+	ssn varchar(20) NULL,
+	marital_status varchar(20) NULL,
+	phone varchar(20) NULL,
+	cell_phone varchar(20) NULL,
+	work_phone varchar(20) NULL,
+	email varchar(255) NULL,
+	preferred_contact varchar(50) NULL,
+	address_line1 varchar(255) NULL,
+	address_line2 varchar(255) NULL,
+	city varchar(100) NULL,
+	state varchar(50) NULL,
+	zip varchar(20) NULL,
+	preferred_provider_id varchar(50) NULL,
+	preferred_language varchar(50) DEFAULT 'English'::character varying NOT NULL,
+	first_visit date NULL,
+	last_visit date NULL,
+	next_recall date NULL,
+	is_finance_charge bool DEFAULT false NOT NULL,
+	send_statements bool DEFAULT true NOT NULL,
+	send_collections bool DEFAULT false NOT NULL,
+	no_auto_email bool DEFAULT false NOT NULL,
+	no_auto_sms bool DEFAULT false NOT NULL,
+	is_locked bool DEFAULT false NOT NULL,
+	hipaa_agreement bool DEFAULT false NOT NULL,
+	guardian_name varchar(255) NULL,
+	guardian_phone varchar(20) NULL,
+	referral_type varchar(50) NULL,
+	referred_by varchar(255) NULL,
+	patient_notes text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	created_by int4 NULL,
+	responsible_party_id varchar(50) NULL,
+	patient_type varchar(50) NULL,
+	medicaid_id varchar(50) NULL,
+	CONSTRAINT patients_chart_no_key UNIQUE (chart_no),
+	CONSTRAINT patients_legacy_id_key UNIQUE (legacy_id),
+	CONSTRAINT patients_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_patients_legacy ON public.patients USING btree (legacy_id);
+CREATE INDEX idx_patients_name ON public.patients USING btree (last_name, first_name);
+CREATE INDEX idx_patients_office ON public.patients USING btree (home_office_id);
+CREATE INDEX idx_patients_tenant ON public.patients USING btree (tenant_id);
+
+
+-- public.payment_allocations definition
+
+-- Drop table
+
+-- DROP TABLE public.payment_allocations;
+
+CREATE TABLE public.payment_allocations (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	procedure_id varchar(50) NULL,
+	payment_id varchar(50) NULL,
+	claim_id varchar(50) NULL,
+	ins_plan_id int4 NULL,
+	provider_id varchar(50) NULL,
+	alloc_date date NULL,
+	amount numeric(12, 2) NOT NULL,
+	alloc_type varchar(5) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT payment_allocations_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_alloc_patient ON public.payment_allocations USING btree (patient_id);
+CREATE INDEX idx_alloc_payment ON public.payment_allocations USING btree (payment_id);
+CREATE INDEX idx_alloc_proc ON public.payment_allocations USING btree (procedure_id);
+
+
+-- public.perio_chart_activity definition
+
+-- Drop table
+
+-- DROP TABLE public.perio_chart_activity;
+
+CREATE TABLE public.perio_chart_activity (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	activity_date date NULL,
+	perio_type varchar(50) NULL,
+	orientation varchar(10) NULL,
+	arch varchar(10) NULL,
+	quadrant varchar(10) NULL,
+	tooth_no varchar(10) NULL,
+	block_no varchar(20) NULL,
+	add_info text NULL,
+	mxy varchar(50) NULL,
+	perio_value varchar(100) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT perio_chart_activity_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_perio_activity_patient ON public.perio_chart_activity USING btree (patient_id, activity_date);
+
+
+-- public.perio_exam_details definition
+
+-- Drop table
+
+-- DROP TABLE public.perio_exam_details;
+
+CREATE TABLE public.perio_exam_details (
+	id serial4 NOT NULL,
+	exam_id int4 NOT NULL,
+	tooth_no varchar(10) NOT NULL,
+	pd1 int4 NULL,
+	pd2 int4 NULL,
+	pd3 int4 NULL,
+	pd4 int4 NULL,
+	pd5 int4 NULL,
+	pd6 int4 NULL,
+	fgm1 int4 NULL,
+	fgm2 int4 NULL,
+	fgm3 int4 NULL,
+	fgm4 int4 NULL,
+	fgm5 int4 NULL,
+	fgm6 int4 NULL,
+	mgj1 int4 NULL,
+	mgj2 int4 NULL,
+	mgj3 int4 NULL,
+	mgj4 int4 NULL,
+	mgj5 int4 NULL,
+	mgj6 int4 NULL,
+	bleed1 bool NULL,
+	bleed2 bool NULL,
+	bleed3 bool NULL,
+	bleed4 bool NULL,
+	bleed5 bool NULL,
+	bleed6 bool NULL,
+	supp1 bool NULL,
+	supp2 bool NULL,
+	supp3 bool NULL,
+	supp4 bool NULL,
+	supp5 bool NULL,
+	supp6 bool NULL,
+	furc1 int4 NULL,
+	furc2 int4 NULL,
+	furc3 int4 NULL,
+	furc4 int4 NULL,
+	furc5 int4 NULL,
+	furc6 int4 NULL,
+	mobility_buccal int4 NULL,
+	mobility_lingual int4 NULL,
+	CONSTRAINT perio_exam_details_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_perio_detail_exam ON public.perio_exam_details USING btree (exam_id);
+
+
+-- public.perio_exams definition
+
+-- Drop table
+
+-- DROP TABLE public.perio_exams;
+
+CREATE TABLE public.perio_exams (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	exam_date date NOT NULL,
+	notes text NULL,
+	is_voided bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT perio_exams_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_perio_patient_date ON public.perio_exams USING btree (patient_id, exam_date);
+
+
+-- public.postcard_templates definition
+
+-- Drop table
+
+-- DROP TABLE public.postcard_templates;
+
+CREATE TABLE public.postcard_templates (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	card_type varchar(10) NULL,
+	body text NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT postcard_templates_pkey PRIMARY KEY (id)
+);
+
+
+-- public.prescriptions definition
+
+-- Drop table
+
+-- DROP TABLE public.prescriptions;
+
+CREATE TABLE public.prescriptions (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	library_rx_id int4 NULL,
+	rx_date date NULL,
+	drug_name varchar(255) NOT NULL,
+	dispense varchar(255) NULL,
+	sig varchar(500) NULL,
+	refills int4 DEFAULT 0 NOT NULL,
+	is_as_written bool DEFAULT false NOT NULL,
+	provider_id varchar(50) NULL,
+	notes text NULL,
+	is_active bool DEFAULT true NOT NULL,
+	dosespot_rx_id varchar(50) NULL,
+	dosespot_status varchar(50) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT prescriptions_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_rx_patient_date ON public.prescriptions USING btree (patient_id, rx_date);
+
+
+-- public.progress_notes definition
+
+-- Drop table
+
+-- DROP TABLE public.progress_notes;
+
+CREATE TABLE public.progress_notes (
+	id serial4 NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	note_date date NULL,
+	notes text NULL,
+	notes_html text NULL,
+	tooth varchar(255) NULL,
+	is_deleted bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	surface varchar(50) NULL,
+	region varchar(50) NULL,
+	signed_by int4 NULL,
+	signed_at timestamp NULL,
+	is_struck_off bool DEFAULT false NOT NULL,
+	CONSTRAINT progress_notes_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_pnote_patient_date ON public.progress_notes USING btree (patient_id, note_date);
+
+
+-- public.provider_insurance_ids definition
+
+-- Drop table
+
+-- DROP TABLE public.provider_insurance_ids;
+
+CREATE TABLE public.provider_insurance_ids (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	provider_id varchar(50) NOT NULL,
+	carrier_id int4 NOT NULL,
+	ins_id varchar(100) NULL,
+	in_network bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT provider_insurance_ids_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_prov_ins_id_carrier ON public.provider_insurance_ids USING btree (carrier_id);
+CREATE INDEX idx_prov_ins_id_prov ON public.provider_insurance_ids USING btree (provider_id);
+
+
+-- public.provider_offices definition
+
+-- Drop table
+
+-- DROP TABLE public.provider_offices;
+
+CREATE TABLE public.provider_offices (
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	provider_id varchar(50) NOT NULL,
+	id serial4 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT pk_provider_offices PRIMARY KEY (id),
+	CONSTRAINT uq_provider_office UNIQUE (office_id, provider_id)
+);
+CREATE INDEX ix_provider_offices_office_id ON public.provider_offices USING btree (office_id);
+CREATE INDEX ix_provider_offices_tenant_id ON public.provider_offices USING btree (tenant_id);
+
+
+-- public.provider_route_slips definition
+
+-- Drop table
+
+-- DROP TABLE public.provider_route_slips;
+
+CREATE TABLE public.provider_route_slips (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	provider_id varchar(50) NOT NULL,
+	legacy_id varchar(20) NULL,
+	procedure_code varchar(20) NULL,
+	num_times int4 DEFAULT 1 NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT provider_route_slips_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_route_slip_provider ON public.provider_route_slips USING btree (provider_id);
+
+
+-- public.providers definition
+
+-- Drop table
+
+-- DROP TABLE public.providers;
+
+CREATE TABLE public.providers (
+	id varchar(50) NOT NULL,
+	tenant_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(255) NOT NULL,
+	title varchar(20) NULL,
+	short_id varchar(20) NULL,
+	"role" varchar(50) DEFAULT 'dentist'::character varying NOT NULL,
+	npi varchar(50) NULL,
+	license varchar(100) NULL,
+	tax_id varchar(50) NULL,
+	dea_id varchar(50) NULL,
+	specialty varchar(100) NULL,
+	is_active bool DEFAULT true NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	first_name varchar(100) NULL,
+	last_name varchar(100) NULL,
+	created_by int4 NULL,
+	CONSTRAINT providers_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_providers_legacy ON public.providers USING btree (legacy_id);
+CREATE INDEX idx_providers_office ON public.providers USING btree (office_id);
+
+
+-- public.referral_demog_details definition
+
+-- Drop table
+
+-- DROP TABLE public.referral_demog_details;
+
+CREATE TABLE public.referral_demog_details (
+	id serial4 NOT NULL,
+	referral_id int4 NULL,
+	tenant_id int4 NOT NULL,
+	demog_header_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	"data" text NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by varchar(100) NULL,
+	CONSTRAINT referral_demog_details_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_ref_demog_detail_ref ON public.referral_demog_details USING btree (referral_id);
+
+
+-- public.referrals definition
+
+-- Drop table
+
+-- DROP TABLE public.referrals;
+
+CREATE TABLE public.referrals (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	referral_type varchar(10) NULL,
+	patient_id int4 NULL,
+	first_name varchar(100) NULL,
+	last_name varchar(100) NULL,
+	address varchar(255) NULL,
+	city varchar(100) NULL,
+	state varchar(50) NULL,
+	zip varchar(20) NULL,
+	phone varchar(20) NULL,
+	email varchar(255) NULL,
+	npi varchar(50) NULL,
+	specialty varchar(100) NULL,
+	reason_code varchar(20) NULL,
+	notes text NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT referrals_pkey PRIMARY KEY (id)
+);
+
+
+-- public.sms_messages definition
+
+-- Drop table
+
+-- DROP TABLE public.sms_messages;
+
+CREATE TABLE public.sms_messages (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	office_id int4 NULL,
+	patient_id int4 NULL,
+	appointment_id varchar(50) NULL,
+	legacy_id varchar(20) NULL,
+	sent_text text NULL,
+	sent_phone varchar(20) NULL,
+	send_status varchar(50) NULL,
+	delivered_on timestamp NULL,
+	reply_text text NULL,
+	reply_phone varchar(20) NULL,
+	reply_received_on timestamp NULL,
+	message_type varchar(50) NULL,
+	is_read bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	created_by int4 NULL,
+	CONSTRAINT sms_messages_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_sms_patient ON public.sms_messages USING btree (patient_id, created_at);
+
+
+-- public.time_clock_entries definition
+
+-- Drop table
+
+-- DROP TABLE public.time_clock_entries;
+
+CREATE TABLE public.time_clock_entries (
+	id serial4 NOT NULL,
+	tenant_id int4 NOT NULL,
+	office_id int4 NULL,
+	user_id int4 NOT NULL,
+	legacy_id varchar(20) NULL,
+	clock_in timestamp NOT NULL,
+	clock_out timestamp NULL,
+	total_hours numeric(5, 2) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT time_clock_entries_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_tclock_user_date ON public.time_clock_entries USING btree (user_id, clock_in);
+
+
+-- public.treatment_plan_insurance_details definition
+
+-- Drop table
+
+-- DROP TABLE public.treatment_plan_insurance_details;
+
+CREATE TABLE public.treatment_plan_insurance_details (
+	id serial4 NOT NULL,
+	plan_item_id varchar(50) NOT NULL,
+	ins_plan_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	is_archived bool DEFAULT false NOT NULL,
+	billing_order varchar(10) NULL,
+	estimated_ins numeric(12, 2) DEFAULT 0 NOT NULL,
+	estimated_pat numeric(12, 2) DEFAULT 0 NOT NULL,
+	deductible numeric(12, 2) NULL,
+	coverage_pct numeric(5, 2) NULL,
+	annual_max_rem numeric(12, 2) NULL,
+	preauth_number varchar(100) NULL,
+	preauth_date date NULL,
+	preauth_expires date NULL,
+	preauth_amount numeric(12, 2) NULL,
+	notes text NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT treatment_plan_insurance_details_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_tp_ins_detail_item ON public.treatment_plan_insurance_details USING btree (plan_item_id);
+
+
+-- public.treatment_plan_items definition
+
+-- Drop table
+
+-- DROP TABLE public.treatment_plan_items;
+
+CREATE TABLE public.treatment_plan_items (
+	id varchar(50) NOT NULL,
+	plan_id varchar(50) NOT NULL,
+	procedure_code varchar(20) NOT NULL,
+	description varchar(500) NULL,
+	tooth varchar(10) NULL,
+	surface varchar(50) NULL,
+	priority int4 DEFAULT 1 NOT NULL,
+	fee numeric(10, 2) NOT NULL,
+	insurance_estimate numeric(10, 2) DEFAULT 0 NOT NULL,
+	status varchar(20) DEFAULT 'Planned'::character varying NOT NULL,
+	diagnosed_by varchar(200) NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	billing_order varchar(10) NULL,
+	CONSTRAINT treatment_plan_items_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_txitem_plan ON public.treatment_plan_items USING btree (plan_id);
+
+
+-- public.treatment_plans definition
+
+-- Drop table
+
+-- DROP TABLE public.treatment_plans;
+
+CREATE TABLE public.treatment_plans (
+	id varchar(50) NOT NULL,
+	patient_id int4 NOT NULL,
+	office_id int4 NULL,
+	legacy_id varchar(20) NULL,
+	"name" varchar(200) NOT NULL,
+	status varchar(20) DEFAULT 'Active'::character varying NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	updated_at timestamp NULL,
+	created_by int4 NULL,
+	CONSTRAINT treatment_plans_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_txplan_legacy ON public.treatment_plans USING btree (legacy_id);
+CREATE INDEX idx_txplan_patient ON public.treatment_plans USING btree (patient_id);
+
+
+-- public.user_offices definition
+
+-- Drop table
+
+-- DROP TABLE public.user_offices;
+
+CREATE TABLE public.user_offices (
+	id serial4 NOT NULL,
+	user_id int4 NOT NULL,
+	office_id int4 NOT NULL,
+	is_primary bool DEFAULT false NOT NULL,
+	created_at timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT user_offices_pkey PRIMARY KEY (id),
+	CONSTRAINT user_offices_user_id_office_id_key UNIQUE (user_id, office_id)
+);
+
+
+-- public.account_holidays foreign keys
+
+ALTER TABLE public.account_holidays ADD CONSTRAINT fk_account_holidays_created_by_users FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.account_holidays ADD CONSTRAINT fk_account_holidays_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.account_holidays ADD CONSTRAINT fk_account_holidays_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.account_notes foreign keys
+
+ALTER TABLE public.account_notes ADD CONSTRAINT account_notes_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.account_notes ADD CONSTRAINT account_notes_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+
+
+-- public.account_settings foreign keys
+
+ALTER TABLE public.account_settings ADD CONSTRAINT fk_account_settings_model_office_id_offices FOREIGN KEY (model_office_id) REFERENCES public.offices(id);
+ALTER TABLE public.account_settings ADD CONSTRAINT fk_account_settings_ortho_visit_code_procedure_codes FOREIGN KEY (ortho_visit_code) REFERENCES public.procedure_codes(code);
+ALTER TABLE public.account_settings ADD CONSTRAINT fk_account_settings_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+ALTER TABLE public.account_settings ADD CONSTRAINT fk_account_settings_transworld_office_id_offices FOREIGN KEY (transworld_office_id) REFERENCES public.offices(id);
+ALTER TABLE public.account_settings ADD CONSTRAINT fk_account_settings_updated_by_users FOREIGN KEY (updated_by) REFERENCES public.users(id);
+
+
+-- public.appointment_procedures foreign keys
+
+ALTER TABLE public.appointment_procedures ADD CONSTRAINT appointment_procedures_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.appointments(id);
+ALTER TABLE public.appointment_procedures ADD CONSTRAINT appointment_procedures_material_id_fkey FOREIGN KEY (material_id) REFERENCES public.chart_materials(id);
+ALTER TABLE public.appointment_procedures ADD CONSTRAINT appointment_procedures_procedure_code_fkey FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code);
+ALTER TABLE public.appointment_procedures ADD CONSTRAINT appointment_procedures_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.appointment_procedures ADD CONSTRAINT appointment_procedures_treatment_plan_id_fkey FOREIGN KEY (treatment_plan_id) REFERENCES public.treatment_plans(id);
+
+
+-- public.appointments foreign keys
+
+ALTER TABLE public.appointments ADD CONSTRAINT appointments_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.appointments ADD CONSTRAINT appointments_operatory_id_fkey FOREIGN KEY (operatory_id) REFERENCES public.operatories(id);
+ALTER TABLE public.appointments ADD CONSTRAINT appointments_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.appointments ADD CONSTRAINT appointments_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.appointments ADD CONSTRAINT appointments_treatment_plan_id_fkey FOREIGN KEY (treatment_plan_id) REFERENCES public.treatment_plans(id);
+
+
+-- public.caries_risk_assessments foreign keys
+
+ALTER TABLE public.caries_risk_assessments ADD CONSTRAINT caries_risk_assessments_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.caries_risk_assessments ADD CONSTRAINT caries_risk_assessments_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.caries_risk_assessments ADD CONSTRAINT caries_risk_assessments_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.chart_conditions foreign keys
+
+ALTER TABLE public.chart_conditions ADD CONSTRAINT chart_conditions_material_id_fkey FOREIGN KEY (material_id) REFERENCES public.chart_materials(id);
+ALTER TABLE public.chart_conditions ADD CONSTRAINT chart_conditions_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.chart_conditions ADD CONSTRAINT chart_conditions_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.chart_conditions ADD CONSTRAINT chart_conditions_procedure_code_fkey FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code);
+ALTER TABLE public.chart_conditions ADD CONSTRAINT chart_conditions_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+
+
+-- public.claim_attachments foreign keys
+
+ALTER TABLE public.claim_attachments ADD CONSTRAINT fk_claim_attachments_claim_id_insurance_claims FOREIGN KEY (claim_id) REFERENCES public.insurance_claims(id);
+ALTER TABLE public.claim_attachments ADD CONSTRAINT fk_claim_attachments_created_by_users FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.claim_attachments ADD CONSTRAINT fk_claim_attachments_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.claim_submissions foreign keys
+
+ALTER TABLE public.claim_submissions ADD CONSTRAINT claim_submissions_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.insurance_claims(id);
+ALTER TABLE public.claim_submissions ADD CONSTRAINT claim_submissions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+
+
+-- public.codes_view foreign keys
+
+ALTER TABLE public.codes_view ADD CONSTRAINT codes_view_code_fkey FOREIGN KEY (code) REFERENCES public.procedure_codes(code);
+ALTER TABLE public.codes_view ADD CONSTRAINT codes_view_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.codes_view ADD CONSTRAINT codes_view_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.fee_schedule_assignments foreign keys
+
+ALTER TABLE public.fee_schedule_assignments ADD CONSTRAINT fee_schedule_assignments_carrier_id_fkey FOREIGN KEY (carrier_id) REFERENCES public.insurance_carriers(id);
+ALTER TABLE public.fee_schedule_assignments ADD CONSTRAINT fee_schedule_assignments_fee_schedule_id_fkey FOREIGN KEY (fee_schedule_id) REFERENCES public.fee_schedules(id);
+ALTER TABLE public.fee_schedule_assignments ADD CONSTRAINT fee_schedule_assignments_ins_plan_id_fkey FOREIGN KEY (ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.fee_schedule_assignments ADD CONSTRAINT fee_schedule_assignments_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.fee_schedule_assignments ADD CONSTRAINT fee_schedule_assignments_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.fee_schedule_assignments ADD CONSTRAINT fee_schedule_assignments_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.fee_schedule_entries foreign keys
+
+ALTER TABLE public.fee_schedule_entries ADD CONSTRAINT fee_schedule_entries_fee_schedule_id_fkey FOREIGN KEY (fee_schedule_id) REFERENCES public.fee_schedules(id);
+ALTER TABLE public.fee_schedule_entries ADD CONSTRAINT fee_schedule_entries_procedure_code_fkey FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code);
+
+
+-- public.fee_schedules foreign keys
+
+ALTER TABLE public.fee_schedules ADD CONSTRAINT fee_schedules_ins_plan_id_fkey FOREIGN KEY (ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.fee_schedules ADD CONSTRAINT fee_schedules_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.fee_schedules ADD CONSTRAINT fee_schedules_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.image_details foreign keys
+
+ALTER TABLE public.image_details ADD CONSTRAINT image_details_image_group_id_fkey FOREIGN KEY (image_group_id) REFERENCES public.image_groups(id);
+ALTER TABLE public.image_details ADD CONSTRAINT image_details_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.image_details ADD CONSTRAINT image_details_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.image_groups foreign keys
+
+ALTER TABLE public.image_groups ADD CONSTRAINT image_groups_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.image_groups ADD CONSTRAINT image_groups_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.image_groups ADD CONSTRAINT image_groups_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.imaging_templates(id);
+ALTER TABLE public.image_groups ADD CONSTRAINT image_groups_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.imaging_templates foreign keys
+
+ALTER TABLE public.imaging_templates ADD CONSTRAINT imaging_templates_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+
+-- public.insurance_claims foreign keys
+
+ALTER TABLE public.insurance_claims ADD CONSTRAINT insurance_claims_billing_provider_id_fkey FOREIGN KEY (billing_provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.insurance_claims ADD CONSTRAINT insurance_claims_carrier_id_fkey FOREIGN KEY (carrier_id) REFERENCES public.insurance_carriers(id);
+ALTER TABLE public.insurance_claims ADD CONSTRAINT insurance_claims_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.insurance_claims ADD CONSTRAINT insurance_claims_ins_plan_id_fkey FOREIGN KEY (ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.insurance_claims ADD CONSTRAINT insurance_claims_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.insurance_claims ADD CONSTRAINT insurance_claims_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.insurance_claims ADD CONSTRAINT insurance_claims_treating_provider_id_fkey FOREIGN KEY (treating_provider_id) REFERENCES public.providers(id);
+
+
+-- public.insurance_subscribers foreign keys
+
+ALTER TABLE public.insurance_subscribers ADD CONSTRAINT fk_ins_sub_patient FOREIGN KEY (subscriber_patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.insurance_subscribers ADD CONSTRAINT insurance_subscribers_ins_plan_id_fkey FOREIGN KEY (ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.insurance_subscribers ADD CONSTRAINT insurance_subscribers_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.insurance_subscribers ADD CONSTRAINT insurance_subscribers_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.ledger_insurance_details foreign keys
+
+ALTER TABLE public.ledger_insurance_details ADD CONSTRAINT ledger_insurance_details_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.insurance_claims(id);
+ALTER TABLE public.ledger_insurance_details ADD CONSTRAINT ledger_insurance_details_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.ledger_insurance_details ADD CONSTRAINT ledger_insurance_details_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.ledger_insurance_details ADD CONSTRAINT ledger_insurance_details_prim_ins_plan_id_fkey FOREIGN KEY (prim_ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.ledger_insurance_details ADD CONSTRAINT ledger_insurance_details_procedure_id_fkey FOREIGN KEY (procedure_id) REFERENCES public.patient_procedures(id);
+ALTER TABLE public.ledger_insurance_details ADD CONSTRAINT ledger_insurance_details_sec_ins_plan_id_fkey FOREIGN KEY (sec_ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.ledger_insurance_details ADD CONSTRAINT ledger_insurance_details_ter_ins_plan_id_fkey FOREIGN KEY (ter_ins_plan_id) REFERENCES public.insurance_plans(id);
+
+
+-- public.medical_history_details foreign keys
+
+ALTER TABLE public.medical_history_details ADD CONSTRAINT medical_history_details_history_id_fkey FOREIGN KEY (history_id) REFERENCES public.medical_history_records(id);
+
+
+-- public.medical_history_records foreign keys
+
+ALTER TABLE public.medical_history_records ADD CONSTRAINT medical_history_records_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.medical_history_records ADD CONSTRAINT medical_history_records_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.medical_history_records ADD CONSTRAINT medical_history_records_signature_id_fkey FOREIGN KEY (signature_id) REFERENCES public.patient_signatures(id);
+
+
+-- public.office_advanced_settings foreign keys
+
+ALTER TABLE public.office_advanced_settings ADD CONSTRAINT fk_office_advanced_settings_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_advanced_settings ADD CONSTRAINT fk_office_advanced_settings_preferred_provider_id_providers FOREIGN KEY (preferred_provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.office_advanced_settings ADD CONSTRAINT fk_office_advanced_settings_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+ALTER TABLE public.office_advanced_settings ADD CONSTRAINT fk_office_advanced_settings_updated_by_users FOREIGN KEY (updated_by) REFERENCES public.users(id);
+
+
+-- public.office_code_bundles foreign keys
+
+ALTER TABLE public.office_code_bundles ADD CONSTRAINT fk_office_code_bundles_bundle_id_code_bundles FOREIGN KEY (bundle_id) REFERENCES public.code_bundles(id);
+ALTER TABLE public.office_code_bundles ADD CONSTRAINT fk_office_code_bundles_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_code_bundles ADD CONSTRAINT fk_office_code_bundles_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_integrations foreign keys
+
+ALTER TABLE public.office_integrations ADD CONSTRAINT fk_office_integrations_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_integrations ADD CONSTRAINT fk_office_integrations_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+ALTER TABLE public.office_integrations ADD CONSTRAINT fk_office_integrations_updated_by_users FOREIGN KEY (updated_by) REFERENCES public.users(id);
+
+
+-- public.office_letter_templates foreign keys
+
+ALTER TABLE public.office_letter_templates ADD CONSTRAINT fk_office_letter_templates_letter_template_id_letter_templates FOREIGN KEY (letter_template_id) REFERENCES public.letter_templates(id);
+ALTER TABLE public.office_letter_templates ADD CONSTRAINT fk_office_letter_templates_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_letter_templates ADD CONSTRAINT fk_office_letter_templates_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_note_macros foreign keys
+
+ALTER TABLE public.office_note_macros ADD CONSTRAINT fk_office_note_macros_note_macro_id_note_macros FOREIGN KEY (note_macro_id) REFERENCES public.note_macros(id);
+ALTER TABLE public.office_note_macros ADD CONSTRAINT fk_office_note_macros_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_note_macros ADD CONSTRAINT fk_office_note_macros_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_phone_assignments foreign keys
+
+ALTER TABLE public.office_phone_assignments ADD CONSTRAINT fk_office_phone_assignments_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_phone_assignments ADD CONSTRAINT fk_office_phone_assignments_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_prescription_library foreign keys
+
+ALTER TABLE public.office_prescription_library ADD CONSTRAINT fk_office_prescription_library_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_prescription_library ADD CONSTRAINT fk_office_prescription_library_prescription_library_id__43f0 FOREIGN KEY (prescription_library_id) REFERENCES public.prescription_library(id);
+ALTER TABLE public.office_prescription_library ADD CONSTRAINT fk_office_prescription_library_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_procedure_codes foreign keys
+
+ALTER TABLE public.office_procedure_codes ADD CONSTRAINT fk_office_procedure_codes_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_procedure_codes ADD CONSTRAINT fk_office_procedure_codes_procedure_code_procedure_codes FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code);
+ALTER TABLE public.office_procedure_codes ADD CONSTRAINT fk_office_procedure_codes_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_production_types foreign keys
+
+ALTER TABLE public.office_production_types ADD CONSTRAINT fk_office_production_types_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_production_types ADD CONSTRAINT fk_office_production_types_production_type_id_production_types FOREIGN KEY (production_type_id) REFERENCES public.production_types(id);
+ALTER TABLE public.office_production_types ADD CONSTRAINT fk_office_production_types_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_schedule_days foreign keys
+
+ALTER TABLE public.office_schedule_days ADD CONSTRAINT fk_office_schedule_days_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_schedule_days ADD CONSTRAINT fk_office_schedule_days_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_smart_assist foreign keys
+
+ALTER TABLE public.office_smart_assist ADD CONSTRAINT fk_office_smart_assist_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_smart_assist ADD CONSTRAINT fk_office_smart_assist_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+ALTER TABLE public.office_smart_assist ADD CONSTRAINT fk_office_smart_assist_updated_by_users FOREIGN KEY (updated_by) REFERENCES public.users(id);
+
+
+-- public.office_smart_assist_items foreign keys
+
+ALTER TABLE public.office_smart_assist_items ADD CONSTRAINT fk_office_smart_assist_items_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_smart_assist_items ADD CONSTRAINT fk_office_smart_assist_items_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.office_statement_settings foreign keys
+
+ALTER TABLE public.office_statement_settings ADD CONSTRAINT fk_office_statement_settings_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.office_statement_settings ADD CONSTRAINT fk_office_statement_settings_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+ALTER TABLE public.office_statement_settings ADD CONSTRAINT fk_office_statement_settings_updated_by_users FOREIGN KEY (updated_by) REFERENCES public.users(id);
+
+
+-- public.offices foreign keys
+
+ALTER TABLE public.offices ADD CONSTRAINT fk_offices_billing_provider_id_providers FOREIGN KEY (billing_provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.offices ADD CONSTRAINT fk_offices_default_fee_schedule_id_fee_schedules FOREIGN KEY (default_fee_schedule_id) REFERENCES public.fee_schedules(id);
+ALTER TABLE public.offices ADD CONSTRAINT fk_offices_default_ucr_fee_schedule_id_fee_schedules FOREIGN KEY (default_ucr_fee_schedule_id) REFERENCES public.fee_schedules(id);
+ALTER TABLE public.offices ADD CONSTRAINT fk_offices_office_group_id_office_groups FOREIGN KEY (office_group_id) REFERENCES public.office_groups(id);
+ALTER TABLE public.offices ADD CONSTRAINT offices_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.offices ADD CONSTRAINT offices_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.operatories foreign keys
+
+ALTER TABLE public.operatories ADD CONSTRAINT fk_operatories_provider_id_providers FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.operatories ADD CONSTRAINT operatories_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+
+
+-- public.ortho_plans foreign keys
+
+ALTER TABLE public.ortho_plans ADD CONSTRAINT ortho_plans_ins_plan_id_fkey FOREIGN KEY (ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.ortho_plans ADD CONSTRAINT ortho_plans_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.ortho_plans ADD CONSTRAINT ortho_plans_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.ortho_plans ADD CONSTRAINT ortho_plans_procedure_code_fkey FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code);
+ALTER TABLE public.ortho_plans ADD CONSTRAINT ortho_plans_sec_ins_plan_id_fkey FOREIGN KEY (sec_ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.ortho_plans ADD CONSTRAINT ortho_plans_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.patient_adjustments foreign keys
+
+ALTER TABLE public.patient_adjustments ADD CONSTRAINT fk_patient_adjustments_created_by_users FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_adjustments ADD CONSTRAINT fk_patient_adjustments_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.patient_adjustments ADD CONSTRAINT fk_patient_adjustments_patient_id_patients FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_adjustments ADD CONSTRAINT fk_patient_adjustments_procedure_id_patient_procedures FOREIGN KEY (procedure_id) REFERENCES public.patient_procedures(id);
+ALTER TABLE public.patient_adjustments ADD CONSTRAINT fk_patient_adjustments_provider_id_providers FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.patient_adjustments ADD CONSTRAINT fk_patient_adjustments_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.patient_alerts foreign keys
+
+ALTER TABLE public.patient_alerts ADD CONSTRAINT patient_alerts_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_alerts ADD CONSTRAINT patient_alerts_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+
+
+-- public.patient_documents foreign keys
+
+ALTER TABLE public.patient_documents ADD CONSTRAINT fk_patient_documents_created_by_users FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_documents ADD CONSTRAINT fk_patient_documents_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.patient_documents ADD CONSTRAINT fk_patient_documents_patient_id_patients FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_documents ADD CONSTRAINT fk_patient_documents_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.patient_emergency_contacts foreign keys
+
+ALTER TABLE public.patient_emergency_contacts ADD CONSTRAINT fk_patient_emergency_contacts_created_by_users FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_emergency_contacts ADD CONSTRAINT fk_patient_emergency_contacts_patient_id_patients FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_emergency_contacts ADD CONSTRAINT fk_patient_emergency_contacts_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.patient_ins_payment_plans foreign keys
+
+ALTER TABLE public.patient_ins_payment_plans ADD CONSTRAINT patient_ins_payment_plans_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_ins_payment_plans ADD CONSTRAINT patient_ins_payment_plans_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.patient_insurance foreign keys
+
+ALTER TABLE public.patient_insurance ADD CONSTRAINT patient_insurance_ins_plan_id_fkey FOREIGN KEY (ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.patient_insurance ADD CONSTRAINT patient_insurance_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_insurance ADD CONSTRAINT patient_insurance_subscriber_id_fkey FOREIGN KEY (subscriber_id) REFERENCES public.insurance_subscribers(id);
+
+
+-- public.patient_notes foreign keys
+
+ALTER TABLE public.patient_notes ADD CONSTRAINT fk_patient_notes_updated_by_users FOREIGN KEY (updated_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_notes ADD CONSTRAINT patient_notes_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_notes ADD CONSTRAINT patient_notes_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.patient_notes ADD CONSTRAINT patient_notes_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+
+
+-- public.patient_payment_plans foreign keys
+
+ALTER TABLE public.patient_payment_plans ADD CONSTRAINT patient_payment_plans_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.patient_payment_plans ADD CONSTRAINT patient_payment_plans_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_payment_plans ADD CONSTRAINT patient_payment_plans_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.patient_payments foreign keys
+
+ALTER TABLE public.patient_payments ADD CONSTRAINT patient_payments_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_payments ADD CONSTRAINT patient_payments_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.patient_payments ADD CONSTRAINT patient_payments_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_payments ADD CONSTRAINT patient_payments_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+
+
+-- public.patient_procedures foreign keys
+
+ALTER TABLE public.patient_procedures ADD CONSTRAINT fk_proc_claim FOREIGN KEY (claim_id) REFERENCES public.insurance_claims(id);
+ALTER TABLE public.patient_procedures ADD CONSTRAINT patient_procedures_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.appointments(id);
+ALTER TABLE public.patient_procedures ADD CONSTRAINT patient_procedures_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_procedures ADD CONSTRAINT patient_procedures_material_id_fkey FOREIGN KEY (material_id) REFERENCES public.chart_materials(id);
+ALTER TABLE public.patient_procedures ADD CONSTRAINT patient_procedures_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.patient_procedures ADD CONSTRAINT patient_procedures_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_procedures ADD CONSTRAINT patient_procedures_procedure_code_fkey FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code);
+ALTER TABLE public.patient_procedures ADD CONSTRAINT patient_procedures_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+
+
+-- public.patient_recalls foreign keys
+
+ALTER TABLE public.patient_recalls ADD CONSTRAINT patient_recalls_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_recalls ADD CONSTRAINT patient_recalls_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.patient_recalls ADD CONSTRAINT patient_recalls_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_recalls ADD CONSTRAINT patient_recalls_procedure_code_fkey FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code);
+
+
+-- public.patient_reg_plans foreign keys
+
+ALTER TABLE public.patient_reg_plans ADD CONSTRAINT patient_reg_plans_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.patient_reg_plans ADD CONSTRAINT patient_reg_plans_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_reg_plans ADD CONSTRAINT patient_reg_plans_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.patient_sec_ins_payment_plans foreign keys
+
+ALTER TABLE public.patient_sec_ins_payment_plans ADD CONSTRAINT patient_sec_ins_payment_plans_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.patient_sec_ins_payment_plans ADD CONSTRAINT patient_sec_ins_payment_plans_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.patient_signatures foreign keys
+
+ALTER TABLE public.patient_signatures ADD CONSTRAINT patient_signatures_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patient_signatures ADD CONSTRAINT patient_signatures_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+
+
+-- public.patients foreign keys
+
+ALTER TABLE public.patients ADD CONSTRAINT patients_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.patients ADD CONSTRAINT patients_home_office_id_fkey FOREIGN KEY (home_office_id) REFERENCES public.offices(id);
+ALTER TABLE public.patients ADD CONSTRAINT patients_preferred_provider_id_fkey FOREIGN KEY (preferred_provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.patients ADD CONSTRAINT patients_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.payment_allocations foreign keys
+
+ALTER TABLE public.payment_allocations ADD CONSTRAINT payment_allocations_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.insurance_claims(id);
+ALTER TABLE public.payment_allocations ADD CONSTRAINT payment_allocations_ins_plan_id_fkey FOREIGN KEY (ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.payment_allocations ADD CONSTRAINT payment_allocations_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.payment_allocations ADD CONSTRAINT payment_allocations_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.patient_payments(id);
+ALTER TABLE public.payment_allocations ADD CONSTRAINT payment_allocations_procedure_id_fkey FOREIGN KEY (procedure_id) REFERENCES public.patient_procedures(id);
+ALTER TABLE public.payment_allocations ADD CONSTRAINT payment_allocations_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+
+
+-- public.perio_chart_activity foreign keys
+
+ALTER TABLE public.perio_chart_activity ADD CONSTRAINT perio_chart_activity_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.perio_chart_activity ADD CONSTRAINT perio_chart_activity_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+
+
+-- public.perio_exam_details foreign keys
+
+ALTER TABLE public.perio_exam_details ADD CONSTRAINT perio_exam_details_exam_id_fkey FOREIGN KEY (exam_id) REFERENCES public.perio_exams(id);
+
+
+-- public.perio_exams foreign keys
+
+ALTER TABLE public.perio_exams ADD CONSTRAINT perio_exams_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.perio_exams ADD CONSTRAINT perio_exams_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.perio_exams ADD CONSTRAINT perio_exams_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+
+
+-- public.postcard_templates foreign keys
+
+ALTER TABLE public.postcard_templates ADD CONSTRAINT postcard_templates_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.postcard_templates ADD CONSTRAINT postcard_templates_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.prescriptions foreign keys
+
+ALTER TABLE public.prescriptions ADD CONSTRAINT prescriptions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.prescriptions ADD CONSTRAINT prescriptions_library_rx_id_fkey FOREIGN KEY (library_rx_id) REFERENCES public.prescription_library(id);
+ALTER TABLE public.prescriptions ADD CONSTRAINT prescriptions_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.prescriptions ADD CONSTRAINT prescriptions_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.prescriptions ADD CONSTRAINT prescriptions_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+
+
+-- public.progress_notes foreign keys
+
+ALTER TABLE public.progress_notes ADD CONSTRAINT fk_progress_notes_signed_by_users FOREIGN KEY (signed_by) REFERENCES public.users(id);
+ALTER TABLE public.progress_notes ADD CONSTRAINT progress_notes_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.progress_notes ADD CONSTRAINT progress_notes_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.progress_notes ADD CONSTRAINT progress_notes_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+
+
+-- public.provider_insurance_ids foreign keys
+
+ALTER TABLE public.provider_insurance_ids ADD CONSTRAINT provider_insurance_ids_carrier_id_fkey FOREIGN KEY (carrier_id) REFERENCES public.insurance_carriers(id);
+ALTER TABLE public.provider_insurance_ids ADD CONSTRAINT provider_insurance_ids_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.provider_insurance_ids ADD CONSTRAINT provider_insurance_ids_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.provider_offices foreign keys
+
+ALTER TABLE public.provider_offices ADD CONSTRAINT fk_provider_offices_office_id_offices FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.provider_offices ADD CONSTRAINT fk_provider_offices_provider_id_providers FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.provider_offices ADD CONSTRAINT fk_provider_offices_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.provider_route_slips foreign keys
+
+ALTER TABLE public.provider_route_slips ADD CONSTRAINT provider_route_slips_procedure_code_fkey FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code);
+ALTER TABLE public.provider_route_slips ADD CONSTRAINT provider_route_slips_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id);
+ALTER TABLE public.provider_route_slips ADD CONSTRAINT provider_route_slips_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.providers foreign keys
+
+ALTER TABLE public.providers ADD CONSTRAINT fk_providers_created_by_users FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.providers ADD CONSTRAINT providers_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.providers ADD CONSTRAINT providers_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.referral_demog_details foreign keys
+
+ALTER TABLE public.referral_demog_details ADD CONSTRAINT referral_demog_details_demog_header_id_fkey FOREIGN KEY (demog_header_id) REFERENCES public.referral_demog_headers(id);
+ALTER TABLE public.referral_demog_details ADD CONSTRAINT referral_demog_details_referral_id_fkey FOREIGN KEY (referral_id) REFERENCES public.referrals(id);
+ALTER TABLE public.referral_demog_details ADD CONSTRAINT referral_demog_details_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.referrals foreign keys
+
+ALTER TABLE public.referrals ADD CONSTRAINT referrals_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.referrals ADD CONSTRAINT referrals_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.referrals ADD CONSTRAINT referrals_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.referrals ADD CONSTRAINT referrals_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.sms_messages foreign keys
+
+ALTER TABLE public.sms_messages ADD CONSTRAINT sms_messages_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.appointments(id);
+ALTER TABLE public.sms_messages ADD CONSTRAINT sms_messages_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.sms_messages ADD CONSTRAINT sms_messages_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.sms_messages ADD CONSTRAINT sms_messages_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+ALTER TABLE public.sms_messages ADD CONSTRAINT sms_messages_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+-- public.time_clock_entries foreign keys
+
+ALTER TABLE public.time_clock_entries ADD CONSTRAINT time_clock_entries_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.time_clock_entries ADD CONSTRAINT time_clock_entries_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+ALTER TABLE public.time_clock_entries ADD CONSTRAINT time_clock_entries_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+-- public.treatment_plan_insurance_details foreign keys
+
+ALTER TABLE public.treatment_plan_insurance_details ADD CONSTRAINT treatment_plan_insurance_details_ins_plan_id_fkey FOREIGN KEY (ins_plan_id) REFERENCES public.insurance_plans(id);
+ALTER TABLE public.treatment_plan_insurance_details ADD CONSTRAINT treatment_plan_insurance_details_plan_item_id_fkey FOREIGN KEY (plan_item_id) REFERENCES public.treatment_plan_items(id);
+
+
+-- public.treatment_plan_items foreign keys
+
+ALTER TABLE public.treatment_plan_items ADD CONSTRAINT treatment_plan_items_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.treatment_plans(id);
+ALTER TABLE public.treatment_plan_items ADD CONSTRAINT treatment_plan_items_procedure_code_fkey FOREIGN KEY (procedure_code) REFERENCES public.procedure_codes(code);
+
+
+-- public.treatment_plans foreign keys
+
+ALTER TABLE public.treatment_plans ADD CONSTRAINT treatment_plans_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+ALTER TABLE public.treatment_plans ADD CONSTRAINT treatment_plans_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.treatment_plans ADD CONSTRAINT treatment_plans_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id);
+
+
+-- public.user_offices foreign keys
+
+ALTER TABLE public.user_offices ADD CONSTRAINT user_offices_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE public.user_offices ADD CONSTRAINT user_offices_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);

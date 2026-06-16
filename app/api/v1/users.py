@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, status
 from pydantic import BaseModel, EmailStr, Field
 
-from app.api.deps import DbSession, PageParams, TenantId, require_roles
+from app.api.deps import CurrentUser, DbSession, PageParams, TenantId, require_roles
 from app.core.security import hash_password
 from app.crud.base import CRUDBase
 from app.db.models import User
@@ -42,6 +42,13 @@ class UserCreate(BaseModel):
     phone: str | None = None
     role: str = "staff"
     must_change_password: bool = False
+    # Security -> Users (users_missing_fields dev-report): structural gaps 1-4.
+    # image_url (gap #5) is written via the dedicated upload endpoint, not here.
+    short_id: str | None = Field(default=None, max_length=6)
+    report_access_provider_id: str | None = None
+    custom_1: str | None = None
+    custom_2: str | None = None
+    signature_data: str | None = None
 
 
 class UserUpdate(BaseModel):
@@ -52,6 +59,11 @@ class UserUpdate(BaseModel):
     role: str | None = None
     is_active: bool | None = None
     password: str | None = Field(default=None, min_length=8)
+    short_id: str | None = Field(default=None, max_length=6)
+    report_access_provider_id: str | None = None
+    custom_1: str | None = None
+    custom_2: str | None = None
+    signature_data: str | None = None
 
 
 @router.get("", response_model=PaginatedResponse[UserRead], operation_id="list_users",
@@ -75,30 +87,40 @@ def list_users(
         sort=page.sort, order=page.order, search=page.search,
         filters={"role": role, "is_active": is_active}, id_in=id_in,
     )
+    user_admin_service.attach_audit_names(db, items)  # gap #8: resolve *_by names
     return PaginatedResponse.build(items, total, page.page, page.size)
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED,
              operation_id="create_user", summary="Create a user")
-def create_user(db: DbSession, tenant_id: TenantId, body: UserCreate):
+def create_user(db: DbSession, tenant_id: TenantId, body: UserCreate, current: CurrentUser):
     data = body.model_dump(exclude={"password"})
     data["password_hash"] = hash_password(body.password)
-    return _crud.create(db, data, tenant_id=tenant_id)
+    data["created_by"] = current.id  # gap #8: record the creating actor
+    user = _crud.create(db, data, tenant_id=tenant_id)
+    user_admin_service.attach_audit_names(db, user)
+    return user
 
 
 @router.get("/{user_id}", response_model=UserRead, operation_id="get_user",
             summary="Get a user by id")
 def get_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()]):
-    return _crud.get(db, user_id, tenant_id=tenant_id)
+    user = _crud.get(db, user_id, tenant_id=tenant_id)
+    user_admin_service.attach_audit_names(db, user)
+    return user
 
 
 @router.patch("/{user_id}", response_model=UserRead, operation_id="update_user",
               summary="Update a user")
-def update_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()], body: UserUpdate):
+def update_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
+                body: UserUpdate, current: CurrentUser):
     data = body.model_dump(exclude_unset=True)
     if "password" in data:
         data["password_hash"] = hash_password(data.pop("password"))
-    return _crud.update(db, user_id, data, tenant_id=tenant_id)
+    data["updated_by"] = current.id  # gap #8: record the editing actor
+    user = _crud.update(db, user_id, data, tenant_id=tenant_id)
+    user_admin_service.attach_audit_names(db, user)
+    return user
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT,

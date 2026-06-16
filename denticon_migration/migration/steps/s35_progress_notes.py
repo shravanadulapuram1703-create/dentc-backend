@@ -6,6 +6,7 @@ Returns: {}
 
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file
+from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import clean, parse_date, parse_bool
 
 
@@ -14,6 +15,12 @@ def _trunc(val: str | None, max_len: int) -> str | None:
     if not text:
         return None
     return text[:max_len]
+
+
+COLS = [
+    "patient_id", "office_id", "legacy_id", "note_date",
+    "notes", "notes_html", "tooth", "is_deleted",
+]
 
 
 def run(conn, maps: dict) -> dict:
@@ -25,8 +32,12 @@ def run(conn, maps: dict) -> dict:
         print("  [s35] progress_notes: file not found, skipping")
         return {}
 
-    cur = conn.cursor()
-    inserted = skipped = 0
+    skipped = 0
+    buf = BulkBuffer(
+        conn, "progress_notes", COLS,
+        conflict="ON CONFLICT DO NOTHING",
+        flush_every=20000, page_size=2000, label="progress_notes",
+    )
 
     for row in read_denticon_file(src):
         note_id = (row.get("PROGNOTESID") or "").strip()
@@ -39,30 +50,17 @@ def run(conn, maps: dict) -> dict:
 
         oid = (row.get("OID") or "").strip()
 
-        cur.execute(
-            """
-            INSERT INTO progress_notes (
-                patient_id, office_id, legacy_id, note_date,
-                notes, notes_html, tooth, is_deleted
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT DO NOTHING
-            """,
-            (
-                pat_id,
-                office_map.get(oid),
-                note_id,
-                parse_date(row.get("ACTDATE") or row.get("NOTEDATE") or ""),
-                clean(row.get("NOTES") or row.get("NOTE")),
-                clean(row.get("NOTESHTML") or row.get("HTMLNOTES")),
-                _trunc(row.get("TH") or row.get("TOOTH"), 255),
-                parse_bool(row.get("ISDELETED", "False")),
-            ),
-        )
-        inserted += 1
+        buf.add((
+            pat_id,
+            office_map.get(oid),
+            note_id,
+            parse_date(row.get("ACTDATE") or row.get("NOTEDATE") or ""),
+            clean(row.get("NOTES") or row.get("NOTE")),
+            clean(row.get("NOTESHTML") or row.get("HTMLNOTES")),
+            _trunc(row.get("TH") or row.get("TOOTH"), 255),
+            parse_bool(row.get("ISDELETED", "False")),
+        ))
 
-        if inserted % 2000 == 0:
-            conn.commit()
-
-    conn.commit()
-    print(f"  [s35] progress_notes: {inserted} inserted, {skipped} skipped")
+    buf.flush()
+    print(f"  [s35] progress_notes: {buf.inserted} inserted, {skipped} skipped")
     return {}

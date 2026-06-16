@@ -23,7 +23,7 @@ from sqlalchemy import inspect as sa_inspect
 from app.schemas.common import ORMModel
 
 # Columns the API manages itself; never part of a client write payload.
-_WRITE_EXCLUDE = {"created_at", "updated_at", "created_by", "tenant_id", "legacy_id"}
+_WRITE_EXCLUDE = {"created_at", "updated_at", "created_by", "updated_by", "tenant_id", "legacy_id"}
 
 
 def _py_type(col) -> type:  # noqa: ANN001

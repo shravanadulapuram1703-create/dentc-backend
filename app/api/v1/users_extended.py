@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, File, Path, Response, UploadFile, status
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user, require_roles
 from app.schemas.auth import UserRead
@@ -23,6 +23,7 @@ from app.schemas.user_admin import (
     TimeClockConfigRead,
     UserCompleteCreate,
     UserCompleteUpdate,
+    UserImageResult,
     UserSetupMetadata,
 )
 from app.services import user_admin_service as svc
@@ -57,14 +58,20 @@ def change_my_password(db: DbSession, current_user: CurrentUser, body: ChangePas
              responses={409: {"model": ErrorResponse}},
              summary="Create a fully-configured user in one transaction")
 def create_user_complete(db: DbSession, tenant_id: TenantId, body: UserCompleteCreate, current: CurrentUser):
-    return svc.create_complete(db, tenant_id, body.model_dump(), current.id)
+    user = svc.create_complete(db, tenant_id, body.model_dump(), current.id)
+    svc.attach_audit_names(db, user)  # gap #8
+    return user
 
 
 @router.put("/{user_id}/complete", response_model=UserRead, operation_id="update_user_complete",
             dependencies=[_admin], responses={409: {"model": ErrorResponse}},
             summary="Update a fully-configured user in one transaction")
-def update_user_complete(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()], body: UserCompleteUpdate):
-    return svc.update_complete(db, tenant_id, user_id, body.model_dump(exclude_unset=True))
+def update_user_complete(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
+                         body: UserCompleteUpdate, current: CurrentUser):
+    user = svc.update_complete(db, tenant_id, user_id, body.model_dump(exclude_unset=True),
+                               updated_by=current.id)  # gap #8
+    svc.attach_audit_names(db, user)
+    return user
 
 
 # ── Gap 3: time-clock config ─────────────────────────────────────────────────
@@ -89,8 +96,31 @@ def get_security_settings(db: DbSession, tenant_id: TenantId, user_id: Annotated
 
 @router.put("/{user_id}/security-settings", response_model=SecuritySettingsRead,
             operation_id="set_user_security_settings", dependencies=[_admin])
-def set_security_settings(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()], body: SecuritySettings):
-    return svc.set_security_settings(db, user_id, tenant_id, body.model_dump(exclude_unset=True))
+def set_security_settings(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
+                          body: SecuritySettings, current: CurrentUser):
+    return svc.set_security_settings(db, user_id, tenant_id, body.model_dump(exclude_unset=True),
+                                     updated_by=current.id)
+
+
+# ── User image / avatar (users_missing_fields dev-report gap #5) ─────────────
+@router.post("/{user_id}/image", response_model=UserImageResult, dependencies=[_admin],
+             operation_id="upload_user_image", responses={422: {"model": ErrorResponse}},
+             summary="Upload a user avatar image")
+async def upload_user_image(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
+                            file: Annotated[UploadFile, File()], current: CurrentUser):
+    data = await file.read()
+    user = svc.save_user_image(db, user_id, tenant_id, file.filename or "avatar",
+                               file.content_type or "", data, updated_by=current.id)
+    return UserImageResult(image_url=user.image_url)
+
+
+@router.delete("/{user_id}/image", status_code=status.HTTP_204_NO_CONTENT,
+               dependencies=[_admin], operation_id="delete_user_image",
+               summary="Remove a user avatar image")
+def delete_user_image(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
+                      current: CurrentUser):
+    svc.delete_user_image(db, user_id, tenant_id, updated_by=current.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ── Gap 5: roles catalog (permissions deferred to Phase-4 RBAC) ──────────────

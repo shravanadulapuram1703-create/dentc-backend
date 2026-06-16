@@ -7,7 +7,10 @@ Returns: {}
 
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file
+from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import clean
+
+COLS = ["tenant_id", "office_id", "code", "created_by"]
 
 
 def run(conn, maps: dict) -> dict:
@@ -21,8 +24,12 @@ def run(conn, maps: dict) -> dict:
         print("  [s49] codes_view: file not found, skipping")
         return {}
 
-    cur = conn.cursor()
-    inserted = skipped = 0
+    skipped = 0
+    buf = BulkBuffer(
+        conn, "codes_view", COLS,
+        conflict="ON CONFLICT (office_id, code) DO NOTHING",
+        flush_every=20000, page_size=2000, label="codes_view",
+    )
 
     for row in read_denticon_file(src):
         code = (row.get("CODE") or "").strip()
@@ -44,20 +51,8 @@ def run(conn, maps: dict) -> dict:
             continue
 
         tid = tenant_map.get(pgid, default_tid)
+        buf.add((tid, office_id, code, clean(row.get("CREATEDBY"))))
 
-        cur.execute(
-            """
-            INSERT INTO codes_view (tenant_id, office_id, code, created_by)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (office_id, code) DO NOTHING
-            """,
-            (tid, office_id, code, clean(row.get("CREATEDBY"))),
-        )
-        inserted += 1
-
-        if inserted % 2000 == 0:
-            conn.commit()
-
-    conn.commit()
-    print(f"  [s49] codes_view: {inserted} inserted, {skipped} skipped")
+    buf.flush()
+    print(f"  [s49] codes_view: {buf.inserted} inserted, {skipped} skipped")
     return {}

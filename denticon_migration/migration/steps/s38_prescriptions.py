@@ -6,7 +6,14 @@ Returns: {}
 
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file
+from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import clean, parse_date, parse_int, parse_bool
+
+COLS = [
+    "patient_id", "office_id", "legacy_id", "library_rx_id",
+    "rx_date", "drug_name", "dispense", "sig", "refills", "is_as_written",
+    "provider_id", "notes",
+]
 
 
 def run(conn, maps: dict) -> dict:
@@ -20,8 +27,12 @@ def run(conn, maps: dict) -> dict:
         print("  [s38] prescriptions: file not found, skipping")
         return {}
 
-    cur = conn.cursor()
-    inserted = skipped = 0
+    skipped = 0
+    buf = BulkBuffer(
+        conn, "prescriptions", COLS,
+        conflict="ON CONFLICT DO NOTHING",
+        flush_every=20000, page_size=2000, label="prescriptions",
+    )
 
     for row in read_denticon_file(src):
         rx_id  = (row.get("PATRXID") or "").strip()
@@ -41,32 +52,21 @@ def run(conn, maps: dict) -> dict:
         prid = (row.get("PROVIDERID") or "").strip()
         rxref = (row.get("RXRefID") or row.get("RXREFID") or "").strip()
 
-        cur.execute(
-            """
-            INSERT INTO prescriptions (
-                patient_id, office_id, legacy_id, library_rx_id,
-                rx_date, drug_name, dispense, sig, refills, is_as_written,
-                provider_id, notes
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT DO NOTHING
-            """,
-            (
-                pat_id,
-                office_map.get(oid),
-                rx_id,
-                rx_lib_map.get(rxref),
-                parse_date(row.get("RXDATE") or row.get("ACTDATE") or ""),
-                drug,
-                clean(row.get("Dispense") or row.get("DISPENSE")),
-                clean(row.get("Sig") or row.get("SIG")),
-                parse_int(row.get("Refill") or row.get("REFILL"), 0),
-                parse_bool(row.get("IsAsWritten") or row.get("ISASWRITTEN") or "False"),
-                provider_map.get(prid),
-                clean(row.get("NOTES")),
-            ),
-        )
-        inserted += 1
+        buf.add((
+            pat_id,
+            office_map.get(oid),
+            rx_id,
+            rx_lib_map.get(rxref),
+            parse_date(row.get("RXDATE") or row.get("ACTDATE") or ""),
+            drug,
+            clean(row.get("Dispense") or row.get("DISPENSE")),
+            clean(row.get("Sig") or row.get("SIG")),
+            parse_int(row.get("Refill") or row.get("REFILL"), 0),
+            parse_bool(row.get("IsAsWritten") or row.get("ISASWRITTEN") or "False"),
+            provider_map.get(prid),
+            clean(row.get("NOTES")),
+        ))
 
-    conn.commit()
-    print(f"  [s38] prescriptions: {inserted} inserted, {skipped} skipped")
+    buf.flush()
+    print(f"  [s38] prescriptions: {buf.inserted} inserted, {skipped} skipped")
     return {}

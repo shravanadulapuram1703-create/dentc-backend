@@ -7,8 +7,11 @@ Returns: {}
 
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file
+from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import clean, parse_datetime, parse_decimal
 from migration.utils.user_lookup import build_user_lookup, resolve_user_id
+
+COLS = ["tenant_id", "office_id", "user_id", "legacy_id", "clock_in", "clock_out", "total_hours"]
 
 
 def run(conn, maps: dict) -> dict:
@@ -22,10 +25,20 @@ def run(conn, maps: dict) -> dict:
         return {}
 
     # Build username → user_id map from DB (since USERID is a string, not a numeric ID)
-    cur = conn.cursor()
     user_lookup = build_user_lookup(conn)
 
-    inserted = skipped = 0
+    # No natural unique key (serial PK only); truncate for a clean idempotent
+    # reload. Leaf table.
+    cur = conn.cursor()
+    cur.execute("TRUNCATE TABLE time_clock_entries RESTART IDENTITY")
+    conn.commit()
+
+    skipped = 0
+    buf = BulkBuffer(
+        conn, "time_clock_entries", COLS,
+        conflict="ON CONFLICT DO NOTHING",
+        flush_every=20000, page_size=2000, label="time_clock_entries",
+    )
 
     for row in read_denticon_file(src):
         tc_id    = (row.get("TCLOCKID") or "").strip()
@@ -44,24 +57,15 @@ def run(conn, maps: dict) -> dict:
             skipped += 1
             continue
 
-        cur.execute(
-            """
-            INSERT INTO time_clock_entries
-                (tenant_id, office_id, user_id, legacy_id, clock_in, clock_out, total_hours)
-            VALUES (%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT DO NOTHING
-            """,
-            (
-                tid,
-                office_map.get(oid),
-                user_id, tc_id,
-                clock_in,
-                parse_datetime(row.get("LOUT") or ""),
-                parse_decimal(row.get("LTOTAL") or "0"),
-            ),
-        )
-        inserted += 1
+        buf.add((
+            tid,
+            office_map.get(oid),
+            user_id, tc_id,
+            clock_in,
+            parse_datetime(row.get("LOUT") or ""),
+            parse_decimal(row.get("LTOTAL") or "0"),
+        ))
 
-    conn.commit()
-    print(f"  [s40] time_clock_entries: {inserted} inserted, {skipped} skipped")
+    buf.flush()
+    print(f"  [s40] time_clock_entries: {buf.inserted} inserted, {skipped} skipped")
     return {}

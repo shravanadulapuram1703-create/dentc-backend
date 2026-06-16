@@ -37,7 +37,7 @@ def run(conn, maps: dict) -> dict:
             INSERT INTO code_bundles
                 (tenant_id, legacy_id, name, display_code, description, same_tooth)
             VALUES (%s,%s,%s,%s,%s,%s)
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (tenant_id, legacy_id) DO NOTHING
             RETURNING id
             """,
             (tid, bid, desc, clean(row.get("CODE")), desc,
@@ -45,7 +45,10 @@ def run(conn, maps: dict) -> dict:
         )
         row_id = cur.fetchone()
         if row_id is None:
-            cur.execute("SELECT id FROM code_bundles WHERE legacy_id = %s", (bid,))
+            cur.execute(
+                "SELECT id FROM code_bundles WHERE tenant_id = %s AND legacy_id = %s",
+                (tid, bid),
+            )
             row_id = cur.fetchone()
         if row_id:
             bundle_map[bid] = row_id[0]

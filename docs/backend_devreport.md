@@ -786,6 +786,19 @@ Current Status: Entire resource absent — no path, model, or endpoint anywhere 
 Suggested Endpoint: `GET /api/v1/explosion-codes` + `GET`/bulk `PUT /api/v1/offices/{office_id}/exp-codes`.
 Impact on Frontend: Exp Codes tab gated.
 
+**Resolved** — shipped as **Code Bundles**: `/api/v1/code-bundles` (+ `/code-bundle-items`,
+filter `bundle_id`) and the office assignment `GET`/`PUT /api/v1/offices/{office_id}/exp-codes`.
+The Explosion Codes Setup screen is fully backend-driven.
+
+**Data-note fix (2026-06-14, Alembic `e8f9a0b1c2d3`)** — the importer's
+`ON CONFLICT DO NOTHING` was a no-op because `code_bundles` had no unique key, so
+re-runs produced duplicate bundles per `legacy_id` (the seed showed 4× per id). Fixed:
+(1) added `UNIQUE (tenant_id, legacy_id)` to `code_bundles`; (2) the migration dedupes
+existing rows first (keep lowest id, drop duplicate bundles + their redundant items);
+(3) `scripts/dedupe_code_bundles.py` runs the same collapse on demand (`--dry-run`/`--tenant`);
+(4) the Denticon importer (`s14`) now targets `ON CONFLICT (tenant_id, legacy_id)` so it is
+idempotent. API-created bundles (NULL `legacy_id`) are exempt. Run `alembic upgrade head`.
+
 ## Missing API — #26 Production Types resource + office assignment
 
 Module: Setup → Office Assignment

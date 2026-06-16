@@ -63,6 +63,20 @@ class Settings(BaseSettings):
     # Base URL the emailed reset link points at (frontend route).
     PASSWORD_RESET_URL_BASE: str = "http://localhost:5173/reset-password"
 
+    # ── Email (SMTP transport) ───────────────────────────────────────────────
+    # When SMTP_HOST is unset, the email integration stays in log-only mode
+    # (links are written to the logs instead of sent) so dev works without creds.
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_USE_TLS: bool = True  # STARTTLS on port 587; set False + SMTP_USE_SSL for 465
+    SMTP_USE_SSL: bool = False  # implicit TLS (port 465)
+    SMTP_TIMEOUT_SECONDS: int = 10
+    # From-address shown to recipients. Falls back to SMTP_USER when unset.
+    EMAIL_FROM: str | None = None
+    EMAIL_FROM_NAME: str = "Dental PMS"
+
     # ── Redis (token store / blacklist) ────────────────────────────────────
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379

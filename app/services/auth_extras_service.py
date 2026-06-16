@@ -102,13 +102,21 @@ def _consume_token(db: Session, raw: str, purpose: str) -> tuple[AuthActionToken
 
 
 # ── Forgot / reset password ──────────────────────────────────────────────────
-def forgot_password(db: Session, email: str) -> dict:
-    """Always returns the same message (no account enumeration)."""
+def forgot_password(db: Session, email: str, background_tasks=None) -> dict:
+    """Always returns the same message (no account enumeration).
+
+    The token is committed synchronously; the (potentially slow) email send is
+    offloaded to ``background_tasks`` so the response doesn't block on SMTP. When
+    no ``background_tasks`` is provided (direct callers/tests), it sends inline.
+    """
     ident = (email or "").strip()
     user = db.execute(select(User).where(User.email == ident)).scalar_one_or_none()
     if user is not None and user.is_active:
         raw = _issue_token(db, user, PURPOSE_RESET, settings.PASSWORD_RESET_TOKEN_TTL_MINUTES)
-        email_integration.send_password_reset(user.email, raw)
+        if background_tasks is not None:
+            background_tasks.add_task(email_integration.send_password_reset, user.email, raw)
+        else:
+            email_integration.send_password_reset(user.email, raw)
     return {"message": _GENERIC_FORGOT_MESSAGE}
 
 

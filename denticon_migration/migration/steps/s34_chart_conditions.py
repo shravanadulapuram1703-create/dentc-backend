@@ -6,7 +6,15 @@ Returns: {}
 
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file
+from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import clean, parse_date, parse_bool
+
+COLS = [
+    "patient_id", "office_id", "legacy_id", "activity_date",
+    "tooth", "surface", "region", "area",
+    "description", "condition_code", "procedure_code",
+    "provider_id", "material_id", "chart_as", "is_inactive", "notes",
+]
 
 
 def run(conn, maps: dict) -> dict:
@@ -21,8 +29,12 @@ def run(conn, maps: dict) -> dict:
         print("  [s34] chart_conditions: file not found, skipping")
         return {}
 
-    cur = conn.cursor()
-    inserted = skipped = 0
+    skipped = 0
+    buf = BulkBuffer(
+        conn, "chart_conditions", COLS,
+        conflict="ON CONFLICT DO NOTHING",
+        flush_every=20000, page_size=2000, label="chart_conditions",
+    )
 
     for row in read_denticon_file(src):
         chart_id = (row.get("CHARTID") or "").strip()
@@ -39,40 +51,25 @@ def run(conn, maps: dict) -> dict:
         code     = (row.get("CODE") or row.get("ADACODE") or "").strip()
         code_fk  = code if (proc_code_set and code in proc_code_set) else None
 
-        cur.execute(
-            """
-            INSERT INTO chart_conditions (
-                patient_id, office_id, legacy_id, activity_date,
-                tooth, surface, region, area,
-                description, condition_code, procedure_code,
-                provider_id, material_id, chart_as, is_inactive, notes
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT DO NOTHING
-            """,
-            (
-                pat_id,
-                office_map.get(oid),
-                chart_id,
-                parse_date(row.get("ACTDATE") or ""),
-                clean(row.get("TH") or row.get("TOOTH")),
-                clean(row.get("SURF") or row.get("SURFACE")),
-                clean(row.get("REGION")),
-                clean(row.get("AREA")),
-                clean(row.get("DESCR") or row.get("DESCRIPTION")),
-                clean(row.get("CONDITIONCODE") or row.get("CONDITION")),
-                code_fk,
-                provider_map.get(prid),
-                material_map.get(mat_id) if mat_id else None,
-                clean(row.get("CHARTAS")),
-                parse_bool(row.get("ISINACTIVE", "False")),
-                clean(row.get("NOTES")),
-            ),
-        )
-        inserted += 1
+        buf.add((
+            pat_id,
+            office_map.get(oid),
+            chart_id,
+            parse_date(row.get("ACTDATE") or ""),
+            clean(row.get("TH") or row.get("TOOTH")),
+            clean(row.get("SURF") or row.get("SURFACE")),
+            clean(row.get("REGION")),
+            clean(row.get("AREA")),
+            clean(row.get("DESCR") or row.get("DESCRIPTION")),
+            clean(row.get("CONDITIONCODE") or row.get("CONDITION")),
+            code_fk,
+            provider_map.get(prid),
+            material_map.get(mat_id) if mat_id else None,
+            clean(row.get("CHARTAS")),
+            parse_bool(row.get("ISINACTIVE", "False")),
+            clean(row.get("NOTES")),
+        ))
 
-        if inserted % 2000 == 0:
-            conn.commit()
-
-    conn.commit()
-    print(f"  [s34] chart_conditions: {inserted} inserted, {skipped} skipped")
+    buf.flush()
+    print(f"  [s34] chart_conditions: {buf.inserted} inserted, {skipped} skipped")
     return {}

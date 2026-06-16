@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, LegacyIdMixin, TimestampMixin
@@ -25,6 +25,10 @@ class Tenant(Base, IntPKMixin, CreatedAtMixin):
 
 class User(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "users"
+    # short_id is the legacy 6-char user code; unique within a tenant (NULLs allowed).
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "short_id", name="uq_users_tenant_short_id"),
+    )
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(50), index=True)
@@ -45,6 +49,18 @@ class User(Base, IntPKMixin, TimestampMixin):
     legacy_activation_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     password_created_at: Mapped[datetime | None]
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # Audit Information panel (users dev-report gap #8): who last edited this user.
+    # ``updated_at`` is already provided by TimestampMixin.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # ── Security -> Users (users_missing_fields dev-report): structural gaps ──
+    short_id: Mapped[str | None] = mapped_column(String(6), index=True)  # gap #1
+    report_access_provider_id: Mapped[str | None] = mapped_column(  # gap #2
+        String(50), ForeignKey("providers.id")
+    )
+    custom_1: Mapped[str | None] = mapped_column(String(255))  # gap #3
+    custom_2: Mapped[str | None] = mapped_column(String(255))  # gap #3
+    signature_data: Mapped[str | None] = mapped_column(Text)  # gap #4 (base64 Topaz capture)
+    image_url: Mapped[str | None] = mapped_column(String(500))  # gap #5 (avatar)
 
 
 class RefreshToken(Base, IntPKMixin, CreatedAtMixin):
@@ -129,6 +145,21 @@ class Provider(Base, CreatedAtMixin):
     first_name: Mapped[str | None] = mapped_column(String(100))
     last_name: Mapped[str | None] = mapped_column(String(100))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # Provider Setup -> User & Permissions (provider dev-report gap #6): linked user account.
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    # Provider Setup -> Info "Provider/Advanced Settings" (provider dev-report gap #7).
+    scheduler_color: Mapped[str | None] = mapped_column(String(20))  # hex
+    is_ortho_provider: Mapped[bool] = mapped_column(Boolean, default=False)
+    visible_in_appointnow: Mapped[bool] = mapped_column(Boolean, default=True)
+    default_provider_time: Mapped[int | None] = mapped_column(Integer)  # minutes
+    is_billing_provider: Mapped[bool] = mapped_column(Boolean, default=False)
+    dosespot_user_id: Mapped[str | None] = mapped_column(String(100))
+    updox_direct_address: Mapped[str | None] = mapped_column(String(255))
+    denticon_user_id: Mapped[str | None] = mapped_column(String(100))
+    print_separate_claim_form: Mapped[bool] = mapped_column(Boolean, default=False)
+    ortho_questionnaire_template: Mapped[str | None] = mapped_column(String(100))
+    custom_1: Mapped[str | None] = mapped_column(String(255))
+    custom_2: Mapped[str | None] = mapped_column(String(255))
 
 
 class Operatory(Base, CreatedAtMixin):

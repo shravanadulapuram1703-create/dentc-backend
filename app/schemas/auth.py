@@ -42,8 +42,21 @@ class UserRead(ORMModel):
     is_legacy_user: bool = False
     legacy_activation_completed: bool = False
     password_created_at: datetime | None = None
+    # Security -> Users (users_missing_fields dev-report): structural gaps 1-5.
+    short_id: str | None = None
+    report_access_provider_id: str | None = None
+    custom_1: str | None = None
+    custom_2: str | None = None
+    signature_data: str | None = None
+    image_url: str | None = None
+    # Audit Information panel (users dev-report gap #8): created/updated actors.
     created_at: datetime
     created_by: int | None = None
+    updated_at: datetime | None = None
+    updated_by: int | None = None
+    # Resolved display names for the *_by actor ids (None when unresolved).
+    created_by_name: str | None = None
+    updated_by_name: str | None = None
 
 
 class SignupRequest(BaseModel):

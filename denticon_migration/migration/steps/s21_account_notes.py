@@ -10,7 +10,9 @@ from migration.utils.parsers import clean, parse_bool
 
 
 def run(conn, maps: dict) -> dict:
-    patient_map = maps["patient_map"]
+    # RESPNOTES are account-level (keyed by the responsible party RPID, no PATID),
+    # so resolve to the guarantor's primary patient.
+    rp_patient_map = maps.get("rp_patient_map", {})
 
     src = cfg.src("RESPNOTES.txt")
     if not src.exists():
@@ -23,7 +25,7 @@ def run(conn, maps: dict) -> dict:
     for row in read_denticon_file(src):
         note_id = (row.get("RESPNOTESID") or "").strip()
         rpid    = (row.get("RPID") or "").strip()
-        pat_id  = patient_map.get(rpid)
+        pat_id  = rp_patient_map.get(rpid)
 
         if not pat_id:
             skipped += 1

@@ -5,8 +5,10 @@ Alembic autogenerate and by the app at startup). Add new domain modules here.
 """
 
 from app.db.models.access import (
+    Permission,
     UserGroup,
     UserGroupMembership,
+    UserGroupRight,
     UserIpRule,
     UserLoginRestriction,
     UserPreference,
@@ -20,6 +22,7 @@ from app.db.models.account import (
     OfficePhoneAssignment,
 )
 from app.db.models.audit import AuditLog
+from app.db.models.aux_codes import IcdCode, PlaceOfServiceCode
 from app.db.models.patient_extra import (
     ClaimAttachment,
     PatientAdjustment,
@@ -43,6 +46,17 @@ from app.db.models.office_setup import (
     OfficeSmartAssist,
     OfficeSmartAssistItem,
     OfficeStatementSettings,
+)
+from app.db.models.procedure_setup import (
+    ProcedureInsuranceRule,
+    ProviderProcedureCode,
+)
+from app.db.models.provider_setup import (
+    ProviderCarrierLogin,
+    ProviderHoliday,
+    ProviderReferralOffice,
+    ProviderScheduleDay,
+    ProviderWatermark,
 )
 from app.db.models.billing import (
     ClaimSubmission,
@@ -139,7 +153,7 @@ __all__ = [
     "AuditLog",
     # access (Phase 4 net-new)
     "UserPreference", "UserGroup", "UserGroupMembership", "UserIpRule",
-    "UserTimeClockConfig", "UserLoginRestriction",
+    "UserTimeClockConfig", "UserLoginRestriction", "Permission", "UserGroupRight",
     # patients module net-new
     "PatientDocument", "PatientEmergencyContact", "PatientAdjustment", "ClaimAttachment",
     # account information (Setup -> Account Info)
@@ -148,6 +162,13 @@ __all__ = [
     # office setup (Setup -> Offices)
     "OfficeStatementSettings", "OfficeIntegrations", "OfficeScheduleDay",
     "OfficeAdvancedSettings", "OfficeSmartAssist", "OfficeSmartAssistItem",
+    # provider setup (Setup -> Providers)
+    "ProviderScheduleDay", "ProviderHoliday", "ProviderWatermark",
+    "ProviderReferralOffice", "ProviderCarrierLogin",
+    # procedure code setup (Setup -> Procedure Codes)
+    "ProviderProcedureCode", "ProcedureInsuranceRule",
+    # auxiliary code tables (Setup -> Procedure Codes)
+    "PlaceOfServiceCode", "IcdCode",
     # office assignment (Setup -> Offices -> Office Assignment)
     "ProductionType", "OfficeProcedureCode", "OfficeCodeBundle",
     "OfficeProductionType", "ProviderOffice", "OfficeNoteMacro",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, status
 
 from sqlalchemy import select
 
@@ -125,8 +125,12 @@ def me_full(db: DbSession, current_user: CurrentUser, tenant_id: TenantId) -> Me
     operation_id="forgot_password",
     summary="Request a password-reset email (always 200, never reveals existence)",
 )
-def forgot_password(db: DbSession, body: ForgotPasswordRequest) -> MessageResponse:
-    return MessageResponse(**auth_extras_service.forgot_password(db, body.email))
+def forgot_password(
+    db: DbSession, body: ForgotPasswordRequest, background_tasks: BackgroundTasks
+) -> MessageResponse:
+    return MessageResponse(
+        **auth_extras_service.forgot_password(db, body.email, background_tasks=background_tasks)
+    )
 
 
 @router.post(

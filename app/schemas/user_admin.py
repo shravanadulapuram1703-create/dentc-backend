@@ -64,6 +64,12 @@ class UserCompleteCreate(BaseModel):
     role: str = "staff"
     must_change_password: bool = False
     patient_access_level: str | None = None
+    # structural gaps 1-4 (users_missing_fields dev-report); image via upload endpoint
+    short_id: str | None = Field(None, max_length=6)
+    report_access_provider_id: str | None = None
+    custom_1: str | None = None
+    custom_2: str | None = None
+    signature_data: str | None = None
     # related
     home_office_id: int | None = None
     assigned_offices: list[int] = Field(default_factory=list)
@@ -86,6 +92,11 @@ class UserCompleteUpdate(BaseModel):
     is_active: bool | None = None
     must_change_password: bool | None = None
     patient_access_level: str | None = None
+    short_id: str | None = Field(None, max_length=6)
+    report_access_provider_id: str | None = None
+    custom_1: str | None = None
+    custom_2: str | None = None
+    signature_data: str | None = None
     home_office_id: int | None = None
     assigned_offices: list[int] | None = None
     group_ids: list[int] | None = None
@@ -93,6 +104,11 @@ class UserCompleteUpdate(BaseModel):
     login_restrictions: LoginRestrictions | None = None
     time_clock: TimeClockConfig | None = None
     preferences: dict[str, str] | None = None
+
+
+# ── Gap 5: user image / avatar ───────────────────────────────────────────────
+class UserImageResult(BaseModel):
+    image_url: str | None = None
 
 
 # ── Gap 7: self-service password change ──────────────────────────────────────

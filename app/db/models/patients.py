@@ -147,6 +147,11 @@ class Referral(Base, IntPKMixin, CreatedAtMixin):
     specialty: Mapped[str | None] = mapped_column(String(100))
     reason_code: Mapped[str | None] = mapped_column(String(20))
     notes: Mapped[str | None] = mapped_column(Text)
+    # Referral Info grid (referral dev-report gaps 1–4): legacy columns with no home.
+    e_referral_id: Mapped[str | None] = mapped_column(String(50))
+    practice_name: Mapped[str | None] = mapped_column(String(255))
+    contact_name: Mapped[str | None] = mapped_column(String(255))
+    cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 

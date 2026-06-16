@@ -17,6 +17,7 @@ from app.schemas.common import ErrorResponse
 from app.schemas.reports import (
     AccountsReceivable,
     Aging,
+    InsuranceVerificationSummary,
     ReportSummary,
     ReportTrends,
 )
@@ -78,6 +79,20 @@ def get_accounts_receivable(
     as_of: Annotated[date | None, Query(description="Point in time; defaults to today")] = None,
 ):
     return report_service.get_accounts_receivable(db, tenant_id, office_id, as_of)
+
+
+@router.get(
+    "/insurance-verification-summary",
+    response_model=InsuranceVerificationSummary,
+    operation_id="get_insurance_verification_summary",
+    summary="Active subscribers grouped by eligibility status (powers Pending Verifications)",
+)
+def get_insurance_verification_summary(
+    db: DbSession,
+    tenant_id: TenantId,
+    office_id: _OfficeId = None,
+):
+    return report_service.get_insurance_verification_summary(db, tenant_id, office_id)
 
 
 @router.get(

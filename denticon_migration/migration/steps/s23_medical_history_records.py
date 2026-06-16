@@ -6,7 +6,10 @@ Returns: {}
 
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file
+from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import parse_bool, parse_datetime, clean
+
+COLS = ["patient_id", "legacy_id", "signature_id", "is_archived", "created_at"]
 
 
 def run(conn, maps: dict) -> dict:
@@ -18,12 +21,17 @@ def run(conn, maps: dict) -> dict:
         print("  [s23] medical_history_records: file not found, skipping")
         return {}
 
-    cur = conn.cursor()
-    inserted = skipped = 0
+    skipped = 0
+    buf = BulkBuffer(
+        conn, "medical_history_records", COLS,
+        conflict="ON CONFLICT DO NOTHING",
+        template="(%s,%s,%s,%s,COALESCE(%s, NOW()))",
+        flush_every=20000, page_size=2000, label="medical_history_records",
+    )
 
     for row in read_denticon_file(src):
         hist_id = (row.get("PATMEDICALHISTORYID") or "").strip()
-        rpid    = (row.get("RPID") or row.get("PATID") or "").strip()
+        rpid    = (row.get("PATID") or row.get("RPID") or "").strip()  # PatMedicalHistoryH is PATID-keyed
         pat_id  = patient_map.get(rpid)
 
         if not pat_id:
@@ -32,23 +40,14 @@ def run(conn, maps: dict) -> dict:
 
         sig_legacy = (row.get("SIGNATUREID") or "").strip()
         sig_db_id  = sig_map.get(sig_legacy)
-        created_at = parse_datetime(row.get("ACTDATE") or row.get("CREATEDDATE") or "")
+        created_at = parse_datetime(row.get("CREATEDON") or row.get("ACTDATE") or "")
 
-        cur.execute(
-            """
-            INSERT INTO medical_history_records
-                (patient_id, legacy_id, signature_id, is_archived, created_at)
-            VALUES (%s,%s,%s,%s,COALESCE(%s, NOW()))
-            ON CONFLICT DO NOTHING
-            """,
-            (
-                pat_id, hist_id, sig_db_id,
-                parse_bool(row.get("ISARCHIVED", "False")),
-                created_at,
-            ),
-        )
-        inserted += 1
+        buf.add((
+            pat_id, hist_id, sig_db_id,
+            parse_bool(row.get("MOVETOARCHIVE", "False")),
+            created_at,
+        ))
 
-    conn.commit()
-    print(f"  [s23] medical_history_records: {inserted} inserted, {skipped} skipped")
+    buf.flush()
+    print(f"  [s23] medical_history_records: {buf.inserted} inserted, {skipped} skipped")
     return {}

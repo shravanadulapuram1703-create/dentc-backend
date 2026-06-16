@@ -36,6 +36,8 @@ class CrudConfig:
     pk_name: str = "id"
     search_fields: tuple[str, ...] = ()
     sortable_fields: tuple[str, ...] = ()
+    # INS-9: (fk_attr, related_model, related_search_fields) — extend search to a related name.
+    search_relations: tuple[tuple[str, type, tuple[str, ...]], ...] = ()
     filter_fields: tuple[str, ...] = ()
     range_fields: tuple[str, ...] = ()  # emit {f}_from / {f}_to typed query params
     default_sort: str = "created_at"
@@ -140,6 +142,7 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         search_fields=cfg.search_fields,
         sortable_fields=cfg.sortable_fields,
         default_sort=cfg.default_sort,
+        search_relations=cfg.search_relations,
     )
     router = APIRouter(
         prefix=f"/{cfg.prefix}",
@@ -192,9 +195,10 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         tenant_id: TenantId,
         item_id: PkPath,
         body: cfg.update_schema,  # type: ignore[valid-type]
+        current=Depends(get_current_user),
     ):
         data = body.model_dump(exclude_unset=True)
-        return crud.update(db, item_id, data, tenant_id=tenant_id)
+        return crud.update(db, item_id, data, tenant_id=tenant_id, updated_by=current.id)
 
     @router.delete(
         "/{item_id}",

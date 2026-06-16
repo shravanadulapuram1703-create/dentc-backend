@@ -15,7 +15,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError
+from app.core import filestore
+from app.core.config import settings
+from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError, ValidationError
 from app.core.security import hash_password, verify_password
 from app.db.models import (
     Definition,
@@ -145,12 +147,25 @@ def _set_login_restrictions(db: Session, user: User, tenant_id: int, data: dict)
 _IDENTITY_FIELDS = {
     "email", "username", "first_name", "last_name", "phone", "role",
     "is_active", "must_change_password", "patient_access_level",
+    # structural gaps 1-4 (users_missing_fields dev-report); image_url via upload endpoint
+    "short_id", "report_access_provider_id", "custom_1", "custom_2", "signature_data",
 }
 
 
 def _commit(db: Session) -> None:
     try:
         db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ConflictError("User violates a uniqueness/reference constraint",
+                            details=str(getattr(exc, "orig", exc))) from exc
+
+
+def _flush(db: Session) -> None:
+    # Uniqueness violations (e.g. duplicate short_id / username) surface at flush,
+    # before _commit's guard — convert them to a 409 here too.
+    try:
+        db.flush()
     except IntegrityError as exc:
         db.rollback()
         raise ConflictError("User violates a uniqueness/reference constraint",
@@ -169,17 +184,23 @@ def create_complete(db: Session, tenant_id: int, payload: dict, created_by: int 
         role=payload.get("role", "staff"),
         must_change_password=payload.get("must_change_password", False),
         patient_access_level=payload.get("patient_access_level"),
+        short_id=payload.get("short_id"),
+        report_access_provider_id=payload.get("report_access_provider_id"),
+        custom_1=payload.get("custom_1"),
+        custom_2=payload.get("custom_2"),
+        signature_data=payload.get("signature_data"),
         created_by=created_by,
     )
     db.add(user)
-    db.flush()  # assign user.id
+    _flush(db)  # assign user.id (converts uniqueness violations to 409)
     _apply_related(db, user, tenant_id, payload, is_create=True)
     _commit(db)
     db.refresh(user)
     return user
 
 
-def update_complete(db: Session, tenant_id: int, user_id: int, payload: dict) -> User:
+def update_complete(db: Session, tenant_id: int, user_id: int, payload: dict,
+                    updated_by: int | None = None) -> User:
     user = db.execute(
         select(User).where(User.id == user_id, User.tenant_id == tenant_id)
     ).scalar_one_or_none()
@@ -189,6 +210,7 @@ def update_complete(db: Session, tenant_id: int, user_id: int, payload: dict) ->
         setattr(user, field, payload[field])
     if "password" in payload and payload["password"]:
         user.password_hash = hash_password(payload["password"])
+    user.updated_by = updated_by  # gap #8: record the editing actor
     _apply_related(db, user, tenant_id, payload, is_create=False)
     _commit(db)
     db.refresh(user)
@@ -256,12 +278,14 @@ def get_security_settings(db: Session, user_id: int, tenant_id: int) -> dict:
             "login_restrictions": restrictions}
 
 
-def set_security_settings(db: Session, user_id: int, tenant_id: int, payload: dict) -> dict:
+def set_security_settings(db: Session, user_id: int, tenant_id: int, payload: dict,
+                          updated_by: int | None = None) -> dict:
     user = _require_user(db, user_id, tenant_id)
     if "patient_access_level" in payload:
         user.patient_access_level = payload["patient_access_level"]
     if payload.get("login_restrictions") is not None:
         _set_login_restrictions(db, user, tenant_id, payload["login_restrictions"])
+    user.updated_by = updated_by  # gap #8
     _commit(db)
     return get_security_settings(db, user_id, tenant_id)
 
@@ -272,6 +296,81 @@ def change_password(db: Session, user: User, current_password: str, new_password
     user.password_hash = hash_password(new_password)
     user.must_change_password = False
     db.commit()
+
+
+# ── User image / avatar (users_missing_fields dev-report gap #5) ─────────────
+def save_user_image(db: Session, user_id: int, tenant_id: int, filename: str,
+                    content_type: str, data: bytes, updated_by: int | None = None) -> User:
+    user = _require_user(db, user_id, tenant_id)
+    if content_type not in settings.LOGO_ALLOWED_TYPES:
+        raise ValidationError(
+            f"Unsupported image type '{content_type}'. Allowed: "
+            f"{', '.join(settings.LOGO_ALLOWED_TYPES)}",
+            code="invalid_image_type",
+        )
+    if len(data) > settings.LOGO_MAX_BYTES:
+        raise ValidationError(
+            f"Image exceeds {settings.LOGO_MAX_BYTES // (1024 * 1024)} MB limit",
+            code="image_too_large",
+        )
+    # Replace any prior avatar so we don't orphan files on disk.
+    filestore.delete_file(_image_rel_path(user.image_url))
+    _, url = filestore.save_file("user_images", filename, data)
+    user.image_url = url
+    user.updated_by = updated_by  # gap #8
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def delete_user_image(db: Session, user_id: int, tenant_id: int,
+                      updated_by: int | None = None) -> None:
+    user = _require_user(db, user_id, tenant_id)
+    filestore.delete_file(_image_rel_path(user.image_url))
+    user.image_url = None
+    user.updated_by = updated_by  # gap #8
+    db.commit()
+
+
+def _image_rel_path(image_url: str | None) -> str | None:
+    """Map a stored avatar URL back to its filestore-relative path."""
+    if not image_url:
+        return None
+    return f"user_images/{image_url.rsplit('/', 1)[-1]}"
+
+
+# ── Audit Information panel (users dev-report gap #8): id -> display name ─────
+def _display_name(u: User) -> str:
+    full = " ".join(p for p in (u.first_name, u.last_name) if p).strip()
+    return full or u.username
+
+
+def resolve_user_names(db: Session, user_ids: set[int]) -> dict[int, str]:
+    """Batch-resolve user ids to display names (no N+1)."""
+    ids = {i for i in user_ids if i is not None}
+    if not ids:
+        return {}
+    rows = db.execute(select(User).where(User.id.in_(ids))).scalars().all()
+    return {u.id: _display_name(u) for u in rows}
+
+
+def attach_audit_names(db: Session, users: User | list[User]) -> None:
+    """Set transient ``created_by_name`` / ``updated_by_name`` on user ORM objects.
+
+    These are non-mapped attributes Pydantic's ``from_attributes`` reads when
+    serialising ``UserRead`` (gap #8). Mutates in place.
+    """
+    items = [users] if isinstance(users, User) else list(users)
+    wanted: set[int] = set()
+    for u in items:
+        if u.created_by is not None:
+            wanted.add(u.created_by)
+        if u.updated_by is not None:
+            wanted.add(u.updated_by)
+    names = resolve_user_names(db, wanted)
+    for u in items:
+        u.created_by_name = names.get(u.created_by) if u.created_by is not None else None
+        u.updated_by_name = names.get(u.updated_by) if u.updated_by is not None else None
 
 
 # ── Gap 6: list users filtered by office / role ──────────────────────────────

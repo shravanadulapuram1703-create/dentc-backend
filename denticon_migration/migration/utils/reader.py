@@ -75,7 +75,13 @@ def read_denticon_file(
                 row.append("")
             if apply_limit:
                 cfg.consume_row_budget()
-            yield dict(zip(headers, row))
+            # Strip NUL (0x00) bytes — Postgres rejects them in text literals.
+            # Some Denticon exports (e.g. InsPlans.txt) contain stray NULs that
+            # otherwise crash a full run mid-stream.
+            yield {
+                h: (v.replace("\x00", "") if v else v)
+                for h, v in zip(headers, row)
+            }
 
 
 def read_folder(

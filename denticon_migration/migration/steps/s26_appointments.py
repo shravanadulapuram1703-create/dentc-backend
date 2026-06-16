@@ -11,10 +11,20 @@ import itertools
 from datetime import datetime, timedelta
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file, read_folder
+from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import (
     clean, parse_date, parse_datetime, parse_bool, parse_int, parse_decimal,
     map_appt_status
 )
+
+COLS = [
+    "id", "patient_id", "provider_id", "operatory_id", "office_id",
+    "legacy_id", "is_archived", "date", "start_time", "end_time", "duration",
+    "status", "is_missed", "is_cancelled", "is_posted",
+    "procedure_label", "notes",
+    "has_lab", "lab_cost", "lab_sent_on", "lab_due_on", "lab_received_on",
+    "is_blocked", "campaign_id", "treatment_plan_id",
+]
 
 
 def _rows():
@@ -37,9 +47,18 @@ def run(conn, maps: dict) -> dict:
     txplan_map    = maps.get("txplan_map", {})
     default_oid   = next(iter(office_map.values()))
 
-    cur = conn.cursor()
     appt_map: dict[str, str] = {}
-    inserted = skipped = 0
+    skipped = 0
+    buf = BulkBuffer(
+        conn, "appointments", COLS,
+        conflict=(
+            "ON CONFLICT (id) DO UPDATE SET "
+            "status = EXCLUDED.status, "
+            "updated_at = NOW()"
+        ),
+        dedup_index=COLS.index("id"),
+        flush_every=20000, page_size=2000, label="appointments",
+    )
 
     for row, is_archived in _rows():
         appt_id = (row.get("APPTID") or "").strip()
@@ -86,53 +105,26 @@ def run(conn, maps: dict) -> dict:
         tpid  = (row.get("TREATPLANID") or "").strip()
         tp_pk = txplan_map.get(tpid) if tpid and tpid != "0" else None
 
-        cur.execute(
-            """
-            INSERT INTO appointments (
-                id, patient_id, provider_id, operatory_id, office_id,
-                legacy_id, is_archived, date, start_time, end_time, duration,
-                status, is_missed, is_cancelled, is_posted,
-                procedure_label, notes,
-                has_lab, lab_cost, lab_sent_on, lab_due_on, lab_received_on,
-                is_blocked, campaign_id, treatment_plan_id
-            ) VALUES (
-                %s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,
-                %s,%s,
-                %s,%s,%s,%s,%s,
-                %s,%s,%s
-            )
-            ON CONFLICT (id) DO UPDATE SET
-                status     = EXCLUDED.status,
-                updated_at = NOW()
-            """,
-            (
-                db_pk, pat_id, provider_pk, operatory_pk, office_id,
-                appt_id, is_archived, appt_date, start_t, end_t, duration,
-                map_appt_status(row),
-                parse_bool(row.get("ISMISSED", "False")),
-                parse_bool(row.get("ISCANCELLED", "False")),
-                parse_bool(row.get("ISPOSTED", "False")),
-                clean(row.get("PRODTYPE")),
-                clean(row.get("APPTNOTES") or row.get("NOTES")),
-                parse_bool(row.get("ISLAB", "False")),
-                parse_decimal(row.get("LABCOST") or "0"),
-                parse_date(row.get("LABSENTON") or ""),
-                parse_date(row.get("LABDUEON") or ""),
-                parse_date(row.get("LABRECVDON") or ""),
-                is_blocked,
-                clean(row.get("CAMPAIGN")),
-                tp_pk,
-            ),
-        )
+        buf.add((
+            db_pk, pat_id, provider_pk, operatory_pk, office_id,
+            appt_id, is_archived, appt_date, start_t, end_t, duration,
+            map_appt_status(row),
+            parse_bool(row.get("ISMISSED", "False")),
+            parse_bool(row.get("ISCANCELLED", "False")),
+            parse_bool(row.get("ISPOSTED", "False")),
+            clean(row.get("PRODTYPE")),
+            clean(row.get("APPTNOTES") or row.get("NOTES")),
+            parse_bool(row.get("ISLAB", "False")),
+            parse_decimal(row.get("LABCOST") or "0"),
+            parse_date(row.get("LABSENTON") or ""),
+            parse_date(row.get("LABDUEON") or ""),
+            parse_date(row.get("LABRECVDON") or ""),
+            is_blocked,
+            clean(row.get("CAMPAIGN")),
+            tp_pk,
+        ))
         appt_map[appt_id] = db_pk
-        inserted += 1
 
-        if inserted % 1000 == 0:
-            conn.commit()
-            print(f"    ...{inserted} appointments inserted")
-
-    conn.commit()
-    print(f"  [s26] appointments: {inserted} upserted, {skipped} skipped → map size {len(appt_map)}")
+    buf.flush()
+    print(f"  [s26] appointments: {buf.inserted} upserted, {skipped} skipped → map size {len(appt_map)}")
     return appt_map

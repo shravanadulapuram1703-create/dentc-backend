@@ -15,7 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
 
 
-class Employer(Base, IntPKMixin, CreatedAtMixin):
+class Employer(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "employers"
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
@@ -26,23 +26,54 @@ class Employer(Base, IntPKMixin, CreatedAtMixin):
     state: Mapped[str | None] = mapped_column(String(50))
     zip: Mapped[str | None] = mapped_column(String(20))
     phone: Mapped[str | None] = mapped_column(String(20))
+    # Insurance dev-report INS-5: legacy Employer screen fields.
+    salesrep: Mapped[str | None] = mapped_column(String(255))
+    contact_person: Mapped[str | None] = mapped_column(String(255))
+    # INS-5/INS-6: server-maintained audit actors (``updated_at`` via TimestampMixin).
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
-class InsuranceCarrier(Base, IntPKMixin, CreatedAtMixin):
+class InsuranceCarrier(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "insurance_carriers"
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(255))
+    carrier_type: Mapped[str | None] = mapped_column(String(20))
     payer_id: Mapped[str | None] = mapped_column(String(50))
+    national_id: Mapped[str | None] = mapped_column(String(50))
+    claim_type: Mapped[str | None] = mapped_column(String(10))
+    fee_id: Mapped[str | None] = mapped_column(String(20))
     phone: Mapped[str | None] = mapped_column(String(20))
     phone2: Mapped[str | None] = mapped_column(String(20))
+    # INS-4: Fax & Email modeled discretely (no longer crammed into notes).
+    fax: Mapped[str | None] = mapped_column(String(20))
+    email: Mapped[str | None] = mapped_column(String(255))
     address: Mapped[str | None] = mapped_column(String(255))
+    address2: Mapped[str | None] = mapped_column(String(255))
     city: Mapped[str | None] = mapped_column(String(100))
     state: Mapped[str | None] = mapped_column(String(50))
     zip: Mapped[str | None] = mapped_column(String(20))
     website: Mapped[str | None] = mapped_column(String(255))
+    contact: Mapped[str | None] = mapped_column(String(255))
     notes: Mapped[str | None] = mapped_column(Text)
+    ref_num: Mapped[str | None] = mapped_column(String(50))
+    vbs_id: Mapped[str | None] = mapped_column(String(50))
+    vbs_pgid: Mapped[str | None] = mapped_column(String(50))
+    cda_carrier_transaction_counter: Mapped[str | None] = mapped_column(String(50))
+    # INS-3: medical-carrier capability flags (nullable = unknown) + sub-type.
+    supports_realtime_eligibility: Mapped[bool | None] = mapped_column(Boolean)
+    supports_claim_status: Mapped[bool | None] = mapped_column(Boolean)
+    supports_dxc_attachment: Mapped[bool | None] = mapped_column(Boolean)
+    insurance_type: Mapped[str | None] = mapped_column(String(50))
+    # Legacy free-text audit (migrated source); kept for display.
+    created_on: Mapped[datetime | None]
+    created_by: Mapped[str | None] = mapped_column(String(100))
+    modified_on: Mapped[datetime | None]
+    modified_by: Mapped[str | None] = mapped_column(String(100))
+    # INS-6: server-maintained modified actor (``updated_at`` via TimestampMixin).
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -138,6 +169,8 @@ class FeeScheduleAssignment(Base, IntPKMixin, CreatedAtMixin):
     carrier_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_carriers.id"))
     provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
     office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
+    # FEE-3: legacy "Office Group" target — assign a fee schedule at the group level.
+    office_group_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("office_groups.id"))
     fee_schedule_id: Mapped[int] = mapped_column(Integer, ForeignKey("fee_schedules.id"), index=True)
     specialty_id: Mapped[str | None] = mapped_column(String(20))
     created_by: Mapped[str | None] = mapped_column(String(100))

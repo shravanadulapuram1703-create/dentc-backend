@@ -8,10 +8,17 @@ Returns: { ledgerid_str: payment_varchar_pk }
 
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file, read_folder
+from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import (
     clean, parse_date, parse_decimal, parse_bool,
     route_ledger_row, map_payment_method, LTYPE_PAYMENT_TYPE
 )
+
+COLS = [
+    "id", "patient_id", "office_id", "legacy_id", "is_archived",
+    "payment_date", "amount", "payment_type", "payment_method",
+    "check_number", "provider_id", "notes", "is_void",
+]
 
 
 def _rows():
@@ -30,9 +37,13 @@ def run(conn, maps: dict) -> dict:
     provider_map = maps["provider_map"]
     office_map   = maps["office_map"]
 
-    cur = conn.cursor()
     payment_map: dict[str, str] = {}
-    inserted = skipped = 0
+    skipped = 0
+    buf = BulkBuffer(
+        conn, "patient_payments", COLS,
+        conflict="ON CONFLICT (id) DO NOTHING",
+        flush_every=20000, page_size=2000, label="payments",
+    )
 
     for row, is_archived in _rows():
         if route_ledger_row(row) != "patient_payments":
@@ -59,35 +70,20 @@ def run(conn, maps: dict) -> dict:
         # Amount: AMOUNT is the raw amount. For adjustments it may be negative.
         amount = parse_decimal(row.get("AMOUNT") or "0")
 
-        cur.execute(
-            """
-            INSERT INTO patient_payments (
-                id, patient_id, office_id, legacy_id, is_archived,
-                payment_date, amount, payment_type, payment_method,
-                check_number, provider_id, notes, is_void
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (id) DO NOTHING
-            """,
-            (
-                db_pk, pat_id,
-                office_map.get(oid),
-                ledger_id, is_archived,
-                pay_date, amount,
-                LTYPE_PAYMENT_TYPE.get(ltype, "patient"),
-                map_payment_method(row.get("TYPE2") or ""),
-                clean(row.get("CHECKNO")),
-                provider_map.get(prid),
-                clean(row.get("NOTES")),
-                parse_bool(row.get("ISVOID", "False")),
-            ),
-        )
+        buf.add((
+            db_pk, pat_id,
+            office_map.get(oid),
+            ledger_id, is_archived,
+            pay_date, amount,
+            LTYPE_PAYMENT_TYPE.get(ltype, "patient"),
+            map_payment_method(row.get("TYPE2") or ""),
+            clean(row.get("CHECKNO")),
+            provider_map.get(prid),
+            clean(row.get("NOTES")),
+            parse_bool(row.get("ISVOID", "False")),
+        ))
         payment_map[ledger_id] = db_pk
-        inserted += 1
 
-        if inserted % 2000 == 0:
-            conn.commit()
-            print(f"    ...{inserted} payments inserted")
-
-    conn.commit()
-    print(f"  [s29] patient_payments: {inserted} inserted, {skipped} skipped → map size {len(payment_map)}")
+    buf.flush()
+    print(f"  [s29] patient_payments: {buf.inserted} inserted, {skipped} skipped → map size {len(payment_map)}")
     return payment_map

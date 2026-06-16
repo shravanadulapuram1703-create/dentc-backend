@@ -55,6 +55,42 @@ class UserGroupMembership(Base, IntPKMixin, CreatedAtMixin):
     group_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_groups.id"), index=True)
 
 
+class Permission(Base, IntPKMixin, CreatedAtMixin):
+    """Global catalog of assignable rights (Security -> Groups dev-report gap #1).
+
+    Application-defined and identical across tenants, so this table is NOT
+    tenant-scoped — it is seeded once from ``data/Groups.txt``. ``code`` is the
+    stable slug the frontend keys on (e.g. ``appointments_add_new_appointment``);
+    ``label`` is the human text; ``category`` is the leading segment (Appointments,
+    Patient, Reports, Setup, Transactions, Utilities, …).
+    """
+
+    __tablename__ = "permissions"
+
+    code: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    label: Mapped[str] = mapped_column(String(255))
+    category: Mapped[str | None] = mapped_column(String(100), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class UserGroupRight(Base, IntPKMixin, CreatedAtMixin):
+    """Group -> permission assignment (Security -> Groups dev-report gap #2).
+
+    Normalised M:N join between ``user_groups`` and the global ``permissions``
+    catalog. Tenant-scoped (carries ``tenant_id``) so a group's rights stay within
+    its practice. A user's effective rights = union over their group memberships.
+    """
+
+    __tablename__ = "user_group_rights"
+    __table_args__ = (
+        UniqueConstraint("group_id", "permission_id", name="uq_user_group_rights_group_permission"),
+    )
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    group_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_groups.id"), index=True)
+    permission_id: Mapped[int] = mapped_column(Integer, ForeignKey("permissions.id"), index=True)
+
+
 class UserIpRule(Base, IntPKMixin, CreatedAtMixin):
     __tablename__ = "user_ip_rules"
 

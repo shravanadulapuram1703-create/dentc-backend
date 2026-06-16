@@ -16,6 +16,21 @@ from fastapi import APIRouter
 from app.crud.router_factory import CrudConfig, register_crud
 from app.db import models as m
 from app.schemas.factory import build_schemas
+from app.schemas.fee_schedule import (
+    FeeScheduleCreate,
+    FeeScheduleRead,
+    FeeScheduleUpdate,
+)
+from app.schemas.insurance import (
+    InsuranceCarrierCreate,
+    InsuranceCarrierRead,
+    InsuranceCarrierUpdate,
+)
+from app.schemas.procedure_code import (
+    ProcedureCodeCreate,
+    ProcedureCodeRead,
+    ProcedureCodeUpdate,
+)
 
 _DEFAULT_SORT = ("created_at", "id")
 
@@ -31,6 +46,7 @@ def _cfg(
     pk_type: type = int,
     pk_name: str = "id",
     search: tuple[str, ...] = (),
+    search_relations: tuple[tuple[str, type, tuple[str, ...]], ...] = (),
     sortable: tuple[str, ...] = _DEFAULT_SORT,
     filters: tuple[str, ...] = (),
     ranges: tuple[str, ...] = (),
@@ -52,6 +68,7 @@ def _cfg(
         pk_type=pk_type,
         pk_name=pk_name,
         search_fields=search,
+        search_relations=search_relations,
         sortable_fields=sortable,
         filter_fields=filters,
         range_fields=ranges,
@@ -99,7 +116,9 @@ _PATIENTS = [
          "medical_history_record", "medical_history_records",
          filters=("patient_id",), soft_field="is_archived", soft_value=True),
     _cfg(m.Referral, "Referral", "referrals", "Patients", "referral", "referrals",
-         search=("first_name", "last_name", "specialty"), filters=("patient_id", "office_id"),
+         search=("first_name", "last_name", "specialty", "practice_name"),
+         # Left-rail SEARCH ON (referral_type direction) + TYPE (reason_code) server filters.
+         filters=("patient_id", "office_id", "referral_type", "reason_code"),
          soft_field=None),
     _cfg(m.PatientNote, "PatientNote", "patient-notes", "Patients",
          "patient_note", "patient_notes",
@@ -121,16 +140,33 @@ _PATIENTS = [
 _INSURANCE = [
     _cfg(m.Employer, "Employer", "employers", "Insurance", "employer", "employers",
          search=("name", "city"), soft_field=None),
-    _cfg(m.InsuranceCarrier, "InsuranceCarrier", "insurance-carriers", "Insurance",
-         "insurance_carrier", "insurance_carriers", search=("name", "payer_id"),
-         filters=("is_active",)),
+    # Carrier uses a custom Read schema (computed ``is_dental``, INS-2) and exposes
+    # the server-side ``carrier_type`` filter that splits Dental/Medical (INS-1).
+    CrudConfig(
+        model=m.InsuranceCarrier,
+        create_schema=InsuranceCarrierCreate,
+        update_schema=InsuranceCarrierUpdate,
+        read_schema=InsuranceCarrierRead,
+        prefix="insurance-carriers", tag="Insurance",
+        singular="insurance_carrier", plural="insurance_carriers",
+        search_fields=("name", "payer_id"),
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("is_active", "carrier_type", "insurance_type"),
+        default_sort="created_at",
+    ),
     _cfg(m.InsurancePlan, "InsurancePlan", "insurance-plans", "Insurance",
          "insurance_plan", "insurance_plans", search=("group_number", "plan_type"),
+         # INS-9: also match a plan by its carrier/employer name (plans store only ids).
+         search_relations=(
+             ("carrier_id", m.InsuranceCarrier, ("name", "payer_id")),
+             ("employer_id", m.Employer, ("name",)),
+         ),
          filters=("carrier_id", "employer_id", "is_active")),
     _cfg(m.InsuranceSubscriber, "InsuranceSubscriber", "insurance-subscribers", "Insurance",
          "insurance_subscriber", "insurance_subscribers",
          search=("sub_first_name", "sub_last_name", "sub_member_id"),
-         filters=("ins_plan_id", "subscriber_patient_id", "is_active")),
+         # INS-11: elig_status (+ office_id) filter so verification queues are countable.
+         filters=("ins_plan_id", "subscriber_patient_id", "office_id", "elig_status", "is_active")),
     _cfg(m.InsuranceCoverageRule, "InsuranceCoverageRule", "insurance-coverage-rules", "Insurance",
          "insurance_coverage_rule", "insurance_coverage_rules",
          filters=("ins_plan_id",), soft_field=None),
@@ -138,13 +174,36 @@ _INSURANCE = [
 
 # ── Procedures, fees & codes ───────────────────────────────────────────────
 _CODES = [
-    _cfg(m.ProcedureCode, "ProcedureCode", "procedure-codes", "Procedures",
-         "procedure_code", "procedure_codes", pk_type=str, pk_name="code",
-         search=("code", "description", "category"), sortable=("code", "category"),
-         filters=("category", "is_active", "is_ortho")),
-    _cfg(m.FeeSchedule, "FeeSchedule", "fee-schedules", "Procedures",
-         "fee_schedule", "fee_schedules", search=("name",),
-         filters=("ins_plan_id", "office_id", "is_active")),
+    # ProcedureCode uses custom schemas (valid_teeth array, PROC-1) shared with the
+    # stats/insurance-rules supplemental router.
+    CrudConfig(
+        model=m.ProcedureCode,
+        create_schema=ProcedureCodeCreate,
+        update_schema=ProcedureCodeUpdate,
+        read_schema=ProcedureCodeRead,
+        prefix="procedure-codes", tag="Procedures",
+        singular="procedure_code", plural="procedure_codes",
+        pk_type=str, pk_name="code",
+        search_fields=("code", "description", "category"),
+        sortable_fields=("code", "category"),
+        filter_fields=("category", "is_active", "is_ortho", "chart_category"),
+        default_sort="created_at",
+    ),
+    # FeeSchedule uses shared schemas (reused by the restore/new-version router)
+    # and exposes the schedule-level effective_date range + version lineage (FEE-4).
+    CrudConfig(
+        model=m.FeeSchedule,
+        create_schema=FeeScheduleCreate,
+        update_schema=FeeScheduleUpdate,
+        read_schema=FeeScheduleRead,
+        prefix="fee-schedules", tag="Procedures",
+        singular="fee_schedule", plural="fee_schedules",
+        search_fields=("name",),
+        sortable_fields=("created_at", "id", "effective_date", "name"),
+        filter_fields=("ins_plan_id", "office_id", "is_active", "parent_schedule_id"),
+        range_fields=("effective_date",),
+        default_sort="created_at",
+    ),
     _cfg(m.FeeScheduleEntry, "FeeScheduleEntry", "fee-schedule-entries", "Procedures",
          "fee_schedule_entry", "fee_schedule_entries",
          filters=("fee_schedule_id", "procedure_code"), soft_field=None),
@@ -159,6 +218,15 @@ _CODES = [
     _cfg(m.PrescriptionLibrary, "PrescriptionLibrary", "prescription-library", "Procedures",
          "prescription_library_item", "prescription_library", search=("drug_name",),
          filters=("is_active",)),
+    # Auxiliary code tables (Setup -> Procedure Codes). AUX-3 POS is tenant-scoped;
+    # AUX-4 ICD is a global catalog (like procedure_codes) — paginated + searchable.
+    _cfg(m.PlaceOfServiceCode, "PlaceOfServiceCode", "place-of-service-codes", "Procedures",
+         "place_of_service_code", "place_of_service_codes",
+         search=("code", "type", "name"), sortable=("code", "created_at"),
+         filters=("office_id", "is_active")),
+    _cfg(m.IcdCode, "IcdCode", "icd-codes", "Procedures",
+         "icd_code", "icd_codes", search=("code", "description", "icd10", "snomed"),
+         sortable=("code", "created_at"), filters=("is_active",)),
 ]
 
 # ── Scheduling ─────────────────────────────────────────────────────────────
@@ -272,7 +340,8 @@ _REFERENCE = [
          "ins_custom_coverage", "ins_custom_coverage", soft_field=None),
     _cfg(m.FeeScheduleAssignment, "FeeScheduleAssignment", "fee-schedule-assignments", "Procedures",
          "fee_schedule_assignment", "fee_schedule_assignments",
-         filters=("fee_schedule_id", "ins_plan_id", "provider_id", "office_id"), soft_field=None),
+         filters=("fee_schedule_id", "ins_plan_id", "provider_id", "office_id",
+                  "office_group_id", "carrier_id"), soft_field=None),
     _cfg(m.MedicalHistoryDetail, "MedicalHistoryDetail", "medical-history-details", "Patients",
          "medical_history_detail", "medical_history_details",
          filters=("history_id",), soft_field=None),
@@ -319,9 +388,11 @@ _MISC = [
          soft_field="is_deleted", soft_value=True),
     _cfg(m.CollectionAgency, "CollectionAgency", "collection-agencies", "Imaging",
          "collection_agency", "collection_agencies", search=("name",), soft_field=None),
-    _cfg(m.ReferralDemogHeader, "ReferralDemogHeader", "referral-demog-headers", "Imaging",
+    # Referral demographics feed (referral dev-report gap 5). Tagged "Patients" so it
+    # lands in the same generated client file as referrals (was "Imaging" → undiscovered).
+    _cfg(m.ReferralDemogHeader, "ReferralDemogHeader", "referral-demog-headers", "Patients",
          "referral_demog_header", "referral_demog_headers", search=("description",), soft_field=None),
-    _cfg(m.ReferralDemogDetail, "ReferralDemogDetail", "referral-demog-details", "Imaging",
+    _cfg(m.ReferralDemogDetail, "ReferralDemogDetail", "referral-demog-details", "Patients",
          "referral_demog_detail", "referral_demog_details",
          filters=("referral_id", "demog_header_id"), soft_field=None),
 ]

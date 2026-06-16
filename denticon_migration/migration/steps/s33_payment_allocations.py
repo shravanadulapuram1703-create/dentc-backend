@@ -6,7 +6,14 @@ Returns: {}
 
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file
+from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import clean, parse_date, parse_decimal
+
+COLS = [
+    "patient_id", "legacy_id", "procedure_id", "payment_id",
+    "claim_id", "ins_plan_id", "provider_id",
+    "alloc_date", "amount", "alloc_type",
+]
 
 
 def run(conn, maps: dict) -> dict:
@@ -22,8 +29,12 @@ def run(conn, maps: dict) -> dict:
         print("  [s33] payment_allocations: file not found, skipping")
         return {}
 
-    cur = conn.cursor()
-    inserted = skipped = 0
+    skipped = 0
+    buf = BulkBuffer(
+        conn, "payment_allocations", COLS,
+        conflict="ON CONFLICT DO NOTHING",
+        flush_every=20000, page_size=2000, label="payment_allocations",
+    )
 
     for row in read_denticon_file(src):
         alloc_id   = (row.get("PAYALLOCID") or "").strip()
@@ -40,32 +51,18 @@ def run(conn, maps: dict) -> dict:
         planid    = (row.get("INSPLANID") or "").strip()
         prid      = (row.get("PROVIDERID") or "").strip()
 
-        cur.execute(
-            """
-            INSERT INTO payment_allocations (
-                patient_id, legacy_id, procedure_id, payment_id,
-                claim_id, ins_plan_id, provider_id,
-                alloc_date, amount, alloc_type
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT DO NOTHING
-            """,
-            (
-                pat_id, alloc_id,
-                procedure_map.get(proc_leg),
-                payment_map.get(pay_leg),
-                claim_map.get(claim_leg),
-                ins_plan_map.get(planid),
-                provider_map.get(prid),
-                parse_date(row.get("ALLOCDATE") or ""),
-                parse_decimal(row.get("AMOUNT") or "0"),
-                clean(row.get("LTYPE")),
-            ),
-        )
-        inserted += 1
+        buf.add((
+            pat_id, alloc_id,
+            procedure_map.get(proc_leg),
+            payment_map.get(pay_leg),
+            claim_map.get(claim_leg),
+            ins_plan_map.get(planid),
+            provider_map.get(prid),
+            parse_date(row.get("ALLOCDATE") or ""),
+            parse_decimal(row.get("AMOUNT") or "0"),
+            clean(row.get("LTYPE")),
+        ))
 
-        if inserted % 2000 == 0:
-            conn.commit()
-
-    conn.commit()
-    print(f"  [s33] payment_allocations: {inserted} inserted, {skipped} skipped")
+    buf.flush()
+    print(f"  [s33] payment_allocations: {buf.inserted} inserted, {skipped} skipped")
     return {}

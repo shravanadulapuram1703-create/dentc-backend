@@ -454,6 +454,13 @@ def main():
     )
 
     conn = get_conn()
+    # Bulk load over a remote DB: skip waiting for WAL flush on each commit.
+    # Safe for a re-runnable migration — worst case after a crash is replaying
+    # the last batch, which every step already handles idempotently.
+    with conn.cursor() as _c:
+        _c.execute("SET synchronous_commit TO off")
+    conn.commit()
+
     maps: dict = {}
     if args.from_step and args.from_step > 1:
         print(f"\n  Resuming from step {args.from_step} — loading maps from DB...")

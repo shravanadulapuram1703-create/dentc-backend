@@ -150,15 +150,29 @@ CREATE TABLE IF NOT EXISTS insurance_carriers (
     tenant_id   INTEGER      NOT NULL REFERENCES tenants(id),
     legacy_id   VARCHAR(20)  UNIQUE,
     name        VARCHAR(255) NOT NULL,
+    carrier_type VARCHAR(20),                 -- Denticon CARRIERTYPE (True/False flag)
     payer_id    VARCHAR(50),
+    national_id VARCHAR(50),                  -- NATIONALID
+    claim_type  VARCHAR(10),                  -- CLAIMTYPE (1/0)
+    fee_id      VARCHAR(20),                  -- FEEID (legacy fee-schedule ref)
     phone       VARCHAR(20),
     phone2      VARCHAR(20),
     address     VARCHAR(255),
+    address2    VARCHAR(255),
     city        VARCHAR(100),
     state       VARCHAR(50),
     zip         VARCHAR(20),
     website     VARCHAR(255),
+    contact     VARCHAR(255),                 -- CONTACT
     notes       TEXT,
+    ref_num     VARCHAR(50),                  -- REFNUM
+    vbs_id      VARCHAR(50),                  -- VBSID
+    vbs_pgid    VARCHAR(50),                  -- VBSPGID
+    cda_carrier_transaction_counter VARCHAR(50), -- CDACARRIERTRANSACTIONCOUNTER
+    created_on  TIMESTAMP,                    -- Denticon CREATEDON
+    created_by  VARCHAR(100),                 -- CREATEDBY
+    modified_on TIMESTAMP,                    -- MODIFIEDON
+    modified_by VARCHAR(100),                 -- MODIFIEDBY
     is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -364,7 +378,7 @@ CREATE TABLE IF NOT EXISTS patients (
     tenant_id            INTEGER      NOT NULL REFERENCES tenants(id),
     home_office_id       INTEGER      REFERENCES offices(id),
     legacy_id            VARCHAR(20)  UNIQUE,
-    chart_no             VARCHAR(50)  UNIQUE,
+    chart_no             VARCHAR(50),  -- NOT unique: family members share a chart number (per-account in Denticon)
     first_name           VARCHAR(100),
     last_name            VARCHAR(100),
     preferred_name       VARCHAR(100),

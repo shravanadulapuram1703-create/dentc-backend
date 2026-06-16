@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Generic, TypeVar
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, inspect as sa_inspect, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ class CRUDBase(Generic[ModelT]):
         search_fields: tuple[str, ...] = (),
         sortable_fields: tuple[str, ...] = (),
         default_sort: str = "created_at",
+        search_relations: tuple[tuple[str, type, tuple[str, ...]], ...] = (),
     ) -> None:
         self.model = model
         self.pk_attr = pk_attr
@@ -38,6 +39,14 @@ class CRUDBase(Generic[ModelT]):
         self.soft_delete_value = soft_delete_value
         self.search_fields = tuple(f for f in search_fields if hasattr(model, f))
         self.sortable_fields = tuple(f for f in sortable_fields if hasattr(model, f))
+        # INS-9: extend free-text search across a related table via an FK, e.g.
+        # match an insurance plan by its carrier/employer *name* (plans store ids).
+        # Each entry is (fk_attr_on_self, related_model, related_search_fields).
+        self.search_relations = tuple(
+            (fk, rel, fields)
+            for fk, rel, fields in search_relations
+            if hasattr(model, fk)
+        )
         self.default_sort = default_sort if hasattr(model, default_sort) else pk_attr
         self.resource_name = model.__name__
 
@@ -45,6 +54,16 @@ class CRUDBase(Generic[ModelT]):
     @property
     def _pk(self):
         return getattr(self.model, self.pk_attr)
+
+    def _is_int_col(self, name: str) -> bool:
+        """True if ``name`` maps to an integer column (so an actor user id fits)."""
+        col = sa_inspect(self.model).columns.get(name)
+        if col is None:
+            return False
+        try:
+            return col.type.python_type is int
+        except Exception:  # noqa: BLE001
+            return False
 
     def _scope_tenant(self, stmt, tenant_id: int | None):
         if tenant_id is not None and hasattr(self.model, "tenant_id"):
@@ -94,19 +113,30 @@ class CRUDBase(Generic[ModelT]):
             if bounds.get("le") is not None:
                 stmt = stmt.where(column <= bounds["le"])
 
-        # free-text search across declared columns
-        if search and self.search_fields:
+        # free-text search across declared columns (+ related-table names, INS-9)
+        if search and (self.search_fields or self.search_relations):
             term = f"%{search}%"
-            stmt = stmt.where(
-                or_(*[getattr(self.model, f).ilike(term) for f in self.search_fields])
-            )
+            clauses = [getattr(self.model, f).ilike(term) for f in self.search_fields]
+            for fk_attr, related, rel_fields in self.search_relations:
+                rel_pk = sa_inspect(related).primary_key[0]
+                sub = select(rel_pk).where(
+                    or_(*[getattr(related, rf).ilike(term) for rf in rel_fields])
+                )
+                clauses.append(getattr(self.model, fk_attr).in_(sub))
+            if clauses:
+                stmt = stmt.where(or_(*clauses))
 
         total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
 
         sort_col = sort if (sort and sort in self.sortable_fields) else self.default_sort
         column = getattr(self.model, sort_col)
-        stmt = stmt.order_by(column.desc() if order == "desc" else column.asc())
-        stmt = stmt.offset((page - 1) * size).limit(size)
+        order_by = [column.desc() if order == "desc" else column.asc()]
+        # INS-8: append the primary key as a deterministic tiebreaker so rows
+        # never shift/drop/duplicate across page boundaries when the primary
+        # sort column is non-unique (e.g. carriers/employers sorted by name).
+        if sort_col != self.pk_attr:
+            order_by.append(self._pk.asc())
+        stmt = stmt.order_by(*order_by).offset((page - 1) * size).limit(size)
 
         items = list(db.execute(stmt).scalars().all())
         return items, total
@@ -123,7 +153,9 @@ class CRUDBase(Generic[ModelT]):
         payload = dict(data)
         if tenant_id is not None and hasattr(self.model, "tenant_id"):
             payload.setdefault("tenant_id", tenant_id)
-        if created_by is not None and hasattr(self.model, "created_by"):
+        # Only stamp the actor id into an *integer* created_by column; legacy
+        # free-text created_by columns (carriers, etc.) are left untouched.
+        if created_by is not None and self._is_int_col("created_by"):
             payload.setdefault("created_by", created_by)
         obj = self.model(**payload)
         db.add(obj)
@@ -138,10 +170,14 @@ class CRUDBase(Generic[ModelT]):
         data: dict[str, Any],
         *,
         tenant_id: int | None = None,
+        updated_by: int | None = None,
     ) -> ModelT:
         obj = self.get(db, obj_id, tenant_id=tenant_id)
         for key, value in data.items():
             setattr(obj, key, value)
+        # INS-6: server-maintained modified actor (integer updated_by columns only).
+        if updated_by is not None and self._is_int_col("updated_by"):
+            obj.updated_by = updated_by
         self._commit(db)
         db.refresh(obj)
         return obj

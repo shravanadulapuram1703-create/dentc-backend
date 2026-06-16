@@ -75,6 +75,21 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
         ("draft", "Draft"), ("submitted", "Submitted"), ("paid", "Paid"),
         ("denied", "Denied"), ("closed", "Closed"),
     ],
+    # Insurance Setup -> Plans/Coverage (dev-report INS-10): label the opaque codes.
+    # ``insurance_plans.coverage_type`` (Denticon COVERAGETYPE, single char).
+    "coverage_type": [
+        ("I", "Indemnity"), ("P", "PPO"), ("H", "HMO"), ("C", "Capitation"),
+        ("M", "Medicaid"), ("S", "Self Pay"), ("O", "Other"),
+    ],
+    # ``insurance_coverage_rules.category`` (Denticon INSCATEGORYID → ADA group;
+    # see denticon_migration/migration_mapping.md). key1 = the raw stored code.
+    "coverage_category": [
+        ("0", "Other"), ("1", "Diagnostic"), ("2", "Preventive"), ("3", "Restorative"),
+        ("4", "Endodontics"), ("5", "Periodontics"), ("6", "Prosthodontics (Removable)"),
+        ("7", "Maxillofacial Prosthetics"), ("8", "Implant Services"),
+        ("9", "Prosthodontics (Fixed)"), ("10", "Oral & Maxillofacial Surgery"),
+        ("11", "Orthodontics"), ("12", "Adjunctive General Services"),
+    ],
     # Security -> Users module (gaps #2/#5)
     "user_role": [
         ("admin", "Administrator"), ("provider", "Provider"), ("front_desk", "Front Desk"),
@@ -121,6 +136,57 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
     "referral_type": [
         ("patient", "Existing Patient"), ("doctor", "Doctor"), ("insurance", "Insurance"),
         ("online", "Online"), ("walk_in", "Walk-in"), ("other", "Other"),
+    ],
+    # Referral Setup -> Referral Sources (referral dev-report): the referrals
+    # ``referral_type`` column is a direction code, not the above lead-source list.
+    "referral_direction": [("0", "Referred By"), ("1", "Referred To")],
+    # ── Auxiliary code tables (Setup -> Procedure Codes), AUX-1 / AUX-2 ──────────
+    # Modifier Codes — standard CPT/HCPCS modifiers (key1 = code, description = label).
+    "MODIFIER": [
+        ("21", "Prolonged Evaluation and Management Services"),
+        ("22", "Increased Procedural Services"),
+        ("23", "Unusual Anesthesia"),
+        ("24", "Unrelated E/M Service During a Postoperative Period"),
+        ("25", "Significant, Separately Identifiable E/M Service"),
+        ("26", "Professional Component"),
+        ("27", "Multiple Outpatient Hospital E/M Encounters"),
+        ("32", "Mandated Services"),
+        ("50", "Bilateral Procedure"),
+        ("51", "Multiple Procedures"),
+        ("52", "Reduced Services"),
+        ("53", "Discontinued Procedure"),
+        ("54", "Surgical Care Only"),
+        ("55", "Postoperative Management Only"),
+        ("56", "Preoperative Management Only"),
+        ("57", "Decision for Surgery"),
+        ("58", "Staged or Related Procedure"),
+        ("59", "Distinct Procedural Service"),
+        ("62", "Two Surgeons"),
+        ("76", "Repeat Procedure by Same Physician"),
+        ("77", "Repeat Procedure by Another Physician"),
+        ("78", "Unplanned Return to the Operating Room"),
+        ("79", "Unrelated Procedure During the Postoperative Period"),
+        ("80", "Assistant Surgeon"),
+        ("90", "Reference (Outside) Laboratory"),
+        ("91", "Repeat Clinical Diagnostic Laboratory Test"),
+        ("99", "Multiple Modifiers"),
+    ],
+    # Type of Service — standard CMS TOS codes.
+    "TYPEOFSERVICE": [
+        ("01", "Medical Care"),
+        ("02", "Surgery"),
+        ("03", "Consultation"),
+        ("04", "Diagnostic Radiology"),
+        ("05", "Diagnostic Laboratory"),
+        ("06", "Therapeutic Radiology"),
+        ("07", "Anesthesia"),
+        ("08", "Assistant at Surgery"),
+        ("09", "Other Medical Items or Services"),
+        ("10", "Whole Blood"),
+        ("11", "Used Durable Medical Equipment (DME)"),
+        ("12", "DME Purchase"),
+        ("13", "Ambulatory Surgical Center (ASC) Facility"),
+        ("99", "Other"),
     ],
     "pronoun": [("he_him", "He/Him"), ("she_her", "She/Her"), ("they_them", "They/Them")],
     "contact_pref": [

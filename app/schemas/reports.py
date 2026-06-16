@@ -64,6 +64,25 @@ class AccountsReceivable(BaseModel):
     as_of: str
 
 
+class InsuranceVerificationSummary(BaseModel):
+    """Subscriber eligibility-verification counts (INS-11).
+
+    A single GROUP BY over ``insurance_subscribers`` (no row scan) so the Insurance
+    Dashboard's "Pending Verifications" KPI is cheap. ``by_status`` maps each
+    ``elig_status`` (NULL/blank → ``"unknown"``) to its count; ``pending`` is every
+    active subscriber not in the verified vocabulary.
+    """
+
+    by_status: dict[str, int] = Field(
+        default_factory=dict, description="elig_status → active subscriber count"
+    )
+    total: int = Field(0, description="Total active subscribers counted")
+    verified: int = Field(0, description="Subscribers with a verified eligibility status")
+    pending: int = Field(0, description="Active subscribers still needing verification")
+    office_id: int | None = None
+    as_of: str = Field(..., description="UTC timestamp the summary was computed")
+
+
 class Aging(BaseModel):
     """Receivables aged by the age of each charge's date_of_service (FE gap 3).
 
