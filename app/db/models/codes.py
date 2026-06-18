@@ -85,17 +85,26 @@ class FeeScheduleEntry(Base, IntPKMixin, CreatedAtMixin):
     effective_date: Mapped[date | None]
 
 
-class ChartMaterial(Base, IntPKMixin, CreatedAtMixin):
+class ChartMaterial(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "chart_materials"
+    # Same defect as code_bundles: no unique key meant the importer's
+    # ``ON CONFLICT DO NOTHING`` was a no-op and re-runs produced duplicate rows
+    # (4x per legacy_id). NULL legacy_id (API-created) is exempt — NULLs are distinct.
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "legacy_id", name="uq_chart_materials_tenant_legacy"),
+    )
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20))
     name: Mapped[str] = mapped_column(String(100))
     pattern: Mapped[str | None] = mapped_column(String(100))
     color: Mapped[str | None] = mapped_column(String(50))
+    # CHART-3a/3b: TimestampMixin adds updated_at ("Modified On"); updated_by is the
+    # editing actor ("Modified By"), auto-set by CRUDBase.update on every PATCH.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
-class NoteMacro(Base, IntPKMixin, CreatedAtMixin):
+class NoteMacro(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "note_macros"
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
@@ -104,6 +113,9 @@ class NoteMacro(Base, IntPKMixin, CreatedAtMixin):
     content: Mapped[str] = mapped_column(Text)
     category: Mapped[str | None] = mapped_column(String(100))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # NM-4: TimestampMixin adds updated_at ("Modified On"); updated_by is the editing
+    # actor ("Modified By"), auto-set by CRUDBase.update on every PATCH.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class CodeBundle(Base, IntPKMixin, CreatedAtMixin):
@@ -146,10 +158,18 @@ class PrescriptionLibrary(Base, IntPKMixin, TimestampMixin):
     refills: Mapped[int] = mapped_column(Integer, default=0)
     is_as_written: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # RX-1: "Modified By". updated_at already comes from TimestampMixin ("Modified
+    # On"); updated_by is auto-set by CRUDBase.update on every PATCH.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class ChartColor(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "chart_colors"
+    # Same migration-rerun duplication as chart_materials (5x per legacy_id).
+    # NULL legacy_id (API-created) is exempt — Postgres treats NULLs as distinct.
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "legacy_id", name="uq_chart_colors_tenant_legacy"),
+    )
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20))
@@ -163,6 +183,9 @@ class ChartColor(Base, IntPKMixin, TimestampMixin):
     gradient_angle: Mapped[str | None] = mapped_column(String(20))
     gradient_method: Mapped[str | None] = mapped_column(String(20))
     created_by: Mapped[str | None] = mapped_column(String(100))
+    # CHART-2a: editing actor ("Modified By"), auto-set by CRUDBase.update on PATCH.
+    # (created_at/updated_at already provided by TimestampMixin.)
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class CodesView(Base, IntPKMixin, CreatedAtMixin):

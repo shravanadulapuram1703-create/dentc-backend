@@ -75,6 +75,7 @@ from app.db.models.clinical import (
     PatientProcedure,
     PerioChartActivity,
     PerioChartSetting,
+    PerioChartTemplate,
     PerioExam,
     PerioExamDetail,
     Prescription,
@@ -194,6 +195,7 @@ __all__ = [
     # clinical
     "PatientProcedure", "ChartCondition", "ProgressNote", "PerioExam",
     "PerioExamDetail", "Prescription", "PerioChartSetting", "PerioChartActivity",
+    "PerioChartTemplate",
     # billing
     "PatientPayment", "InsuranceClaim", "ClaimSubmission", "LedgerInsuranceDetail",
     "PaymentAllocation", "PatientPaymentPlan", "PatientInsPaymentPlan",

@@ -9,10 +9,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, CreatedAtMixin, IntPKMixin
+from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
 
 
 class PatientProcedure(Base, CreatedAtMixin):
@@ -142,6 +142,9 @@ class Prescription(Base, IntPKMixin, CreatedAtMixin):
 
 
 class PerioChartSetting(Base, IntPKMixin, CreatedAtMixin):
+    """Per-user runtime perio-charting preference (one row per user). Distinct from
+    PerioChartTemplate, which is the practice-level named template library (CHART-1)."""
+
     __tablename__ = "perio_chart_settings"
 
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), unique=True)
@@ -151,6 +154,32 @@ class PerioChartSetting(Base, IntPKMixin, CreatedAtMixin):
     pd_level: Mapped[int] = mapped_column(Integer, default=4)
     bp_level: Mapped[int] = mapped_column(Integer, default=2)
     ip_level: Mapped[int] = mapped_column(Integer, default=3)
+
+
+class PerioChartTemplate(Base, IntPKMixin, TimestampMixin):
+    """CHART-1: named, tenant-scoped Perio Setup Template (the legacy "Perio Setup
+    Templates" screen — add/edit/delete named templates). ``auto_advance`` is a JSON
+    map of the 8 region keys (ur_facial … ll_lingual) to a direction string like
+    "01-08"/"08-01"; mirrors the valid_teeth JSON precedent on procedure_codes."""
+
+    __tablename__ = "perio_chart_templates"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "legacy_id", name="uq_perio_chart_templates_tenant_legacy"),
+    )
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    legacy_id: Mapped[str | None] = mapped_column(String(20))
+    name: Mapped[str] = mapped_column(String(100))
+    show_mgj: Mapped[bool] = mapped_column(Boolean, default=False)
+    pd_warning_level: Mapped[int] = mapped_column(Integer, default=4)
+    cal_warning_level: Mapped[int] = mapped_column(Integer, default=4)
+    bp_level: Mapped[int] = mapped_column(Integer, default=2)
+    ip_level: Mapped[int] = mapped_column(Integer, default=3)
+    fgm_level: Mapped[int] = mapped_column(Integer, default=2)
+    start_voice: Mapped[bool] = mapped_column(Boolean, default=False)
+    auto_advance: Mapped[dict | None] = mapped_column(JSON)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class PerioChartActivity(Base, IntPKMixin, CreatedAtMixin):

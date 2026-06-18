@@ -61,9 +61,12 @@ reference content (below). All four screens are now unblocked.
 - **Decision:** ICD is a **global catalog (no `tenant_id`)**, mirroring `procedure-codes` —
   one shared diagnosis set across the practice; `is_active` toggles apply globally. If you
   need per-tenant active sets, flag it and we'll add tenant scoping.
-- **Not seeded.** ICD is a large external set with no in-repo source. Load it from the
-  practice's ICD file via `createIcdCode` / a future import, then manage with bulk-status.
-  Until loaded, the screen shows an empty grid (not an error).
+- **Seeded** with the legacy Denticon dental ICD-9 set (265 codes) via
+  `python -m scripts.seed_icd_codes`. Every row is `is_active=false` (legacy default) and
+  `icd9`/`icd10`/`snomed` are blank in the source → left NULL. The practice **activates**
+  the codes it uses via `bulk-status`, and can fill the crosswalk columns via `updateIcdCode`.
+  So the default grid lists all 265 (Active = false); a future crosswalk/ICD-10 import can
+  be a one-off if you supply the source.
 
 ---
 

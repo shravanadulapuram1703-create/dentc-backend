@@ -214,7 +214,9 @@ _CODES = [
     _cfg(m.ChartMaterial, "ChartMaterial", "chart-materials", "Procedures",
          "chart_material", "chart_materials", search=("name",), soft_field=None),
     _cfg(m.NoteMacro, "NoteMacro", "note-macros", "Procedures",
-         "note_macro", "note_macros", search=("name", "category"), soft_field=None),
+         "note_macro", "note_macros", search=("name", "category"),
+         # NM-1: server-side "Select Macro Category" filter (was client-side only).
+         filters=("category",), soft_field=None),
     _cfg(m.PrescriptionLibrary, "PrescriptionLibrary", "prescription-library", "Procedures",
          "prescription_library_item", "prescription_library", search=("drug_name",),
          filters=("is_active",)),
@@ -278,6 +280,10 @@ _CLINICAL = [
          filters=("patient_id", "provider_id", "is_active")),
     _cfg(m.PerioChartSetting, "PerioChartSetting", "perio-chart-settings", "Clinical",
          "perio_chart_setting", "perio_chart_settings", filters=("user_id",), soft_field=None),
+    # CHART-1: named, tenant-scoped Perio Setup Templates (distinct from the per-user
+    # perio_chart_settings above). Backs the "Perio Setup Templates" screen.
+    _cfg(m.PerioChartTemplate, "PerioChartTemplate", "perio-chart-templates", "Clinical",
+         "perio_chart_template", "perio_chart_templates", search=("name",), soft_field=None),
     _cfg(m.PerioChartActivity, "PerioChartActivity", "perio-chart-activity", "Clinical",
          "perio_chart_activity", "perio_chart_activity", filters=("patient_id",), soft_field=None),
 ]
@@ -322,13 +328,16 @@ _REFERENCE = [
          filters=("group_code", "is_active")),
     _cfg(m.DefinitionGroup, "DefinitionGroup", "definition-groups", "Metadata",
          "definition_group", "definition_groups", search=("description", "group_code"),
-         soft_field=None),
+         # MED-1 / TB-1: feature-scoped fetch (MEDALERT/MEDQUEST/DENTQUEST/TOOLBAR…)
+         # so the medical & toolbar setup screens stop fetching every group.
+         filters=("group_type",), soft_field=None),
     _cfg(m.ImagingTemplate, "ImagingTemplate", "imaging-templates", "Metadata",
          "imaging_template", "imaging_templates", search=("name",),
          filters=("office_id",), soft_field=None),
     _cfg(m.QuestionnaireHeader, "QuestionnaireHeader", "questionnaire-headers", "Metadata",
          "questionnaire_header", "questionnaire_headers", search=("description",),
-         filters=("is_active",)),
+         # PICK-3: is_custom splits "Manage Pick Lists" (false) from "Custom Pick Lists".
+         filters=("is_active", "is_custom")),
     _cfg(m.QuestionnaireOption, "QuestionnaireOption", "questionnaire-options", "Metadata",
          "questionnaire_option", "questionnaire_options",
          filters=("questionnaire_id", "is_active")),

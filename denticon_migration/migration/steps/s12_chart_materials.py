@@ -4,9 +4,21 @@ Source: ChartMaterials.txt
 Returns: { materialid_str: material_db_id }
 """
 
+import os
+
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file
 from migration.utils.parsers import clean
+
+
+def _pattern_key(value):
+    """Source MATPATTERN is a GIF filename (``hash.gif``); the charting renderer
+    keys its fill-pattern catalog by the bare name (``hash``). Strip the
+    extension + lowercase so the Sample column renders instead of showing ``?``."""
+    v = clean(value)
+    if not v:
+        return v
+    return os.path.splitext(v)[0].lower() or None
 
 
 def run(conn, maps: dict) -> dict:
@@ -39,7 +51,7 @@ def run(conn, maps: dict) -> dict:
             ON CONFLICT DO NOTHING
             RETURNING id
             """,
-            (tid, mid, name, clean(row.get("MATPATTERN")), clean(row.get("MATCOLOR"))),
+            (tid, mid, name, _pattern_key(row.get("MATPATTERN")), clean(row.get("MATCOLOR"))),
         )
         row_id = cur.fetchone()
         if row_id is None:

@@ -17,6 +17,7 @@ from app.api.v1 import (
     office_assignment,
     office_setup,
     patients_extra,
+    pick_lists,
     procedure_codes,
     provider_setup,
     reports,
@@ -69,6 +70,9 @@ api_router.include_router(provider_setup.carrier_router)
 api_router.include_router(procedure_codes.router)
 # ICD codes bulk-status. Before generic CRUD so /icd-codes/bulk-status wins.
 api_router.include_router(icd_codes.router)
+# Pick List supplements (atomic items replace + cascade delete). Before generic
+# CRUD so /questionnaire-headers/{id}/options & /{id}/cascade win over /{item_id}.
+api_router.include_router(pick_lists.router)
 # Patients module supplemental: documents, claim detail/lifecycle/attachments,
 # progress-note sign, duplicate-check (before generic CRUD for literal paths).
 api_router.include_router(patients_extra.documents_router)

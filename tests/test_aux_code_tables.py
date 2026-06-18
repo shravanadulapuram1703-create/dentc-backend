@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.db.models import IcdCode
 from scripts.seed_account_definitions import seed_for_tenant
 from scripts.seed_aux_codes import seed_for_tenant as seed_pos
+from scripts.seed_icd_codes import seed as seed_icd
 
 
 def test_modifier_and_tos_definitions_seeded(client, db_session):
@@ -73,3 +74,17 @@ def test_icd_bulk_status(client, db_session):
     # All now inactive.
     active = client.get("/api/v1/icd-codes", params={"is_active": True}).json()
     assert active["meta"]["total"] == 0
+
+
+def test_icd_seed_loads_dental_set_inactive_and_idempotent(client, db_session):
+    # The legacy dental ICD-9 set seeds (is_active=False) and re-running is a no-op.
+    added = seed_icd(db_session)
+    assert added > 200
+    listed = client.get("/api/v1/icd-codes", params={"size": 1}).json()
+    assert listed["meta"]["total"] == added
+    # Legacy default: every seeded row is inactive until the practice activates it.
+    assert client.get("/api/v1/icd-codes", params={"is_active": True, "size": 1}).json()["meta"]["total"] == 0
+    one = client.get("/api/v1/icd-codes", params={"search": "Anodontia"}).json()
+    assert any(r["code"] == "520.0" for r in one["items"])
+    # Idempotent.
+    assert seed_icd(db_session) == 0

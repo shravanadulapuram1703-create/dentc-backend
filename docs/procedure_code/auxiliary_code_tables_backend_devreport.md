@@ -12,21 +12,6 @@ project rule (backend is the source of truth; no mock/hardcoded business data), 
 are intentionally **not** built against fabricated CMS code lists. They will be built and
 wired once the endpoints below ship — the same loop used for PROC-1…PROC-5.
 
-> **✅ RESOLVED (backend, 2026-06-14, Alembic `f9a0b1c2d3e4`).** All four shipped.
-> Wiring details, decisions, and open questions are in the companion
-> **`auxiliary_code_tables_frontend_handoff.md`**. Summary:
-> - **AUX-1 Modifier** → seeded `definitions` group `MODIFIER` (CPT/HCPCS set). Read
->   `GET /definitions?group_code=MODIFIER`; CRUD via existing definitions endpoints.
-> - **AUX-2 Type of Service** → seeded `definitions` group `TYPEOFSERVICE` (CMS TOS set).
-> - **AUX-3 Place of Service** → new tenant-scoped resource `GET/POST/PATCH/DELETE
->   /api/v1/place-of-service-codes` (code/type/name/tax_id/office_id/is_active; search +
->   office_id/is_active filters). Standard CMS POS list seeded per tenant.
-> - **AUX-4 ICD Codes** → new global resource `GET/POST/PATCH/DELETE /api/v1/icd-codes`
->   (code/description/icd9/icd10/snomed/is_active; paginated + search + is_active filter)
->   plus `POST /api/v1/icd-codes/bulk-status` `{ids, is_active}` for the legacy bulk toggle.
-> - Seeds: `python -m scripts.seed_account_definitions` (Modifier/TOS) and
->   `python -m scripts.seed_aux_codes` (POS). ICD is not seeded (load from a practice source).
-
 ---
 
 ## Verification (how we know these are missing)

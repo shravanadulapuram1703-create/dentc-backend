@@ -9,10 +9,10 @@ from __future__ import annotations
 from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, CreatedAtMixin, IntPKMixin
+from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
 
 
-class Definition(Base, IntPKMixin, CreatedAtMixin):
+class Definition(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "definitions"
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
@@ -28,9 +28,15 @@ class Definition(Base, IntPKMixin, CreatedAtMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_flash_alert: Mapped[bool] = mapped_column(Boolean, default=False)
     blocks_charges: Mapped[bool] = mapped_column(Boolean, default=False)
+    # MED-3: typed questionnaire control (TEXT/TEXTAREA/YESNO/DATE) for definitions
+    # repurposed as questionnaire questions; null for plain definitions/alerts.
+    input_type: Mapped[str | None] = mapped_column(String(20))
+    # TB-3 / MED modified-by: TimestampMixin adds updated_at; updated_by is the
+    # editing actor, auto-set by CRUDBase.update on every PATCH.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
-class DefinitionGroup(Base, IntPKMixin, CreatedAtMixin):
+class DefinitionGroup(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "definition_groups"
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
@@ -41,7 +47,10 @@ class DefinitionGroup(Base, IntPKMixin, CreatedAtMixin):
     key2_label: Mapped[str | None] = mapped_column(String(100))
     is_editable: Mapped[bool] = mapped_column(Boolean, default=True)
     can_add: Mapped[bool] = mapped_column(Boolean, default=True)
-    group_type: Mapped[str | None] = mapped_column(String(10))
+    group_type: Mapped[str | None] = mapped_column(String(20))
+    # TB-3: "Modified On" / "Modified By" on toolbars/medical headers built on
+    # definition_groups. TimestampMixin adds updated_at; updated_by auto-set on PATCH.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class ImagingTemplate(Base, IntPKMixin, CreatedAtMixin):
@@ -62,12 +71,17 @@ class QuestionnaireHeader(Base, IntPKMixin, CreatedAtMixin):
     description: Mapped[str] = mapped_column(String(255))
     is_multi_select: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # PICK-3: splits user-created "Custom Pick Lists" (true) from the built-in/
+    # system pick lists (false) so the two legacy nav routes can be filtered apart.
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class QuestionnaireOption(Base, IntPKMixin, CreatedAtMixin):
     __tablename__ = "questionnaire_options"
 
-    questionnaire_id: Mapped[int] = mapped_column(Integer, ForeignKey("questionnaire_headers.id"), index=True)
+    questionnaire_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("questionnaire_headers.id", ondelete="CASCADE"), index=True
+    )
     legacy_id: Mapped[str | None] = mapped_column(String(20))
     answer_code: Mapped[str] = mapped_column(String(20))
     sort_order: Mapped[int] = mapped_column(Integer, default=1)
