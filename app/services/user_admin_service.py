@@ -332,6 +332,29 @@ def delete_user_image(db: Session, user_id: int, tenant_id: int,
     db.commit()
 
 
+# ── PN-1: per-user signature store ("Load My Signature") ─────────────────────
+def get_user_signature(db: Session, user_id: int, tenant_id: int) -> User:
+    """Return the user (caller reads ``signature_*`` off it). 404 if no user;
+    the route returns 404 separately when ``signature_data`` is unset."""
+    return _require_user(db, user_id, tenant_id)
+
+
+def set_user_signature(
+    db: Session, user_id: int, tenant_id: int, *,
+    signature_data: str, signature_len: int | None, device_source: str | None,
+) -> User:
+    from datetime import datetime, timezone
+
+    user = _require_user(db, user_id, tenant_id)
+    user.signature_data = signature_data
+    user.signature_len = signature_len
+    user.signature_device_source = device_source
+    user.signature_updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def _image_rel_path(image_url: str | None) -> str | None:
     """Map a stored avatar URL back to its filestore-relative path."""
     if not image_url:

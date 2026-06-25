@@ -95,6 +95,18 @@ class MeFull(BaseModel):
     user: UserRead
     tenant: TenantBrief | None = None
     offices: list[OfficeAssignment] = []
+    # PDP-1: persistent default patient, validated (null if missing/archived/cross-tenant),
+    # so the session restores it without an extra round-trip.
+    last_patient_id: int | None = None
+
+
+# ── Persistent default patient (PDP-1/2) ─────────────────────────────────────
+class LastPatientRead(BaseModel):
+    patient_id: int | None = None
+
+
+class LastPatientUpdate(BaseModel):
+    patient_id: int | None = Field(None, description="Patient to set as default; null clears it")
 
 
 # ── Forgot / reset password (login dev-report §2.1–2.3) ──────────────────────

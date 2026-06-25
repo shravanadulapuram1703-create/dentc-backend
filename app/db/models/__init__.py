@@ -26,8 +26,15 @@ from app.db.models.aux_codes import IcdCode, PlaceOfServiceCode
 from app.db.models.patient_extra import (
     ClaimAttachment,
     PatientAdjustment,
+    PatientConsent,
     PatientDocument,
     PatientEmergencyContact,
+    ProgressNoteAttachment,
+)
+from app.db.models.restorative import (
+    ChartSettings,
+    ChartStatusTemplate,
+    ChartToothNote,
 )
 from app.db.models.office_assignment import (
     OfficeCodeBundle,
@@ -157,6 +164,8 @@ __all__ = [
     "UserTimeClockConfig", "UserLoginRestriction", "Permission", "UserGroupRight",
     # patients module net-new
     "PatientDocument", "PatientEmergencyContact", "PatientAdjustment", "ClaimAttachment",
+    "ProgressNoteAttachment", "PatientConsent",
+    "ChartStatusTemplate", "ChartSettings", "ChartToothNote",
     # account information (Setup -> Account Info)
     "AccountSettings", "AccountCommunications", "OfficePhoneAssignment",
     "AccountHoliday", "AccountConsent",

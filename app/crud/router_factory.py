@@ -11,6 +11,7 @@ real Pydantic class at definition time so FastAPI can build the request model.
 """
 
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Optional
 
@@ -43,6 +44,14 @@ class CrudConfig:
     default_sort: str = "created_at"
     soft_delete_field: str | None = "is_active"
     soft_delete_value: bool = False
+    # Optional post-read hook ``(db, items, tenant_id) -> None`` that mutates the
+    # returned ORM rows in place (e.g. attach resolved actor names). Applied to
+    # list/get/create/update responses. Batch-resolve inside to avoid N+1.
+    read_enrich: Optional[Callable[[Any, list, int], None]] = None
+    # Optional CRUDBase subclass with overridden create/update/delete for entities
+    # that need real business rules (e.g. progress-note lock + strike-off). Defaults
+    # to the generic CRUDBase. Must accept the same constructor kwargs.
+    crud_class: type[CRUDBase] = CRUDBase
 
 
 def _col_pytype(columns, name: str) -> type | None:  # noqa: ANN001
@@ -85,6 +94,8 @@ def _make_list_endpoint(cfg: "CrudConfig", crud: CRUDBase, plural: str):
             filters=filters,
             range_filters=range_filters,
         )
+        if cfg.read_enrich is not None and items:
+            cfg.read_enrich(db, items, tenant_id)
         return PaginatedResponse.build(items, total, page.page, page.size)
 
     params = [
@@ -134,7 +145,7 @@ _ERRORS = {
 
 def register_crud(cfg: CrudConfig) -> APIRouter:
     plural = cfg.plural or cfg.prefix
-    crud: CRUDBase = CRUDBase(
+    crud: CRUDBase = cfg.crud_class(
         cfg.model,
         pk_attr=cfg.pk_name,
         soft_delete_field=cfg.soft_delete_field,
@@ -173,7 +184,10 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         current=Depends(get_current_user),
     ):
         data = body.model_dump(exclude_unset=True)
-        return crud.create(db, data, tenant_id=tenant_id, created_by=current.id)
+        obj = crud.create(db, data, tenant_id=tenant_id, created_by=current.id)
+        if cfg.read_enrich is not None:
+            cfg.read_enrich(db, [obj], tenant_id)
+        return obj
 
     @router.get(
         "/{item_id}",
@@ -182,7 +196,10 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         summary=f"Get {cfg.singular.replace('_', ' ')} by id",
     )
     def get_item(db: DbSession, tenant_id: TenantId, item_id: PkPath):
-        return crud.get(db, item_id, tenant_id=tenant_id)
+        obj = crud.get(db, item_id, tenant_id=tenant_id)
+        if cfg.read_enrich is not None:
+            cfg.read_enrich(db, [obj], tenant_id)
+        return obj
 
     @router.patch(
         "/{item_id}",
@@ -198,7 +215,10 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         current=Depends(get_current_user),
     ):
         data = body.model_dump(exclude_unset=True)
-        return crud.update(db, item_id, data, tenant_id=tenant_id, updated_by=current.id)
+        obj = crud.update(db, item_id, data, tenant_id=tenant_id, updated_by=current.id)
+        if cfg.read_enrich is not None:
+            cfg.read_enrich(db, [obj], tenant_id)
+        return obj
 
     @router.delete(
         "/{item_id}",

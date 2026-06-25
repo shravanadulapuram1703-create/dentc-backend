@@ -6,10 +6,10 @@ All tenant-scoped; file-backed entities store an internal path + a served URL.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
@@ -58,6 +58,49 @@ class PatientAdjustment(Base, IntPKMixin, CreatedAtMixin):
     adjustment_type: Mapped[str | None] = mapped_column(String(50))  # code from definitions 'adjustment'
     notes: Mapped[str | None] = mapped_column(Text)
     is_void: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class ProgressNoteAttachment(Base, IntPKMixin, CreatedAtMixin):
+    """PN-3: a file attached to a *specific* progress note (mirrors the
+    claim-attachment precedent). Tenancy via the note's patient; soft-deleted."""
+
+    __tablename__ = "progress_note_attachments"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    progress_note_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("progress_notes.id"), index=True
+    )
+    attachment_type: Mapped[str | None] = mapped_column(String(50))
+    file_name: Mapped[str] = mapped_column(String(500))
+    content_type: Mapped[str | None] = mapped_column(String(100))
+    file_size: Mapped[int | None] = mapped_column(BigInteger)
+    file_path: Mapped[str] = mapped_column(String(500))
+    file_url: Mapped[str] = mapped_column(String(500))
+    description: Mapped[str | None] = mapped_column(String(500))
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class PatientConsent(Base, IntPKMixin, CreatedAtMixin):
+    """PLAN-7: a per-patient consent capture — a letter/consent template rendered
+    with patient + treatment-plan data, optionally signed and stored. Distinct
+    from the tenant-level account ``consents`` (those are the master documents)."""
+
+    __tablename__ = "patient_consents"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("letter_templates.id"))
+    plan_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("treatment_plans.id"))
+    title: Mapped[str | None] = mapped_column(String(255))
+    rendered_html: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|signed|declined
+    signature_data: Mapped[str | None] = mapped_column(Text)  # base64 capture (or print/scan)
+    document_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patient_documents.id"))
+    signed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 

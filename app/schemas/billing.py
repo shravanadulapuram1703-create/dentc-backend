@@ -86,6 +86,46 @@ class LedgerResponse(BaseModel):
     as_of: str
 
 
+# ── Account Ledger — fully-denormalised feed (AL-1/2/4/5/7) ───────────────────
+class AccountLedgerRow(BaseModel):
+    """One fully-denormalised Account-Ledger row (no client-side lookups needed)."""
+
+    entry_date: date | None = None
+    source_type: str = Field(..., description="charge | payment | adjustment")
+    source_id: str
+    code: str | None = Field(None, description="procedure_code | 'PMT' | 'PATADJ'")
+    description: str | None = None
+    transaction_kind: str = Field(..., description="'P' (debit) | 'C' (credit) — the legacy T column")
+    apply_to: str | None = None
+    tooth: str | None = None
+    surface: str | None = None
+    provider_id: str | None = None
+    provider_name: str | None = None
+    office_id: int | None = None
+    office_short_id: str | None = None
+    patient_estimate: Decimal | None = None
+    insurance_estimate: Decimal | None = None
+    billing_status: str | None = None
+    unbilled: bool | None = Field(None, description="AL-6 'N' — a procedure with no claim_id")
+    user_id: int | None = None
+    user_label: str | None = None
+    charge: Decimal = Decimal("0")
+    credit: Decimal = Decimal("0")
+    amount: Decimal = Field(Decimal("0"), description="Signed: +charge / -credit")
+    running_balance: Decimal = Decimal("0")
+
+
+class AccountLedgerResponse(BaseModel):
+    patient_id: int
+    rows: list[AccountLedgerRow]
+    grand_total: Decimal = Field(..., description="Final running balance over the full account window")
+    total: int = Field(..., description="Total rows after the type filter")
+    page: int
+    size: int
+    pages: int
+    as_of: str
+
+
 class PatientBalance(BaseModel):
     """Computed account balance (charges − payments). Phase 3 cached aggregate.
 

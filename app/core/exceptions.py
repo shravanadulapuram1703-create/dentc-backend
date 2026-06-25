@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -121,9 +122,13 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+        # jsonable_encoder: Pydantic error ``input`` values can be non-JSON-native
+        # types (e.g. a Decimal for a NUMERIC field) that plain json.dumps rejects.
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content=_error_body("validation_error", "Request validation failed", exc.errors()),
+            content=_error_body(
+                "validation_error", "Request validation failed", jsonable_encoder(exc.errors())
+            ),
         )
 
     @app.exception_handler(Exception)

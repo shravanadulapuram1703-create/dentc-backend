@@ -109,16 +109,25 @@ class InsuranceSubscriber(Base, IntPKMixin, TimestampMixin):
     sub_last_name: Mapped[str | None] = mapped_column(String(100))
     sub_mi: Mapped[str | None] = mapped_column(String(10))
     sub_address: Mapped[str | None] = mapped_column(String(255))
+    # INS-PT-4: legacy screen has two subscriber address lines.
+    sub_address2: Mapped[str | None] = mapped_column(String(255))
     sub_city: Mapped[str | None] = mapped_column(String(100))
     sub_state: Mapped[str | None] = mapped_column(String(50))
     sub_zip: Mapped[str | None] = mapped_column(String(20))
     sub_dob: Mapped[date | None]
     sub_gender: Mapped[str | None] = mapped_column(String(10))
+    # INS-PT-1 / INS-PT-2: legacy subscriber Marital Status + Phone.
+    marital_status: Mapped[str | None] = mapped_column(String(20))
+    sub_phone: Mapped[str | None] = mapped_column(String(20))
     sub_ssn: Mapped[str | None] = mapped_column(String(20))
     sub_member_id: Mapped[str | None] = mapped_column(String(100))
     group_number: Mapped[str | None] = mapped_column(String(100))
     effective_date: Mapped[date | None]
     term_date: Mapped[date | None]
+    # INS-PT-6: legacy Eligibility grid distinguishes Plan Date from Sub Date
+    # (effective_date/term_date above are the subscriber dates).
+    plan_effective_date: Mapped[date | None]
+    plan_term_date: Mapped[date | None]
     family_max_remaining: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     family_ded_remaining: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     ortho_remaining: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))

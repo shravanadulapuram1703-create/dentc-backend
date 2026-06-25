@@ -8,7 +8,9 @@ remains the writable field (form binds to it 1:1); ``is_dental`` is read-only.
 
 from __future__ import annotations
 
-from pydantic import computed_field
+from datetime import datetime
+
+from pydantic import BaseModel, computed_field
 
 from app.db.models import InsuranceCarrier
 from app.schemas.factory import build_schemas
@@ -31,3 +33,18 @@ class InsuranceCarrierRead(_CarrierReadBase):  # type: ignore[valid-type, misc]
         if ct is None:
             return None
         return ct.strip().lower() not in _MEDICAL_TOKENS
+
+
+# ── INS-PT-5: eligibility "Update Status" stamp ──────────────────────────────
+class EligibilityVerifyRequest(BaseModel):
+    elig_status: str | None = None  # defaults to "verified" server-side
+    notes: str | None = None
+
+
+class EligibilityVerifyResult(BaseModel):
+    subscriber_id: int
+    elig_status: str | None = None
+    elig_verified_on: datetime | None = None
+    elig_verified_by: str | None = None
+    realtime_supported: bool | None = None
+    method: str  # "realtime" | "manual"

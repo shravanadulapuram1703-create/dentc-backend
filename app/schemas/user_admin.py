@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import time
+from datetime import datetime, time
 from decimal import Decimal
 
 from pydantic import BaseModel, EmailStr, Field
@@ -109,6 +109,21 @@ class UserCompleteUpdate(BaseModel):
 # ── Gap 5: user image / avatar ───────────────────────────────────────────────
 class UserImageResult(BaseModel):
     image_url: str | None = None
+
+
+# ── PN-1: per-user signature store ("Load My Signature") ─────────────────────
+class UserSignatureUpdate(BaseModel):
+    signature_data: str = Field(..., description="Base64 / data-URL signature image")
+    signature_len: int | None = None
+    device_source: str | None = Field(None, max_length=20)
+
+
+class UserSignatureRead(BaseModel):
+    user_id: int
+    signature_data: str | None = None
+    signature_len: int | None = None
+    device_source: str | None = None
+    updated_at: datetime | None = Field(None, description="When the signature last changed")
 
 
 # ── Gap 7: self-service password change ──────────────────────────────────────

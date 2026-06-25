@@ -15,9 +15,10 @@ Conventions:
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, create_model
+from sqlalchemy import JSON
 from sqlalchemy import inspect as sa_inspect
 
 from app.schemas.common import ORMModel
@@ -27,6 +28,11 @@ _WRITE_EXCLUDE = {"created_at", "updated_at", "created_by", "updated_by", "tenan
 
 
 def _py_type(col) -> type:  # noqa: ANN001
+    # JSON columns hold either an object OR an array (e.g. valid_teeth, implants,
+    # drawing_strokes) — type them permissively so list payloads aren't rejected by
+    # the dict default that ``JSON.python_type`` reports.
+    if isinstance(col.type, JSON):
+        return Any
     try:
         return col.type.python_type
     except Exception:  # noqa: BLE001

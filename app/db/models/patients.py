@@ -76,6 +76,9 @@ class PatientInsurance(Base, IntPKMixin, TimestampMixin):
     legacy_plan_type: Mapped[str | None] = mapped_column(String(5))
     insurance_type: Mapped[str] = mapped_column(String(20))
     relationship: Mapped[str | None] = mapped_column(String(50))
+    # INS-PT-3: on secondary/tertiary/quaternary slots — this subscriber's
+    # relationship to the PRIMARY subscriber.
+    sec_sub_rel_to_prim_sub: Mapped[str | None] = mapped_column(String(50))
     deductible_remaining: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     max_remaining: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     ortho_remaining: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))

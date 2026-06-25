@@ -76,6 +76,20 @@ def authenticate(db: Session, username: str, password: str) -> User:
     return user
 
 
+def verify_user_credentials(db: Session, username: str, password: str) -> User:
+    """Verify a username/password pair WITHOUT issuing tokens or touching the
+    lockout counter — used for over-the-shoulder actions (PN-2 progress-note
+    signing). Raises 401 on bad credentials or a disabled account."""
+    user = db.execute(
+        select(User).where(or_(User.username == username, User.email == username))
+    ).scalar_one_or_none()
+    if user is None or not verify_password(password, user.password_hash):
+        raise UnauthorizedError("Invalid credentials", code="invalid_credentials")
+    if not user.is_active:
+        raise UnauthorizedError("This account is disabled", code="account_disabled")
+    return user
+
+
 def issue_tokens(user: User) -> TokenResponse:
     claims = {"tenant_id": user.tenant_id, "role": user.role}
     access, _ = create_access_token(user.id, claims)

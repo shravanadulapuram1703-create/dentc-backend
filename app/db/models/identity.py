@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, LegacyIdMixin, TimestampMixin
@@ -60,7 +60,19 @@ class User(Base, IntPKMixin, TimestampMixin):
     custom_1: Mapped[str | None] = mapped_column(String(255))  # gap #3
     custom_2: Mapped[str | None] = mapped_column(String(255))  # gap #3
     signature_data: Mapped[str | None] = mapped_column(Text)  # gap #4 (base64 Topaz capture)
+    # PN-1: per-user signature metadata so "Load My Signature" can round-trip
+    # independent of any patient. ``signature_updated_at`` is when the signature
+    # itself last changed (distinct from the row's ``updated_at``).
+    signature_len: Mapped[int | None]
+    signature_device_source: Mapped[str | None] = mapped_column(String(20))
+    signature_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
     image_url: Mapped[str | None] = mapped_column(String(500))  # gap #5 (avatar)
+    # PDP-3: server-side persistent default patient (last opened). ON DELETE SET
+    # NULL so a hard-deleted patient can't strand the user on a 404; soft-deleted
+    # patients are filtered to null at read time (PDP-4).
+    last_patient_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("patients.id", ondelete="SET NULL")
+    )
 
 
 class RefreshToken(Base, IntPKMixin, CreatedAtMixin):

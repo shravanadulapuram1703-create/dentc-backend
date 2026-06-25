@@ -18,7 +18,6 @@ from app.db.models import (
     PatientDocument,
     PatientProcedure,
     PaymentAllocation,
-    ProgressNote,
 )
 
 _MAX_UPLOAD = 10 * 1024 * 1024  # 10 MB
@@ -164,19 +163,7 @@ def set_claim_status(db: Session, tenant_id: int, claim_id: str, status: str) ->
     return claim
 
 
-# ── Progress-note sign ───────────────────────────────────────────────────────
-def sign_progress_note(db: Session, tenant_id: int, note_id: int, user_id: int | None) -> ProgressNote:
-    note = db.execute(
-        select(ProgressNote).join(Patient, Patient.id == ProgressNote.patient_id)
-        .where(ProgressNote.id == note_id, Patient.tenant_id == tenant_id)
-    ).scalar_one_or_none()
-    if note is None:
-        raise NotFoundError(f"Progress note '{note_id}' was not found")
-    note.signed_by = user_id
-    note.signed_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(note)
-    return note
+# Progress-note signing moved to app/services/progress_notes_service.py (PN-2).
 
 
 # ── Duplicate check ──────────────────────────────────────────────────────────

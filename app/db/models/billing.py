@@ -138,6 +138,8 @@ class PatientPaymentPlan(Base, IntPKMixin, TimestampMixin):
     first_due_date: Mapped[date | None]
     rem_payments: Mapped[int | None]
     rem_total_amt: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # AL-3: discriminate Regular-Patient vs Ortho-Patient contract panels.
+    plan_type: Mapped[str] = mapped_column(String(20), default="regular")  # regular | ortho
     notes: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[str | None] = mapped_column(String(100))
@@ -152,6 +154,12 @@ class PatientInsPaymentPlan(Base, IntPKMixin, CreatedAtMixin):
     periodic_order: Mapped[int | None]
     periodic_date: Mapped[date | None]
     periodic_amt: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # AL-3: financial summary so the Ortho-/Regular-Insurance panels can show
+    # Plan Amount / Down Pay / Rem-Total / Rem-#-of-Pay (not just Next Per. Amt/Date).
+    plan_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    down_payment: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    rem_total_amt: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    rem_payments: Mapped[int | None]
     is_billed: Mapped[bool] = mapped_column(Boolean, default=False)
     billing_code: Mapped[str | None] = mapped_column(String(50))
     ledger_id: Mapped[str | None] = mapped_column(String(20))
@@ -167,6 +175,11 @@ class PatientSecInsPaymentPlan(Base, IntPKMixin, CreatedAtMixin):
     periodic_order: Mapped[int | None]
     periodic_date: Mapped[date | None]
     periodic_amt: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # AL-3: financial summary (see PatientInsPaymentPlan).
+    plan_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    down_payment: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    rem_total_amt: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    rem_payments: Mapped[int | None]
     is_billed: Mapped[bool] = mapped_column(Boolean, default=False)
     billing_code: Mapped[str | None] = mapped_column(String(50))
     ledger_id: Mapped[str | None] = mapped_column(String(20))

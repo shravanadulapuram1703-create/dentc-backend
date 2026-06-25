@@ -16,6 +16,9 @@ from fastapi import APIRouter
 from app.crud.router_factory import CrudConfig, register_crud
 from app.db import models as m
 from app.schemas.factory import build_schemas
+from app.services.perio_service import attach_actor_names
+from app.services.progress_notes_service import ProgressNoteCRUD, enrich_progress_notes
+from app.services.treatment_service import TreatmentPlanItemCRUD
 from app.schemas.fee_schedule import (
     FeeScheduleCreate,
     FeeScheduleRead,
@@ -25,6 +28,30 @@ from app.schemas.insurance import (
     InsuranceCarrierCreate,
     InsuranceCarrierRead,
     InsuranceCarrierUpdate,
+)
+from app.schemas.perio import (
+    PerioChartSettingCreate,
+    PerioChartSettingRead,
+    PerioChartSettingUpdate,
+    PerioChartTemplateCreate,
+    PerioChartTemplateRead,
+    PerioChartTemplateUpdate,
+    PerioExamCreate,
+    PerioExamDetailCreate,
+    PerioExamDetailRead,
+    PerioExamDetailUpdate,
+    PerioExamRead,
+    PerioExamUpdate,
+)
+from app.schemas.progress_notes import (
+    ProgressNoteCreate,
+    ProgressNoteRead,
+    ProgressNoteUpdate,
+)
+from app.schemas.treatment import (
+    TreatmentPlanItemCreate,
+    TreatmentPlanItemRead,
+    TreatmentPlanItemUpdate,
 )
 from app.schemas.procedure_code import (
     ProcedureCodeCreate,
@@ -103,15 +130,24 @@ _PATIENTS = [
                   "dob", "ssn", "medicaid_id", "email", "phone", "gender",
                   "patient_type", "responsible_party_id"),
          ranges=("created_at", "dob")),
+    # legacy_plan_type ("D"/"M") + insurance_type ("primary"…) address one slot
+    # (INS-PT); is_active toggles a slot on/off.
     _cfg(m.PatientInsurance, "PatientInsurance", "patient-insurance", "Patients",
          "patient_insurance", "patient_insurance",
-         filters=("patient_id", "insurance_type", "ins_plan_id")),
+         filters=("patient_id", "insurance_type", "ins_plan_id",
+                  "legacy_plan_type", "is_active")),
     _cfg(m.PatientAlert, "PatientAlert", "patient-alerts", "Patients",
          "patient_alert", "patient_alerts", filters=("patient_id", "is_active")),
     _cfg(m.AccountNote, "AccountNote", "account-notes", "Patients",
          "account_note", "account_notes", filters=("patient_id",), soft_field=None),
     _cfg(m.PatientSignature, "PatientSignature", "patient-signatures", "Patients",
          "patient_signature", "patient_signatures", filters=("patient_id",), soft_field=None),
+    # PLAN-7: per-patient consent capture (template rendered with patient/plan data,
+    # optionally signed + stored). Distinct from tenant-level account consents.
+    _cfg(m.PatientConsent, "PatientConsent", "patient-consents", "Patients",
+         "patient_consent", "patient_consents",
+         filters=("patient_id", "plan_id", "template_id", "status"),
+         soft_field="is_deleted", soft_value=True),
     _cfg(m.MedicalHistoryRecord, "MedicalHistoryRecord", "medical-history-records", "Patients",
          "medical_history_record", "medical_history_records",
          filters=("patient_id",), soft_field="is_archived", soft_value=True),
@@ -249,9 +285,25 @@ _TREATMENT = [
     _cfg(m.TreatmentPlan, "TreatmentPlan", "treatment-plans", "Treatment Plans",
          "treatment_plan", "treatment_plans", pk_type=str, search=("name",),
          filters=("patient_id", "office_id", "status"), soft_field=None),
-    _cfg(m.TreatmentPlanItem, "TreatmentPlanItem", "treatment-plan-items", "Treatment Plans",
-         "treatment_plan_item", "treatment_plan_items", pk_type=str,
-         filters=("plan_id", "procedure_code", "status"), soft_field=None),
+    # Items: custom schemas add phase_id/dates/provider_id/discount + status enum
+    # (PLAN-1/2/5/10); is_archived soft-delete (PLAN-14) via TreatmentPlanItemCRUD,
+    # which also archives the item's insurance-details so a detail FK can't make the
+    # item undeletable (PLAN-13). is_archived/phase_id/provider_id are filterable.
+    CrudConfig(
+        model=m.TreatmentPlanItem,
+        create_schema=TreatmentPlanItemCreate,
+        update_schema=TreatmentPlanItemUpdate,
+        read_schema=TreatmentPlanItemRead,
+        prefix="treatment-plan-items", tag="Treatment Plans",
+        singular="treatment_plan_item", plural="treatment_plan_items",
+        pk_type=str,
+        sortable_fields=("priority", "created_at"),
+        filter_fields=("plan_id", "procedure_code", "status", "phase_id",
+                       "provider_id", "is_archived"),
+        soft_delete_field="is_archived", soft_delete_value=True,
+        default_sort="created_at",
+        crud_class=TreatmentPlanItemCRUD,
+    ),
 ]
 
 # ── Clinical records ───────────────────────────────────────────────────────
@@ -259,33 +311,112 @@ _CLINICAL = [
     _cfg(m.PatientProcedure, "PatientProcedure", "patient-procedures", "Clinical",
          "patient_procedure", "patient_procedures", pk_type=str,
          sortable=("date_of_service", "created_at"),
+         # treatment_plan_id: planned→completed lineage filter (REST).
          filters=("patient_id", "appointment_id", "provider_id", "procedure_code",
-                  "claim_id", "office_id", "billing_status", "is_void"),
+                  "claim_id", "office_id", "billing_status", "treatment_plan_id", "is_void"),
          ranges=("date_of_service",), soft_field="is_void", soft_value=True),
+    # Server-side chart filters (REST capability §6): procedure_code / chart_as /
+    # is_inactive / group_id / status so the chart can be queried by ADA code,
+    # module, span, or active-state instead of pulling size=200 and filtering client-side.
     _cfg(m.ChartCondition, "ChartCondition", "chart-conditions", "Clinical",
          "chart_condition", "chart_conditions",
-         filters=("patient_id", "tooth", "provider_id"),
+         filters=("patient_id", "tooth", "provider_id", "procedure_code",
+                  "chart_as", "is_inactive", "group_id", "status", "material_id"),
          soft_field="is_inactive", soft_value=True),
-    _cfg(m.ProgressNote, "ProgressNote", "progress-notes", "Clinical",
-         "progress_note", "progress_notes", search=("notes",),
-         filters=("patient_id",), soft_field="is_deleted", soft_value=True),
-    _cfg(m.PerioExam, "PerioExam", "perio-exams", "Clinical",
-         "perio_exam", "perio_exams", sortable=("exam_date", "created_at"),
-         filters=("patient_id",), soft_field="is_voided", soft_value=True),
-    _cfg(m.PerioExamDetail, "PerioExamDetail", "perio-exam-details", "Clinical",
-         "perio_exam_detail", "perio_exam_details", sortable=("id",),
-         default_sort="id", filters=("exam_id", "tooth_no"), soft_field=None),
+    # Progress notes. Custom Read adds struck_off audit + resolved names + computed
+    # is_locked + attachment_count (PN-4/5/7/3); ProgressNoteCRUD enforces lock +
+    # strike-off transitions on PATCH (PN-7/4).
+    CrudConfig(
+        model=m.ProgressNote,
+        create_schema=ProgressNoteCreate,
+        update_schema=ProgressNoteUpdate,
+        read_schema=ProgressNoteRead,
+        prefix="progress-notes", tag="Clinical",
+        singular="progress_note", plural="progress_notes",
+        search_fields=("notes",),
+        sortable_fields=("note_date", "created_at"),
+        filter_fields=("patient_id", "office_id", "is_struck_off"),
+        range_fields=("note_date",),
+        soft_delete_field="is_deleted", soft_delete_value=True,
+        default_sort="created_at",
+        read_enrich=enrich_progress_notes,
+        crud_class=ProgressNoteCRUD,
+    ),
+    # Perio exam header. Custom Read embeds resolved actor names (PERIO-BE-6);
+    # is_voided soft-delete (PERIO-BE-3) + is_voided filter so the Date-of-Service
+    # list can exclude voided; exam_date range filter (PERIO-BE-9).
+    CrudConfig(
+        model=m.PerioExam,
+        create_schema=PerioExamCreate,
+        update_schema=PerioExamUpdate,
+        read_schema=PerioExamRead,
+        prefix="perio-exams", tag="Clinical",
+        singular="perio_exam", plural="perio_exams",
+        sortable_fields=("exam_date", "created_at"),
+        filter_fields=("patient_id", "office_id", "is_voided"),
+        range_fields=("exam_date",),
+        soft_delete_field="is_voided", soft_delete_value=True,
+        default_sort="exam_date",
+        read_enrich=attach_actor_names,
+    ),
+    # Per-tooth detail. Custom Create/Update enforce clinical value ranges
+    # (PERIO-BE-7); Read carries audit cols + names (PERIO-BE-5). One row per
+    # tooth is enforced by the (exam_id, tooth_no) unique constraint (PERIO-BE-1).
+    CrudConfig(
+        model=m.PerioExamDetail,
+        create_schema=PerioExamDetailCreate,
+        update_schema=PerioExamDetailUpdate,
+        read_schema=PerioExamDetailRead,
+        prefix="perio-exam-details", tag="Clinical",
+        singular="perio_exam_detail", plural="perio_exam_details",
+        sortable_fields=("id", "tooth_no", "created_at"),
+        default_sort="id",
+        filter_fields=("exam_id", "tooth_no"),
+        soft_delete_field=None,
+        read_enrich=attach_actor_names,
+    ),
     _cfg(m.Prescription, "Prescription", "prescriptions", "Clinical",
          "prescription", "prescriptions", search=("drug_name",),
          filters=("patient_id", "provider_id", "is_active")),
-    _cfg(m.PerioChartSetting, "PerioChartSetting", "perio-chart-settings", "Clinical",
-         "perio_chart_setting", "perio_chart_settings", filters=("user_id",), soft_field=None),
+    # Per-user perio prefs. See /perio-chart-settings/me (PERIO-BE-11) for the
+    # token-resolved, self-seeding convenience accessor.
+    CrudConfig(
+        model=m.PerioChartSetting,
+        create_schema=PerioChartSettingCreate,
+        update_schema=PerioChartSettingUpdate,
+        read_schema=PerioChartSettingRead,
+        prefix="perio-chart-settings", tag="Clinical",
+        singular="perio_chart_setting", plural="perio_chart_settings",
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("user_id",),
+        soft_delete_field=None,
+        default_sort="created_at",
+    ),
     # CHART-1: named, tenant-scoped Perio Setup Templates (distinct from the per-user
     # perio_chart_settings above). Backs the "Perio Setup Templates" screen.
-    _cfg(m.PerioChartTemplate, "PerioChartTemplate", "perio-chart-templates", "Clinical",
-         "perio_chart_template", "perio_chart_templates", search=("name",), soft_field=None),
+    # Custom schemas type the auto_advance structure (PERIO-BE-12).
+    CrudConfig(
+        model=m.PerioChartTemplate,
+        create_schema=PerioChartTemplateCreate,
+        update_schema=PerioChartTemplateUpdate,
+        read_schema=PerioChartTemplateRead,
+        prefix="perio-chart-templates", tag="Clinical",
+        singular="perio_chart_template", plural="perio_chart_templates",
+        search_fields=("name",),
+        sortable_fields=_DEFAULT_SORT,
+        soft_delete_field=None,
+        default_sort="created_at",
+    ),
     _cfg(m.PerioChartActivity, "PerioChartActivity", "perio-chart-activity", "Clinical",
          "perio_chart_activity", "perio_chart_activity", filters=("patient_id",), soft_field=None),
+    # REST-2: practice-editable bridge/denture preset catalog.
+    _cfg(m.ChartStatusTemplate, "ChartStatusTemplate", "chart-status-templates", "Clinical",
+         "chart_status_template", "chart_status_templates", search=("name",),
+         filters=("template_type", "arch", "material", "is_active")),
+    # REST-4: per-tooth notes (also has /chart-tooth-notes/upsert for upsert-by-tooth).
+    _cfg(m.ChartToothNote, "ChartToothNote", "chart-tooth-notes", "Clinical",
+         "chart_tooth_note", "chart_tooth_notes",
+         filters=("patient_id", "tooth"), soft_field=None),
 ]
 
 # ── Billing & claims ───────────────────────────────────────────────────────
@@ -307,8 +438,10 @@ _BILLING = [
     _cfg(m.PaymentAllocation, "PaymentAllocation", "payment-allocations", "Billing",
          "payment_allocation", "payment_allocations",
          filters=("patient_id", "payment_id", "procedure_id", "claim_id"), soft_field=None),
+    # AL-3: plan_type discriminates Regular-Patient vs Ortho-Patient contracts.
     _cfg(m.PatientPaymentPlan, "PatientPaymentPlan", "patient-payment-plans", "Billing",
-         "patient_payment_plan", "patient_payment_plans", filters=("patient_id", "is_active")),
+         "patient_payment_plan", "patient_payment_plans",
+         filters=("patient_id", "is_active", "plan_type")),
     _cfg(m.PatientInsPaymentPlan, "PatientInsPaymentPlan", "patient-ins-payment-plans", "Billing",
          "patient_ins_payment_plan", "patient_ins_payment_plans",
          filters=("patient_id", "is_billed"), soft_field=None),
@@ -357,10 +490,12 @@ _REFERENCE = [
     _cfg(m.CariesRiskAssessment, "CariesRiskAssessment", "caries-risk-assessments", "Clinical",
          "caries_risk_assessment", "caries_risk_assessments",
          filters=("patient_id", "risk_level"), soft_field=None),
+    # is_archived filterable so the list can exclude archived rows (PLAN-13).
     _cfg(m.TreatmentPlanInsuranceDetail, "TreatmentPlanInsuranceDetail",
          "treatment-plan-insurance-details", "Treatment Plans",
          "treatment_plan_insurance_detail", "treatment_plan_insurance_details",
-         filters=("plan_item_id", "ins_plan_id"), soft_field="is_archived", soft_value=True),
+         filters=("plan_item_id", "ins_plan_id", "is_archived"),
+         soft_field="is_archived", soft_value=True),
 ]
 
 # ── Communications ─────────────────────────────────────────────────────────

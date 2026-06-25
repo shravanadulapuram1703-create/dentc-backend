@@ -104,15 +104,8 @@ def delete_claim_attachment(db: DbSession, tenant_id: TenantId, claim_id: Annota
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# ── Progress-note sign ───────────────────────────────────────────────────────
-progress_router = APIRouter(prefix="/progress-notes", tags=["Clinical"], dependencies=_auth, responses=_errs)
-
-
-@progress_router.post("/{note_id}/sign", operation_id="sign_progress_note")
-def sign_progress_note(db: DbSession, tenant_id: TenantId, current: CurrentUser, note_id: Annotated[int, Path()]):
-    note = svc.sign_progress_note(db, tenant_id, note_id, current.id)
-    return {"id": note.id, "signed_by": note.signed_by,
-            "signed_at": note.signed_at.isoformat() if note.signed_at else None}
+# Progress-note sign + per-note attachments moved to app/api/v1/progress_notes.py
+# (PN-2 over-the-shoulder signing + PN-3 attachments).
 
 
 # ── Duplicate check ──────────────────────────────────────────────────────────

@@ -49,6 +49,10 @@ class ProcedureCode(Base, CreatedAtMixin):
     ar_code: Mapped[str | None] = mapped_column(String(50))
     is_post_op: Mapped[bool] = mapped_column(Boolean, default=False)
     exempt_from_dental_max: Mapped[bool] = mapped_column(Boolean, default=False)
+    # ── REST-8: alternate-maximum-benefit ("A code") downgrade metadata ───────
+    amb_code: Mapped[str | None] = mapped_column(String(20))  # the alternate-benefit downgrade code
+    is_downgrade: Mapped[bool] = mapped_column(Boolean, default=False)  # true for AMB codes
+    alternate_of: Mapped[str | None] = mapped_column(String(20))  # the code this one downgrades
     lock_default_provider: Mapped[bool] = mapped_column(Boolean, default=False)
     default_provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
     default_notes_macro_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("note_macros.id"))

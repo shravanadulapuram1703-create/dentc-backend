@@ -28,7 +28,7 @@ from app.schemas.auth import (
     UserRead,
 )
 from app.schemas.common import ErrorResponse
-from app.services import auth_extras_service, auth_service
+from app.services import auth_extras_service, auth_service, patient_context_service
 
 router = APIRouter(prefix="/auth", tags=["Auth"], responses={401: {"model": ErrorResponse}})
 
@@ -115,7 +115,8 @@ def me_full(db: DbSession, current_user: CurrentUser, tenant_id: TenantId) -> Me
         )
         for link, office in rows
     ]
-    return MeFull(user=current_user, tenant=tenant, offices=offices)
+    last_patient_id = patient_context_service.resolve_last_patient(db, current_user, tenant_id)
+    return MeFull(user=current_user, tenant=tenant, offices=offices, last_patient_id=last_patient_id)
 
 
 # ── Forgot / reset password (login dev-report §2.1–2.3) ──────────────────────

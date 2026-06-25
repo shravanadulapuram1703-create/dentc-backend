@@ -36,11 +36,26 @@ class TreatmentPlanItem(Base, TimestampMixin):
     tooth: Mapped[str | None] = mapped_column(String(10))
     surface: Mapped[str | None] = mapped_column(String(50))
     priority: Mapped[int] = mapped_column(Integer, default=1)
+    # PLAN-1: first-class Phase ID (was stop-gapped into billing_order, freeing it
+    # to mean billing order again).
+    phase_id: Mapped[int | None] = mapped_column(Integer)
     fee: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     insurance_estimate: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
+    # PLAN-10: optional planned discount on the line.
+    discount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     billing_order: Mapped[str | None] = mapped_column(String(10))
-    status: Mapped[str] = mapped_column(String(20), default="Planned")
+    status: Mapped[str] = mapped_column(String(20), default="diagnosed")
     diagnosed_by: Mapped[str | None] = mapped_column(String(200))
+    # PLAN-5: dedicated performing provider (distinct from diagnosed_by).
+    provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
+    # PLAN-2: editable clinical dates (created_at is no longer overloaded as Diag Date).
+    diagnosed_date: Mapped[date | None]
+    start_date: Mapped[date | None]
+    end_date: Mapped[date | None]
+    # PLAN-14: soft-delete parity with patient_procedures / chart_conditions. Also
+    # resolves PLAN-13 (a soft-deleted item keeps its FK so insurance-details never
+    # block the delete).
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class TreatmentPlanInsuranceDetail(Base, IntPKMixin, CreatedAtMixin):

@@ -13,11 +13,15 @@ from app.api.v1 import (
     fee_schedules,
     groups,
     icd_codes,
+    insurance,
     ledger,
     office_assignment,
     office_setup,
     patients_extra,
+    perio,
     pick_lists,
+    progress_notes,
+    restorative,
     procedure_codes,
     provider_setup,
     reports,
@@ -70,6 +74,9 @@ api_router.include_router(provider_setup.carrier_router)
 api_router.include_router(procedure_codes.router)
 # ICD codes bulk-status. Before generic CRUD so /icd-codes/bulk-status wins.
 api_router.include_router(icd_codes.router)
+# Insurance supplements (eligibility verify). Before generic CRUD so
+# /insurance-subscribers/{id}/verify-eligibility wins over /{item_id}.
+api_router.include_router(insurance.router)
 # Pick List supplements (atomic items replace + cascade delete). Before generic
 # CRUD so /questionnaire-headers/{id}/options & /{id}/cascade win over /{item_id}.
 api_router.include_router(pick_lists.router)
@@ -77,6 +84,17 @@ api_router.include_router(pick_lists.router)
 # progress-note sign, duplicate-check (before generic CRUD for literal paths).
 api_router.include_router(patients_extra.documents_router)
 api_router.include_router(patients_extra.claims_router)
-api_router.include_router(patients_extra.progress_router)
 api_router.include_router(patients_extra.dup_router)
+# Progress-notes supplements: sign (PN-2) + per-note attachments (PN-3) + macro
+# categories (PN-6). Before generic CRUD so literal sub-paths win over /{item_id}.
+api_router.include_router(progress_notes.router)
+api_router.include_router(progress_notes.macro_router)
+# Perio charting supplements (bulk upsert / compare / settings-me). Before generic
+# CRUD so /perio-exams/compare, /perio-exams/{id}/details and
+# /perio-chart-settings/me win over the generic /{item_id} routes.
+api_router.include_router(perio.router)
+# Restorative charting supplements: chart-settings (REST-3), tooth-note upsert
+# (REST-4), bulk conditions, aggregate /patients/{id}/chart. Before generic CRUD so
+# literal sub-paths (/chart-conditions/bulk, /chart-tooth-notes/upsert) win.
+api_router.include_router(restorative.router)
 api_router.include_router(build_entity_router())

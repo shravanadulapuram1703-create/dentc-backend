@@ -12,7 +12,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Path, Response, UploadFile, status
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user, require_roles
-from app.schemas.auth import UserRead
+from app.core.exceptions import NotFoundError
+from app.schemas.auth import LastPatientRead, LastPatientUpdate, UserRead
+from app.services import patient_context_service
 from app.schemas.common import ErrorResponse
 from app.schemas.user_admin import (
     ChangePasswordRequest,
@@ -25,6 +27,8 @@ from app.schemas.user_admin import (
     UserCompleteUpdate,
     UserImageResult,
     UserSetupMetadata,
+    UserSignatureRead,
+    UserSignatureUpdate,
 )
 from app.services import user_admin_service as svc
 
@@ -50,6 +54,78 @@ def get_setup_metadata(db: DbSession, tenant_id: TenantId):
              operation_id="change_my_password", summary="Change your own password")
 def change_my_password(db: DbSession, current_user: CurrentUser, body: ChangePasswordRequest):
     svc.change_password(db, current_user, body.current_password, body.new_password)
+
+
+# ── PDP-1/2: persistent default patient (self-service) ───────────────────────
+@router.get("/me/last-patient", response_model=LastPatientRead, operation_id="get_my_last_patient",
+            summary="Get the caller's persistent default patient")
+def get_my_last_patient(db: DbSession, tenant_id: TenantId, current: CurrentUser):
+    return LastPatientRead(patient_id=patient_context_service.resolve_last_patient(db, current, tenant_id))
+
+
+@router.put("/me/last-patient", response_model=LastPatientRead, operation_id="set_my_last_patient",
+            responses={404: {"model": ErrorResponse}},
+            summary="Set (or clear with null) the caller's default patient")
+def set_my_last_patient(db: DbSession, tenant_id: TenantId, current: CurrentUser, body: LastPatientUpdate):
+    pid = patient_context_service.set_last_patient(db, current, tenant_id, body.patient_id)
+    return LastPatientRead(patient_id=pid)
+
+
+@router.delete("/me/last-patient", status_code=status.HTTP_204_NO_CONTENT,
+               operation_id="clear_my_last_patient", summary="Clear the caller's default patient")
+def clear_my_last_patient(db: DbSession, tenant_id: TenantId, current: CurrentUser):
+    patient_context_service.set_last_patient(db, current, tenant_id, None)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── PN-1: per-user signature ("Load My Signature") ───────────────────────────
+def _signature_read(user) -> UserSignatureRead:  # noqa: ANN001
+    return UserSignatureRead(
+        user_id=user.id, signature_data=user.signature_data,
+        signature_len=user.signature_len, device_source=user.signature_device_source,
+        updated_at=user.signature_updated_at,
+    )
+
+
+# /me/signature (literal) MUST precede /{user_id}/signature so "me" isn't parsed as an id.
+@router.get("/me/signature", response_model=UserSignatureRead, operation_id="get_my_signature",
+            responses={404: {"model": ErrorResponse}}, summary="Get the logged-in user's signature")
+def get_my_signature(db: DbSession, tenant_id: TenantId, current: CurrentUser):
+    user = svc.get_user_signature(db, current.id, tenant_id)
+    if not user.signature_data:
+        raise NotFoundError("No signature on file for this user")
+    return _signature_read(user)
+
+
+@router.put("/me/signature", response_model=UserSignatureRead, operation_id="set_my_signature",
+            summary="Save the logged-in user's signature")
+def set_my_signature(db: DbSession, tenant_id: TenantId, current: CurrentUser, body: UserSignatureUpdate):
+    user = svc.set_user_signature(
+        db, current.id, tenant_id, signature_data=body.signature_data,
+        signature_len=body.signature_len, device_source=body.device_source,
+    )
+    return _signature_read(user)
+
+
+@router.get("/{user_id}/signature", response_model=UserSignatureRead, dependencies=[_admin],
+            operation_id="get_user_signature", responses={404: {"model": ErrorResponse}},
+            summary="Get a user's signature")
+def get_user_signature(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()]):
+    user = svc.get_user_signature(db, user_id, tenant_id)
+    if not user.signature_data:
+        raise NotFoundError("No signature on file for this user")
+    return _signature_read(user)
+
+
+@router.put("/{user_id}/signature", response_model=UserSignatureRead, dependencies=[_admin],
+            operation_id="set_user_signature", summary="Save a user's signature")
+def set_user_signature(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
+                       body: UserSignatureUpdate):
+    user = svc.set_user_signature(
+        db, user_id, tenant_id, signature_data=body.signature_data,
+        signature_len=body.signature_len, device_source=body.device_source,
+    )
+    return _signature_read(user)
 
 
 # ── Gap 1: compound atomic create / update ───────────────────────────────────

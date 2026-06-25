@@ -49,7 +49,11 @@ def legacy_db():
                        "color VARCHAR, created_at VARCHAR, updated_at VARCHAR, updated_by INTEGER)"))
         c.execute(text("CREATE TABLE chart_colors (id INTEGER PRIMARY KEY AUTOINCREMENT, "
                        "tenant_id INTEGER, legacy_id VARCHAR)"))
-        for tbl in ("patient_procedures", "chart_conditions", "appointment_procedures"):
+        # chart_conditions now carries updated_at (TimestampMixin) — the material_id
+        # repoint is an ORM update, so SQLAlchemy auto-sets the onupdate column.
+        c.execute(text("CREATE TABLE chart_conditions (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                       "material_id INTEGER, updated_at VARCHAR)"))
+        for tbl in ("patient_procedures", "appointment_procedures"):
             c.execute(text(f"CREATE TABLE {tbl} (id INTEGER PRIMARY KEY AUTOINCREMENT, material_id INTEGER)"))
         c.execute(text("CREATE TABLE procedure_codes (code VARCHAR PRIMARY KEY, default_material_id INTEGER)"))
     session = Session(bind=engine)
