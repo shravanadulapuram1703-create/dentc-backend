@@ -15,7 +15,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query
 
-from app.api.deps import DbSession, TenantId, get_current_user
+from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
 from app.schemas.common import ErrorResponse
 from app.schemas.scheduler import (
     AppointmentSchedulerRead,
@@ -41,9 +41,12 @@ def list_scheduler_appointments(
     date_from: Annotated[date | None, Query()] = None,
     date_to: Annotated[date | None, Query()] = None,
     office_id: Annotated[int | None, Query()] = None,
+    provider_id: Annotated[str | None, Query(description="Scope to one provider (MP-7 / G8)")] = None,
+    status: Annotated[str | None, Query(description="Scope to one appointment status")] = None,
 ):
     return svc.list_scheduler_appointments(
-        db, tenant_id, date_from=date_from, date_to=date_to, office_id=office_id
+        db, tenant_id, date_from=date_from, date_to=date_to, office_id=office_id,
+        provider_id=provider_id, status=status,
     )
 
 
@@ -51,10 +54,15 @@ def list_scheduler_appointments(
                    operation_id="update_appointment_status",
                    summary="Change appointment status; the server stamps the transition time")
 def update_appointment_status(
-    db: DbSession, tenant_id: TenantId, appointment_id: Annotated[str, Path()],
+    db: DbSession, tenant_id: TenantId, current: CurrentUser,
+    appointment_id: Annotated[str, Path()],
     body: AppointmentStatusUpdate,
 ):
-    appt = svc.update_status(db, tenant_id, appointment_id, body.status)
+    appt = svc.update_status(
+        db, tenant_id, appointment_id, body.status,
+        cancellation_note=body.cancellation_note, cancellation_reason=body.cancellation_reason,
+        add_to_call_list=body.add_to_call_list, actor_id=current.id,
+    )
     # Reuse the denormalized shape (single-row) for a consistent response.
     rows = svc.list_scheduler_appointments(db, tenant_id, office_id=appt.office_id)
     match = next((r for r in rows if r["id"] == appt.id), None)

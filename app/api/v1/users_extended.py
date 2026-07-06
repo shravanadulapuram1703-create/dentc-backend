@@ -9,12 +9,21 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Path, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Path, Query, Response, UploadFile, status
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user, require_roles
 from app.core.exceptions import NotFoundError
 from app.schemas.auth import LastPatientRead, LastPatientUpdate, UserRead
-from app.services import patient_context_service
+from app.schemas.my_page import (
+    NotificationList,
+    NotificationRead,
+    PreferencesBlob,
+    UserSelfUpdate,
+    UserTaskCreate,
+    UserTaskRead,
+    UserTaskUpdate,
+)
+from app.services import my_page_service, patient_context_service
 from app.schemas.common import ErrorResponse
 from app.schemas.user_admin import (
     ChangePasswordRequest,
@@ -54,6 +63,97 @@ def get_setup_metadata(db: DbSession, tenant_id: TenantId):
              operation_id="change_my_password", summary="Change your own password")
 def change_my_password(db: DbSession, current_user: CurrentUser, body: ChangePasswordRequest):
     svc.change_password(db, current_user, body.current_password, body.new_password)
+
+
+# ── MP-1: self-service profile update ────────────────────────────────────────
+@router.patch("/me", response_model=UserRead, operation_id="update_my_profile",
+              responses={409: {"model": ErrorResponse}},
+              summary="Update your own name / phone / email (MP-1)")
+def update_my_profile(db: DbSession, current: CurrentUser, body: UserSelfUpdate):
+    user = my_page_service.update_self(db, current, body.model_dump(exclude_unset=True))
+    svc.attach_audit_names(db, user)
+    return user
+
+
+# ── MP-2: self-service profile photo ─────────────────────────────────────────
+@router.post("/me/photo", response_model=UserImageResult, operation_id="upload_my_photo",
+             responses={422: {"model": ErrorResponse}}, summary="Upload your own avatar (MP-2)")
+async def upload_my_photo(db: DbSession, tenant_id: TenantId, current: CurrentUser,
+                          file: Annotated[UploadFile, File()]):
+    user = svc.save_user_image(db, current.id, tenant_id, file.filename or "avatar",
+                               file.content_type or "", await file.read(), updated_by=current.id)
+    return UserImageResult(image_url=user.image_url)
+
+
+@router.delete("/me/photo", status_code=status.HTTP_204_NO_CONTENT,
+               operation_id="delete_my_photo", summary="Remove your own avatar (MP-2)")
+def delete_my_photo(db: DbSession, tenant_id: TenantId, current: CurrentUser):
+    svc.delete_user_image(db, current.id, tenant_id, updated_by=current.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── MP-3: personal tasks ──────────────────────────────────────────────────────
+@router.get("/me/tasks", response_model=list[UserTaskRead], operation_id="list_my_tasks",
+            summary="List your personal tasks (MP-3)")
+def list_my_tasks(db: DbSession, current: CurrentUser):
+    return my_page_service.list_tasks(db, current)
+
+
+@router.post("/me/tasks", response_model=UserTaskRead, status_code=status.HTTP_201_CREATED,
+             operation_id="create_my_task", summary="Create a personal task (MP-3)")
+def create_my_task(db: DbSession, current: CurrentUser, body: UserTaskCreate):
+    return my_page_service.create_task(db, current, body.model_dump())
+
+
+@router.patch("/me/tasks/{task_id}", response_model=UserTaskRead, operation_id="update_my_task",
+              responses={404: {"model": ErrorResponse}}, summary="Update a personal task (MP-3)")
+def update_my_task(db: DbSession, current: CurrentUser, task_id: Annotated[int, Path()],
+                   body: UserTaskUpdate):
+    return my_page_service.update_task(db, current, task_id, body.model_dump(exclude_unset=True))
+
+
+@router.delete("/me/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT,
+               operation_id="delete_my_task", responses={404: {"model": ErrorResponse}},
+               summary="Delete a personal task (MP-3)")
+def delete_my_task(db: DbSession, current: CurrentUser, task_id: Annotated[int, Path()]):
+    my_page_service.delete_task(db, current, task_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── MP-4: preferences blob ────────────────────────────────────────────────────
+@router.get("/me/preferences", response_model=PreferencesBlob, operation_id="get_my_preferences",
+            summary="Get your UI preferences blob (MP-4)")
+def get_my_preferences(db: DbSession, current: CurrentUser):
+    return PreferencesBlob(preferences=my_page_service.get_preferences(db, current))
+
+
+@router.put("/me/preferences", response_model=PreferencesBlob, operation_id="set_my_preferences",
+            summary="Replace your UI preferences blob (MP-4)")
+def set_my_preferences(db: DbSession, current: CurrentUser, body: PreferencesBlob):
+    return PreferencesBlob(preferences=my_page_service.set_preferences(db, current, body.preferences))
+
+
+# ── MP-6: notifications inbox ─────────────────────────────────────────────────
+@router.get("/me/notifications", response_model=NotificationList, operation_id="list_my_notifications",
+            summary="List your notifications with unread count (MP-6)")
+def list_my_notifications(db: DbSession, current: CurrentUser,
+                          unread_only: Annotated[bool, Query()] = False,
+                          limit: Annotated[int, Query(ge=1, le=200)] = 50):
+    return my_page_service.list_notifications(db, current, unread_only=unread_only, limit=limit)
+
+
+@router.post("/me/notifications/{notification_id}/read", response_model=NotificationRead,
+             operation_id="mark_my_notification_read", responses={404: {"model": ErrorResponse}},
+             summary="Mark a notification read (MP-6)")
+def mark_my_notification_read(db: DbSession, current: CurrentUser,
+                              notification_id: Annotated[int, Path()]):
+    return my_page_service.mark_notification_read(db, current, notification_id)
+
+
+@router.post("/me/notifications/read-all", operation_id="mark_all_my_notifications_read",
+             summary="Mark all your notifications read (MP-6)")
+def mark_all_my_notifications_read(db: DbSession, current: CurrentUser):
+    return {"marked_read": my_page_service.mark_all_read(db, current)}
 
 
 # ── PDP-1/2: persistent default patient (self-service) ───────────────────────

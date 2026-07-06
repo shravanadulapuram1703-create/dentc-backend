@@ -9,11 +9,13 @@ constitute the deferred Phase-4 RBAC system.
 
 from __future__ import annotations
 
-from datetime import time
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    Date,
+    DateTime,
     ForeignKey,
     Integer,
     Numeric,
@@ -25,6 +27,38 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
+
+
+class UserTask(Base, IntPKMixin, TimestampMixin):
+    """MP-3: a personal to-do owned by one user (My Page → My Tasks)."""
+
+    __tablename__ = "user_tasks"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    priority: Mapped[str] = mapped_column(String(10), default="normal")  # high | normal | low
+    is_done: Mapped[bool] = mapped_column(Boolean, default=False)
+    due_date: Mapped[date | None] = mapped_column(Date)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+
+class Notification(Base, IntPKMixin, CreatedAtMixin):
+    """MP-6: a per-user notification/alert (My Page → Alerts inbox). Producers
+    (claim rejected, lab received, task assigned, …) are follow-up work; the
+    resource + read/unread contract land here."""
+
+    __tablename__ = "notifications"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    category: Mapped[str | None] = mapped_column(String(50))
+    title: Mapped[str] = mapped_column(String(255))
+    body: Mapped[str | None] = mapped_column(Text)
+    ref_type: Mapped[str | None] = mapped_column(String(50))
+    ref_id: Mapped[str | None] = mapped_column(String(50))
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class UserPreference(Base, IntPKMixin, TimestampMixin):

@@ -98,6 +98,8 @@ class MeFull(BaseModel):
     # PDP-1: persistent default patient, validated (null if missing/archived/cross-tenant),
     # so the session restores it without an extra round-trip.
     last_patient_id: int | None = None
+    # MP-7: the provider row linked to this user (My Schedule scoping); null if none.
+    provider_id: str | None = None
 
 
 # ── Persistent default patient (PDP-1/2) ─────────────────────────────────────

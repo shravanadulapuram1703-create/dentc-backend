@@ -16,6 +16,11 @@ from fastapi import APIRouter
 from app.crud.router_factory import CrudConfig, register_crud
 from app.db import models as m
 from app.schemas.factory import build_schemas
+from app.services.enrich_service import (
+    enrich_patient_carrier,
+    enrich_patient_provider,
+    enrich_treatment_plan,
+)
 from app.services.perio_service import attach_actor_names
 from app.services.progress_notes_service import ProgressNoteCRUD, enrich_progress_notes
 from app.services.treatment_service import TreatmentPlanItemCRUD
@@ -42,6 +47,20 @@ from app.schemas.perio import (
     PerioExamDetailUpdate,
     PerioExamRead,
     PerioExamUpdate,
+)
+from app.schemas.enriched import (
+    InsuranceClaimCreate,
+    InsuranceClaimRead,
+    InsuranceClaimUpdate,
+    PatientPaymentCreate,
+    PatientPaymentRead,
+    PatientPaymentUpdate,
+    PatientProcedureCreate,
+    PatientProcedureRead,
+    PatientProcedureUpdate,
+    TreatmentPlanCreate,
+    TreatmentPlanRead,
+    TreatmentPlanUpdate,
 )
 from app.schemas.progress_notes import (
     ProgressNoteCreate,
@@ -282,9 +301,18 @@ _SCHEDULING = [
 
 # ── Treatment plans ────────────────────────────────────────────────────────
 _TREATMENT = [
-    _cfg(m.TreatmentPlan, "TreatmentPlan", "treatment-plans", "Treatment Plans",
-         "treatment_plan", "treatment_plans", pk_type=str, search=("name",),
-         filters=("patient_id", "office_id", "status"), soft_field=None),
+    # G9: read carries patient_name + rolled-up totals (Treatment Plan report).
+    CrudConfig(
+        model=m.TreatmentPlan,
+        create_schema=TreatmentPlanCreate, update_schema=TreatmentPlanUpdate,
+        read_schema=TreatmentPlanRead,
+        prefix="treatment-plans", tag="Treatment Plans",
+        singular="treatment_plan", plural="treatment_plans", pk_type=str,
+        search_fields=("name",),
+        filter_fields=("patient_id", "office_id", "status"),
+        soft_delete_field=None, default_sort="created_at",
+        read_enrich=enrich_treatment_plan,
+    ),
     # Items: custom schemas add phase_id/dates/provider_id/discount + status enum
     # (PLAN-1/2/5/10); is_archived soft-delete (PLAN-14) via TreatmentPlanItemCRUD,
     # which also archives the item's insurance-details so a detail FK can't make the
@@ -308,13 +336,20 @@ _TREATMENT = [
 
 # ── Clinical records ───────────────────────────────────────────────────────
 _CLINICAL = [
-    _cfg(m.PatientProcedure, "PatientProcedure", "patient-procedures", "Clinical",
-         "patient_procedure", "patient_procedures", pk_type=str,
-         sortable=("date_of_service", "created_at"),
-         # treatment_plan_id: planned→completed lineage filter (REST).
-         filters=("patient_id", "appointment_id", "provider_id", "procedure_code",
-                  "claim_id", "office_id", "billing_status", "treatment_plan_id", "is_void"),
-         ranges=("date_of_service",), soft_field="is_void", soft_value=True),
+    # G7: denormalized patient_name/provider_name on the read (Production report).
+    CrudConfig(
+        model=m.PatientProcedure,
+        create_schema=PatientProcedureCreate, update_schema=PatientProcedureUpdate,
+        read_schema=PatientProcedureRead,
+        prefix="patient-procedures", tag="Clinical",
+        singular="patient_procedure", plural="patient_procedures", pk_type=str,
+        sortable_fields=("date_of_service", "created_at"),
+        # treatment_plan_id: planned→completed lineage filter (REST).
+        filter_fields=("patient_id", "appointment_id", "provider_id", "procedure_code",
+                       "claim_id", "office_id", "billing_status", "treatment_plan_id", "is_void"),
+        range_fields=("date_of_service",), soft_delete_field="is_void", soft_delete_value=True,
+        default_sort="created_at", read_enrich=enrich_patient_provider,
+    ),
     # Server-side chart filters (REST capability §6): procedure_code / chart_as /
     # is_inactive / group_id / status so the chart can be queried by ADA code,
     # module, span, or active-state instead of pulling size=200 and filtering client-side.
@@ -421,15 +456,31 @@ _CLINICAL = [
 
 # ── Billing & claims ───────────────────────────────────────────────────────
 _BILLING = [
-    _cfg(m.PatientPayment, "PatientPayment", "patient-payments", "Billing",
-         "patient_payment", "patient_payments", pk_type=str,
-         sortable=("payment_date", "created_at"),
-         filters=("patient_id", "payment_type", "provider_id", "office_id", "is_void"),
-         ranges=("payment_date",), soft_field="is_void", soft_value=True),
-    _cfg(m.InsuranceClaim, "InsuranceClaim", "insurance-claims", "Billing",
-         "insurance_claim", "insurance_claims", pk_type=str, search=("claim_number",),
-         filters=("patient_id", "status", "claim_type", "carrier_id", "ins_plan_id",
-                  "office_id", "is_active")),
+    # G7: denormalized patient_name/provider_name (Collections report).
+    CrudConfig(
+        model=m.PatientPayment,
+        create_schema=PatientPaymentCreate, update_schema=PatientPaymentUpdate,
+        read_schema=PatientPaymentRead,
+        prefix="patient-payments", tag="Billing",
+        singular="patient_payment", plural="patient_payments", pk_type=str,
+        sortable_fields=("payment_date", "created_at"),
+        filter_fields=("patient_id", "payment_type", "provider_id", "office_id", "is_void"),
+        range_fields=("payment_date",), soft_delete_field="is_void", soft_delete_value=True,
+        default_sort="created_at", read_enrich=enrich_patient_provider,
+    ),
+    # G7: patient_name/carrier_name; G10: submitted/paid/created date-range filters.
+    CrudConfig(
+        model=m.InsuranceClaim,
+        create_schema=InsuranceClaimCreate, update_schema=InsuranceClaimUpdate,
+        read_schema=InsuranceClaimRead,
+        prefix="insurance-claims", tag="Billing",
+        singular="insurance_claim", plural="insurance_claims", pk_type=str,
+        search_fields=("claim_number",),
+        filter_fields=("patient_id", "status", "claim_type", "carrier_id", "ins_plan_id",
+                       "office_id", "is_active"),
+        range_fields=("submitted_date", "paid_date", "created_at"),
+        default_sort="created_at", read_enrich=enrich_patient_carrier,
+    ),
     _cfg(m.ClaimSubmission, "ClaimSubmission", "claim-submissions", "Billing",
          "claim_submission", "claim_submissions", filters=("claim_id", "batch_id"), soft_field=None),
     _cfg(m.LedgerInsuranceDetail, "LedgerInsuranceDetail", "ledger-insurance-details", "Billing",

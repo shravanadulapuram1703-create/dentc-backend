@@ -5,6 +5,7 @@ Alembic autogenerate and by the app at startup). Add new domain modules here.
 """
 
 from app.db.models.access import (
+    Notification,
     Permission,
     UserGroup,
     UserGroupMembership,
@@ -12,8 +13,10 @@ from app.db.models.access import (
     UserIpRule,
     UserLoginRestriction,
     UserPreference,
+    UserTask,
     UserTimeClockConfig,
 )
+from app.db.models.platform import SupportTicket, UtilityRun
 from app.db.models.account import (
     AccountCommunications,
     AccountConsent,
@@ -162,6 +165,9 @@ __all__ = [
     # access (Phase 4 net-new)
     "UserPreference", "UserGroup", "UserGroupMembership", "UserIpRule",
     "UserTimeClockConfig", "UserLoginRestriction", "Permission", "UserGroupRight",
+    "UserTask", "Notification",
+    # platform (help / utilities)
+    "SupportTicket", "UtilityRun",
     # patients module net-new
     "PatientDocument", "PatientEmergencyContact", "PatientAdjustment", "ClaimAttachment",
     "ProgressNoteAttachment", "PatientConsent",

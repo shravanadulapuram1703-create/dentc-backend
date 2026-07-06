@@ -5,22 +5,49 @@ transitions, and the patient-context aggregate for cross-module navigation.
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.db.models import (
     Appointment,
+    AppointmentProcedure,
     InsuranceCarrier,
     InsurancePlan,
+    InsuranceSubscriber,
     Office,
     Operatory,
     Patient,
+    PatientAlert,
     PatientInsurance,
+    PatientPayment,
+    PatientProcedure,
     Provider,
 )
 from app.services import balance_service
+from app.services.user_admin_service import resolve_user_names
+
+_ELIGIBLE = {"active", "eligible", "verified", "yes"}
+_INELIGIBLE = {"inactive", "ineligible", "termed", "terminated", "denied", "no"}
+
+
+def _age(dob: date | None, today: date) -> int | None:
+    if dob is None:
+        return None
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+
+def _eligibility(status: str | None) -> str | None:
+    if status is None:
+        return None
+    s = status.strip().lower()
+    if s in _ELIGIBLE:
+        return "eligible"
+    if s in _INELIGIBLE:
+        return "ineligible"
+    return "unknown"
 
 # Status (normalised) -> timestamp column the server stamps on transition (gap #5).
 _STATUS_STAMP = {
@@ -43,9 +70,64 @@ def _patient_name(p: Patient | None) -> str | None:
     return name or p.chart_no or f"Patient {p.id}"
 
 
+def _batch_balances(db: Session, patient_ids: set[int]) -> dict[int, Decimal]:
+    """Account balance (charges − payments) per patient in two aggregate queries."""
+    if not patient_ids:
+        return {}
+    charges = dict(db.execute(
+        select(PatientProcedure.patient_id, func.coalesce(func.sum(PatientProcedure.fee), 0))
+        .where(PatientProcedure.patient_id.in_(patient_ids),
+               PatientProcedure.is_void.is_(False), PatientProcedure.is_archived.is_(False))
+        .group_by(PatientProcedure.patient_id)
+    ).all())
+    payments = dict(db.execute(
+        select(PatientPayment.patient_id, func.coalesce(func.sum(PatientPayment.amount), 0))
+        .where(PatientPayment.patient_id.in_(patient_ids), PatientPayment.is_void.is_(False))
+        .group_by(PatientPayment.patient_id)
+    ).all())
+    return {
+        pid: Decimal(charges.get(pid, 0)) - Decimal(payments.get(pid, 0))
+        for pid in patient_ids
+    }
+
+
+def _batch_service_summary(db: Session, appt_ids: list[str]) -> dict[str, str]:
+    """Comma-joined procedure codes per appointment (the block's service list)."""
+    if not appt_ids:
+        return {}
+    rows = db.execute(
+        select(AppointmentProcedure.appointment_id, AppointmentProcedure.procedure_code)
+        .where(AppointmentProcedure.appointment_id.in_(appt_ids),
+               AppointmentProcedure.is_archived.is_(False))
+        .order_by(AppointmentProcedure.appointment_id, AppointmentProcedure.id)
+    ).all()
+    summary: dict[str, list[str]] = {}
+    for appt_id, code in rows:
+        summary.setdefault(appt_id, []).append(code)
+    return {k: ", ".join(v) for k, v in summary.items()}
+
+
+def _batch_eligibility(db: Session, patient_ids: set[int]) -> dict[int, str]:
+    """Primary-insurance eligibility per patient (best active subscriber status)."""
+    if not patient_ids:
+        return {}
+    rows = db.execute(
+        select(PatientInsurance.patient_id, InsuranceSubscriber.elig_status)
+        .join(InsuranceSubscriber, InsuranceSubscriber.id == PatientInsurance.subscriber_id)
+        .where(PatientInsurance.patient_id.in_(patient_ids), PatientInsurance.is_active.is_(True))
+    ).all()
+    out: dict[int, str] = {}
+    for pid, status in rows:
+        mapped = _eligibility(status)
+        if mapped and (pid not in out or mapped == "eligible"):
+            out[pid] = mapped
+    return out
+
+
 def list_scheduler_appointments(
     db: Session, tenant_id: int, *, date_from: date | None = None,
     date_to: date | None = None, office_id: int | None = None,
+    provider_id: str | None = None, status: str | None = None,
 ) -> list[dict]:
     stmt = (
         select(Appointment, Patient, Provider, Operatory)
@@ -57,14 +139,39 @@ def list_scheduler_appointments(
     )
     if office_id is not None:
         stmt = stmt.where(Appointment.office_id == office_id)
+    if provider_id is not None:  # SCHED/MP-7/Reports-G8: server-side provider scoping
+        stmt = stmt.where(Appointment.provider_id == provider_id)
+    if status is not None:
+        stmt = stmt.where(Appointment.status == status)
     if date_from is not None:
         stmt = stmt.where(Appointment.date >= date_from)
     if date_to is not None:
         stmt = stmt.where(Appointment.date <= date_to)
     stmt = stmt.order_by(Appointment.date.asc(), Appointment.start_time.asc())
 
+    records = db.execute(stmt).all()
+
+    # Batch enrichment (one query per dimension → no per-block N+1).
+    today = datetime.now(timezone.utc).date()
+    patient_ids = {a.patient_id for a, *_ in records if a.patient_id is not None}
+    appt_ids = [a.id for a, *_ in records]
+    alert_pids = {
+        pid for (pid,) in db.execute(
+            select(PatientAlert.patient_id).where(
+                PatientAlert.patient_id.in_(patient_ids), PatientAlert.is_active.is_(True)
+            ).distinct()
+        ).all()
+    } if patient_ids else set()
+    balances = _batch_balances(db, patient_ids)
+    services = _batch_service_summary(db, appt_ids)
+    eligibility = _batch_eligibility(db, patient_ids)
+    actor_ids = {a.created_by for a, *_ in records if a.created_by} | {
+        a.updated_by for a, *_ in records if a.updated_by}
+    names = resolve_user_names(db, actor_ids)
+
     out: list[dict] = []
-    for appt, patient, provider, operatory in db.execute(stmt).all():
+    for appt, patient, provider, operatory in records:
+        bal = balances.get(appt.patient_id)
         out.append({
             "id": appt.id,
             "patient_id": appt.patient_id,
@@ -83,9 +190,26 @@ def list_scheduler_appointments(
             "is_missed": appt.is_missed,
             "is_cancelled": appt.is_cancelled,
             "is_blocked": appt.is_blocked,
+            "is_posted": appt.is_posted,
+            "posted_on": appt.posted_on,
             "confirmed_on": appt.confirmed_on,
             "checked_in_on": appt.checked_in_on,
             "checked_out_on": appt.checked_out_on,
+            # G1/G2/G4/G5 enrichment.
+            "has_alert": appt.patient_id in alert_pids if appt.patient_id else False,
+            "patient_age": _age(patient.dob, today) if patient else None,
+            "patient_gender": patient.gender if patient else None,
+            "responsible_party_id": patient.responsible_party_id if patient else None,
+            "service_summary": services.get(appt.id),
+            "insurance_eligibility": eligibility.get(appt.patient_id) if appt.patient_id else None,
+            "account_balance": bal if bal is not None else None,
+            "created_by": appt.created_by,
+            "created_by_name": names.get(appt.created_by) if appt.created_by else None,
+            "updated_by": appt.updated_by,
+            "updated_by_name": names.get(appt.updated_by) if appt.updated_by else None,
+            "cancellation_note": appt.cancellation_note,
+            "cancellation_reason": appt.cancellation_reason,
+            "add_to_call_list": appt.add_to_call_list,
         })
     return out
 
@@ -100,7 +224,11 @@ def _appointment_in_tenant(db: Session, appt_id: str, tenant_id: int) -> Appoint
     return appt
 
 
-def update_status(db: Session, tenant_id: int, appt_id: str, status: str) -> Appointment:
+def update_status(
+    db: Session, tenant_id: int, appt_id: str, status: str,
+    *, cancellation_note: str | None = None, cancellation_reason: str | None = None,
+    add_to_call_list: bool | None = None, actor_id: int | None = None,
+) -> Appointment:
     appt = _appointment_in_tenant(db, appt_id, tenant_id)
     normalized = status.strip().lower().replace(" ", "_").replace("-", "_")
     appt.status = status
@@ -109,6 +237,15 @@ def update_status(db: Session, tenant_id: int, appt_id: str, status: str) -> App
         setattr(appt, stamp_field, datetime.now(timezone.utc))
     appt.is_missed = normalized in _MISSED
     appt.is_cancelled = normalized in _CANCELLED
+    # SCHED G3: persist cancellation metadata when provided (Cancel dialog).
+    if cancellation_note is not None:
+        appt.cancellation_note = cancellation_note
+    if cancellation_reason is not None:
+        appt.cancellation_reason = cancellation_reason
+    if add_to_call_list is not None:
+        appt.add_to_call_list = add_to_call_list
+    if actor_id is not None:
+        appt.updated_by = actor_id
     db.commit()
     db.refresh(appt)
     return appt

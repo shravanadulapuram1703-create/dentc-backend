@@ -46,6 +46,15 @@ class Appointment(Base, TimestampMixin):
     confirmed_on: Mapped[datetime | None]
     checked_in_on: Mapped[datetime | None]
     checked_out_on: Mapped[datetime | None]
+    # SCHED G8: when the appointment was posted to the ledger (paired with is_posted).
+    posted_on: Mapped[datetime | None]
+    # SCHED G3: cancellation metadata captured by the Cancel dialog (M03 p.16).
+    cancellation_note: Mapped[str | None] = mapped_column(Text)
+    cancellation_reason: Mapped[str | None] = mapped_column(String(50))
+    add_to_call_list: Mapped[bool] = mapped_column(Boolean, default=False)
+    # SCHED G5: who created / last modified (pop-out attribution).
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class AppointmentProcedure(Base, IntPKMixin, CreatedAtMixin):
@@ -60,6 +69,8 @@ class AppointmentProcedure(Base, IntPKMixin, CreatedAtMixin):
     description: Mapped[str | None] = mapped_column(String(500))
     fee: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     insurance_estimate: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    # SCHED G6: patient portion per line (COB-aware when set; else derived on read).
+    est_patient: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     billing_order: Mapped[str | None] = mapped_column(String(10))
     status: Mapped[str] = mapped_column(String(20), default="Planned")
     material_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("chart_materials.id"))

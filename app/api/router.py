@@ -26,9 +26,11 @@ from app.api.v1 import (
     provider_setup,
     reports,
     scheduler,
+    support,
     treatment,
     users,
     users_extended,
+    utilities,
 )
 from app.api.v1.registry import build_entity_router
 
@@ -54,6 +56,9 @@ api_router.include_router(ledger.router)
 api_router.include_router(audit.router)
 # Reports module: practice-wide aggregation (summary/trends/AR/aging).
 api_router.include_router(reports.router)
+# Help Center support tickets (Jira proxy) + Utilities execution/audit.
+api_router.include_router(support.router)
+api_router.include_router(utilities.router)
 # Scheduler module: denormalized feed + status transition + patient context.
 # Before generic CRUD so /appointments/scheduler & /patients/{id}/context win.
 api_router.include_router(scheduler.appt_router)
