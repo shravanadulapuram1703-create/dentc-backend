@@ -92,7 +92,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 #  CORS must come first
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000","http://16.176.134.94:5173/","http://16.176.134.94:5173","http://localhost:5173/","http://localhost:5173","http://34.66.199.55:5173","http://34.66.199.55:5173/"],
+    allow_origins=["http://localhost:3000","http://16.176.134.94:5173/",
+                    "http://16.176.134.94:5173","http://localhost:5173/",
+                    "http://localhost:5173","http://34.66.199.55:5173",
+                    "http://34.66.199.55:5173/", "http://16.176.134.94:5173/",
+                    "http://localhost:5173/","http://localhost:5173",
+                    "http://34.66.199.55:5173","http://34.66.199.55:5173/",
+                    "https://reckondental.com","https://reckondental.com/"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
