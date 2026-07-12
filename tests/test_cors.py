@@ -108,3 +108,30 @@ def test_error_response_still_carries_cors_header(client):
     )
     assert r.status_code == 401
     assert r.headers.get("access-control-allow-origin") == CLOUD_RUN_FE
+
+
+def test_unhandled_500_still_carries_cors_header(db_session):
+    """Regression for the appointments incident: an *unhandled* 500 (e.g. a bad DB
+    query) must still carry CORS headers, so the browser sees a real 500 instead of a
+    phantom 'No Access-Control-Allow-Origin' error. CatchAllMiddleware (inside CORS)
+    guarantees this — FastAPI's built-in 500 handler runs above CORS and would not."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    path = "/api/v1/__boom_test__"
+
+    async def _boom():
+        raise RuntimeError("boom")
+
+    app.add_api_route(path, _boom, methods=["GET"], include_in_schema=False)
+    try:
+        # raise_server_exceptions=False so the client returns the 500 response
+        # instead of re-raising, letting us inspect the headers the browser would see.
+        with TestClient(app, raise_server_exceptions=False) as c:
+            r = c.get(path, headers={"Origin": CLOUD_RUN_FE})
+        assert r.status_code == 500
+        assert r.headers.get("access-control-allow-origin") == CLOUD_RUN_FE
+        assert r.json()["error"]["code"] == "internal_error"
+    finally:
+        app.router.routes = [rt for rt in app.router.routes if getattr(rt, "path", None) != path]

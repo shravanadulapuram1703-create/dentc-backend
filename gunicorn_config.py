@@ -16,6 +16,12 @@ worker_connections = int(os.getenv("GUNICORN_WORKER_CONNECTIONS", "1000"))
 timeout = int(os.getenv("GUNICORN_TIMEOUT", "120"))
 keepalive = int(os.getenv("GUNICORN_KEEPALIVE", "5"))
 
+# Trust X-Forwarded-* from the front-end proxy (Cloud Run / load balancer) so the
+# app sees the real https scheme and builds redirect URLs with https:// instead of
+# downgrading to http://. Cloud Run has no direct ingress, so "*" is safe there;
+# override FORWARDED_ALLOW_IPS to a specific proxy IP in other environments.
+forwarded_allow_ips = os.getenv("FORWARDED_ALLOW_IPS", "*")
+
 # Logging
 accesslog = os.getenv("GUNICORN_ACCESS_LOG", "-")  # "-" means stdout
 errorlog = os.getenv("GUNICORN_ERROR_LOG", "-")
