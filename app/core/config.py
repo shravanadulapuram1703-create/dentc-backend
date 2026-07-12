@@ -7,12 +7,15 @@ discrete ``DB_*`` parts used by the migration tooling.
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import Literal
 from urllib.parse import quote_plus
 
 from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_log = logging.getLogger("app.config")
 
 
 class Settings(BaseSettings):
@@ -120,7 +123,22 @@ class Settings(BaseSettings):
     @classmethod
     def _split_cors(cls, v: object) -> object:
         if isinstance(v, str):
-            return [o.strip() for o in v.split(",") if o.strip()]
+            v = [o.strip() for o in v.split(",") if o.strip()]
+        if isinstance(v, list):
+            # Security: we always send `allow_credentials=True`. Starlette then
+            # special-cases a `"*"` origin by reflecting *whatever* Origin the
+            # request carried — effectively "allow any origin with credentials"
+            # (a CSRF / data-exposure risk). Strip wildcards so only the explicit
+            # allow-list + CORS_ORIGIN_REGEX can ever match. This neutralises a
+            # stale `CORS_ORIGINS=*` env var without needing a redeploy env edit.
+            cleaned = [o.strip() for o in v if isinstance(o, str) and o.strip() and o.strip() != "*"]
+            if len(cleaned) != len([o for o in v if str(o).strip()]):
+                _log.warning(
+                    "CORS_ORIGINS contained a '*' wildcard; ignoring it because "
+                    "allow_credentials is enabled. Use an explicit allow-list "
+                    "(and CORS_ORIGIN_REGEX for per-deploy origins) instead."
+                )
+            return cleaned
         return v
 
     @computed_field  # type: ignore[prop-decorator]

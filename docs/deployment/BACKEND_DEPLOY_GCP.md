@@ -228,15 +228,25 @@ Common causes: DB socket/connection-name typo, missing IAM grant from Step 3d, o
 
 ## 7. After the frontend is deployed — fix CORS
 
-Once the frontend has a URL, point the backend at it and redeploy a revision:
+Point the backend at the real frontend origin(s) with an **explicit allow-list** and redeploy a
+revision. Include the production custom domain and (if used directly) the frontend Cloud Run URL:
 ```powershell
 gcloud run services update dentc-backend `
   --region us-central1 `
-  --update-env-vars "CORS_ORIGINS=https://dentc-frontend-477406612596.us-central1.run.app"
+  --update-env-vars "CORS_ORIGINS=https://reckondental.com,https://www.reckondental.com"
 ```
-(Comma-separate multiple origins. With `allow_credentials=True`, a `*` origin is rejected by browsers — always list exact origins.)
 
-gcloud run services update dentc-backend --region us-central1 --update-env-vars "CORS_ORIGINS=https://dentc-frontend-477406612596.us-central1.run.app"
+Then pin traffic to the newest revision so old revisions can't serve the stale config:
+```powershell
+gcloud run services update-traffic dentc-backend --region us-central1 --to-latest
+```
+
+> **Never set `CORS_ORIGINS=*`.** With `allow_credentials=True`, a `*` reflects *whatever* Origin the
+> request carried — effectively "allow any origin with credentials" (a CSRF / data-exposure risk).
+> The backend now defensively **strips `*`** from `CORS_ORIGINS` at startup (logs a warning) and falls
+> back to the explicit list + `CORS_ORIGIN_REGEX`, so a stray wildcard can't re-open this hole. Still,
+> set an explicit list. `CORS_ORIGIN_REGEX` (default `https://([a-z0-9-]+\.)*(run\.app|reckondental\.com)`)
+> covers per-deploy Cloud Run URLs and `reckondental.com` subdomains automatically.
 
 
 

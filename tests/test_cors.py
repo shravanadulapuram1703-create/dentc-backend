@@ -69,6 +69,35 @@ def test_disallowed_origin_gets_no_cors_header(client):
     assert r.headers.get("access-control-allow-origin") != "https://evil.example.com"
 
 
+def test_invalid_production_origin_variants_are_not_reflected(client):
+    """Regression for the incident report §4: with `allow_credentials=True` we must
+    NOT reflect arbitrary/near-miss origins (insecure http, trailing slash, look-alike
+    hostname). Only the exact allow-list + tight regex may match."""
+    for origin in (
+        "http://reckondental.com",  # insecure scheme
+        "https://reckondental.com/",  # trailing slash
+        "https://notreckondental.com",  # look-alike hostname
+        "https://reckondental.com.evil.com",  # suffix-attack hostname
+    ):
+        r = client.options(
+            f"{PREFIX}/auth/login",
+            headers={"Origin": origin, "Access-Control-Request-Method": "POST"},
+        )
+        assert r.headers.get("access-control-allow-origin") != origin, origin
+
+
+def test_wildcard_origin_is_stripped_when_credentials_enabled():
+    """A `CORS_ORIGINS=*` (env or default) must be dropped, since Starlette would
+    otherwise reflect any origin back alongside allow-credentials."""
+    from app.core.config import Settings
+
+    s = Settings(CORS_ORIGINS="*")
+    assert "*" not in s.CORS_ORIGINS
+
+    s2 = Settings(CORS_ORIGINS="*,https://reckondental.com")
+    assert s2.CORS_ORIGINS == ["https://reckondental.com"]
+
+
 def test_error_response_still_carries_cors_header(client):
     """A 401 from login must still include the CORS header (middleware outermost)."""
     _clear_auth_overrides()
