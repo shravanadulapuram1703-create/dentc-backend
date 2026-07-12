@@ -93,12 +93,14 @@ class Settings(BaseSettings):
             "http://localhost:5173",
             "http://localhost:3000",
             "http://localhost:8080",
+            "https://reckondental.com",
+            "https://www.reckondental.com",
         ]
     )
     # Regex fallback for origins that vary per deploy (e.g. Cloud Run URLs carry a
-    # project-number hash). Matches any *.run.app frontend by default. Set to a
-    # tighter pattern (or "" to disable) in production.
-    CORS_ORIGIN_REGEX: str | None = r"https://.*\.run\.app"
+    # project-number hash). Matches any *.run.app frontend and any reckondental.com
+    # subdomain by default. Set to a tighter pattern (or "" to disable) in production.
+    CORS_ORIGIN_REGEX: str | None = r"https://([a-z0-9-]+\.)*(run\.app|reckondental\.com)"
 
     # ── Encryption (EIN, AI-assist secret, …) ────────────────────────────────
     # A urlsafe-base64 32-byte Fernet key. If unset, derived from JWT_SECRET_KEY.

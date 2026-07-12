@@ -36,6 +36,21 @@ def test_preflight_allows_cloud_run_frontend(client):
     assert r.headers.get("access-control-allow-credentials") == "true"
 
 
+def test_preflight_allows_production_domain(client):
+    origin = "https://reckondental.com"
+    r = client.options(
+        f"{PREFIX}/auth/login",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.headers.get("access-control-allow-origin") == origin
+    assert r.headers.get("access-control-allow-credentials") == "true"
+
+
 def test_preflight_allows_localhost_exact_origin(client):
     r = client.options(
         f"{PREFIX}/auth/login",
