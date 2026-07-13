@@ -20,7 +20,13 @@ CORS in [app/main.py](../../app/main.py). Any unhandled error is now converted t
 the `Access-Control-*` headers. A backend fault now shows in the browser as an honest,
 readable 500 instead of a phantom CORS error.
 
-### P0b (deploy) — apply the pending DB migrations ⚠️ ACTION REQUIRED
+### P0b (deploy) — apply the pending DB migrations ✅ now automated in CI
+> **Automated:** [.github/workflows/deploy-cloud-run.yml](../../.github/workflows/deploy-cloud-run.yml)
+> now runs `alembic upgrade head` (via the Cloud SQL Auth Proxy, inside the freshly built
+> image) **before** the Cloud Run deploy. It's idempotent and blocks the rollout on failure,
+> so a push to `feature/phase_data_migration` applies the pending appointment columns and
+> then deploys. The manual steps below remain valid for a one-off run or verification.
+
 **Root cause of the actual 500:** the production `recondental_migrated` DB is stamped
 **below** the current Alembic head (`b0c1d2e3f4a5`) and is missing the appointment
 columns added by revision **`a9b0c1d2e3f4` (add scheduler gaps)**:
@@ -105,6 +111,15 @@ Then reload `https://reckondental.com/dashboard` — Today's Appointments / Toda
 Schedule should populate.
 
 ## Deploy order
+The CI workflow now does 1→2→3 automatically on push to `feature/phase_data_migration`:
 1. Build + push the new image (P0a + P1 code).
-2. `alembic upgrade head` against prod via the Cloud SQL Auth Proxy (P0b).
-3. `gcloud run deploy …` the new image; set `CORS_ORIGINS` + `update-traffic --to-latest` (P2).
+2. `alembic upgrade head` against prod via the Cloud SQL Auth Proxy (P0b) — blocks deploy on failure.
+3. `gcloud run deploy …` the new image.
+
+Still do once, out-of-band: set `CORS_ORIGINS` to the explicit allow-list and
+`update-traffic --to-latest` (P2) — the workflow doesn't manage env vars. (CORS already
+works without it thanks to the code defaults + wildcard-strip, but an explicit list is best.)
+
+**CI prerequisite:** the deploy service account (`WIF_SERVICE_ACCOUNT`) must have
+`roles/cloudsql.client` and `roles/secretmanager.secretAccessor` (for the `DATABASE_URL`
+secret). If the migration step fails on permissions, grant those and re-run.
