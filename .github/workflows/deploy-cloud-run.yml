@@ -124,9 +124,26 @@ jobs:
             --vpc-egress private-ranges-only \
             --update-env-vars "REDIS_ENABLED=true,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT"
 
+          # Force 100% traffic onto the revision we just built. Without this, a
+          # service whose traffic was ever pinned to a specific revision (e.g. a
+          # past console rollback) keeps serving the OLD revision — `gcloud run
+          # deploy` creates the new one but does NOT migrate traffic to it. That
+          # produces a green deploy serving stale code (symptom: new routes 404).
+          # --to-latest is idempotent when traffic already tracks latest.
+          gcloud run services update-traffic $SERVICE \
+            --region "$REGION" --project "$PROJECT_ID" --to-latest
+
+          echo "Now serving:"
+          gcloud run services describe $SERVICE --region "$REGION" --project "$PROJECT_ID" \
+            --format='value(status.traffic)'
+
       # Post-deploy gate: confirm the running revision can actually reach Redis over
       # the VPC. A green deploy with a mis-wired VPC/IP would otherwise look fine
       # while real-time messaging silently degrades. Fails the job if it can't.
+      #
+      # A 404 here means stale code is serving (the /health/redis route is missing),
+      # NOT a Redis problem — distinct from a 200 with "connected": false, which is
+      # a real VPC/Redis failure. The messages below keep the two apart.
       - name: Verify Redis connectivity
         run: |
           set -euo pipefail
@@ -134,13 +151,21 @@ jobs:
             --project "$PROJECT_ID" --format='value(status.url)')"
           echo "Probing $URL/health/redis"
           for i in $(seq 1 10); do
-            body="$(curl -fsS "$URL/health/redis" || true)"
-            echo "$body"
+            code="$(curl -s -o /tmp/body -w '%{http_code}' "$URL/health/redis" || true)"
+            body="$(cat /tmp/body 2>/dev/null || true)"
+            echo "HTTP $code $body"
             if echo "$body" | grep -q '"connected": *true'; then
               echo "✅ Redis reachable from Cloud Run."
               exit 0
             fi
+            if [ "$code" = "404" ]; then
+              echo "⚠️  /health/redis 404 — a STALE revision is serving (not a Redis issue)."
+            fi
             sleep 6
           done
-          echo "❌ Cloud Run could not reach Redis. Check VPC egress + REDIS_HOST ($REDIS_HOST)."
+          if [ "$code" = "404" ]; then
+            echo "❌ Serving revision lacks /health/redis — traffic did not move to the new revision."
+          else
+            echo "❌ New revision is live but cannot reach Redis. Check VPC egress + REDIS_HOST ($REDIS_HOST)."
+          fi
           exit 1
