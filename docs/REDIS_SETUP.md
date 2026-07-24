@@ -6,6 +6,26 @@
 
 ---
 
+## 0. Current setup (already wired — start here)
+
+Memorystore is provisioned at **`10.48.189.19:6379`** and the Cloud Run deploy is
+automated. What's live now:
+
+- **Local:** `docker compose up -d redis` → Redis on `localhost:6379`; `.env` is
+  already pointed at it (`REDIS_ENABLED=true`).
+- **Cloud:** `.github/workflows/deploy-cloud-run.yml` attaches the service to the
+  VPC via **Direct VPC egress** and injects the Redis env vars on every deploy —
+  then **fails the build if the new revision can't reach Redis**.
+- **Verify either environment:**
+  - `GET /health/redis` → `{"status":"ok","connected":true}` means Redis is reachable.
+  - `GET /health/messaging` → `"fanout":"redis"` means real-time events cross instances.
+
+The rest of this guide is the underlying reference. Note §6.5 below documents the
+older **VPC-connector** approach; the workflow now uses **Direct VPC egress**
+(`--network`/`--subnet`/`--vpc-egress`) instead — see §6.7.
+
+---
+
 ## 1. What Redis is used for
 
 `app/integrations/redis_store.py` uses Redis for three things:
@@ -70,13 +90,18 @@ Then start Redis (see §4) and verify `redis-cli ping` → `PONG`.
 
 Redis has no official native Windows build. Use one of:
 
-### 4a. Docker (recommended)
+### 4a. Docker Compose (recommended)
+The repo ships a `docker-compose.yml` with a ready Redis service:
+```bash
+docker compose up -d redis                 # start on localhost:6379
+docker compose ps                          # STATUS shows "healthy"
+docker compose down                        # stop
+```
+Or a one-off container without compose:
 ```powershell
 docker run -d --name dentc-redis -p 6379:6379 redis:7-alpine
-docker ps                      # confirm it's running
 docker exec -it dentc-redis redis-cli ping   # -> PONG
 ```
-Stop/start later: `docker stop dentc-redis` / `docker start dentc-redis`.
 
 ### 4b. Memurai (native Windows Redis-compatible service)
 Install from memurai.com → runs as a Windows service on `localhost:6379`.
@@ -188,6 +213,41 @@ printf '%s' "<AUTH_STRING>" | gcloud secrets create dentc-redis-auth --data-file
 
 **GCE / GKE** in the same VPC: just set the env vars to the private host/port
 (+ password) — no connector needed.
+
+### 6.7 ✅ What this repo actually uses — Direct VPC egress (automated)
+
+The deploy workflow uses **Direct VPC egress** rather than a Serverless VPC Access
+connector (§6.5). It's newer, needs no connector resource, and is the option the
+console surfaces as "Send traffic directly to a VPC → Route only requests to
+private IPs". The deploy step runs:
+
+```bash
+gcloud run deploy dentc-backend \
+  --image "$IMAGE" --region us-central1 --project reckon-dental \
+  --network default --subnet default --vpc-egress private-ranges-only \
+  --update-env-vars REDIS_ENABLED=true,REDIS_HOST=10.48.189.19,REDIS_PORT=6379
+```
+
+Two things that are easy to get wrong:
+
+- **`--update-env-vars`, NOT `--set-env-vars`.** This service's `DATABASE_URL` and
+  JWT secrets are set on the service (console / Secret Manager), not in the
+  workflow. `--set-env-vars` replaces the *entire* env set and would wipe them,
+  breaking the service on the next deploy. `--update-env-vars` merges — it only
+  touches the Redis keys. (This corrects the `--set-env-vars` shown in §6.5.)
+- **`private-ranges-only`** routes only RFC-1918 traffic through the VPC, so
+  outbound internet calls (Gemini, Stripe, …) keep working without Cloud NAT. The
+  subnet must be in the Cloud Run region (`us-central1`) and share the VPC with
+  Memorystore.
+
+The host/port are in the workflow's `env:` block (`REDIS_HOST`, `REDIS_PORT`) — edit
+there if the instance is re-created. AUTH is off on basic tier, so no password; if
+you enable it, add `--update-secrets REDIS_PASSWORD=<secret>:latest`.
+
+**Post-deploy gate.** The workflow's *Verify Redis connectivity* step curls
+`/health/redis` on the freshly deployed revision and fails the job unless it returns
+`"connected": true`. A silently degraded fan-out (green deploy, unreachable Redis)
+becomes a red build instead of a mystery in production.
 
 ### 6.6 Production env vars
 ```dotenv

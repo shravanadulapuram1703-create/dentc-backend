@@ -115,6 +115,19 @@ class Settings(BaseSettings):
     LOGO_MAX_BYTES: int = 2 * 1024 * 1024  # 2 MB
     LOGO_ALLOWED_TYPES: list[str] = Field(default_factory=lambda: ["image/jpeg", "image/png"])
 
+    # ── Direct Messaging ─────────────────────────────────────────────────────
+    # Presence key TTL. Must exceed the client's 30s heartbeat with headroom, or a
+    # slightly late ping flaps the user to offline (requirements §12).
+    MESSAGING_PRESENCE_TTL_SECONDS: int = 45
+    # Windows after which a message can no longer be changed (§29).
+    MESSAGING_EDIT_WINDOW_SECONDS: int = 15 * 60
+    MESSAGING_DELETE_WINDOW_SECONDS: int = 60 * 60
+    # Message history page size (§17).
+    MESSAGING_HISTORY_DEFAULT_LIMIT: int = 30
+    MESSAGING_HISTORY_MAX_LIMIT: int = 100
+    # Conversations included in the WS `sync` warm-up snapshot on connect.
+    MESSAGING_SYNC_CONVERSATION_LIMIT: int = 50
+
     # ── Logging ────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
     LOG_JSON: bool = False

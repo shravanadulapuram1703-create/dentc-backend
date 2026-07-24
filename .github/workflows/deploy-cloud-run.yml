@@ -17,6 +17,18 @@ env:
   # Cloud SQL instance that hosts recondental_migrated (note: DB region is us-east1,
   # distinct from the Cloud Run REGION above). Used by the migration step's proxy.
   INSTANCE_CONNECTION_NAME: reckon-dental:us-east1:recon-dental-db
+  # Memorystore (Redis) reached over Direct VPC egress. The host is a PRIVATE IP,
+  # so Cloud Run must attach to the VPC (see the deploy step's --network/--subnet/
+  # --vpc-egress flags) to route to it. The messaging fan-out + presence + token
+  # store all use this; without it the WS gateway degrades to per-instance delivery.
+  # Change these here if Memorystore is re-created with a different IP/port. Not a
+  # secret (basic-tier Memorystore has no AUTH), so plain env is fine.
+  REDIS_HOST: 10.48.189.19
+  REDIS_PORT: "6379"
+  # VPC for Direct egress. `default`/`default` matches the console setup; the subnet
+  # MUST live in the Cloud Run REGION (us-central1) and share the VPC with Redis.
+  VPC_NETWORK: default
+  VPC_SUBNET: default
 
 jobs:
   deploy:
@@ -93,7 +105,42 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          # --update-env-vars (NOT --set-env-vars): this deploy does not declare
+          # DATABASE_URL / JWT_SECRET / etc. — those live on the service (console /
+          # Secret Manager). --set-env-vars REPLACES the whole set and would wipe
+          # them, breaking the service. --update-env-vars merges, touching only the
+          # Redis keys.
+          #
+          # --network/--subnet/--vpc-egress enable Direct VPC egress so the service
+          # can reach Memorystore's private IP. private-ranges-only keeps internet
+          # traffic (Gemini, Stripe, …) on the normal path — only RFC-1918 ranges
+          # go through the VPC, so no Cloud NAT is required.
           gcloud run deploy $SERVICE \
             --image "$IMAGE" \
             --region "$REGION" \
-            --project "$PROJECT_ID"
+            --project "$PROJECT_ID" \
+            --network "$VPC_NETWORK" \
+            --subnet "$VPC_SUBNET" \
+            --vpc-egress private-ranges-only \
+            --update-env-vars "REDIS_ENABLED=true,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT"
+
+      # Post-deploy gate: confirm the running revision can actually reach Redis over
+      # the VPC. A green deploy with a mis-wired VPC/IP would otherwise look fine
+      # while real-time messaging silently degrades. Fails the job if it can't.
+      - name: Verify Redis connectivity
+        run: |
+          set -euo pipefail
+          URL="$(gcloud run services describe $SERVICE --region "$REGION" \
+            --project "$PROJECT_ID" --format='value(status.url)')"
+          echo "Probing $URL/health/redis"
+          for i in $(seq 1 10); do
+            body="$(curl -fsS "$URL/health/redis" || true)"
+            echo "$body"
+            if echo "$body" | grep -q '"connected": *true'; then
+              echo "✅ Redis reachable from Cloud Run."
+              exit 0
+            fi
+            sleep 6
+          done
+          echo "❌ Cloud Run could not reach Redis. Check VPC egress + REDIS_HOST ($REDIS_HOST)."
+          exit 1

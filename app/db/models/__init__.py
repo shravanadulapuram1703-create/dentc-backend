@@ -104,6 +104,16 @@ from app.db.models.codes import (
     ProcedureCode,
 )
 from app.db.models.comms import LetterTemplate, PostcardTemplate, SmsMessage
+from app.db.models.messaging import (
+    Conversation,
+    ConversationParticipant,
+    Message,
+    MessageAttachment,
+    MessageReaction,
+    MessageReceipt,
+    MessageRecipientState,
+    UserPresence,
+)
 from app.db.models.identity import (
     AuthActionToken,
     Office,
@@ -220,6 +230,9 @@ __all__ = [
     "QuestionnaireOption",
     # communications
     "SmsMessage", "LetterTemplate", "PostcardTemplate",
+    # direct messaging
+    "Conversation", "ConversationParticipant", "Message", "MessageReceipt",
+    "MessageRecipientState", "MessageAttachment", "MessageReaction", "UserPresence",
     # staff
     "TimeClockEntry", "ProviderInsuranceId", "ProviderRouteSlip",
     # imaging / misc

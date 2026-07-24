@@ -215,3 +215,126 @@ def get_counter(key: str) -> int:
         logger.warning("Redis read failed (get_counter): %s", exc)
         _reset_client()
         return 0
+
+
+# ── Messaging fan-out + presence ─────────────────────────────────────────────
+# Publishing is synchronous and fire-and-forget: REST handlers in this codebase
+# are `def` (threadpool), so they cannot await. The WebSocket gateway does the
+# *subscribing* with redis.asyncio — see ``app.integrations.redis_pubsub``.
+
+
+def publish(channel: str, payload: str) -> bool:
+    """PUBLISH to ``channel``. Returns False when Redis is unavailable.
+
+    A False return is meaningful, unlike the cache helpers above: the caller
+    (``messaging_events``) falls back to in-process delivery so single-node dev
+    and test runs still get real-time events without a Redis server.
+    """
+    client = _get_client()
+    if client is None:
+        return False
+    try:
+        client.publish(channel, payload)
+        return True
+    except RedisError as exc:
+        logger.warning("Redis publish failed (%s): %s", channel, exc)
+        _reset_client()
+        return False
+
+
+def presence_set(key: str, status: str, ttl_seconds: int) -> None:
+    cache_set(key, status, ttl_seconds)
+
+
+def presence_get_many(keys: list[str]) -> dict[str, str | None]:
+    """MGET presence keys. Returns all-None when Redis is down (→ 'offline')."""
+    if not keys:
+        return {}
+    client = _get_client()
+    if client is None:
+        return {k: None for k in keys}
+    try:
+        values = client.mget(keys)
+        return dict(zip(keys, values, strict=True))
+    except RedisError as exc:
+        logger.warning("Redis read failed (presence_get_many): %s", exc)
+        _reset_client()
+        return {k: None for k in keys}
+
+
+def presence_touch(key: str, ttl_seconds: int) -> None:
+    """Refresh a presence key's TTL on heartbeat without changing its value."""
+    client = _get_client()
+    if client is None:
+        return
+    try:
+        client.expire(key, ttl_seconds)
+    except RedisError as exc:
+        logger.warning("Redis write failed (presence_touch): %s", exc)
+        _reset_client()
+
+
+def health() -> dict[str, object]:
+    """Actively probe Redis with a set/get round-trip for a health endpoint.
+
+    Unlike the helpers above (which degrade silently on purpose), this reports the
+    truth so a deploy can be *verified*. It still never raises — a health check
+    that 500s is useless — it returns ``connected: false`` with the reason instead.
+
+    Uses ``redis.Redis`` directly rather than the module client so the probe isn't
+    suppressed by the post-failure cooldown; a health check should always attempt a
+    live connection.
+    """
+    if not settings.REDIS_ENABLED:
+        return {"connected": False, "enabled": False, "detail": "REDIS_ENABLED is false"}
+    if _redis is None:
+        return {"connected": False, "enabled": True, "detail": "redis package not installed"}
+    try:
+        client = _redis.Redis(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            db=settings.REDIS_DB,
+            password=settings.REDIS_PASSWORD,
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        client.set("dentc:health:probe", "ok", ex=10)
+        value = client.get("dentc:health:probe")
+        return {
+            "connected": value == "ok",
+            "enabled": True,
+            "host": settings.REDIS_HOST,
+            "port": settings.REDIS_PORT,
+            "detail": None if value == "ok" else "round-trip mismatch",
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "connected": False,
+            "enabled": True,
+            "host": settings.REDIS_HOST,
+            "port": settings.REDIS_PORT,
+            "detail": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def conn_refcount(key: str, delta: int, ttl_seconds: int) -> int | None:
+    """Adjust a user's live-socket count. A user is online while this is > 0.
+
+    Returns the new count, or None when Redis is unavailable (the caller then
+    uses its in-process count instead).
+    """
+    client = _get_client()
+    if client is None:
+        return None
+    try:
+        count = client.incrby(key, delta)
+        if count <= 0:
+            client.delete(key)
+            return 0
+        client.expire(key, ttl_seconds)
+        return int(count)
+    except RedisError as exc:
+        logger.warning("Redis op failed (conn_refcount): %s", exc)
+        _reset_client()
+        return None

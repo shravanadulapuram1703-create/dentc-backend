@@ -1,0 +1,30 @@
+# Local development dependencies.
+#
+# The app itself runs on the host (uvicorn app.main:app --reload), against the
+# shared Cloud SQL Postgres. Redis is the one piece that must be local for the
+# messaging module's real-time fan-out to work across your own tabs the same way
+# it will in production.
+#
+#   docker compose up -d redis        # start Redis on localhost:6379
+#   docker compose ps                 # check health
+#   docker compose down               # stop
+#
+# With this running and REDIS_ENABLED=true in .env, GET /health/redis returns
+# {"status": "ok", ...} and GET /health/messaging reports "fanout": "redis".
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: dentc-redis
+    # Mirror the Memorystore topology used in production as closely as a dev box
+    # can: no AUTH (Memorystore basic tier default), persistence off (it's a cache
+    # + ephemeral pub-sub bus, nothing here needs to survive a restart).
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped

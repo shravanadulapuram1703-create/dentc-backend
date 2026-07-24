@@ -15,6 +15,8 @@ from app.api.v1 import (
     icd_codes,
     insurance,
     ledger,
+    messaging,
+    messaging_ws,
     office_assignment,
     office_setup,
     patients_extra,
@@ -102,4 +104,9 @@ api_router.include_router(perio.router)
 # (REST-4), bulk conditions, aggregate /patients/{id}/chart. Before generic CRUD so
 # literal sub-paths (/chart-conditions/bulk, /chart-tooth-notes/upsert) win.
 api_router.include_router(restorative.router)
+# Direct Messaging: REST (/messaging/conversations, /messaging/presence, …) plus
+# the WebSocket gateway (/messaging/ws). Both are hand-written — messaging is not
+# a generic CRUD entity, so it is not in the registry.
+api_router.include_router(messaging.router)
+api_router.include_router(messaging_ws.router)
 api_router.include_router(build_entity_router())

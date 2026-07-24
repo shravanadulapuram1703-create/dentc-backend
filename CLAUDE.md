@@ -134,6 +134,36 @@ consents (versioned + sanitized). Secrets (AI-assist secret, EIN) encrypted via
 [app/core/crypto.py](app/core/crypto.py). Dropdown `group_code`s seeded by
 `scripts/seed_account_definitions.py`.
 
+**Direct Messaging module** (user-to-user DMs; gaps MSG-1…MSG-5 of
+[docs/messaging_backend_devreport.md](docs/messaging_backend_devreport.md), wire
+contract in [docs/api-contracts/MESSAGING_API_CONTRACT.md](docs/api-contracts/MESSAGING_API_CONTRACT.md)).
+The **first WebSocket surface in the app** and the first non-CRUD real-time
+subsystem, so it sits outside the registry entirely:
+- 8 tables (`conversations`, `conversation_participants`, `messages`,
+  `message_receipts`, `message_recipient_states`, `message_attachments`,
+  `message_reactions`, `user_presence`; Alembic `c4d5e6f7a8b9`) in
+  [app/db/models/messaging.py](app/db/models/messaging.py). Conversation/message ids
+  are **UUIDv7** ([app/core/ids.py](app/core/ids.py)) so they are time-sortable —
+  that is what makes keyset history pagination (`?before=`) work.
+- REST in [app/api/v1/messaging.py](app/api/v1/messaging.py) + logic in
+  [app/services/messaging_service.py](app/services/messaging_service.py).
+  Sends are idempotent per `client_id`; conversations are get-or-create per user
+  pair via `dedupe_key`.
+- WS gateway `/api/v1/messaging/ws?token=` in
+  [app/api/v1/messaging_ws.py](app/api/v1/messaging_ws.py). Auth is **query-string
+  JWT decoded by hand** (browsers can't set headers on a WS handshake), so it
+  bypasses `HTTPBearer`/`get_db` — it uses a `_session()` seam instead.
+- Fan-out via Redis Pub/Sub on `msg:{tenant}:{user}`
+  ([app/integrations/redis_pubsub.py](app/integrations/redis_pubsub.py) async
+  subscriber + `redis_store.publish` sync publisher). **Falls back to in-process
+  delivery without Redis** — fine for dev, but does not cross gunicorn workers.
+- Presence in [app/services/presence_service.py](app/services/presence_service.py):
+  Redis TTL keyed on the client's 30s heartbeat, socket refcount for multi-tab,
+  `user_presence.last_seen_at` written on the transition to offline.
+- **All ids serialize as strings** on the wire (the frontend compares them with
+  `===` against auth-context values). MSG-6…MSG-11 (attachments, push, FTS search,
+  rate limiting, audit) are not implemented.
+
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))
   records authenticated 2xx mutations (POST/PUT/PATCH/DELETE) to `audit_logs` via

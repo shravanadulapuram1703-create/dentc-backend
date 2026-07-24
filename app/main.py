@@ -18,9 +18,11 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import get_logger, setup_logging
+from app.integrations import redis_store
 from app.middleware.audit import AuditMiddleware
 from app.middleware.catch_all import CatchAllMiddleware
 from app.middleware.request_context import RequestContextMiddleware
+from app.services import messaging_events
 
 setup_logging(settings.LOG_LEVEL, settings.LOG_JSON)
 logger = get_logger("app")
@@ -29,7 +31,12 @@ logger = get_logger("app")
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     logger.info("Starting %s (env=%s)", settings.APP_NAME, settings.ENV)
+    # Messaging fan-out: records the serving loop (so sync REST handlers can
+    # schedule socket delivery) and opens the Redis Pub/Sub subscriber. Degrades
+    # to in-process delivery when Redis is off — see app.services.messaging_events.
+    await messaging_events.start_fanout()
     yield
+    await messaging_events.stop_fanout()
     logger.info("Shutting down %s", settings.APP_NAME)
 
 
@@ -74,6 +81,7 @@ def create_app() -> FastAPI:
 
     # Serve uploaded assets (e.g. account logos). Swap for object storage in prod.
     import os
+
     from fastapi.staticfiles import StaticFiles
 
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
@@ -82,6 +90,44 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["Meta"], operation_id="health_check")
     def health() -> dict[str, str]:
         return {"status": "ok", "service": settings.APP_NAME}
+
+    @app.get("/health/redis", tags=["Meta"], operation_id="redis_health_check")
+    def redis_health() -> dict[str, object]:
+        """Live Redis connectivity probe (set/get round-trip).
+
+        Use this to verify the VPC egress + REDIS_HOST wiring after a Cloud Run
+        deploy. ``{"status": "ok", "connected": true}`` means the service can reach
+        Memorystore on its private IP. Never 500s — a broken Redis reports
+        ``connected: false`` with the reason so the check itself stays reachable.
+        """
+        result = redis_store.health()
+        return {"status": "ok" if result.get("connected") else "degraded", **result}
+
+    @app.get("/health/messaging", tags=["Meta"], operation_id="messaging_health_check")
+    def messaging_health() -> dict[str, object]:
+        """Report the real-time fan-out mode.
+
+        Without Redis the WS gateway still works, but delivery is in-process only
+        and does NOT cross workers/instances — a failure that is invisible from the
+        UI (REST history stays correct while live events silently go missing). This
+        endpoint exists so a deploy can be *verified* rather than assumed.
+
+        ``fanout: "redis"`` is the only correct state for multi-instance serving.
+        """
+        redis_ok = messaging_events.fanout.available
+        return {
+            "status": "ok",
+            "fanout": "redis" if redis_ok else "in_process",
+            "cross_worker_delivery": redis_ok,
+            "redis_enabled_setting": settings.REDIS_ENABLED,
+            "redis_host": settings.REDIS_HOST,
+            "warning": None
+            if redis_ok
+            else (
+                "Real-time events will not cross gunicorn workers or Cloud Run "
+                "instances. Provision Redis and set REDIS_HOST/REDIS_PORT."
+            ),
+        }
 
     _assert_unique_operation_ids(app)
     _customise_openapi(app)
