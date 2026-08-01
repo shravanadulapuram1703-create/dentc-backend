@@ -143,6 +143,7 @@ class PatientBalance(BaseModel):
     patient_balance: float = Field(0, description="Charges − payments − estimated insurance")
     insurance_balance: float = Field(0, description="Outstanding expected-insurance portion")
     today_charges: float = Field(0, description="Sum of today's non-void procedure charges")
+    opening_balance: float = Field(0, description="Seeded opening A/R (GAP-AP-12); already in balance/aging")
     aging: BalanceAging = Field(default_factory=BalanceAging)
     recent_activity: BalanceRecentActivity = Field(default_factory=BalanceRecentActivity)
     as_of: str = Field(..., description="UTC timestamp the balance was computed")

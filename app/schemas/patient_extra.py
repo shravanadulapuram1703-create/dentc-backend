@@ -53,6 +53,10 @@ class DuplicateCandidate(BaseModel):
     dob: date | None = None
     is_active: bool
     match_score: int = Field(..., description="0-100 heuristic confidence")
+    # BUG-1: the columns a user needs to tell candidates apart (were blank in the UI).
+    email: str | None = None
+    home_office_short_id: str | None = None
+    preferred_provider_name: str | None = None
 
 
 class DuplicateCheckResponse(BaseModel):

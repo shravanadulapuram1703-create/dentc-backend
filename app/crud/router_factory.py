@@ -44,6 +44,9 @@ class CrudConfig:
     default_sort: str = "created_at"
     soft_delete_field: str | None = "is_active"
     soft_delete_value: bool = False
+    # PP-1: exclude soft-deleted rows from the default listing (an explicit
+    # ``?{soft_delete_field}=`` filter still wins). Opt-in per resource.
+    hide_soft_deleted: bool = False
     # Optional post-read hook ``(db, items, tenant_id) -> None`` that mutates the
     # returned ORM rows in place (e.g. attach resolved actor names). Applied to
     # list/get/create/update responses. Batch-resolve inside to avoid N+1.
@@ -154,6 +157,7 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         sortable_fields=cfg.sortable_fields,
         default_sort=cfg.default_sort,
         search_relations=cfg.search_relations,
+        hide_soft_deleted=cfg.hide_soft_deleted,
     )
     router = APIRouter(
         prefix=f"/{cfg.prefix}",

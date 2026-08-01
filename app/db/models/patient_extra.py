@@ -41,6 +41,8 @@ class PatientEmergencyContact(Base, IntPKMixin, TimestampMixin):
     relationship: Mapped[str | None] = mapped_column(String(50))
     phone: Mapped[str | None] = mapped_column(String(20))
     email: Mapped[str | None] = mapped_column(String(255))
+    # LEG-3: the Medical-Questionnaire "Emergency Contact" block flags a primary.
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 

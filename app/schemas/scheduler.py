@@ -83,3 +83,5 @@ class PatientContext(BaseModel):
     balance: dict
     insurance: list[PatientContextInsurance]
     visit: PatientContextVisit
+    # PE-3: opening A/R buckets folded in so the Edit form hydrates from one call.
+    opening_balance: dict = {}

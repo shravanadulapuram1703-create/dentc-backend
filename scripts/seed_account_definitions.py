@@ -195,6 +195,39 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
     "resp_party_rel": [
         ("self", "Self"), ("spouse", "Spouse"), ("parent", "Parent"),
         ("guardian", "Guardian"), ("child", "Child"), ("other", "Other"),
+        # PO-9: legacy single-letter subscriber-relationship codes on
+        # patient_insurance.relationship (e.g. "S" -> "Self") so they expand.
+        ("S", "Self"), ("SP", "Spouse"), ("P", "Parent"), ("G", "Guardian"),
+        ("C", "Child"), ("D", "Dependent"), ("O", "Other"),
+    ],
+    # PE-2: the 8 legacy patient-type codes (multi-select on patients.patient_types),
+    # exposed as a lookup so a tenant can rename/retire one without a FE release.
+    "patient_type": [
+        ("CH", "Child"), ("CP", "Collection Problem"), ("EF", "Employee Family"),
+        ("OR", "Ortho"), ("SN", "Short Notice"), ("SR", "Senior"),
+        ("SS", "Spanish Speaking"), ("UP", "Update Information"),
+    ],
+    # LEG-13: Responsible-Party *Type* (drives statement/collection behaviour).
+    # Provisional — CA/CO/DI are from the legacy screenshot; confirm the full
+    # authoritative list with the product owner and extend here.
+    "resp_party_type": [
+        ("CA", "Cash"), ("CO", "Collection"), ("DI", "Discount"),
+        ("IN", "Insurance"), ("ST", "Standard"), ("WO", "Write Off"),
+    ],
+    # PP-8: the payment-plan discriminator, exposed as a lookup so the FE renders
+    # labels from the backend. The write schemas enforce the same two values.
+    "plan_type": [("regular", "Regular Payment Plan"), ("ortho", "Ortho Payment Plan")],
+    # OPP-3: Ortho "Insert Class" dropdown (legacy default is None).
+    "insert_class": [
+        ("NONE", "None"), ("CL1", "Class I"), ("CL2", "Class II"), ("CL3", "Class III"),
+    ],
+    # OPP-5 / RPP-3: which disclosure text prints on the contract report.
+    # `description` is the label; the printed body comes from the same row, so
+    # replace these placeholders with the practice's approved wording.
+    "financial_disclosure": [
+        ("STD", "Standard Truth-in-Lending disclosure"),
+        ("NOFIN", "No finance charge — interest-free contract"),
+        ("ORTHO", "Orthodontic contract disclosure"),
     ],
 }
 

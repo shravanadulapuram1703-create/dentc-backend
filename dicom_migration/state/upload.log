@@ -1,0 +1,12 @@
+2026-07-30 07:26:26,835 INFO    Seeded/confirmed 15 files in the resume store.
+2026-07-30 07:26:29,235 INFO    Worklist: 15 file(s) to process; 0/15 already done.
+2026-07-30 07:26:43,072 INFO    ──────── UPLOAD SUMMARY ────────
+2026-07-30 07:26:43,075 INFO      total files        : 15
+2026-07-30 07:26:43,077 INFO      uploaded (new)     : 15
+2026-07-30 07:26:43,085 INFO      already in GCS     : 0
+2026-07-30 07:26:43,087 INFO      pending            : 0
+2026-07-30 07:26:43,090 INFO      errors (retryable) : 0
+2026-07-30 07:26:43,092 INFO      skipped (permanent): 0
+2026-07-30 07:26:43,093 INFO      bytes in GCS       : 29.4MB
+2026-07-30 07:26:43,094 INFO      done               : 15/15 (100.0%)
+2026-07-30 07:26:43,097 INFO    ────────────────────────────────

@@ -164,6 +164,144 @@ subsystem, so it sits outside the registry entirely:
   `===` against auth-context values). MSG-6…MSG-11 (attachments, push, FTS search,
   rate limiting, audit) are not implemented.
 
+**Add New Patient module** (gaps in
+[docs/patients/add_patient_backend_devreport.md](docs/patients/add_patient_backend_devreport.md),
+response in [docs/patients/add_patient_backend_response.md](docs/patients/add_patient_backend_response.md);
+Alembic `d5e6f7a8b9c0`). Persists every previously-dropped Add-Patient field:
+additive `patients` columns (`pronouns`, `driver_license`, `student_status`/
+`school_name`, `preferred_hygienist_id`, `fee_schedule_id`, `referred_to`/
+`referral_to_date`, `responsible_party_relationship`, `patient_types` JSON,
+`assign_benefits`/`add_to_quickfill`/`no_correspondence`, `hipaa_sharing_notes`),
+plus 3 tables (`patient_medical_alerts`, `patient_questionnaire_responses`,
+`patient_opening_balances`). `chart_no` auto-generates when omitted via
+`PatientCRUD` ([app/services/patient_service.py](app/services/patient_service.py)).
+Opening A/R (`PUT/GET /patients/{id}/opening-balance`) folds into the computed
+`/patients/{id}/balance`. Atomic `POST /patients/register`
+([app/api/v1/patient_intake.py](app/api/v1/patient_intake.py) +
+[app/services/patient_intake_service.py](app/services/patient_intake_service.py))
+composes patient + responsible-party + alerts + questionnaire + recalls + opening
+balance in one transaction. Shared `PatientCreate` schema lives in
+[app/schemas/patient.py](app/schemas/patient.py).
+
+**Legacy-parity extension** (LEG-1…14,
+[docs/patients/add_patient_legacy_parity_devreport.md](docs/patients/add_patient_legacy_parity_devreport.md)
+/ [response](docs/patients/add_patient_legacy_parity_response.md); Alembic
+`e6f7a8b9c0d1`). Adds the standalone **`responsible_parties`** guarantor/billing
+entity (demographics + per-account billing flags + `collection_agency_id` +
+statement/financial notes + `resp_party_type`), creatable inline via
+`POST /patients/register` (`responsible_party.person`) and exposed as CRUD;
+`GET /responsible-parties/{id}/patients` is the account roster (balance/age/sex).
+`chart_no` auto-gen is now collision-safe (probes `{id}`,`{id}-1`,…). Additive:
+`patient-medical-alerts.response` enum (`yes|no|unknown`),
+`patient_emergency_contacts.is_primary`, `definitions.section`,
+`patient_insurance` Dentical-Share cols, `insurance_plans.anniversary_expiry_date`,
+`patient_recalls.interval_unit`/`scheduled_date`/`scheduled_time`,
+`insurance-plans?group_number=` + `GET /patients/{id}/account-plans`, and
+`home_office_name`/`home_office_code` on `PatientRead` (LEG-16, via
+`enrich_patient_office`). Catalog seeding (MEDALERT/DENTQUEST/MEDQUEST, LEG-1) and
+outbound `referral_type="1"` practices (LEG-15) are deferred pending source data;
+`resp_party_type` is seeded (provisional) via `seed_account_definitions.py`.
+
+**Patient Overview module** (PO-1…12,
+[docs/patients/patient_overview_backend_devreport.md](docs/patients/patient_overview_backend_devreport.md)
+/ [response](docs/patients/patient_overview_backend_response.md); Alembic
+`a8b9c0d1e2f3`). Aggregate `GET /patients/{id}/overview`
+([app/api/v1/patient_intake.py](app/api/v1/patient_intake.py) +
+[app/services/patient_overview_service.py](app/services/patient_overview_service.py))
+composes patient+balance+responsible-party+account-members+appts+recalls+insurance+
+referrals+contracts in one call (was ~20 requests). `GET /responsible-parties/{id}/patients`
+now takes the **raw string** id (migrated legacy-guarantor accounts resolve) + returns
+aging/estimates/visits per member (PO-3). Also: `GET /appointments/family` (PO-4),
+`is_archived` filter on `/appointments` (PO-5), `legacy_id` filter on
+`/responsible-parties` (PO-2b) + `/referrals` (PO-6), `responsible_parties.legacy_id`/
+`home_office_id` (PO-2b/11), `patients.photo_document_id` (PO-10), single-letter
+`resp_party_rel` seed codes (PO-9), `GET /patients/{id}/insurance-plans` alias (PO-12).
+PO-2a/6-backfill/7/8-populate remain migration-only data tasks (API enablers shipped).
+
+**Edit Patient module** (PE-1…4,
+[docs/patients/patient_edit_backend_devreport.md](docs/patients/patient_edit_backend_devreport.md)
+/ [response](docs/patients/patient_edit_backend_response.md); Alembic `c0d1e2f3a4b6`).
+`patients.updated_by` ("Modified By", stamped by `CRUDBase.update`) + `created_by_name`/
+`updated_by_name` on `PatientRead` (via `enrich_patient_office`, PE-4); `opening_balance`
+folded into `GET /patients/{id}/context` (PE-3); `patient_type` catalog seeded
+(CH/CP/EF/OR/SN/SR/SS/UP, PE-2). PE-1: `patient_types` JSON is the canonical home for the
+patient-type multi-select (the FE-only `patient_flags` shape has no backend columns).
+
+**Payment Plans module** (Ortho + Regular contracts; PP-1…8, OPP-1…11, RPP-1…6 of
+[docs/payment-plans/payment_plans_backend_devreport.md](docs/payment-plans/payment_plans_backend_devreport.md)
+/ [response](docs/payment-plans/payment_plans_backend_response.md); Alembic
+`e1f2a3b4c5d6`). `ortho_plans` + `patient_payment_plans` gain every legacy column
+(two billing codes — `procedure_code` **is** the periodic one, `initial_procedure_code`
+the banding one; `pref_provider_id`; patient-sub-plan setup date/notes/remarks; a
+secondary insurance tier symmetric with the primary; `tx_plan_amt` +
+`treatment_plan_id` FK; `billing_code`; `financial_disclosure`; `total_of_payments`;
+`created_by_id`/`updated_by`/`created_office_id`) plus a **tokenised** payment-method
+block — `payment_token_id`/`card_last4`/exp only, **never a PAN or CVV**.
+New `patient_plan_installments` (OPP-9/RPP-5) is the patient-side instalment store
+for both contract kinds (`plan_side` discriminator); `patient_ins_payment_plans`/
+`patient_sec_ins_payment_plans` gain `ortho_plan_id` (PP-6). Non-CRUD surface in
+[app/api/v1/payment_plans.py](app/api/v1/payment_plans.py) +
+[app/services/payment_plan_service.py](app/services/payment_plan_service.py):
+`POST /{instalment-table}/{id}/post` and `POST /payment-plans/post-due` write a real
+`patient_procedures` charge and stamp `is_billed`/`ledger_id` (PP-2 — 409 on
+re-post, never double-charges); `…/installments/generate` amortises the contract
+server-side (last instalment absorbs the rounding residue); `…/contract(.pdf)` and
+`…/coupons.pdf` render the Truth-in-Lending contract via **reportlab** (lazy import).
+PP-1: `CrudConfig.hide_soft_deleted` (opt-in, on the three contract resources) keeps
+soft-deleted rows out of the default listing — `?is_active=false` still surfaces them.
+PP-4: **`patient_payment_plans` is canonical**; `patient_reg_plans` is migration-only.
+PP-5: the balance aggregate is 2 index-backed scans instead of 6 statements, and a
+post invalidates the Redis cache.
+
+**AppointNow module** (external online booking; AN-1…13 of
+[docs/book/appointnow_backend_devreport.md](docs/book/appointnow_backend_devreport.md);
+Alembic `b3c4d5e6f7a8`). The app's **first anonymous public surface** — an
+embeddable, login-free booking page resolves the tenant from `office_code` (never
+a JWT, and never 401 → AN-12) and lets external patients request a slot; staff
+approve/decline from an authed inbox. Two tables in
+[app/db/models/appointnow.py](app/db/models/appointnow.py): `appointnow_reasons`
+(per-office reason→duration catalog, generic CRUD; a built-in default catalog is
+served when an office customises none) and `booking_requests` (UUIDv7 string PK so
+the inbox pages chronologically by id; a `hold_expires_at` soft-hold, AN-8).
+Logic in [app/services/appointnow_service.py](app/services/appointnow_service.py),
+routes split into `public_router` (unauth, AN-1..3) + `staff_router` (auth,
+AN-4..5,9) in [app/api/v1/appointnow.py](app/api/v1/appointnow.py). The
+**availability engine** mirrors the frontend reference: office window
+(`office_schedule_days`, else the office default hours) ∩ provider window
+(`provider_schedule_days`) − holidays (`account_holidays` + `provider_holidays`) −
+booked appointments − active holds, sliced into `slot_interval_minutes`, timezone-
+correct for "today" (AN-10), short-TTL Redis-cached (AN-2). Intake (AN-3) is
+per-IP/office rate-limited (`incr_counter`), optionally Turnstile-gated
+(`APPOINTNOW_TURNSTILE_SECRET`), re-validates the slot at submit, and soft-holds
+it. **Approve is atomic** (AN-5): re-check → book a real `appointments` row →
+link `appointment_id` → mark `approved`, with optional duplicate-patient match/
+create (AN-9, `GET …/requests/{id}/patient-matches`). The inbox (AN-4/AN-13) does
+server-side `q`/reason/`is_new_patient`/slot-date-range filter + sort + paging and
+returns an unfiltered per-status **count summary** for the tab badges.
+`Provider.visible_in_appointnow` (AN-7) gates which providers are offered. AN-6
+(realtime push) ships only a best-effort publish seam on `appointnow:{tenant}:{office}`
+— no WS consumer yet (the FE `subscribe()` is a no-op, falls back to Refresh);
+AN-11 (per-practice CORS / iframe `frame-ancestors`) is deploy-config, not code.
+
+**Help Center support tickets** (Help → Report an Issue → Jira; HELP-1…5 of
+[docs/help/help_module_backend_devreport.md](docs/help/help_module_backend_devreport.md)
+/ [response](docs/help/help_module_backend_response.md)). `POST/GET /api/v1/support/tickets`
+([app/api/v1/support.py](app/api/v1/support.py) +
+[app/services/support_service.py](app/services/support_service.py)) file and list
+support tickets. Every submission is **persisted durably** to `support_tickets`
+([app/db/models/platform.py](app/db/models/platform.py), Alembic `b0c1d2e3f4a5`) with
+the reporter stamped from the **token** (HELP-3 — client `context.user_id` is display
+metadata only). All outbound Atlassian REST calls are isolated in
+[app/integrations/jira_client.py](app/integrations/jira_client.py): when
+`JIRA_BASE_URL`+`JIRA_EMAIL`+`JIRA_API_TOKEN` (the `JIRA_*` block in
+[config.py](app/core/config.py)) are set the issue is created in Jira Cloud (REST v3)
+with the FE-built **ADF** description, attachments (base64→multipart,
+`X-Atlassian-Token: no-check`) are uploaded, and the list read **syncs live status**
+(Jira workflow → Open|In Progress|Done, persisted); otherwise the ticket lives locally
+with a `LOCAL-<id>` key (zero-config dev/test — `is_configured()` False). A configured-
+Jira create failure persists `status="Failed"` and returns **502** so the FE retries.
+Live cutover = fill the three env secrets + `VITE_JIRA_MODE=proxy`, no code change.
+
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))
   records authenticated 2xx mutations (POST/PUT/PATCH/DELETE) to `audit_logs` via

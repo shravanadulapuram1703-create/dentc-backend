@@ -1,0 +1,18 @@
+2026-07-30 07:26:43,668 INFO    Connecting to Postgres …
+2026-07-30 07:26:44,481 INFO    Ensuring staging tables exist …
+2026-07-30 07:26:44,629 INFO    Reading upload state …
+2026-07-30 07:26:44,942 INFO    Manifest loaded: 15 rows (0 unparseable lines skipped).
+2026-07-30 07:26:44,942 INFO    Rebuilding mig_dicom_object (distinct sha256) …
+2026-07-30 07:26:45,091 INFO    Resolving patient links …
+2026-07-30 07:26:45,839 INFO    ──────── STAGING LOAD SUMMARY ────────
+2026-07-30 07:26:45,840 INFO      manifest rows            : 15
+2026-07-30 07:26:45,841 INFO      distinct objects (dedup) : 15
+2026-07-30 07:26:45,842 INFO      distinct studies         : 6
+2026-07-30 07:26:45,843 INFO      patient links exact      : 4
+2026-07-30 07:26:45,846 INFO      patient links name/dob   : 0
+2026-07-30 07:26:45,847 INFO      UNMATCHED (quarantine)   : 1  <-- resolve before promotion
+2026-07-30 07:26:45,848 INFO      re-identified (CORRECT)  : 1 rows carry OriginalAttributes
+2026-07-30 07:26:45,849 INFO      studies spanning >1 pt   : 0  <-- review
+2026-07-30 07:26:45,851 INFO    ──────────────────────────────────────
+2026-07-30 07:26:45,853 INFO    Query the quarantine with:
+2026-07-30 07:26:45,854 INFO      SELECT * FROM mig_patient_link WHERE match_method='unmatched' ORDER BY image_count DESC;

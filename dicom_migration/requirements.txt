@@ -1,0 +1,20 @@
+# DICOM migration toolkit — dependencies for the colleague's machine.
+# Install with:  pip install -r requirements.txt
+#
+# All wheels; no system libraries needed. Steps 01–05 only read DICOM headers.
+# Step 06 (06_derivatives.py) decodes pixels LOCALLY to build thumbnail/web
+# JPEGs, so it also needs numpy + Pillow and a pixel-data plugin. Dental DICOM
+# is usually JPEG-2000, which pydicom decodes via pylibjpeg-openjpeg — without
+# it, 06 fails on the first image with "no available pixel data handler".
+
+pydicom>=2.4            # DICOM parsing (header scan + pixel read in step 06)
+google-cloud-storage>=2.14   # GCS upload / download
+psycopg2-binary>=2.9    # Postgres staging load / reconcile / promote
+python-dotenv>=1.0      # read the .env config file
+tqdm>=4.66              # live terminal progress bar
+
+# ── Step 06 only: local pixel decode → JPEG derivatives ──────────────────────
+numpy>=1.26             # array math for windowing
+Pillow>=10.0            # resize + JPEG encode
+pylibjpeg>=2.0          # pydicom pixel-data framework
+pylibjpeg-openjpeg>=2.0 # JPEG-2000 (.j2k) decoder — required for dental DICOM

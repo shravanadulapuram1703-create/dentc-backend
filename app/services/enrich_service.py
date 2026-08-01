@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import (
     InsuranceCarrier,
+    Office,
     Patient,
     Provider,
     TreatmentPlanItem,
@@ -43,6 +44,29 @@ def _carrier_names(db: Session, ids: set[int]) -> dict[int, str]:
     return {c.id: c.name for c in db.execute(select(InsuranceCarrier).where(InsuranceCarrier.id.in_(ids))).scalars()}
 
 
+def enrich_patient_office(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
+    """LEG-16: resolve ``home_office_id`` → office name + code on ``PatientRead`` so
+    screens display the office by name without a separate ``GET /offices`` fan-out.
+
+    PE-4: also resolves ``created_by`` / ``updated_by`` → display names, mirroring
+    ``UserRead``, so the Edit dialog header's Modified-By field needs no extra
+    ``GET /users/{id}``."""
+    from app.services.user_admin_service import resolve_user_names
+
+    rows = list(items)
+    ids = {r.home_office_id for r in rows if getattr(r, "home_office_id", None)}
+    offices = {o.id: o for o in db.execute(select(Office).where(Office.id.in_(ids))).scalars()} if ids else {}
+    actor_ids = {r.created_by for r in rows if getattr(r, "created_by", None) is not None}
+    actor_ids |= {r.updated_by for r in rows if getattr(r, "updated_by", None) is not None}
+    names = resolve_user_names(db, actor_ids)
+    for r in rows:
+        office = offices.get(r.home_office_id)
+        r.home_office_name = office.name if office else None
+        r.home_office_code = (office.short_id or office.office_code) if office else None
+        r.created_by_name = names.get(r.created_by) if r.created_by is not None else None
+        r.updated_by_name = names.get(r.updated_by) if r.updated_by is not None else None
+
+
 def enrich_patient_provider(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
     rows = list(items)
     patients = _patient_names(db, {r.patient_id for r in rows if getattr(r, "patient_id", None)})
@@ -59,6 +83,56 @@ def enrich_patient_carrier(db: Session, items, tenant_id=None) -> None:  # noqa:
     for r in rows:
         r.patient_name = patients.get(r.patient_id)
         r.carrier_name = carriers.get(r.carrier_id)
+
+
+def _actor_names(db: Session, rows, attrs: tuple[str, ...]) -> dict[int, str]:  # noqa: ANN001
+    from app.services.user_admin_service import resolve_user_names
+
+    ids: set[int] = set()
+    for r in rows:
+        for attr in attrs:
+            value = getattr(r, attr, None)
+            if value is not None:
+                ids.add(value)
+    return resolve_user_names(db, ids)
+
+
+def enrich_ortho_plan(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
+    """OPP-2/11 + PP-7: resolve the contract header's actor, provider and office.
+
+    ``created_by`` is legacy free text (a migrated user label) and cannot be
+    resolved — ``created_by_id`` is the FK the API stamps going forward, so the
+    name falls back to the legacy string when only that is present.
+    """
+    rows = list(items)
+    names = _actor_names(db, rows, ("created_by_id", "updated_by"))
+    providers = _provider_names(
+        db, {r.pref_provider_id for r in rows if getattr(r, "pref_provider_id", None)}
+    )
+    office_ids = {r.created_office_id for r in rows if getattr(r, "created_office_id", None)}
+    offices = {
+        o.id: o for o in db.execute(select(Office).where(Office.id.in_(office_ids))).scalars()
+    } if office_ids else {}
+    for r in rows:
+        r.created_by_name = (
+            names.get(r.created_by_id) if r.created_by_id is not None else r.created_by
+        )
+        r.updated_by_name = names.get(r.updated_by) if r.updated_by is not None else None
+        r.pref_provider_name = providers.get(r.pref_provider_id)
+        office = offices.get(r.created_office_id)
+        r.created_office_name = office.name if office else None
+        r.created_office_code = (office.short_id or office.office_code) if office else None
+
+
+def enrich_payment_plan(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
+    """PP-7: "Created By" / "Modified By" on a regular contract (see above)."""
+    rows = list(items)
+    names = _actor_names(db, rows, ("created_by_id", "updated_by"))
+    for r in rows:
+        r.created_by_name = (
+            names.get(r.created_by_id) if r.created_by_id is not None else r.created_by
+        )
+        r.updated_by_name = names.get(r.updated_by) if r.updated_by is not None else None
 
 
 def enrich_treatment_plan(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001

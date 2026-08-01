@@ -13,6 +13,12 @@ passlib==1.7.4
 bcrypt==3.2.2
 python-multipart>=0.0.9
 redis>=5.0
+# Server-rendered payment-plan contract / coupon PDFs (PP-3). Imported lazily —
+# without it the JSON contract endpoint still works and the PDF routes 422.
+reportlab>=4.0
+# DICOM imaging object storage (GCS signed URLs / proxy streaming). Imported
+# lazily — without it (or without creds) imaging serving falls back to proxy mode.
+google-cloud-storage>=2.14
 
 # ── Dev / test ───────────────────────────────────────────────────────────────
 pytest>=8.0

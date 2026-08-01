@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-07-30T11:26:51+00:00",
+  "bucket": "rd-phi-dicom-originals",
+  "prefix": "dicom",
+  "files_total": 15,
+  "files_uploaded": 15,
+  "files_exists": 0,
+  "files_pending_or_error": 0,
+  "files_skipped": 0,
+  "objects_expected": 15,
+  "objects_in_gcs": 15,
+  "objects_missing_from_gcs": 0,
+  "objects_orphan_in_gcs": 0,
+  "objects_size_mismatch": 0,
+  "bytes_expected": 30817422,
+  "bytes_in_gcs": 30817422
+}

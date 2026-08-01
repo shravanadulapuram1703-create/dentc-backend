@@ -16,6 +16,7 @@ from app.db.models.access import (
     UserTask,
     UserTimeClockConfig,
 )
+from app.db.models.appointnow import AppointNowReason, BookingRequest
 from app.db.models.platform import SupportTicket, UtilityRun
 from app.db.models.account import (
     AccountCommunications,
@@ -76,6 +77,7 @@ from app.db.models.billing import (
     PatientInsPaymentPlan,
     PatientPayment,
     PatientPaymentPlan,
+    PatientPlanInstallment,
     PatientRegPlan,
     PatientSecInsPaymentPlan,
     PaymentAllocation,
@@ -127,10 +129,14 @@ from app.db.models.identity import (
 )
 from app.db.models.imaging import (
     CollectionAgency,
+    DicomInstance,
+    DicomSeries,
+    DicomStudy,
     ImageDetail,
     ImageGroup,
     ReferralDemogDetail,
     ReferralDemogHeader,
+    StoredObject,
 )
 from app.db.models.insurance import (
     Employer,
@@ -149,10 +155,14 @@ from app.db.models.patients import (
     Patient,
     PatientAlert,
     PatientInsurance,
+    PatientMedicalAlert,
     PatientNote,
+    PatientOpeningBalance,
+    PatientQuestionnaireResponse,
     PatientRecall,
     PatientSignature,
     Referral,
+    ResponsibleParty,
 )
 from app.db.models.reference import (
     Definition,
@@ -178,6 +188,8 @@ __all__ = [
     "UserTask", "Notification",
     # platform (help / utilities)
     "SupportTicket", "UtilityRun",
+    # appointnow (external online booking)
+    "AppointNowReason", "BookingRequest",
     # patients module net-new
     "PatientDocument", "PatientEmergencyContact", "PatientAdjustment", "ClaimAttachment",
     "ProgressNoteAttachment", "PatientConsent",
@@ -213,6 +225,8 @@ __all__ = [
     "Patient", "PatientInsurance", "PatientAlert", "AccountNote",
     "PatientSignature", "MedicalHistoryRecord", "MedicalHistoryDetail",
     "Referral", "PatientNote", "PatientRecall", "CariesRiskAssessment",
+    "PatientMedicalAlert", "PatientQuestionnaireResponse", "PatientOpeningBalance",
+    "ResponsibleParty",
     # scheduling
     "Appointment", "AppointmentProcedure",
     # treatment
@@ -225,6 +239,7 @@ __all__ = [
     "PatientPayment", "InsuranceClaim", "ClaimSubmission", "LedgerInsuranceDetail",
     "PaymentAllocation", "PatientPaymentPlan", "PatientInsPaymentPlan",
     "PatientSecInsPaymentPlan", "PatientRegPlan", "OrthoPlan",
+    "PatientPlanInstallment",
     # reference / config
     "Definition", "DefinitionGroup", "ImagingTemplate", "QuestionnaireHeader",
     "QuestionnaireOption",
@@ -238,4 +253,6 @@ __all__ = [
     # imaging / misc
     "ImageGroup", "ImageDetail", "CollectionAgency", "ReferralDemogHeader",
     "ReferralDemogDetail",
+    # DICOM archive (GCS + Postgres index)
+    "StoredObject", "DicomStudy", "DicomSeries", "DicomInstance",
 ]

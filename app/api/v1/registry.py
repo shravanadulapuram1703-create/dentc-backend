@@ -17,10 +17,15 @@ from app.crud.router_factory import CrudConfig, register_crud
 from app.db import models as m
 from app.schemas.factory import build_schemas
 from app.services.enrich_service import (
+    enrich_ortho_plan,
     enrich_patient_carrier,
+    enrich_patient_office,
     enrich_patient_provider,
+    enrich_payment_plan,
     enrich_treatment_plan,
 )
+from app.services.payment_plan_service import PaymentPlanCRUD
+from app.services.patient_service import PatientCRUD
 from app.services.perio_service import attach_actor_names
 from app.services.progress_notes_service import ProgressNoteCRUD, enrich_progress_notes
 from app.services.treatment_service import TreatmentPlanItemCRUD
@@ -62,6 +67,20 @@ from app.schemas.enriched import (
     TreatmentPlanRead,
     TreatmentPlanUpdate,
 )
+from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
+from app.schemas.payment_plan import (
+    OrthoPlanCreate,
+    OrthoPlanRead,
+    OrthoPlanUpdate,
+    PatientPaymentPlanCreate,
+    PatientPaymentPlanRead,
+    PatientPaymentPlanUpdate,
+)
+from app.schemas.patient_catalog import (
+    PatientMedicalAlertCreate,
+    PatientMedicalAlertRead,
+    PatientMedicalAlertUpdate,
+)
 from app.schemas.progress_notes import (
     ProgressNoteCreate,
     ProgressNoteRead,
@@ -100,6 +119,7 @@ def _cfg(
     soft_value: bool = False,
     default_sort: str = "created_at",
     read_exclude: tuple[str, ...] = (),
+    hide_soft_deleted: bool = False,
 ) -> CrudConfig:
     create_s, update_s, read_s = build_schemas(model, name, read_exclude=read_exclude)
     return CrudConfig(
@@ -121,6 +141,7 @@ def _cfg(
         soft_delete_field=soft_field,
         soft_delete_value=soft_value,
         default_sort=default_sort,
+        hide_soft_deleted=hide_soft_deleted,
     )
 
 
@@ -142,13 +163,27 @@ _ORG = [
 
 # ── Patients ───────────────────────────────────────────────────────────────
 _PATIENTS = [
-    _cfg(m.Patient, "Patient", "patients", "Patients", "patient", "patients",
-         search=("first_name", "last_name", "chart_no", "email", "phone"),
-         sortable=("created_at", "id", "last_name", "first_name", "dob"),
-         filters=("home_office_id", "is_active", "preferred_provider_id", "chart_no",
-                  "dob", "ssn", "medicaid_id", "email", "phone", "gender",
-                  "patient_type", "responsible_party_id"),
-         ranges=("created_at", "dob")),
+    # Custom crud_class auto-generates chart_no when omitted (GAP-AP-14). New
+    # Add-Patient columns (pronouns/fee_schedule_id/patient_types/… ) are picked up
+    # automatically by build_schemas — no schema hand-edits needed.
+    CrudConfig(
+        model=m.Patient,
+        create_schema=PatientCreate,
+        update_schema=PatientUpdate,
+        read_schema=PatientRead,
+        prefix="patients", tag="Patients",
+        singular="patient", plural="patients",
+        search_fields=("first_name", "last_name", "chart_no", "email", "phone"),
+        sortable_fields=("created_at", "id", "last_name", "first_name", "dob"),
+        filter_fields=("home_office_id", "is_active", "preferred_provider_id", "chart_no",
+                       "dob", "ssn", "medicaid_id", "email", "phone", "gender",
+                       "patient_type", "responsible_party_id", "preferred_hygienist_id",
+                       "fee_schedule_id"),
+        range_fields=("created_at", "dob"),
+        default_sort="created_at",
+        crud_class=PatientCRUD,
+        read_enrich=enrich_patient_office,  # LEG-16: home_office_name/code
+    ),
     # legacy_plan_type ("D"/"M") + insurance_type ("primary"…) address one slot
     # (INS-PT); is_active toggles a slot on/off.
     _cfg(m.PatientInsurance, "PatientInsurance", "patient-insurance", "Patients",
@@ -173,7 +208,8 @@ _PATIENTS = [
     _cfg(m.Referral, "Referral", "referrals", "Patients", "referral", "referrals",
          search=("first_name", "last_name", "specialty", "practice_name"),
          # Left-rail SEARCH ON (referral_type direction) + TYPE (reason_code) server filters.
-         filters=("patient_id", "office_id", "referral_type", "reason_code"),
+         # PO-6: legacy_id lets the FE resolve patients.referred_by (a legacy referral id).
+         filters=("patient_id", "office_id", "referral_type", "reason_code", "legacy_id"),
          soft_field=None),
     _cfg(m.PatientNote, "PatientNote", "patient-notes", "Patients",
          "patient_note", "patient_notes",
@@ -181,9 +217,35 @@ _PATIENTS = [
          soft_field="is_deleted", soft_value=True),
     _cfg(m.PatientRecall, "PatientRecall", "patient-recalls", "Patients",
          "patient_recall", "patient_recalls", filters=("patient_id", "status", "is_active")),
+    # GAP-AP-16: per-patient Yes/No medical-alert responses (MEDALERT catalog).
+    # LEG-2: custom schemas constrain response to the tri-state yes|no|unknown.
+    CrudConfig(
+        model=m.PatientMedicalAlert,
+        create_schema=PatientMedicalAlertCreate,
+        update_schema=PatientMedicalAlertUpdate,
+        read_schema=PatientMedicalAlertRead,
+        prefix="patient-medical-alerts", tag="Patients",
+        singular="patient_medical_alert", plural="patient_medical_alerts",
+        filter_fields=("patient_id", "alert_code", "response", "is_active"),
+        default_sort="created_at",
+    ),
+    # GAP-AP-17: per-patient Dental/Medical questionnaire answers.
+    _cfg(m.PatientQuestionnaireResponse, "PatientQuestionnaireResponse",
+         "patient-questionnaire-responses", "Patients",
+         "patient_questionnaire_response", "patient_questionnaire_responses",
+         filters=("patient_id", "questionnaire_type", "question_code", "is_active")),
     _cfg(m.PatientEmergencyContact, "PatientEmergencyContact", "patient-emergency-contacts",
          "Patients", "patient_emergency_contact", "patient_emergency_contacts",
-         filters=("patient_id", "is_active")),
+         filters=("patient_id", "is_active", "is_primary")),
+    # LEG-10/11/12/13: standalone guarantor / billing entity (non-self responsible
+    # party). Generic CRUD gives POST /responsible-parties returning an id; the
+    # register endpoint can also create one inline.
+    _cfg(m.ResponsibleParty, "ResponsibleParty", "responsible-parties", "Patients",
+         "responsible_party", "responsible_parties",
+         search=("first_name", "last_name", "email", "ssn"),
+         # PO-2b: legacy_id lets the FE resolve a migrated guarantor id; PO-11 home_office_id.
+         filters=("resp_party_type", "collection_agency_id", "is_active",
+                  "legacy_id", "home_office_id")),
     _cfg(m.PatientAdjustment, "PatientAdjustment", "patient-adjustments", "Billing",
          "patient_adjustment", "patient_adjustments",
          sortable=("adjustment_date", "created_at"), ranges=("adjustment_date",),
@@ -216,7 +278,9 @@ _INSURANCE = [
              ("carrier_id", m.InsuranceCarrier, ("name", "payer_id")),
              ("employer_id", m.Employer, ("name",)),
          ),
-         filters=("carrier_id", "employer_id", "is_active")),
+         # LEG-5: exact Group # filter (the legacy "Search For = Group #" option);
+         # free-text `search` already covers group_number too.
+         filters=("carrier_id", "employer_id", "is_active", "group_number")),
     _cfg(m.InsuranceSubscriber, "InsuranceSubscriber", "insurance-subscribers", "Insurance",
          "insurance_subscriber", "insurance_subscribers",
          search=("sub_first_name", "sub_last_name", "sub_member_id"),
@@ -291,12 +355,22 @@ _SCHEDULING = [
     _cfg(m.Appointment, "Appointment", "appointments", "Appointments",
          "appointment", "appointments", pk_type=str,
          search=("procedure_label", "notes"), sortable=("date", "start_time", "created_at"),
-         filters=("patient_id", "provider_id", "operatory_id", "office_id", "date", "status"),
+         # PO-5: is_archived filter so archived + active appts aren't returned interleaved.
+         filters=("patient_id", "provider_id", "operatory_id", "office_id", "date",
+                  "status", "is_archived"),
          ranges=("date",), soft_field="is_archived", soft_value=True),
     _cfg(m.AppointmentProcedure, "AppointmentProcedure", "appointment-procedures", "Appointments",
          "appointment_procedure", "appointment_procedures",
          filters=("appointment_id", "procedure_code", "provider_id"),
          soft_field="is_archived", soft_value=True),
+    # AppointNow reason catalog (Setup surface for the online-booking reasons that
+    # drive chair-time duration). The public AN-1/AN-3 endpoints read it directly;
+    # this generic CRUD lets staff customise it per office.
+    _cfg(m.AppointNowReason, "AppointNowReason", "appointnow-reasons", "Appointments",
+         "appointnow_reason", "appointnow_reasons",
+         search=("label", "reason_code"),
+         sortable=("display_order", "created_at"), default_sort="display_order",
+         filters=("office_id", "is_active", "requires_provider")),
 ]
 
 # ── Treatment plans ────────────────────────────────────────────────────────
@@ -490,19 +564,54 @@ _BILLING = [
          "payment_allocation", "payment_allocations",
          filters=("patient_id", "payment_id", "procedure_id", "claim_id"), soft_field=None),
     # AL-3: plan_type discriminates Regular-Patient vs Ortho-Patient contracts.
-    _cfg(m.PatientPaymentPlan, "PatientPaymentPlan", "patient-payment-plans", "Billing",
-         "patient_payment_plan", "patient_payment_plans",
-         filters=("patient_id", "is_active", "plan_type")),
+    # PP-1: a DELETEd contract must not come back on the next page load.
+    # PP-7/PP-8: PaymentPlanCRUD stamps created_by_id; the write schemas constrain
+    # plan_type; enrich_payment_plan resolves the Created/Modified By names.
+    CrudConfig(
+        model=m.PatientPaymentPlan,
+        create_schema=PatientPaymentPlanCreate,
+        update_schema=PatientPaymentPlanUpdate,
+        read_schema=PatientPaymentPlanRead,
+        prefix="patient-payment-plans", tag="Billing",
+        singular="patient_payment_plan", plural="patient_payment_plans",
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("patient_id", "is_active", "plan_type", "treatment_plan_id"),
+        range_fields=("setup_date", "first_due_date"),
+        crud_class=PaymentPlanCRUD,
+        read_enrich=enrich_payment_plan,
+        hide_soft_deleted=True,
+    ),
+    # PP-6: ortho_plan_id ties an instalment row back to the contract that made it.
     _cfg(m.PatientInsPaymentPlan, "PatientInsPaymentPlan", "patient-ins-payment-plans", "Billing",
          "patient_ins_payment_plan", "patient_ins_payment_plans",
-         filters=("patient_id", "is_billed"), soft_field=None),
+         filters=("patient_id", "is_billed", "ortho_plan_id"), ranges=("periodic_date",),
+         soft_field=None),
     _cfg(m.PatientSecInsPaymentPlan, "PatientSecInsPaymentPlan", "patient-sec-ins-payment-plans",
          "Billing", "patient_sec_ins_payment_plan", "patient_sec_ins_payment_plans",
-         filters=("patient_id", "is_billed"), soft_field=None),
+         filters=("patient_id", "is_billed", "ortho_plan_id"), ranges=("periodic_date",),
+         soft_field=None),
+    # OPP-9 / RPP-5: the patient-side instalment store (both contract kinds).
+    _cfg(m.PatientPlanInstallment, "PatientPlanInstallment", "patient-plan-installments",
+         "Billing", "patient_plan_installment", "patient_plan_installments",
+         filters=("patient_id", "is_billed", "plan_side", "ortho_plan_id", "payment_plan_id"),
+         ranges=("periodic_date",), soft_field=None),
     _cfg(m.PatientRegPlan, "PatientRegPlan", "patient-reg-plans", "Billing",
-         "patient_reg_plan", "patient_reg_plans", filters=("patient_id", "is_active")),
-    _cfg(m.OrthoPlan, "OrthoPlan", "ortho-plans", "Billing",
-         "ortho_plan", "ortho_plans", filters=("patient_id", "is_active")),
+         "patient_reg_plan", "patient_reg_plans", filters=("patient_id", "is_active"),
+         hide_soft_deleted=True),
+    CrudConfig(
+        model=m.OrthoPlan,
+        create_schema=OrthoPlanCreate,
+        update_schema=OrthoPlanUpdate,
+        read_schema=OrthoPlanRead,
+        prefix="ortho-plans", tag="Billing",
+        singular="ortho_plan", plural="ortho_plans",
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("patient_id", "is_active", "pref_provider_id", "ins_plan_id"),
+        range_fields=("banding_date", "treat_start_date"),
+        crud_class=PaymentPlanCRUD,
+        read_enrich=enrich_ortho_plan,
+        hide_soft_deleted=True,
+    ),
 ]
 
 # ── Config & reference ─────────────────────────────────────────────────────

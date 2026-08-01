@@ -1,0 +1,19 @@
+2026-07-30 07:26:52,241 INFO    Matched patients to promote: 4
+2026-07-30 07:26:52,293 INFO    Instances to promote: 14
+2026-07-30 07:26:54,527 INFO    ──────── PROMOTION SUMMARY ────────
+2026-07-30 07:26:54,527 INFO      studies    : 5
+2026-07-30 07:26:54,530 INFO      series     : 5
+2026-07-30 07:26:54,531 INFO      instances  : 14
+2026-07-30 07:26:54,533 INFO      objects    : 14 (originals)
+2026-07-30 07:26:54,535 INFO      derivatives: pending — run 06_derivatives.py to generate thumbnails/web images
+2026-07-30 07:26:54,536 INFO    ───────────────────────────────────
+2026-08-01 10:18:02,882 ERROR   psycopg2 not installed. pip install -r requirements.txt
+2026-08-01 10:18:22,588 INFO    Matched patients to promote: 28915
+2026-08-01 10:18:33,201 INFO      scanned 50000 instances …
+2026-08-01 10:18:42,519 INFO      scanned 100000 instances …
+2026-08-01 10:18:52,295 INFO      scanned 150000 instances …
+2026-08-01 10:19:02,431 INFO      scanned 200000 instances …
+2026-08-01 10:19:12,288 INFO      scanned 250000 instances …
+2026-08-01 10:19:21,004 INFO      scanned 300000 instances …
+2026-08-01 10:19:31,282 INFO    Scanned 347979 instances → distinct: 157842 studies, 160326 series, 347965 originals, 347965 instances.
+2026-08-01 10:19:31,288 INFO    --dry-run: would promote 347965 instances across 157842 studies for 28915 patients.

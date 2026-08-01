@@ -25,6 +25,10 @@ class Definition(Base, IntPKMixin, TimestampMixin):
     # (e.g. appointment status colors).
     color: Mapped[str | None] = mapped_column(String(20))
     sort_order: Mapped[int | None] = mapped_column(Integer)
+    # LEG-4: questionnaire section grouping (e.g. "Women Only", "Allergic To") that
+    # drives the collapse/expand UI; null for plain definitions. Pairs with the
+    # existing sort_order + input_type to render questionnaires from backend metadata.
+    section: Mapped[str | None] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_flash_alert: Mapped[bool] = mapped_column(Boolean, default=False)
     blocks_charges: Mapped[bool] = mapped_column(Boolean, default=False)

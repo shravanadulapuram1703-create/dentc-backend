@@ -93,6 +93,8 @@ class InsurancePlan(Base, IntPKMixin, CreatedAtMixin):
     family_max: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     family_deductible: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     anniversary_date: Mapped[date | None]
+    # LEG-7: legacy plan header "Anni. Date Exp" alongside the anniversary date.
+    anniversary_expiry_date: Mapped[date | None]
     coverage_type: Mapped[str | None] = mapped_column(String(10))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

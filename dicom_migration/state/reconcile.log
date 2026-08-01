@@ -1,0 +1,21 @@
+2026-07-30 07:26:46,204 INFO    Resume store: 15 files total; 15 distinct objects expected in GCS.
+2026-07-30 07:26:46,206 INFO    Listing gs://rd-phi-dicom-originals/dicom/ … (this can take a few minutes)
+2026-07-30 07:26:51,158 INFO    GCS holds 15 object(s) under the prefix.
+2026-07-30 07:26:51,161 INFO    ──────── RECONCILIATION ────────
+2026-07-30 07:26:51,162 INFO      generated_at               : 2026-07-30T11:26:51+00:00
+2026-07-30 07:26:51,163 INFO      bucket                     : rd-phi-dicom-originals
+2026-07-30 07:26:51,164 INFO      prefix                     : dicom
+2026-07-30 07:26:51,168 INFO      files_total                : 15
+2026-07-30 07:26:51,170 INFO      files_uploaded             : 15
+2026-07-30 07:26:51,171 INFO      files_exists               : 0
+2026-07-30 07:26:51,172 INFO      files_pending_or_error     : 0
+2026-07-30 07:26:51,173 INFO      files_skipped              : 0
+2026-07-30 07:26:51,174 INFO      objects_expected           : 15
+2026-07-30 07:26:51,176 INFO      objects_in_gcs             : 15
+2026-07-30 07:26:51,177 INFO      objects_missing_from_gcs   : 0
+2026-07-30 07:26:51,178 INFO      objects_orphan_in_gcs      : 0
+2026-07-30 07:26:51,179 INFO      objects_size_mismatch      : 0
+2026-07-30 07:26:51,180 INFO      bytes_expected             : 30817422
+2026-07-30 07:26:51,181 INFO      bytes_in_gcs               : 30817422
+2026-07-30 07:26:51,182 INFO    ────────────────────────────────
+2026-07-30 07:26:51,183 INFO    ✅ GO — all gates pass. Bytes are safely in GCS.

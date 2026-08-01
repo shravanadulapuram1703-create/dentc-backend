@@ -14,10 +14,12 @@ from app.db.models import (
     ClaimAttachment,
     InsuranceClaim,
     LedgerInsuranceDetail,
+    Office,
     Patient,
     PatientDocument,
     PatientProcedure,
     PaymentAllocation,
+    Provider,
 )
 
 _MAX_UPLOAD = 10 * 1024 * 1024  # 10 MB
@@ -186,6 +188,15 @@ def check_duplicate(db: Session, tenant_id: int, req: dict) -> list[dict]:
         select(Patient).where(Patient.tenant_id == tenant_id, or_(*conds)).limit(25)
     ).scalars().all()
 
+    # BUG-1: batch-resolve the office short-id + provider name so the candidate grid
+    # can show enough to tell people apart (was blank client-side).
+    office_ids = {p.home_office_id for p in rows if p.home_office_id is not None}
+    provider_ids = {p.preferred_provider_id for p in rows if p.preferred_provider_id}
+    offices = {o.id: (o.short_id or o.office_code) for o in db.execute(
+        select(Office).where(Office.id.in_(office_ids))).scalars()} if office_ids else {}
+    providers = {pr.id: pr.name for pr in db.execute(
+        select(Provider).where(Provider.id.in_(provider_ids))).scalars()} if provider_ids else {}
+
     out = []
     for p in rows:
         score = 0
@@ -203,6 +214,9 @@ def check_duplicate(db: Session, tenant_id: int, req: dict) -> list[dict]:
             "id": p.id, "chart_no": p.chart_no, "first_name": p.first_name,
             "last_name": p.last_name, "dob": p.dob, "is_active": p.is_active,
             "match_score": min(score, 100),
+            "email": p.email,
+            "home_office_short_id": offices.get(p.home_office_id),
+            "preferred_provider_name": providers.get(p.preferred_provider_id),
         })
     out.sort(key=lambda c: c["match_score"], reverse=True)
     return out

@@ -1,0 +1,7 @@
+# NEVER commit these — they contain PHI or secrets.
+.env
+sa-*.json
+*.json          # service-account keys land here; keep them out of git
+state/          # manifest (PHI), resume db, logs, skip lists, reports
+__pycache__/
+*.pyc

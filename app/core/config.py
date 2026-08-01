@@ -115,6 +115,29 @@ class Settings(BaseSettings):
     LOGO_MAX_BYTES: int = 2 * 1024 * 1024  # 2 MB
     LOGO_ALLOWED_TYPES: list[str] = Field(default_factory=lambda: ["image/jpeg", "image/png"])
 
+    # ── Imaging / object storage (GCS) ───────────────────────────────────────
+    # DICOM originals + derived (thumbnail/web) buckets. When both are unset the
+    # imaging serving layer runs in "proxy" mode (streams through the API) so dev
+    # works without cloud creds; when set and signing credentials are available it
+    # issues short-lived V4 signed URLs straight to GCS.
+    GCS_BUCKET_ORIGINALS: str | None = None
+    GCS_BUCKET_DERIVED: str | None = None
+    # Path to a service-account JSON key for GCS. If unset, Application Default
+    # Credentials are used (the norm on Cloud Run). Set this for local dev.
+    GCS_CREDENTIALS_PATH: str | None = None
+    GCS_ORIGINALS_PREFIX: str = "dicom"
+    GCS_DERIVED_PREFIX: str = "v1"
+    # TTL of the GCS signed URL the browser is redirected to (short — it's a
+    # direct-to-bucket PHI link).
+    IMAGING_SIGNED_URL_TTL_SECONDS: int = 900  # 15 min
+    # TTL of the stable, browser-facing asset token embedded in <img src> URLs.
+    # Longer, so an open gallery keeps working; the token authorises one asset.
+    IMAGING_ASSET_TOKEN_TTL_SECONDS: int = 24 * 3600
+    # "auto" = signed URLs when GCS signing works, else proxy; force with gcs|proxy.
+    IMAGING_URL_MODE: Literal["auto", "gcs", "proxy"] = "auto"
+    # Log every imaging binary read to audit_logs (HIPAA access trail).
+    IMAGING_AUDIT_READS: bool = True
+
     # ── Direct Messaging ─────────────────────────────────────────────────────
     # Presence key TTL. Must exceed the client's 30s heartbeat with headroom, or a
     # slightly late ping flaps the user to offline (requirements §12).
@@ -127,6 +150,49 @@ class Settings(BaseSettings):
     MESSAGING_HISTORY_MAX_LIMIT: int = 100
     # Conversations included in the WS `sync` warm-up snapshot on connect.
     MESSAGING_SYNC_CONVERSATION_LIMIT: int = 50
+
+    # ── AppointNow (external online booking) ─────────────────────────────────
+    # AN-8: how long a public request soft-holds its slot against concurrent
+    # requests before availability treats the slot as free again.
+    APPOINTNOW_HOLD_TTL_MINUTES: int = 15
+    # AN-3 anti-abuse: per-IP/office throttle on the public intake write.
+    APPOINTNOW_RATE_LIMIT_MAX: int = 10
+    APPOINTNOW_RATE_LIMIT_WINDOW_MINUTES: int = 10
+    # AN-3: Cloudflare Turnstile. When the secret is unset, verification is skipped
+    # (dev/tests); when set, a missing/invalid token is a 403 on the public write.
+    APPOINTNOW_TURNSTILE_SECRET: str | None = None
+    APPOINTNOW_TURNSTILE_VERIFY_URL: str = (
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+    )
+    # AN-2: short TTL on the cached availability response (public, cacheable).
+    APPOINTNOW_AVAILABILITY_CACHE_SECONDS: int = 30
+
+    # ── Jira (Help Center → support tickets, HELP-1/2/3) ─────────────────────
+    # The server holds the Jira secret; the browser never sees it. When
+    # JIRA_BASE_URL + JIRA_EMAIL + JIRA_API_TOKEN are all set, support tickets are
+    # mirrored to Jira Cloud (REST v3). Leave any of them unset to stay in the
+    # zero-config "local" mode (tickets persist with a LOCAL-<id> key, no outbound
+    # call) so dev/tests work without Atlassian creds.
+    JIRA_BASE_URL: str | None = None            # e.g. https://your-site.atlassian.net
+    JIRA_EMAIL: str | None = None               # Atlassian account email (Basic-auth user)
+    JIRA_API_TOKEN: str | None = None           # Atlassian API token (the SECRET)
+    # Default project the issue is filed in when the FE omits project_key.
+    JIRA_PROJECT_KEY: str = "SUP"
+    # Fallbacks when the FE omits issue_type / priority.
+    JIRA_DEFAULT_ISSUE_TYPE: str = "Bug"
+    JIRA_DEFAULT_PRIORITY: str = "Medium"
+    # Many Jira projects don't expose the Priority field on the create screen —
+    # sending it then 400s the whole create. Set false to omit it.
+    JIRA_INCLUDE_PRIORITY: bool = True
+    # Optional: file every issue as this Atlassian accountId (a single service
+    # account). When unset, Jira uses the token owner as reporter; the real
+    # end-user is always captured in the issue's Environment block regardless.
+    JIRA_REPORTER_ACCOUNT_ID: str | None = None
+    # When true, "My Tickets" (HELP-2) refreshes each Jira-backed ticket's live
+    # status on read and persists the mapped Open|In Progress|Done value.
+    JIRA_STATUS_SYNC: bool = True
+    # Per-call timeout for the outbound Atlassian REST calls.
+    JIRA_TIMEOUT_SECONDS: int = 15
 
     # ── Logging ────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"

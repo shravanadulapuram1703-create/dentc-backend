@@ -32,11 +32,17 @@ class CRUDBase(Generic[ModelT]):
         sortable_fields: tuple[str, ...] = (),
         default_sort: str = "created_at",
         search_relations: tuple[tuple[str, type, tuple[str, ...]], ...] = (),
+        hide_soft_deleted: bool = False,
     ) -> None:
         self.model = model
         self.pk_attr = pk_attr
         self.soft_delete_field = soft_delete_field if hasattr(model, soft_delete_field or "") else None
         self.soft_delete_value = soft_delete_value
+        # PP-1: when True, ``list`` hides rows DELETE soft-deleted unless the caller
+        # explicitly filters on the soft-delete column itself. Opt-in per resource
+        # because some screens (providers, definitions) legitimately want to see
+        # inactive rows in the default listing.
+        self.hide_soft_deleted = hide_soft_deleted
         self.search_fields = tuple(f for f in search_fields if hasattr(model, f))
         self.sortable_fields = tuple(f for f in sortable_fields if hasattr(model, f))
         # INS-9: extend free-text search across a related table via an FK, e.g.
@@ -102,6 +108,18 @@ class CRUDBase(Generic[ModelT]):
         for field, value in (filters or {}).items():
             if value is not None and hasattr(self.model, field):
                 stmt = stmt.where(getattr(self.model, field) == value)
+
+        # PP-1: a soft-deleted row must not come back on the next page load. Only
+        # applied when the caller did not ask about the soft-delete column itself,
+        # so ``?is_active=false`` still surfaces the deleted rows on purpose.
+        if (
+            self.hide_soft_deleted
+            and self.soft_delete_field
+            and (filters or {}).get(self.soft_delete_field) is None
+        ):
+            stmt = stmt.where(
+                getattr(self.model, self.soft_delete_field) != self.soft_delete_value
+            )
 
         # range filters: {field: {"ge": lo, "le": hi}} (either bound optional)
         for field, bounds in (range_filters or {}).items():

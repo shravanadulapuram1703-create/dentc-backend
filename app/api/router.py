@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     account,
+    appointnow,
     audit,
     auth,
     balances,
@@ -13,13 +14,16 @@ from app.api.v1 import (
     fee_schedules,
     groups,
     icd_codes,
+    imaging,
     insurance,
     ledger,
     messaging,
     messaging_ws,
     office_assignment,
     office_setup,
+    patient_intake,
     patients_extra,
+    payment_plans,
     perio,
     pick_lists,
     progress_notes,
@@ -55,6 +59,10 @@ api_router.include_router(treatment.router)
 api_router.include_router(fee_schedules.router)
 api_router.include_router(balances.router)
 api_router.include_router(ledger.router)
+# Payment-plan contracts: instalment posting (PP-2), server-side amortisation
+# (OPP-9/RPP-5) and the contract/coupon documents (PP-3). Before generic CRUD so
+# /patient-ins-payment-plans/{id}/post & /payment-plans/... win over /{item_id}.
+api_router.include_router(payment_plans.router)
 api_router.include_router(audit.router)
 # Reports module: practice-wide aggregation (summary/trends/AR/aging).
 api_router.include_router(reports.router)
@@ -92,6 +100,12 @@ api_router.include_router(pick_lists.router)
 api_router.include_router(patients_extra.documents_router)
 api_router.include_router(patients_extra.claims_router)
 api_router.include_router(patients_extra.dup_router)
+# Add-Patient intake extras: /patients/register (composite) + /patients/{id}/opening-balance
+# + /patients/{id}/account-plans (LEG-5), and /responsible-parties/{id}/patients roster (LEG-14).
+# Before generic CRUD so these literal sub-paths win over /{item_id}.
+api_router.include_router(patient_intake.router)
+api_router.include_router(patient_intake.rp_router)
+api_router.include_router(patient_intake.appt_router)
 # Progress-notes supplements: sign (PN-2) + per-note attachments (PN-3) + macro
 # categories (PN-6). Before generic CRUD so literal sub-paths win over /{item_id}.
 api_router.include_router(progress_notes.router)
@@ -109,4 +123,16 @@ api_router.include_router(restorative.router)
 # a generic CRUD entity, so it is not in the registry.
 api_router.include_router(messaging.router)
 api_router.include_router(messaging_ws.router)
+# Imaging (DICOM archive): per-patient viewer tree + token-authorised binary
+# serving. Before generic CRUD so /patients/{id}/imaging and the literal
+# /dicom-instances/* paths win over the generic /{item_id} routes.
+api_router.include_router(imaging.router)
+api_router.include_router(imaging.instances_router)
+api_router.include_router(imaging.assets_router)
+# AppointNow (external online booking): anonymous public surface (office info /
+# availability / request intake) + authenticated staff inbox (list / approve /
+# decline). Hand-written — public routes resolve the tenant from office_code and
+# must never 401 (AN-12), and approval is a bespoke atomic booking.
+api_router.include_router(appointnow.public_router)
+api_router.include_router(appointnow.staff_router)
 api_router.include_router(build_entity_router())

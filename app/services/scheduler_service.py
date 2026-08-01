@@ -265,6 +265,9 @@ def get_patient_context(db: Session, patient_id: int, tenant_id: int) -> dict:
         .where(PatientInsurance.patient_id == patient_id, PatientInsurance.is_active.is_(True))
     ).all()
 
+    # PE-3: fold opening A/R buckets in so the Edit form hydrates from one call.
+    from app.services import patient_intake_service
+
     return {
         "patient": patient,
         "balance": balance_service.get_patient_balance(db, patient_id, tenant_id),
@@ -277,4 +280,5 @@ def get_patient_context(db: Session, patient_id: int, tenant_id: int) -> dict:
             "last_visit": patient.last_visit,
             "next_recall": patient.next_recall,
         },
+        "opening_balance": patient_intake_service.get_opening_balance(db, patient_id, tenant_id),
     }
