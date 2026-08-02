@@ -37,6 +37,16 @@ def _f(value) -> float:  # noqa: ANN001
     return float(value or 0)
 
 
+# LED-1: display-sort key extractors (running balance stays chronological).
+_LEDGER_SORT_KEYS = {
+    "date": lambda e: (e["entry_date"], _TYPE_ORDER.get(e["entry_type"], 9), str(e["source_id"])),
+    "amount": lambda e: e["charge"] - e["credit"],
+    "code": lambda e: (e["procedure_code"] or e["payment_type"] or ""),
+    "provider": lambda e: (e.get("provider_name") or ""),
+    "status": lambda e: (e["status"] or ""),
+}
+
+
 def get_patient_ledger(
     db: Session,
     patient_id: int,
@@ -44,6 +54,10 @@ def get_patient_ledger(
     *,
     date_from: date | None = None,
     date_to: date | None = None,
+    transaction_type: str = "all",
+    status: str | None = None,
+    sort_by: str = "date",
+    sort_order: str = "asc",
     page: int = 1,
     size: int = 50,
 ) -> dict:
@@ -85,6 +99,10 @@ def get_patient_ledger(
             "tooth": p.tooth,
             "payment_type": None,
             "status": p.billing_status,
+            # AUD-2: creator/timestamps per ledger row.
+            "provider_id": p.provider_id,
+            "created_by": p.created_by,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
         })
     for pay in db.execute(pay_stmt).scalars():
         entries.append({
@@ -98,8 +116,12 @@ def get_patient_ledger(
             "tooth": None,
             "payment_type": pay.payment_type,
             "status": None,
+            "provider_id": pay.provider_id,
+            "created_by": pay.created_by,
+            "created_at": pay.created_at.isoformat() if pay.created_at else None,
         })
 
+    # Chronological sort first — the running balance must be date-ordered.
     entries.sort(key=lambda e: (e["entry_date"], _TYPE_ORDER.get(e["entry_type"], 9), str(e["source_id"])))
 
     # Running balance over the FULL window (Decimal), computed before slicing.
@@ -107,6 +129,32 @@ def get_patient_ledger(
     for e in entries:
         running += Decimal(str(e["charge"])) - Decimal(str(e["credit"]))
         e["running_balance"] = float(running)
+
+    # AUD-2: resolve creator display names (batched).
+    actor_ids = {e["created_by"] for e in entries if e.get("created_by") is not None}
+    names = _user_names(db, actor_ids)
+    provider_ids = {e["provider_id"] for e in entries if e.get("provider_id")}
+    providers = {p.id: p.name for p in db.execute(
+        select(Provider).where(Provider.id.in_(provider_ids))
+    ).scalars()} if provider_ids else {}
+    for e in entries:
+        e["created_by_name"] = names.get(e["created_by"]) if e.get("created_by") is not None else None
+        e["modified_by"] = None
+        e["modified_at"] = None
+        e["provider_name"] = providers.get(e.get("provider_id"))
+
+    # LED-1: display filters (applied after the running balance is computed).
+    tt = (transaction_type or "all").lower()
+    if tt in ("procedure", "charge"):
+        entries = [e for e in entries if e["entry_type"] == "procedure"]
+    elif tt == "payment":
+        entries = [e for e in entries if e["entry_type"] == "payment"]
+    if status:
+        entries = [e for e in entries if (e["status"] or "").lower() == status.lower()]
+
+    # LED-1: display sort.
+    reverse = (sort_order or "asc").lower() == "desc"
+    entries.sort(key=_LEDGER_SORT_KEYS.get(sort_by, _LEDGER_SORT_KEYS["date"]), reverse=reverse)
 
     total = len(entries)
     start = (page - 1) * size
@@ -124,6 +172,12 @@ def get_patient_ledger(
         "total": total,
         "as_of": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def _user_names(db: Session, ids: set[int]) -> dict[int, str]:
+    if not ids:
+        return {}
+    return {u.id: _user_label(u) for u in db.execute(select(User).where(User.id.in_(ids))).scalars()}
 
 
 # ── Account Ledger — denormalised, server-paged feed (AL-1/2/4/5/7) ───────────

@@ -302,6 +302,49 @@ with a `LOCAL-<id>` key (zero-config dev/test — `is_configured()` False). A co
 Jira create failure persists `status="Failed"` and returns **502** so the FE retries.
 Live cutover = fill the three env secrets + `VITE_JIRA_MODE=proxy`, no code change.
 
+**Transactions module** (Dashboard + global feed + charge/payment/refund entry; DASH-1…5,
+SRCH-1/3, LED-1, INS-1, ADJ-1, REF-1…4, STMT-1…3, AUD-1…3, SVC-1, CHG-1…9 of
+[transactions/transactions_backend_devreport.md](transactions/transactions_backend_devreport.md)
+/ [response](transactions/transactions_backend_response.md); Alembic `c7d8e9f0a1b2`). The
+office-level financial layer the per-patient endpoints never had, plus refunds/statements
+which had **no** backend at all:
+- **Office dashboards** ([app/api/v1/transactions.py](app/api/v1/transactions.py) +
+  [app/services/transactions_service.py](app/services/transactions_service.py)):
+  `GET /offices/{id}/financial-summary` (DASH-1), `/collections?period=` (DASH-2),
+  `/insurance-receivables` (DASH-3, total + by-carrier), `/adjustment-summary?period=`
+  (DASH-4, split by `write_off_type`), `/transactions` (DASH-5). Tenant-wide
+  `GET /transactions?search=&type=&status=&amount_min=&amount_max=&transaction_number=`
+  is the unified cross-patient feed (SRCH-1/3) composing charges+payments+adjustments+
+  refunds+claims, denormalised + paged. `patient_payments`/`insurance_claims`/
+  `patient_procedures` carry no `tenant_id`, so tenancy is enforced via the patient-id set.
+- **Refunds** ([app/api/v1/refunds.py](app/api/v1/refunds.py) +
+  [app/services/refund_service.py](app/services/refund_service.py)): first-class
+  `patient_refunds` — never an ad-hoc negative payment. `POST /patients/{id}/refunds`
+  (REF-1, policy-checked), `/patient-{payments,adjustments}/{id}/reverse` (REF-2),
+  `GET /patients/{id}/refundable-balance` (REF-3), `GET /metadata/refund-policy` (REF-4).
+  A refund folds into the computed balance (`balance += refund`; **`balance_service` now
+  nets `payments − refunds`** and exposes `total_refunded`/`credit_balance`).
+- **Statements** ([app/api/v1/statements.py](app/api/v1/statements.py) +
+  [app/services/statement_service.py](app/services/statement_service.py)): `patient_statements`
+  snapshot rows. `POST /patients/{id}/statements` (STMT-1), `…/{sid}/pdf` (reportlab, STMT-3),
+  `…/{sid}/deliver`, `POST /offices/{id}/statements/batch` (STMT-2, outstanding/aged filter,
+  office aging messages consumed). Email delivery records intent only (no SMTP wired).
+- **Billing supplements** ([app/api/v1/billing.py](app/api/v1/billing.py) +
+  [app/services/billing_service.py](app/services/billing_service.py)):
+  `POST /ledger-insurance-details/payment` adds check/bank/EOB/EFT-trace remittance ids
+  (INS-1); `POST /insurance-claims/{id}/submit` (SVC-1) + `GET …/status-history` (AUD-3,
+  composed from `audit_logs` + claim date columns); `POST /patients/{id}/estimate` is the
+  coverage+fee-schedule estimate engine (CHG-1/7,
+  [app/services/estimate_service.py](app/services/estimate_service.py));
+  `GET /patients/{id}/insurance-summary` (CHG-8), `/todays-appointment` (CHG-9),
+  `GET /explosion-codes/{code}/expand` (CHG-4).
+- **Ledger/audit**: `GET /patients/{id}/ledger` gains `transaction_type`/`status`/`sort_by`/
+  `sort_order` (LED-1) + `created_by`/`created_at`/`provider_name` per row (AUD-2);
+  `GET /audit-logs?resource_id=` (AUD-1). Additive columns: `patient_payments.bank_number`
+  (CHG-5), `patient_procedures.hygienist_id` (CHG-6), `patient_adjustments.write_off_type`
+  (ADJ-1), `procedure_codes.{anatomy,surface,material}_rules` JSON (CHG-2). CHG-3 ("All
+  Medical" CPT codes) stays a data-seeding task (the category filter already works).
+
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))
   records authenticated 2xx mutations (POST/PUT/PATCH/DELETE) to `audit_logs` via

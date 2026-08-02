@@ -27,12 +27,15 @@ from app.api.v1 import (
     perio,
     pick_lists,
     progress_notes,
+    refunds,
     restorative,
     procedure_codes,
     provider_setup,
     reports,
     scheduler,
+    statements,
     support,
+    transactions,
     treatment,
     users,
     users_extended,
@@ -59,6 +62,14 @@ api_router.include_router(treatment.router)
 api_router.include_router(fee_schedules.router)
 api_router.include_router(balances.router)
 api_router.include_router(ledger.router)
+# Transactions module: office financial dashboards (DASH-1..5) + unified
+# cross-patient feed/search (SRCH-1/3), refunds & reversals (REF-1..4), and
+# patient statement generation/delivery (STMT-1..3). Before generic CRUD so the
+# literal /offices/{id}/financial-summary, /patients/{id}/refunds and
+# /patients/{id}/statements sub-paths win over /{item_id}.
+api_router.include_router(transactions.router)
+api_router.include_router(refunds.router)
+api_router.include_router(statements.router)
 # Payment-plan contracts: instalment posting (PP-2), server-side amortisation
 # (OPP-9/RPP-5) and the contract/coupon documents (PP-3). Before generic CRUD so
 # /patient-ins-payment-plans/{id}/post & /payment-plans/... win over /{item_id}.

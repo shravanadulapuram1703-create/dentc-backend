@@ -58,6 +58,10 @@ class PatientAdjustment(Base, IntPKMixin, CreatedAtMixin):
     adjustment_date: Mapped[date] = mapped_column()
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     adjustment_type: Mapped[str | None] = mapped_column(String(50))  # code from definitions 'adjustment'
+    # ADJ-1: an enforced write-off classification (contractual | provider | insurance
+    # | courtesy). Distinguishes a contractual/insurance write-off from a courtesy or
+    # bad-debt adjustment so the office adjustment-summary can split them (DASH-4).
+    write_off_type: Mapped[str | None] = mapped_column(String(20))
     notes: Mapped[str | None] = mapped_column(Text)
     is_void: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))

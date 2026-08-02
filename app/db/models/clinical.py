@@ -41,6 +41,8 @@ class PatientProcedure(Base, CreatedAtMixin):
     tooth: Mapped[str | None] = mapped_column(String(10))
     surface: Mapped[str | None] = mapped_column(String(20))
     quadrant: Mapped[str | None] = mapped_column(String(10))
+    # CHG-6: second (hygiene) provider recorded alongside the treating provider.
+    hygienist_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
     fee: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     ucr_fee: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     insurance_estimate: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/patients", tags=["Billing"], dependencies=[Depends(g
     "/{patient_id}/ledger",
     response_model=LedgerResponse,
     operation_id="get_patient_ledger",
-    summary="Get a patient's ledger feed with running balance",
+    summary="Get a patient's ledger feed with running balance (sortable/filterable, LED-1)",
 )
 def get_ledger(
     db: DbSession,
@@ -26,11 +26,23 @@ def get_ledger(
     patient_id: Annotated[int, Path()],
     date_from: Annotated[date | None, Query()] = None,
     date_to: Annotated[date | None, Query()] = None,
+    transaction_type: Annotated[
+        Literal["all", "procedure", "charge", "payment"],
+        Query(description="Filter by transaction type (LED-1)"),
+    ] = "all",
+    status: Annotated[str | None, Query(description="Filter by billing status (LED-1)")] = None,
+    sort_by: Annotated[
+        Literal["date", "amount", "code", "provider", "status"],
+        Query(description="Sort column (LED-1)"),
+    ] = "date",
+    sort_order: Annotated[Literal["asc", "desc"], Query()] = "asc",
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=500)] = 50,
 ):
     return ledger_service.get_patient_ledger(
-        db, patient_id, tenant_id, date_from=date_from, date_to=date_to, page=page, size=size
+        db, patient_id, tenant_id, date_from=date_from, date_to=date_to,
+        transaction_type=transaction_type, status=status, sort_by=sort_by,
+        sort_order=sort_order, page=page, size=size,
     )
 
 

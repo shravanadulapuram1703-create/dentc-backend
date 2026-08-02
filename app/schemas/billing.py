@@ -75,6 +75,14 @@ class LedgerEntry(BaseModel):
     tooth: str | None = None
     payment_type: str | None = None
     status: str | None = None
+    # AUD-2: creator/modifier + timestamps backing the ledger "CREATED BY" column.
+    provider_id: str | None = None
+    provider_name: str | None = None
+    created_by: int | None = None
+    created_by_name: str | None = None
+    created_at: str | None = None
+    modified_by: int | None = None
+    modified_at: str | None = None
 
 
 class LedgerResponse(BaseModel):
@@ -144,6 +152,8 @@ class PatientBalance(BaseModel):
     insurance_balance: float = Field(0, description="Outstanding expected-insurance portion")
     today_charges: float = Field(0, description="Sum of today's non-void procedure charges")
     opening_balance: float = Field(0, description="Seeded opening A/R (GAP-AP-12); already in balance/aging")
+    total_refunded: float = Field(0, description="Sum of non-void refunds (REF-1); folded into balance")
+    credit_balance: float = Field(0, description="Refundable unapplied credit (REF-3); ≥0")
     aging: BalanceAging = Field(default_factory=BalanceAging)
     recent_activity: BalanceRecentActivity = Field(default_factory=BalanceRecentActivity)
     as_of: str = Field(..., description="UTC timestamp the balance was computed")
