@@ -71,6 +71,8 @@ from app.db.models.provider_setup import (
 )
 from app.db.models.billing import (
     ClaimSubmission,
+    ExplosionCode,
+    ExplosionCodeItem,
     InsuranceClaim,
     LedgerInsuranceDetail,
     OrthoPlan,
@@ -78,8 +80,10 @@ from app.db.models.billing import (
     PatientPayment,
     PatientPaymentPlan,
     PatientPlanInstallment,
+    PatientRefund,
     PatientRegPlan,
     PatientSecInsPaymentPlan,
+    PatientStatement,
     PaymentAllocation,
 )
 from app.db.models.clinical import (
@@ -239,7 +243,8 @@ __all__ = [
     "PatientPayment", "InsuranceClaim", "ClaimSubmission", "LedgerInsuranceDetail",
     "PaymentAllocation", "PatientPaymentPlan", "PatientInsPaymentPlan",
     "PatientSecInsPaymentPlan", "PatientRegPlan", "OrthoPlan",
-    "PatientPlanInstallment",
+    "PatientPlanInstallment", "PatientRefund", "PatientStatement",
+    "ExplosionCode", "ExplosionCodeItem",
     # reference / config
     "Definition", "DefinitionGroup", "ImagingTemplate", "QuestionnaireHeader",
     "QuestionnaireOption",

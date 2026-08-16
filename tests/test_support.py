@@ -13,8 +13,7 @@ from __future__ import annotations
 
 import base64
 
-import pytest
-
+from app.core.config import settings
 from app.integrations import jira_client
 
 TINY_PNG_B64 = base64.b64encode(b"\x89PNG\r\n\x1a\n-fake-bytes").decode()
@@ -147,3 +146,58 @@ def test_create_ticket_jira_failure_persists_and_502s(client, monkeypatch):
     listed = client.get("/api/v1/support/tickets").json()["tickets"]
     assert len(listed) == 1
     assert listed[0]["status"] == "Failed"
+
+
+def test_normalize_adf_moves_version_to_top_level():
+    """Regression: the FE historically emitted {type:doc, attrs:{version:1}}, which
+    Jira 400s as invalid ADF. The client must lift version to the top level."""
+    bad = {"type": "doc", "attrs": {"version": 1}, "content": [{"type": "paragraph"}]}
+    fixed = jira_client._normalize_adf(bad)
+    assert fixed["version"] == 1
+    assert "attrs" not in fixed  # version was the only attr → attrs dropped
+    assert fixed["content"] == [{"type": "paragraph"}]
+
+    # Missing version entirely → defaulted to 1; non-doc values pass through.
+    assert jira_client._normalize_adf({"type": "doc", "content": []})["version"] == 1
+    assert jira_client._normalize_adf(None) is None
+    assert jira_client._normalize_adf({"type": "paragraph"}) == {"type": "paragraph"}
+
+
+def test_issue_type_is_mapped_for_projects_missing_that_type(client, monkeypatch):
+    """FE 'New Feature' → Jira 'Story' when the project has no such type (e.g. the
+    KAN team-managed board)."""
+    monkeypatch.setattr(jira_client, "is_configured", lambda: True)
+    monkeypatch.setattr(settings, "JIRA_ISSUE_TYPE_MAP", {"New Feature": "Story"})
+    seen: dict = {}
+
+    def fake_create(**kw):
+        seen.update(kw)
+        return {"key": "KAN-1", "url": "https://site.atlassian.net/browse/KAN-1"}
+
+    monkeypatch.setattr(jira_client, "create_issue", fake_create)
+    res = client.post("/api/v1/support/tickets", json=_payload(issue_type="New Feature"))
+    assert res.status_code == 200, res.text
+    assert seen["issue_type"] == "Story"
+
+
+def test_unknown_issue_type_falls_back_to_default(client, monkeypatch):
+    """A create rejected for a bad issuetype retries once with the default type so
+    the ticket is never lost."""
+    monkeypatch.setattr(jira_client, "is_configured", lambda: True)
+    monkeypatch.setattr(settings, "JIRA_ISSUE_TYPE_MAP", {})
+    monkeypatch.setattr(settings, "JIRA_DEFAULT_ISSUE_TYPE", "Bug")
+    attempts: list = []
+
+    def fake_create(**kw):
+        attempts.append(kw["issue_type"])
+        if kw["issue_type"] == "Improvement":
+            raise jira_client.JiraError(
+                "Jira create failed (400). issuetype: valid issue type is required",
+                status_code=400,
+            )
+        return {"key": "KAN-2", "url": "https://site.atlassian.net/browse/KAN-2"}
+
+    monkeypatch.setattr(jira_client, "create_issue", fake_create)
+    res = client.post("/api/v1/support/tickets", json=_payload(issue_type="Improvement"))
+    assert res.status_code == 200, res.text
+    assert attempts == ["Improvement", "Bug"]  # rejected, then retried with default

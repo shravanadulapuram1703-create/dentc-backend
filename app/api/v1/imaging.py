@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
+from fastapi import APIRouter, Depends, File, Form, Path, Query, Request, Response, UploadFile, status
 from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ from app.schemas.imaging import (
     PatientImagingSummary,
 )
 from app.services import audit_service
+from app.services import dicom_capture_service as capture_svc
 from app.services import imaging_service as svc
 
 logger = get_logger(__name__)
@@ -64,6 +65,34 @@ def get_patient_imaging(
         db, patient_id, tenant_id,
         modality=modality, tooth=tooth, date_from=date_from, date_to=date_to,
     )
+
+
+@router.post(
+    "/{patient_id}/imaging/captures",
+    response_model=DicomInstanceOut,
+    operation_id="create_patient_imaging_capture",
+    status_code=status.HTTP_201_CREATED,
+    summary="Ingest a freshly captured image/DICOM file (GCS + Postgres, matched to this patient's imaging history)",
+)
+async def create_capture(
+    db: DbSession,
+    tenant_id: TenantId,
+    patient_id: Annotated[int, Path()],
+    file: Annotated[UploadFile, File()],
+    modality: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+):
+    data = await file.read()
+    instance = capture_svc.ingest_capture(
+        db,
+        tenant_id=tenant_id,
+        patient_id=patient_id,
+        data=data,
+        content_type=file.content_type or "application/octet-stream",
+        modality_hint=modality,
+        description=description,
+    )
+    return svc.get_instance_detail(db, instance.sop_instance_uid, tenant_id)
 
 
 @router.get(

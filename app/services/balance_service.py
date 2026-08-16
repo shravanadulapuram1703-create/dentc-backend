@@ -22,7 +22,13 @@ from sqlalchemy import and_, case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
-from app.db.models import Patient, PatientOpeningBalance, PatientPayment, PatientProcedure
+from app.db.models import (
+    Patient,
+    PatientOpeningBalance,
+    PatientPayment,
+    PatientProcedure,
+    PatientRefund,
+)
 from app.integrations import redis_store
 
 _CACHE_TTL = 30
@@ -153,6 +159,18 @@ def _payments(db: Session, patient_id: int, today: date) -> tuple[Decimal, dict]
     }
 
 
+def _refunds_total(db: Session, patient_id: int) -> Decimal:
+    """REF-1: sum of non-void refunds. A refund returns a credit to the patient, so
+    it *increases* the account balance (``balance += refund``)."""
+    total = db.execute(
+        select(func.coalesce(func.sum(PatientRefund.amount), 0)).where(
+            PatientRefund.patient_id == patient_id,
+            PatientRefund.is_void.is_(False),
+        )
+    ).scalar_one()
+    return Decimal(total or 0)
+
+
 def get_patient_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
     cached = redis_store.cache_get(_cache_key(tenant_id, patient_id))
     if cached:
@@ -169,14 +187,17 @@ def get_patient_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
     # PP-5: two scans total (procedures + payments) instead of six statements.
     charged, est_ins, est_pat, today_charges, aging = _charges(db, patient_id, today)
     paid, recent = _payments(db, patient_id, today)
+    refunded = _refunds_total(db, patient_id)
 
     # GAP-AP-12: fold seeded opening A/R into charges, balance and aging.
     opening = _opening(db, patient_id)
     opening_total = Decimal(str(sum(opening.values())))
     charged_total = charged + opening_total
 
-    balance = charged_total - paid
-    patient_responsible = charged_total - paid - est_ins
+    # REF-1: a refund undoes a credit — net payments are payments − refunds.
+    net_paid = paid - refunded
+    balance = charged_total - net_paid
+    patient_responsible = charged_total - net_paid - est_ins
 
     for src_col, bucket in _OPENING_BUCKETS.items():
         aging[bucket] = round(aging[bucket] + opening[src_col], 2)
@@ -197,6 +218,9 @@ def get_patient_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
         "today_charges": _f(today_charges),
         # GAP-AP-12: seeded opening A/R total (already included in balance/aging above).
         "opening_balance": _f(opening_total),
+        # REF-1/3: refunds issued + the refundable credit (a negative balance).
+        "total_refunded": _f(refunded),
+        "credit_balance": _f(-balance if balance < 0 else Decimal(0)),
         "aging": aging,
         "recent_activity": recent,
         "as_of": datetime.now(timezone.utc).isoformat(),

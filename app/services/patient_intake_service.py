@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import ConflictError, NotFoundError
 from app.db.models import (
     Appointment,
     InsuranceCarrier,
@@ -29,7 +29,7 @@ from app.db.models import (
     ResponsibleParty,
 )
 from app.integrations import redis_store
-from app.services import balance_service
+from app.services import balance_service, patient_extra_service
 from app.services.patient_service import assign_chart_no
 
 _BUCKETS = ("current", "over_30", "over_60", "over_90", "over_120")
@@ -103,6 +103,19 @@ def register_patient(db: Session, tenant_id: int, req, *, user_id: int | None = 
     patient with only some of its related records (the client-chained flow could).
     """
     payload = req.patient.model_dump(exclude_unset=True)
+
+    # KAN-108: Quick Save posts straight here, so the duplicate guard has to live
+    # server-side — a client that forgets to call /patients/check-duplicate must
+    # not be able to create a duplicate silently.
+    if not getattr(req, "force_create", False):
+        dupes = patient_extra_service.find_strong_duplicates(db, tenant_id, payload)
+        if dupes:
+            raise ConflictError(
+                "A patient matching these details already exists.",
+                code="duplicate_patient",
+                details={"candidates": dupes},
+            )
+
     payload["tenant_id"] = tenant_id
     if user_id is not None:
         payload.setdefault("created_by", user_id)

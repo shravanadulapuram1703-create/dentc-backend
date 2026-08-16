@@ -66,9 +66,26 @@ class Settings(BaseSettings):
     # Base URL the emailed reset link points at (frontend route).
     PASSWORD_RESET_URL_BASE: str = "http://localhost:5173/reset-password"
 
-    # ── Email (SMTP transport) ───────────────────────────────────────────────
-    # When SMTP_HOST is unset, the email integration stays in log-only mode
-    # (links are written to the logs instead of sent) so dev works without creds.
+    # ── Email (Microsoft Graph transport — preferred) ────────────────────────
+    # App-only (client-credentials) sending via Graph ``sendMail``. Preferred over
+    # SMTP because it works with Entra Security Defaults enabled, needs no mailbox
+    # password, and is unaffected by the Dec-2026 SMTP basic-auth retirement.
+    # All three of tenant/client/secret must be set to activate this transport.
+    GRAPH_TENANT_ID: str | None = None
+    GRAPH_CLIENT_ID: str | None = None
+    GRAPH_CLIENT_SECRET: str | None = None
+    # Mailbox to send as. Falls back to EMAIL_FROM. The app registration should be
+    # scoped (Exchange application access policy) so it can *only* send as this one.
+    GRAPH_SENDER: str | None = None
+    GRAPH_TIMEOUT_SECONDS: int = 15
+    # Keep a copy in the mailbox's Sent Items. Off by default — reset mails are
+    # high-volume and low-value to retain.
+    GRAPH_SAVE_TO_SENT_ITEMS: bool = False
+
+    # ── Email (SMTP transport — legacy fallback) ─────────────────────────────
+    # Used only when Graph is not configured. When neither is configured the
+    # integration stays in log-only mode (links written to the logs) so dev works
+    # without creds.
     SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
     SMTP_USER: str | None = None
@@ -181,6 +198,13 @@ class Settings(BaseSettings):
     # Fallbacks when the FE omits issue_type / priority.
     JIRA_DEFAULT_ISSUE_TYPE: str = "Bug"
     JIRA_DEFAULT_PRIORITY: str = "Medium"
+    # FE issue-type name → Jira issue-type name, for projects that don't have every
+    # FE type (e.g. a team-managed board with no "Support"/"Improvement"/"New
+    # Feature"). JSON object in env, e.g.
+    #   JIRA_ISSUE_TYPE_MAP={"Support":"Task","Improvement":"Story","New Feature":"Story"}
+    # Unmapped names pass through unchanged; a create that still 400s on issuetype
+    # falls back to JIRA_DEFAULT_ISSUE_TYPE so a ticket is never lost.
+    JIRA_ISSUE_TYPE_MAP: dict[str, str] = Field(default_factory=dict)
     # Many Jira projects don't expose the Priority field on the create screen —
     # sending it then 400s the whole create. Set false to omit it.
     JIRA_INCLUDE_PRIORITY: bool = True

@@ -35,7 +35,10 @@ def list_audit_logs(
     page: PageParams,
     user_id: int | None = None,
     resource_type: str | None = None,
+    resource_id: str | None = None,
 ):
+    # AUD-1: ``resource_id`` retrieves the full change history of one record, e.g.
+    # ``?resource_type=insurance-claims&resource_id={id}``.
     items, total = _crud.list(
         db,
         tenant_id=tenant_id,
@@ -43,6 +46,6 @@ def list_audit_logs(
         size=page.size,
         sort=page.sort,
         order=page.order,
-        filters={"user_id": user_id, "resource_type": resource_type},
+        filters={"user_id": user_id, "resource_type": resource_type, "resource_id": resource_id},
     )
     return PaginatedResponse.build(items, total, page.page, page.size)

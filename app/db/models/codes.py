@@ -41,6 +41,16 @@ class ProcedureCode(Base, CreatedAtMixin):
     max_surfaces: Mapped[int | None]
     default_material_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("chart_materials.id"))
     valid_teeth: Mapped[list | None] = mapped_column(JSON)  # e.g. ["1","2",…,"32"]
+    # ── CHG-2: structured tooth/surface/material enforcement rules ─────────────
+    # The ToothSurfaceEnforcement modal needs structured rules (allowed quadrants,
+    # surface min/max + allowed surfaces, material options) per CDT code instead of
+    # fabricating them client-side from the flat requires_* booleans. Each is a JSON
+    # object, e.g. anatomy_rules={"mode":"tooth","allowed_quadrants":["UR","UL"]},
+    # surface_rules={"min":1,"max":5,"allowed":["M","O","D","B","L"]},
+    # material_rules={"options":[{"id":3,"name":"Composite"}]}.
+    anatomy_rules: Mapped[dict | None] = mapped_column(JSON)
+    surface_rules: Mapped[dict | None] = mapped_column(JSON)
+    material_rules: Mapped[dict | None] = mapped_column(JSON)
     # ── PROC-4: legacy "Main" booleans/codes (Provider Settings) ─────────────
     taxable: Mapped[bool] = mapped_column(Boolean, default=False)
     sales_tax_code: Mapped[str | None] = mapped_column(String(50))

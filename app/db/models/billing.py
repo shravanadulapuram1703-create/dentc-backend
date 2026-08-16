@@ -11,7 +11,16 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
@@ -30,6 +39,8 @@ class PatientPayment(Base, CreatedAtMixin):
     payment_type: Mapped[str] = mapped_column(String(20))
     payment_method: Mapped[str | None] = mapped_column(String(50))
     check_number: Mapped[str | None] = mapped_column(String(100))
+    # CHG-5: deposit Bank # captured on the Payments tab (was silently dropped).
+    bank_number: Mapped[str | None] = mapped_column(String(100))
     provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
     notes: Mapped[str | None] = mapped_column(Text)
     is_void: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -101,6 +112,16 @@ class LedgerInsuranceDetail(Base, IntPKMixin, CreatedAtMixin):
     ter_ins_plan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_plans.id"))
     prim_posted: Mapped[bool] = mapped_column(Boolean, default=False)
     sec_posted: Mapped[bool] = mapped_column(Boolean, default=False)
+    # ── INS-1: carrier-remittance identifiers on a posted insurance payment ────
+    # The reconciliation identifiers the EOB carries; without them a posted
+    # insurance payment can't be matched back to the carrier's remittance.
+    payment_date: Mapped[date | None]
+    payment_method: Mapped[str | None] = mapped_column(String(50))  # check | eft | credit_card | …
+    check_number: Mapped[str | None] = mapped_column(String(100))
+    bank_number: Mapped[str | None] = mapped_column(String(100))
+    eob_number: Mapped[str | None] = mapped_column(String(100))
+    eft_trace_number: Mapped[str | None] = mapped_column(String(100))
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class PaymentAllocation(Base, IntPKMixin, CreatedAtMixin):
@@ -376,3 +397,102 @@ class PatientPlanInstallment(Base, IntPKMixin, CreatedAtMixin):
     # patient_procedures.id of the charge this instalment posted (PP-2).
     ledger_id: Mapped[str | None] = mapped_column(String(50))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class PatientRefund(Base, IntPKMixin, CreatedAtMixin):
+    """REF-1/2: an auditable return of funds to the patient (overpayment /
+    duplicate / cancellation). A refund is a first-class concept — never an
+    ad-hoc negative payment — so it carries method, reason and the authorising
+    user, and is folded back into the computed balance (a refund undoes a credit,
+    so ``balance += refund``). ``source_payment_id`` links the overpayment it
+    returns; ``reversed_*`` fields let REF-2 reverse a payment/adjustment posted
+    in error by recording the offsetting refund + voiding the source."""
+
+    __tablename__ = "patient_refunds"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
+    refund_date: Mapped[date] = mapped_column()
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    refund_method: Mapped[str | None] = mapped_column(String(50))  # check | eft | credit_card | cash
+    reason: Mapped[str | None] = mapped_column(String(255))
+    reason_code: Mapped[str | None] = mapped_column(String(50))  # overpayment | duplicate | cancellation
+    # REF-2: which source record (if any) this refund reverses.
+    source_payment_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("patient_payments.id")
+    )
+    reversed_type: Mapped[str | None] = mapped_column(String(20))  # payment | adjustment
+    reversed_id: Mapped[str | None] = mapped_column(String(50))
+    check_number: Mapped[str | None] = mapped_column(String(100))
+    reference_number: Mapped[str | None] = mapped_column(String(100))
+    authorized_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    notes: Mapped[str | None] = mapped_column(Text)
+    is_void: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class PatientStatement(Base, IntPKMixin, CreatedAtMixin):
+    """STMT-1/2: a generated single-patient account statement snapshot.
+
+    The figures are frozen at generation time (so a re-print is reproducible);
+    the PDF is rendered on demand from this snapshot. ``batch_id`` groups a
+    monthly outstanding-balance batch run (STMT-2)."""
+
+    __tablename__ = "patient_statements"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
+    statement_date: Mapped[date] = mapped_column()
+    period_start: Mapped[date | None]
+    period_end: Mapped[date | None]
+    opening_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    total_charges: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    total_payments: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    total_adjustments: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    closing_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    aging_current: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    aging_30: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    aging_60: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    aging_90: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    aging_120: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    message: Mapped[str | None] = mapped_column(String(500))  # office aging message
+    batch_id: Mapped[str | None] = mapped_column(String(50), index=True)
+    # STMT-3: delivery lifecycle.
+    delivery_method: Mapped[str | None] = mapped_column(String(20))  # print | email | download
+    delivery_status: Mapped[str] = mapped_column(String(20), default="generated")
+    delivered_to: Mapped[str | None] = mapped_column(String(255))
+    delivered_at: Mapped[date | None]
+    snapshot: Mapped[dict | None] = mapped_column(JSON)  # full line detail for the PDF
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class ExplosionCode(Base, IntPKMixin, CreatedAtMixin):
+    """CHG-4: a user-defined "explosion" code — one code that expands to a set of
+    procedures posted together (e.g. an "NP Exam" bundle). Header + items."""
+
+    __tablename__ = "explosion_codes"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "office_id", "code", name="uq_explosion_codes_tenant_office_code"),
+    )
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
+    code: Mapped[str] = mapped_column(String(50))
+    description: Mapped[str | None] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class ExplosionCodeItem(Base, IntPKMixin, CreatedAtMixin):
+    __tablename__ = "explosion_code_items"
+
+    explosion_code_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("explosion_codes.id"), index=True
+    )
+    procedure_code: Mapped[str] = mapped_column(String(20), ForeignKey("procedure_codes.code"))
+    display_order: Mapped[int] = mapped_column(Integer, default=0)
+    default_fee: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    tooth: Mapped[str | None] = mapped_column(String(10))
+    surface: Mapped[str | None] = mapped_column(String(20))

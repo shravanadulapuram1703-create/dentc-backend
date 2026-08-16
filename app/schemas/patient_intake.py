@@ -117,6 +117,13 @@ class RegisterRequest(BaseModel):
     questionnaire_responses: list[QuestionnaireResponseIn] = Field(default_factory=list)
     recalls: list[RecallIn] = Field(default_factory=list)
     opening_balance: OpeningBalanceIn | None = None
+    # KAN-108: registration refuses with 409 when an existing patient is almost
+    # certainly the same person. Set once the user has reviewed the returned
+    # matches and confirmed this really is a new patient.
+    force_create: bool = Field(
+        False,
+        description="Create even if a strong duplicate match exists (user confirmed).",
+    )
 
 
 class RegisterResponse(BaseModel):

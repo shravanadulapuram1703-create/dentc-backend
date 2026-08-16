@@ -103,6 +103,41 @@ def signed_url(
         return None
 
 
+def upload_bytes(
+    bucket: str,
+    object_key: str,
+    data: bytes,
+    *,
+    content_type: str = "application/octet-stream",
+    create_only: bool = False,
+) -> None:
+    """Write ``data`` to ``gs://bucket/object_key``.
+
+    ``create_only=True`` mirrors the migration uploader's
+    ``if_generation_match=0`` (never overwrite an existing object — content-
+    addressed keys mean a collision is the same bytes already there, so a
+    412 here is treated as success, not an error).
+
+    Raises ``RuntimeError`` if the GCS client/credentials aren't available —
+    callers should treat that as a real failure, not silently drop the
+    capture.
+    """
+    from google.api_core import exceptions as gexc
+
+    client = _get_client()
+    if client is None or not bucket:
+        raise RuntimeError("GCS is not configured (client unavailable or bucket unset)")
+    blob = client.bucket(bucket).blob(object_key)
+    blob.content_type = content_type
+    try:
+        kwargs = {"content_type": content_type}
+        if create_only:
+            kwargs["if_generation_match"] = 0
+        blob.upload_from_string(data, **kwargs)
+    except gexc.PreconditionFailed:
+        pass  # already there — same sha256, same bytes, dedup success
+
+
 def stream(bucket: str, object_key: str) -> tuple[Iterator[bytes], str | None, int | None]:
     """Proxy-mode download: yield the object's bytes plus (content_type, size).
 

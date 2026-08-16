@@ -348,6 +348,15 @@ _CODES = [
     _cfg(m.IcdCode, "IcdCode", "icd-codes", "Procedures",
          "icd_code", "icd_codes", search=("code", "description", "icd10", "snomed"),
          sortable=("code", "created_at"), filters=("is_active",)),
+    # CHG-4: user-defined explosion codes (one code → many procedures). The
+    # /explosion-codes/{code}/expand supplemental (billing.py) returns the
+    # expanded procedure list; these CRUD routes maintain the catalog.
+    _cfg(m.ExplosionCode, "ExplosionCode", "explosion-codes", "Procedures",
+         "explosion_code", "explosion_codes", search=("code", "description"),
+         filters=("office_id", "is_active")),
+    _cfg(m.ExplosionCodeItem, "ExplosionCodeItem", "explosion-code-items", "Procedures",
+         "explosion_code_item", "explosion_code_items",
+         filters=("explosion_code_id", "procedure_code"), soft_field=None),
 ]
 
 # ── Scheduling ─────────────────────────────────────────────────────────────

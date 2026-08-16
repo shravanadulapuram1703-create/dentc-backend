@@ -19,6 +19,13 @@ reportlab>=4.0
 # DICOM imaging object storage (GCS signed URLs / proxy streaming). Imported
 # lazily — without it (or without creds) imaging serving falls back to proxy mode.
 google-cloud-storage>=2.14
+# Real-time capture ingest (dicom_capture_service): DICOM parsing + pixel
+# decode/resize/encode for thumb/web derivatives, matching 06_derivatives.py.
+pydicom>=2.4
+numpy>=1.26
+Pillow>=10.0
+pylibjpeg>=2.0
+pylibjpeg-openjpeg>=2.0
 
 # ── Dev / test ───────────────────────────────────────────────────────────────
 pytest>=8.0
