@@ -2,12 +2,35 @@
 
 **Module:** Help Center → "Report an Issue"
 **Gap report answered:** [help_module_backend_devreport.md](help_module_backend_devreport.md) (HELP-1…5)
-**Status:** **Implemented.** Runs today in zero-config **local** mode; flips to live
-Jira with three env vars — **no code and no frontend change**.
+**Status:** **Implemented and LIVE-verified** against the real Jira site
+`https://pentaroreinnovationspvtltd.atlassian.net`, project **KAN** ("PMS App
+Development"). A real end-to-end smoke test created **KAN-111** (issue type Bug),
+uploaded an attachment (`smoke-test.txt`), and read its status back ("To Do" → mapped
+to **Open**). Everything runs with no frontend change.
 
-The frontend already targets this contract. Once the Jira team hands over the three
-secrets below, set them in `.env`, restart the API, and set `VITE_JIRA_MODE=proxy` +
-`VITE_JIRA_PROXY_URL=https://<api-host>/api/v1/support/tickets` on the frontend.
+To finish the frontend cutover: set `VITE_JIRA_MODE=proxy` +
+`VITE_JIRA_PROXY_URL=https://<api-host>/api/v1/support/tickets`. (Runs in zero-config
+**local** mode whenever the `JIRA_*` env vars are absent.)
+
+### Live config in `.env` (this environment)
+
+```
+JIRA_BASE_URL=https://pentaroreinnovationspvtltd.atlassian.net
+JIRA_EMAIL=dineshkadari@pentaroreinnovationspvtltd.onmicrosoft.com
+JIRA_API_TOKEN=****                         # the Atlassian API token (secret; gitignored)
+JIRA_PROJECT_KEY=KAN
+JIRA_INCLUDE_PRIORITY=false                 # KAN is team-managed → no Priority on create
+JIRA_ISSUE_TYPE_MAP={"Support":"Task","Improvement":"Story","New Feature":"Story"}
+```
+
+**KAN-specific notes (from probing the project):** it is a **team-managed (next-gen)**
+board whose only issue types are **Bug / Task / Story / Epic / Subtask** — so the FE's
+`Support / Improvement / New Feature` are mapped onto existing types (above), the
+**Priority** field is disabled (`JIRA_INCLUDE_PRIORITY=false`), and **reporter** stays
+the token owner (team-managed projects don't allow setting reporter for others — the
+real end-user is still captured in the issue's Environment block). Any issue type that
+still isn't accepted falls back to `JIRA_DEFAULT_ISSUE_TYPE` (Bug) so a ticket is never
+lost.
 
 ---
 
@@ -63,10 +86,11 @@ it), `JIRA_REPORTER_ACCOUNT_ID` (optional single service-account reporter),
 
 ---
 
-## ⚠️ What we need from the Jira team (to go live)
+## ⚠️ What we need from the Jira team (reference — now supplied & verified)
 
-The implementation is complete; it just needs these real values. All are held
-**server-side only** — none are ever returned to the browser.
+These were provided and are live (see the `.env` block above). Kept here as the
+reference checklist for other environments. All are held **server-side only** — none
+are ever returned to the browser.
 
 1. **Jira site (base) URL** — e.g. `https://reckondental.atlassian.net`
    → `JIRA_BASE_URL`

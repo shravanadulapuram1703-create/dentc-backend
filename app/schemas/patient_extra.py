@@ -43,6 +43,9 @@ class DuplicateCheckRequest(BaseModel):
     dob: date | None = None
     ssn: str | None = None
     chart_no: str | None = None
+    # KAN-108: Quick Save collects contact details, so they have to be matchable.
+    phone: str | None = None
+    email: str | None = None
 
 
 class DuplicateCandidate(BaseModel):
@@ -55,8 +58,13 @@ class DuplicateCandidate(BaseModel):
     match_score: int = Field(..., description="0-100 heuristic confidence")
     # BUG-1: the columns a user needs to tell candidates apart (were blank in the UI).
     email: str | None = None
+    phone: str | None = None
     home_office_short_id: str | None = None
     preferred_provider_name: str | None = None
+    # KAN-108: which fields actually lined up, and whether that is confident
+    # enough that POST /patients/register will refuse without force_create.
+    match_on: list[str] = Field(default_factory=list)
+    is_strong: bool = False
 
 
 class DuplicateCheckResponse(BaseModel):

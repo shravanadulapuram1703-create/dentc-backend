@@ -78,6 +78,28 @@ def _short_error(resp: httpx.Response) -> str:
     return (resp.text or resp.reason_phrase or "")[:300]
 
 
+def _normalize_adf(doc: Any) -> Any:
+    """Repair the most common ADF mistake before sending to Jira: the top-level
+    ``doc`` node MUST carry ``version`` at the top level (Jira 400s
+    ``{"type":"doc","attrs":{"version":1}}`` as "not valid ADF content"). Moves a
+    stray ``attrs.version`` up and defaults ``version`` to 1 when missing. Any
+    non-doc / non-dict value is returned untouched."""
+    if not isinstance(doc, dict) or doc.get("type") != "doc":
+        return doc
+    out = dict(doc)
+    attrs = out.get("attrs")
+    if isinstance(attrs, dict) and "version" in attrs:
+        out.setdefault("version", attrs["version"])
+        rest = {k: v for k, v in attrs.items() if k != "version"}
+        if rest:
+            out["attrs"] = rest
+        else:
+            out.pop("attrs", None)
+    if "version" not in out:
+        out["version"] = 1
+    return out
+
+
 def create_issue(
     *,
     project_key: str,
@@ -98,7 +120,7 @@ def create_issue(
         "issuetype": {"name": issue_type},
     }
     if description_adf:
-        fields["description"] = description_adf
+        fields["description"] = _normalize_adf(description_adf)
     if priority and settings.JIRA_INCLUDE_PRIORITY:
         fields["priority"] = {"name": priority}
     if reporter_account_id:

@@ -175,52 +175,100 @@ FAILED_SQL = """
 """
 
 
-def _flush(conn, results, bucket_name, log):
-    """Apply a batch of worker results to the DB in one transaction. Returns (ok, failed)."""
+def _connect(cfg):
+    """Open a DB connection tuned for a long, bursty job.
+
+    TCP keepalives stop the remote Postgres / network from silently dropping the
+    connection during the minutes-long idle gaps between batch commits (that drop
+    is what was crashing the shards mid-run), and statement_timeout is disabled.
+    """
+    import psycopg2
+
+    conn = psycopg2.connect(
+        cfg.dsn(),
+        keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5,
+        options="-c statement_timeout=0",
+    )
+    conn.autocommit = False
+    return conn
+
+
+def _flush(conn, results, bucket_name, cfg, log):
+    """Apply a batch of worker results in one transaction.
+
+    Returns ``(ok, failed, conn)`` — ``conn`` may be a freshly reconnected handle.
+    A dropped connection is recovered (reconnect + retry once) instead of killing
+    the shard; a genuine data error is logged and the batch skipped (the rows stay
+    unmarked, so a re-run — which is idempotent — picks them up).
+    """
     from psycopg2.extras import execute_values
+    import psycopg2
 
     oks = [x for x in results if x["status"] == "ok"]
     errs = [x for x in results if x["status"] == "error"]
 
-    try:
-        with conn.cursor() as cur:
-            if oks:
-                # 1) upsert both derivative objects; dedupe by object_key so a
-                #    shared sha (deduped original) can't hit the same row twice.
-                obj_args = {}
-                for x in oks:
-                    r = x["row"]
-                    obj_args[x["thumb_key"]] = (
-                        r["tenant_id"], bucket_name, x["thumb_key"], "thumb",
-                        "image/jpeg", x["thumb_len"], x["sha"], 1)
-                    obj_args[x["web_key"]] = (
-                        r["tenant_id"], bucket_name, x["web_key"], "web",
-                        "image/jpeg", x["web_len"], x["sha"], 1)
-                key_to_id = {}
-                for key, _id in execute_values(cur, OBJECT_SQL, list(obj_args.values()),
-                                               page_size=len(obj_args), fetch=True):
-                    key_to_id[key] = _id
+    def _apply(cur):
+        if oks:
+            # 1) upsert both derivative objects; dedupe by object_key so a shared
+            #    sha (deduped original) can't hit the same row twice in a batch.
+            obj_args = {}
+            for x in oks:
+                r = x["row"]
+                obj_args[x["thumb_key"]] = (
+                    r["tenant_id"], bucket_name, x["thumb_key"], "thumb",
+                    "image/jpeg", x["thumb_len"], x["sha"], 1)
+                obj_args[x["web_key"]] = (
+                    r["tenant_id"], bucket_name, x["web_key"], "web",
+                    "image/jpeg", x["web_len"], x["sha"], 1)
+            key_to_id = {}
+            for key, _id in execute_values(cur, OBJECT_SQL, list(obj_args.values()),
+                                           page_size=len(obj_args), fetch=True):
+                key_to_id[key] = _id
 
-                # 2) flip instances to ready, wiring the derivative object ids
-                ready_args = [
-                    (x["row"]["id"], key_to_id[x["thumb_key"]], key_to_id[x["web_key"]],
-                     x["awc"], x["aww"])
-                    for x in oks
-                ]
-                execute_values(cur, READY_SQL, ready_args,
-                               template="(%s,%s,%s,%s,%s)", page_size=len(ready_args))
+            # 2) flip instances to ready, wiring the derivative object ids
+            ready_args = [
+                (x["row"]["id"], key_to_id[x["thumb_key"]], key_to_id[x["web_key"]],
+                 x["awc"], x["aww"])
+                for x in oks
+            ]
+            execute_values(cur, READY_SQL, ready_args,
+                           template="(%s,%s,%s,%s,%s)", page_size=len(ready_args))
 
-            if errs:
-                execute_values(cur, FAILED_SQL,
-                               [(x["row"]["id"], x["error"]) for x in errs],
-                               template="(%s,%s)", page_size=len(errs))
-        conn.commit()
-        return len(oks), len(errs)
-    except Exception as exc:  # noqa: BLE001
-        conn.rollback()
-        log.error("DB flush failed for a batch of %d (rolled back, will not retry this batch): %r",
-                  len(results), exc)
-        return 0, 0
+        if errs:
+            execute_values(cur, FAILED_SQL,
+                           [(x["row"]["id"], x["error"]) for x in errs],
+                           template="(%s,%s)", page_size=len(errs))
+
+    for attempt in (1, 2):
+        try:
+            with conn.cursor() as cur:
+                _apply(cur)
+            conn.commit()
+            return len(oks), len(errs), conn
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
+            # Connection dropped (idle reap / network blip). Reconnect and retry once.
+            log.warning("DB connection lost (%r) — reconnecting (attempt %d/2) ...", exc, attempt)
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                conn = _connect(cfg)
+            except Exception as exc2:  # noqa: BLE001
+                log.error("Reconnect failed: %r — batch skipped (safe to re-run).", exc2)
+                return 0, 0, conn
+        except Exception as exc:  # noqa: BLE001 - a data error must never kill the shard
+            try:
+                conn.rollback()
+            except Exception:  # noqa: BLE001 - rollback on a dead conn would itself throw
+                pass
+            log.error("DB flush failed for a batch of %d (rolled back, skipped): %r",
+                      len(results), exc)
+            return 0, 0, conn
+
+    log.error("Batch of %d skipped after reconnect; rows stay pending (re-run to finish).",
+              len(results))
+    return 0, 0, conn
 
 
 def _run_supervisor(args, cfg, log) -> int:
@@ -237,16 +285,20 @@ def _run_supervisor(args, cfg, log) -> int:
 
     n = args.procs
     state = cfg.state_path
-    log.info("Fan-out: launching %d sharded workers (ideal: one per CPU core) ...", n)
+    # Each shard also spins up upload threads. With N shards that multiplies:
+    # N shards x WORKERS threads all hit the uplink at once and stall it. Keep
+    # per-shard threads small (just enough to overlap the 2 GCS uploads/image);
+    # decode parallelism comes from the shards, not the threads.
+    child_workers = args.workers or 3
+    log.info("Fan-out: launching %d sharded workers x %d upload-threads each ...", n, child_workers)
 
     fhs, procs = [], []
     for k in range(n):
         fh = open(state / f"derivatives.shard{k}.log", "a", encoding="utf-8")
         fhs.append(fh)
         cmd = [sys.executable, os.path.abspath(__file__),
-               "--shards", str(n), "--shard", str(k), "--batch", str(args.batch)]
-        if args.workers:
-            cmd += ["--workers", str(args.workers)]
+               "--shards", str(n), "--shard", str(k),
+               "--batch", str(args.batch), "--workers", str(child_workers)]
         if args.force:
             cmd.append("--force")
         p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=fh)
@@ -256,8 +308,7 @@ def _run_supervisor(args, cfg, log) -> int:
     # Aggregate progress by polling the DB while the children run.
     poll = None
     try:
-        import psycopg2
-        poll = psycopg2.connect(cfg.dsn())
+        poll = _connect(cfg)
         poll.autocommit = True
     except Exception:  # noqa: BLE001 - progress polling is best-effort
         poll = None
@@ -279,8 +330,12 @@ def _run_supervisor(args, cfg, log) -> int:
             eta = f"{(total - ready) / rate / 3600:.1f}h" if rate > 0 else "—"
             log.info("  progress: %d/%d ready  (%.1f img/s, ETA %s)", ready, total, rate, eta)
             last_ready, last_t = ready, now
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:  # noqa: BLE001 - reconnect so progress keeps updating
+            try:
+                poll = _connect(cfg)
+                poll.autocommit = True
+            except Exception:  # noqa: BLE001
+                poll = None
 
     rc = 0
     for k, p in enumerate(procs):
@@ -336,8 +391,7 @@ def main() -> int:
         log.error("Missing dependency: %r. pip install -r requirements.txt", exc)
         return 2
 
-    conn = psycopg2.connect(cfg.dsn())
-    conn.autocommit = False
+    conn = _connect(cfg)
     gcs = storage.Client()
     bucket = gcs.bucket(bucket_name)
     orig_bucket = gcs.bucket(cfg.gcs_bucket_originals) if cfg.gcs_bucket_originals else None
@@ -401,13 +455,13 @@ def main() -> int:
                 if not _STOP.is_set():
                     submit_next()
             if len(pending) >= db_batch:
-                o, f = _flush(conn, pending, bucket_name, log)
+                o, f, conn = _flush(conn, pending, bucket_name, cfg, log)
                 ok += o
                 failed += f
                 pending = []
 
     if pending:                                # final partial batch
-        o, f = _flush(conn, pending, bucket_name, log)
+        o, f, conn = _flush(conn, pending, bucket_name, cfg, log)
         ok += o
         failed += f
     bar.close()

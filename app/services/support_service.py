@@ -46,14 +46,27 @@ def _push_to_jira(
     enriched) attachment metadata to persist, or raises :class:`~app.integrations.
     jira_client.JiraError` on a create failure. No-op caller path handles the
     "not configured" case — this is only invoked when Jira is on."""
-    created = jira_client.create_issue(
-        project_key=ticket.project_key or settings.JIRA_PROJECT_KEY,
+    requested = ticket.issue_type or settings.JIRA_DEFAULT_ISSUE_TYPE
+    issue_type = settings.JIRA_ISSUE_TYPE_MAP.get(requested, requested)
+    project_key = ticket.project_key or settings.JIRA_PROJECT_KEY
+    kw = dict(
+        project_key=project_key,
         summary=ticket.summary,
-        issue_type=ticket.issue_type or settings.JIRA_DEFAULT_ISSUE_TYPE,
         priority=ticket.priority or settings.JIRA_DEFAULT_PRIORITY,
         description_adf=description_adf or _fallback_adf(ticket),
         reporter_account_id=settings.JIRA_REPORTER_ACCOUNT_ID,
     )
+    try:
+        created = jira_client.create_issue(issue_type=issue_type, **kw)
+    except jira_client.JiraError as exc:
+        # A project may not have the requested issue type — retry once with the
+        # configured default so the ticket is never lost to a bad type name.
+        fallback = settings.JIRA_DEFAULT_ISSUE_TYPE
+        if "issuetype" in exc.message.lower() and issue_type != fallback:
+            logger.warning("Issue type %r rejected; retrying as %r", issue_type, fallback)
+            created = jira_client.create_issue(issue_type=fallback, **kw)
+        else:
+            raise
     ticket.jira_issue_key = created["key"]
     ticket.jira_issue_url = created["url"] or jira_client.issue_browse_url(created["key"])
 

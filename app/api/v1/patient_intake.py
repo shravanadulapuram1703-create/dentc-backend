@@ -42,6 +42,16 @@ appt_router = APIRouter(prefix="/appointments", tags=["Appointments"],
     status_code=status.HTTP_201_CREATED,
     operation_id="register_patient",
     summary="Register a patient with responsible party, alerts, questionnaire, recalls and opening balance in one transaction (GAP-AP-13/15/18)",
+    responses={
+        409: {
+            "model": ErrorResponse,
+            "description": (
+                "A strong duplicate match exists (KAN-108). `error.details.candidates` "
+                "holds the matched patients; resubmit with `force_create: true` once "
+                "the user confirms this really is a new patient."
+            ),
+        },
+    },
 )
 def register_patient(db: DbSession, tenant_id: TenantId, current: CurrentUser, body: RegisterRequest):
     return svc.register_patient(db, tenant_id, body, user_id=current.id)
