@@ -221,6 +221,35 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
     "insert_class": [
         ("NONE", "None"), ("CL1", "Class I"), ("CL2", "Class II"), ("CL3", "Class III"),
     ],
+    # LTR-2: the Letters "Letter Group" dropdown. ``letter_templates.letter_type``
+    # is a bare single character with no lookup, so the FE hardcoded the eight
+    # group names. key1 = the stored code, description = the label Setup can edit.
+    "LETTERTYPE": [
+        ("A", "Appointment Letters"),
+        ("C", "Patient Consent"),
+        ("D", "Referral Letters"),
+        ("E", "Email Templates"),
+        ("F", "Financial / Collection"),
+        ("I", "Insurance & Treatment"),
+        ("M", "Marketing Letters"),
+        ("S", "Statements & Disclosures"),
+    ],
+    # LTR-9: ``letter_templates.channel`` is a delivery channel, not body text.
+    # Seeding the vocabulary gives the repair script (scripts/repair_letter_templates.py)
+    # something authoritative to validate migrated values against.
+    "letter_channel": [
+        ("L", "Letter (print)"), ("D", "Document"), ("E", "Email"), ("S", "SMS"),
+    ],
+    # LTR-10: the published patient_consents.status vocabulary. Mirrors
+    # app.services.patient_extra_service.CONSENT_STATUSES.
+    "consent_status": [
+        ("pending", "Pending"), ("printed", "Printed"), ("signed", "Signed"),
+        ("declined", "Declined"), ("voided", "Voided"),
+    ],
+    "consent_signature_method": [
+        ("drawn", "Signed on screen"), ("scanned", "Scanned wet signature"),
+        ("verbal", "Verbal consent"),
+    ],
     # OPP-5 / RPP-3: which disclosure text prints on the contract report.
     # `description` is the label; the printed body comes from the same row, so
     # replace these placeholders with the practice's approved wording.

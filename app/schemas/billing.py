@@ -24,15 +24,60 @@ class AllocatePaymentRequest(BaseModel):
     allocations: list[AllocationLine] = Field(..., min_length=1)
 
 
+# ── ADJ-1: split one adjustment across specific outstanding procedures ────────
+class AdjustmentAllocationLine(BaseModel):
+    procedure_id: str = Field(..., description="The outstanding procedure to write down")
+    amount: Decimal = Field(..., gt=0)
+    provider_id: str | None = None
+    alloc_date: date | None = None
+
+
+class AllocateAdjustmentRequest(BaseModel):
+    allocations: list[AdjustmentAllocationLine] = Field(..., min_length=1)
+    replace: bool = Field(
+        False,
+        description="Replace this adjustment's existing allocations instead of adding to them",
+    )
+
+
 class PaymentAllocationRead(ORMModel):
     id: int
     patient_id: int
     payment_id: str | None = None
+    adjustment_id: int | None = None
     procedure_id: str | None = None
     claim_id: str | None = None
+    provider_id: str | None = None
     amount: Decimal
     alloc_type: str | None = None
     alloc_date: date | None = None
+
+
+class PatientAdjustmentSummary(ORMModel):
+    id: int
+    patient_id: int
+    procedure_id: str | None = None
+    adjustment_date: date
+    amount: Decimal
+    adjustment_type: str | None = None
+    write_off_type: str | None = None
+    notes: str | None = None
+
+
+class ProcedureAllocationsSummary(ORMModel):
+    """CHG-5: what has already been applied to one procedure, and by what."""
+
+    procedure_id: str
+    patient_id: int
+    fee: Decimal
+    patient_estimate: Decimal
+    insurance_estimate: Decimal
+    paid_to_date: Decimal = Field(..., description="Patient payments allocated to the procedure")
+    insurance_paid_to_date: Decimal = Field(..., description="Carrier money posted to the procedure")
+    adjusted_to_date: Decimal = Field(..., description="Non-void adjustments applied")
+    remaining_amount: Decimal = Field(..., description="patient_estimate − paid − adjusted")
+    allocations: list[PaymentAllocationRead] = Field(default_factory=list)
+    adjustments: list[PatientAdjustmentSummary] = Field(default_factory=list)
 
 
 class ClaimRecalcResult(ORMModel):

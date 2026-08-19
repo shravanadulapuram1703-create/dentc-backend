@@ -42,9 +42,14 @@ def test_patient_document_upload_list_delete(client, patient):
     assert up.status_code == 201, up.text
     doc = up.json()
     assert doc["file_url"].endswith(".pdf") and "file_path" not in doc
-    assert len(client.get(f"/api/v1/patient-documents?patient_id={patient.id}").json()) == 1
+    # LTR-12: the list is now the standard paginated envelope, like every other list.
+    assert client.get(
+        f"/api/v1/patient-documents?patient_id={patient.id}"
+    ).json()["meta"]["total"] == 1
     assert client.delete(f"/api/v1/patient-documents/{doc['id']}").status_code == 204
-    assert len(client.get(f"/api/v1/patient-documents?patient_id={patient.id}").json()) == 0
+    assert client.get(
+        f"/api/v1/patient-documents?patient_id={patient.id}"
+    ).json()["meta"]["total"] == 0
 
 
 def test_claim_detail_and_status(client, patient, db_session):

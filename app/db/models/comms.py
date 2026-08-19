@@ -1,13 +1,14 @@
 """Communications domain models.
 
-sms_messages · letter_templates · postcard_templates
+sms_messages · letter_templates · postcard_templates ·
+letter_batch_runs · letter_batch_items
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin
@@ -56,3 +57,49 @@ class PostcardTemplate(Base, IntPKMixin, CreatedAtMixin):
     name: Mapped[str] = mapped_column(String(255))
     card_type: Mapped[str | None] = mapped_column(String(10))
     body: Mapped[str | None] = mapped_column(Text)
+
+
+class LetterBatchRun(Base, IntPKMixin, CreatedAtMixin):
+    """LTR-5: one server-side batch letter run (the ``CS001…CS009 - Batch Coll N``
+    templates are meaningless per-patient — they are meant to sweep a collections
+    queue), plus the durable job record the UI polls for a job id.
+
+    The run header holds the counters; per-patient outcomes live in
+    :class:`LetterBatchItem` so a 500-patient run doesn't become one giant JSON blob.
+    """
+
+    __tablename__ = "letter_batch_runs"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
+    template_id: Mapped[int] = mapped_column(Integer, ForeignKey("letter_templates.id"), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="queued")  # queued|running|completed|failed
+    requested: Mapped[int] = mapped_column(Integer, default=0)
+    processed: Mapped[int] = mapped_column(Integer, default=0)
+    succeeded: Mapped[int] = mapped_column(Integer, default=0)
+    failed: Mapped[int] = mapped_column(Integer, default=0)
+    options: Mapped[dict | None] = mapped_column(JSON)
+    error: Mapped[str | None] = mapped_column(Text)
+    finished_at: Mapped[datetime | None]
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class LetterBatchItem(Base, IntPKMixin, CreatedAtMixin):
+    """One patient's outcome inside a :class:`LetterBatchRun`.
+
+    ``rendered_html`` is only retained when the caller asks for it — a batch over
+    a collections queue is normally consumed as a single print stream, not as 500
+    stored bodies.
+    """
+
+    __tablename__ = "letter_batch_items"
+
+    batch_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("letter_batch_runs.id"), index=True
+    )
+    patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="rendered")  # rendered|skipped|failed
+    unresolved_tokens: Mapped[list | None] = mapped_column(JSON)
+    rendered_html: Mapped[str | None] = mapped_column(Text)
+    document_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patient_documents.id"))
+    error: Mapped[str | None] = mapped_column(Text)

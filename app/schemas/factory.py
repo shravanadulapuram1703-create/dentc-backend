@@ -15,12 +15,14 @@ Conventions:
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, create_model
 from sqlalchemy import JSON
 from sqlalchemy import inspect as sa_inspect
 
+from app.core.datetimes import UtcDatetime
 from app.schemas.common import ORMModel
 
 # Columns the API manages itself; never part of a client write payload.
@@ -34,9 +36,15 @@ def _py_type(col) -> type:  # noqa: ANN001
     if isinstance(col.type, JSON):
         return Any
     try:
-        return col.type.python_type
+        pytype = col.type.python_type
     except Exception:  # noqa: BLE001
         return str
+    # LTR-11: the columns are naive TIMESTAMPs holding UTC. Serialise them with an
+    # explicit offset so the browser stops reading them as local time (a letter
+    # printed 22:05 on the 18th was dated the 19th).
+    if pytype is datetime:
+        return UtcDatetime
+    return pytype
 
 
 def build_schemas(

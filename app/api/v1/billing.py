@@ -8,9 +8,11 @@ from fastapi import APIRouter, Depends, Path, Query
 
 from app.api.deps import DbSession, TenantId, get_current_user
 from app.schemas.billing import (
+    AllocateAdjustmentRequest,
     AllocatePaymentRequest,
     ClaimRecalcResult,
     PaymentAllocationRead,
+    ProcedureAllocationsSummary,
 )
 from app.schemas.common import ErrorResponse
 from app.schemas.transactions import (
@@ -47,6 +49,53 @@ def allocate_payment(
     body: AllocatePaymentRequest,
 ):
     return billing_service.allocate_payment(db, payment_id, body.allocations, tenant_id)
+
+
+# ── ADJ-1: split one adjustment across specific outstanding procedures ───────
+@router.post(
+    "/patient-adjustments/{adjustment_id}/allocate",
+    response_model=list[PaymentAllocationRead],
+    operation_id="allocate_adjustment",
+    summary="Split an adjustment across specific procedures (guards over-allocation) (ADJ-1)",
+)
+def allocate_adjustment(
+    db: DbSession,
+    tenant_id: TenantId,
+    adjustment_id: Annotated[int, Path()],
+    body: AllocateAdjustmentRequest,
+):
+    return billing_service.allocate_adjustment(
+        db, adjustment_id, body.allocations, tenant_id, replace=body.replace
+    )
+
+
+@router.get(
+    "/patient-adjustments/{adjustment_id}/allocations",
+    response_model=list[PaymentAllocationRead],
+    operation_id="list_adjustment_allocations",
+    summary="An adjustment's per-procedure split (ADJ-1)",
+)
+def list_adjustment_allocations(
+    db: DbSession,
+    tenant_id: TenantId,
+    adjustment_id: Annotated[int, Path()],
+):
+    return billing_service.list_adjustment_allocations(db, adjustment_id, tenant_id)
+
+
+# ── CHG-5: what has already been applied to one procedure ────────────────────
+@router.get(
+    "/patient-procedures/{procedure_id}/allocations-summary",
+    response_model=ProcedureAllocationsSummary,
+    operation_id="get_procedure_allocations_summary",
+    summary="Pat Paid / Pat Adj / Rem Amt for one procedure, with its sources (CHG-5)",
+)
+def procedure_allocations_summary(
+    db: DbSession,
+    tenant_id: TenantId,
+    procedure_id: Annotated[str, Path()],
+):
+    return billing_service.procedure_allocations_summary(db, procedure_id, tenant_id)
 
 
 @router.post(

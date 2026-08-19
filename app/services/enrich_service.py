@@ -76,6 +76,25 @@ def enrich_patient_provider(db: Session, items, tenant_id=None) -> None:  # noqa
         r.provider_name = providers.get(r.provider_id)
 
 
+def enrich_patient_procedure(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
+    """CHG-5: patient/provider names **plus** the per-procedure applied totals the
+    "Procedures To Post" grid needs (Pat Paid / Pat Adj / Rem Amt). Batched, so a
+    page costs a fixed handful of statements."""
+    from app.services.procedure_totals_service import ZERO, applied_totals
+
+    rows = list(items)
+    enrich_patient_provider(db, rows)
+    totals = applied_totals(db, [r.id for r in rows])
+    for r in rows:
+        applied = totals.get(r.id, {})
+        r.paid_to_date = applied.get("paid_to_date", ZERO)
+        r.insurance_paid_to_date = applied.get("insurance_paid_to_date", ZERO)
+        r.adjusted_to_date = applied.get("adjusted_to_date", ZERO)
+        r.remaining_amount = (
+            Decimal(r.patient_estimate or 0) - r.paid_to_date - r.adjusted_to_date
+        )
+
+
 def enrich_patient_carrier(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
     rows = list(items)
     patients = _patient_names(db, {r.patient_id for r in rows if getattr(r, "patient_id", None)})

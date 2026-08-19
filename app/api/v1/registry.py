@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from app.crud.base import CRUDBase
 from app.crud.router_factory import CrudConfig, register_crud
 from app.db import models as m
 from app.schemas.factory import build_schemas
@@ -20,11 +21,13 @@ from app.services.enrich_service import (
     enrich_ortho_plan,
     enrich_patient_carrier,
     enrich_patient_office,
+    enrich_patient_procedure,
     enrich_patient_provider,
     enrich_payment_plan,
     enrich_treatment_plan,
 )
 from app.services.payment_plan_service import PaymentPlanCRUD
+from app.services.provider_directory_service import ProviderCRUD
 from app.services.patient_service import PatientCRUD
 from app.services.perio_service import attach_actor_names
 from app.services.progress_notes_service import ProgressNoteCRUD, enrich_progress_notes
@@ -120,6 +123,7 @@ def _cfg(
     default_sort: str = "created_at",
     read_exclude: tuple[str, ...] = (),
     hide_soft_deleted: bool = False,
+    crud_class: type[CRUDBase] = CRUDBase,
 ) -> CrudConfig:
     create_s, update_s, read_s = build_schemas(model, name, read_exclude=read_exclude)
     return CrudConfig(
@@ -142,6 +146,7 @@ def _cfg(
         soft_delete_value=soft_value,
         default_sort=default_sort,
         hide_soft_deleted=hide_soft_deleted,
+        crud_class=crud_class,
     )
 
 
@@ -151,8 +156,12 @@ _ORG = [
          search=("name", "code"), filters=("is_active",)),
     _cfg(m.Office, "Office", "offices", "Organization", "office", "offices",
          search=("name", "office_code", "city"), filters=("is_active",)),
+    # PROV-1: ProviderCRUD widens ``?office_id=`` to the provider_offices join ∪ the
+    # legacy home-office scalar — a provider serves many offices, so the scalar
+    # alone returned an empty list for most offices.
     _cfg(m.Provider, "Provider", "providers", "Organization", "provider", "providers",
-         pk_type=str, search=("name", "specialty", "npi"), filters=("office_id", "is_active")),
+         pk_type=str, search=("name", "specialty", "npi"), filters=("office_id", "is_active"),
+         crud_class=ProviderCRUD),
     _cfg(m.Operatory, "Operatory", "operatories", "Organization", "operatory", "operatories",
          pk_type=str, search=("name",), filters=("office_id", "is_active")),
     _cfg(m.UserOffice, "UserOffice", "user-offices", "Organization", "user_office", "user_offices",
@@ -431,7 +440,7 @@ _CLINICAL = [
         filter_fields=("patient_id", "appointment_id", "provider_id", "procedure_code",
                        "claim_id", "office_id", "billing_status", "treatment_plan_id", "is_void"),
         range_fields=("date_of_service",), soft_delete_field="is_void", soft_delete_value=True,
-        default_sort="created_at", read_enrich=enrich_patient_provider,
+        default_sort="created_at", read_enrich=enrich_patient_procedure,
     ),
     # Server-side chart filters (REST capability §6): procedure_code / chart_as /
     # is_inactive / group_id / status so the chart can be queried by ADA code,
@@ -571,7 +580,8 @@ _BILLING = [
          filters=("patient_id", "claim_id", "procedure_id"), soft_field=None),
     _cfg(m.PaymentAllocation, "PaymentAllocation", "payment-allocations", "Billing",
          "payment_allocation", "payment_allocations",
-         filters=("patient_id", "payment_id", "procedure_id", "claim_id"), soft_field=None),
+         filters=("patient_id", "payment_id", "adjustment_id", "procedure_id", "claim_id"),
+         soft_field=None),
     # AL-3: plan_type discriminates Regular-Patient vs Ortho-Patient contracts.
     # PP-1: a DELETEd contract must not come back on the next page load.
     # PP-7/PP-8: PaymentPlanCRUD stamps created_by_id; the write schemas constrain

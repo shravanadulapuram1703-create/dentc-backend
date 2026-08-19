@@ -22,10 +22,16 @@ PatientPaymentCreate, PatientPaymentUpdate, _ = build_schemas(m.PatientPayment, 
 InsuranceClaimCreate, InsuranceClaimUpdate, _ = build_schemas(m.InsuranceClaim, "InsuranceClaim")
 TreatmentPlanCreate, TreatmentPlanUpdate, _ = build_schemas(m.TreatmentPlan, "TreatmentPlan")
 
+# CHG-5: the applied-money rollup behind the grid's Pat Paid / Pat Adj / Rem Amt
+# columns (previously always 0.00 because the read carried no running totals).
 _pp_base = build_schemas(m.PatientProcedure, "PatientProcedureFull")[2]
 PatientProcedureRead = create_model(
     "PatientProcedureRead", __base__=_pp_base,
     patient_name=(Optional[str], None), provider_name=(Optional[str], None),
+    paid_to_date=(Decimal, Decimal("0")),
+    insurance_paid_to_date=(Decimal, Decimal("0")),
+    adjusted_to_date=(Decimal, Decimal("0")),
+    remaining_amount=(Decimal, Decimal("0")),
 )
 
 _ppay_base = build_schemas(m.PatientPayment, "PatientPaymentFull")[2]

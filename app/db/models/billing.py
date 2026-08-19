@@ -129,8 +129,16 @@ class PaymentAllocation(Base, IntPKMixin, CreatedAtMixin):
 
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20))
-    procedure_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("patient_procedures.id"))
+    procedure_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("patient_procedures.id"), index=True
+    )
     payment_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("patient_payments.id"), index=True)
+    # ADJ-1: an allocation may originate from an adjustment instead of a payment —
+    # the same split-across-procedures mechanism, so it reuses this table. Exactly
+    # one of payment_id / adjustment_id is set.
+    adjustment_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("patient_adjustments.id"), index=True
+    )
     claim_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("insurance_claims.id"))
     ins_plan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_plans.id"))
     provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))

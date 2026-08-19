@@ -110,6 +110,9 @@ class Office(Base, IntPKMixin, TimestampMixin):
     office_code: Mapped[str] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(255))
     short_id: Mapped[str | None] = mapped_column(String(20))
+    # LTR-3: the corporate / DBA name printed by the #OFFICE_CNAME# merge field.
+    # 17 letter templates use it; without it they printed ``name`` twice.
+    corporate_name: Mapped[str | None] = mapped_column(String(255))
     address_line1: Mapped[str | None] = mapped_column(String(255))
     address_line2: Mapped[str | None] = mapped_column(String(255))
     city: Mapped[str | None] = mapped_column(String(100))
@@ -163,6 +166,17 @@ class Provider(Base, CreatedAtMixin):
     scheduler_color: Mapped[str | None] = mapped_column(String(20))  # hex
     is_ortho_provider: Mapped[bool] = mapped_column(Boolean, default=False)
     visible_in_appointnow: Mapped[bool] = mapped_column(Boolean, default=True)
+    # LTR-3: provider letterhead. 10 letter templates print the *provider's* own
+    # address/phone block (#PAT_PREF_PROV_Address# …); with no columns they fell
+    # back to the office block, i.e. the wrong address on a patient-facing letter.
+    # Still nullable — the merge falls back to the office when unset.
+    address_line1: Mapped[str | None] = mapped_column(String(255))
+    address_line2: Mapped[str | None] = mapped_column(String(255))
+    city: Mapped[str | None] = mapped_column(String(100))
+    state: Mapped[str | None] = mapped_column(String(50))
+    zip: Mapped[str | None] = mapped_column(String(20))
+    phone: Mapped[str | None] = mapped_column(String(20))
+    email: Mapped[str | None] = mapped_column(String(255))
     default_provider_time: Mapped[int | None] = mapped_column(Integer)  # minutes
     is_billing_provider: Mapped[bool] = mapped_column(Boolean, default=False)
     dosespot_user_id: Mapped[str | None] = mapped_column(String(100))

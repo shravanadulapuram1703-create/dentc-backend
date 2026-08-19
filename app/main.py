@@ -16,6 +16,7 @@ from fastapi.openapi.utils import get_openapi
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.datetimes import install_utc_json_encoder
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import get_logger, setup_logging
 from app.integrations import redis_store
@@ -41,6 +42,11 @@ async def lifespan(_: FastAPI):
 
 
 def create_app() -> FastAPI:
+    # LTR-11: naive UTC timestamps must reach the browser with an explicit offset.
+    # The generated Read schemas handle themselves (see app/schemas/factory.py);
+    # this covers the endpoints that return plain dicts.
+    install_utc_json_encoder()
+
     app = FastAPI(
         title=settings.APP_NAME,
         version="1.0.0",
