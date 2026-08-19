@@ -345,6 +345,28 @@ which had **no** backend at all:
   (ADJ-1), `procedure_codes.{anatomy,surface,material}_rules` JSON (CHG-2). CHG-3 ("All
   Medical" CPT codes) stays a data-seeding task (the category filter already works).
 
+**Transactions second pass** (ADJ-1 allocation, CHG-5 rollups, PROV-1/2 of
+[docs/transactions_backend_devreport.md](docs/transactions_backend_devreport.md) /
+[response](transactions/transactions_backend_response_2.md); Alembic `d8e9f0a1b2c3`):
+- **PROV-1** a provider is multi-office, so `GET /providers?office_id=` now matches the
+  **union** of `provider_offices` and the legacy `providers.office_id` home scalar —
+  `ProviderCRUD` in [app/services/provider_directory_service.py](app/services/provider_directory_service.py),
+  on the engine's new `CRUDBase.custom_filter_fields`/`_extra_list_clauses()` seam (a
+  declared filter the subclass resolves itself). `GET /offices/{id}/providers/effective`
+  returns that union; `GET/PUT …/providers` stays the assignment grid (GET mirrors PUT).
+  `scripts/backfill_provider_offices.py` reconstructs the unseeded join from the home
+  scalar + where the provider actually produced/was scheduled.
+- **ADJ-1** an adjustment splits across procedures through the *same* table as a payment:
+  `payment_allocations.adjustment_id` + `POST /patient-adjustments/{id}/allocate`
+  (over-allocation/foreign-procedure/void guards, `replace` re-issues the split).
+- **CHG-5** `PatientProcedureRead` carries `paid_to_date`/`insurance_paid_to_date`/
+  `adjusted_to_date`/`remaining_amount` ([app/services/procedure_totals_service.py](app/services/procedure_totals_service.py)
+  via the `enrich_patient_procedure` hook — an adjustment counts through its split *or*
+  its scalar `procedure_id`, never both), plus
+  `GET /patient-procedures/{id}/allocations-summary`. **PROV-2** was a stale `openapi.json`
+  (regenerated). CHG-3 keeps its data-task status; `scripts/seed_medical_codes.py` loads a
+  practice-supplied CSV (CPT is AMA-licensed, so no list is bundled).
+
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))
   records authenticated 2xx mutations (POST/PUT/PATCH/DELETE) to `audit_logs` via

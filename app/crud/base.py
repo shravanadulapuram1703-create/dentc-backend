@@ -21,6 +21,11 @@ ModelT = TypeVar("ModelT", bound=Base)
 
 
 class CRUDBase(Generic[ModelT]):
+    #: Filter fields this class resolves itself in :meth:`_extra_list_clauses`
+    #: instead of plain ``column == value`` (e.g. a filter that must span a join
+    #: table). Declared by subclasses; the generic equality pass skips them.
+    custom_filter_fields: tuple[str, ...] = ()
+
     def __init__(
         self,
         model: type[ModelT],
@@ -106,8 +111,16 @@ class CRUDBase(Generic[ModelT]):
 
         # equality filters on whitelisted columns
         for field, value in (filters or {}).items():
-            if value is not None and hasattr(self.model, field):
+            if (
+                value is not None
+                and field not in self.custom_filter_fields
+                and hasattr(self.model, field)
+            ):
                 stmt = stmt.where(getattr(self.model, field) == value)
+
+        # subclass-resolved filters (a filter that is not a plain column compare)
+        for clause in self._extra_list_clauses(filters or {}):
+            stmt = stmt.where(clause)
 
         # PP-1: a soft-deleted row must not come back on the next page load. Only
         # applied when the caller did not ask about the soft-delete column itself,
@@ -158,6 +171,10 @@ class CRUDBase(Generic[ModelT]):
 
         items = list(db.execute(stmt).scalars().all())
         return items, total
+
+    def _extra_list_clauses(self, filters: dict[str, Any]) -> list:  # noqa: ARG002
+        """WHERE clauses for :attr:`custom_filter_fields`. Overridden by subclasses."""
+        return []
 
     # ── writes ───────────────────────────────────────────────────────────
     def create(

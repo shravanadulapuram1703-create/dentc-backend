@@ -1,6 +1,8 @@
 """Billing business logic that exceeds plain CRUD.
 
 - Allocating a payment across procedures/claims with an over-allocation guard.
+- Splitting an adjustment the same way (ADJ-1) and reporting what has already
+  been applied to a procedure (CHG-5).
 - Recalculating a claim's billed/estimate totals from its linked procedures.
 
 Tables ``patient_payments`` / ``insurance_claims`` carry no ``tenant_id`` column;
@@ -12,6 +14,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -28,6 +31,7 @@ from app.db.models import (
     InsurancePlan,
     LedgerInsuranceDetail,
     Patient,
+    PatientAdjustment,
     PatientInsurance,
     PatientPayment,
     PatientProcedure,
@@ -35,7 +39,8 @@ from app.db.models import (
     ProcedureCode,
 )
 from app.integrations import redis_store
-from app.schemas.billing import AllocationLine
+from app.schemas.billing import AdjustmentAllocationLine, AllocationLine
+from app.services import procedure_totals_service
 from app.services.user_admin_service import resolve_user_names
 
 
@@ -88,6 +93,110 @@ def allocate_payment(
     for alloc in created:
         db.refresh(alloc)
     return created
+
+
+# ── ADJ-1: split one adjustment across specific outstanding procedures ────────
+def allocate_adjustment(
+    db: Session,
+    adjustment_id: int,
+    lines: list[AdjustmentAllocationLine],
+    tenant_id: int,
+    *,
+    replace: bool = False,
+) -> list[PaymentAllocation]:
+    """Write one adjustment down against named procedures.
+
+    Mirrors :func:`allocate_payment` — same table, same over-allocation guard —
+    because an adjustment splits exactly the way a payment does. ``replace``
+    re-issues the split (the grid edits the whole set at once); otherwise the
+    lines are added to whatever is already allocated.
+    """
+    adjustment = db.get(PatientAdjustment, adjustment_id)
+    if adjustment is None:
+        raise NotFoundError(f"PatientAdjustment '{adjustment_id}' was not found")
+    if adjustment.tenant_id != tenant_id:
+        raise NotFoundError(f"PatientAdjustment '{adjustment_id}' was not found")
+    if adjustment.is_void:
+        raise ValidationError("A voided adjustment cannot be allocated", code="adjustment_void")
+
+    if replace:
+        db.execute(
+            sa_delete(PaymentAllocation).where(PaymentAllocation.adjustment_id == adjustment_id)
+        )
+        db.flush()
+
+    already = Decimal(db.execute(
+        select(func.coalesce(func.sum(PaymentAllocation.amount), 0)).where(
+            PaymentAllocation.adjustment_id == adjustment_id
+        )
+    ).scalar_one())
+    requested = sum((line.amount for line in lines), Decimal("0"))
+    if already + requested > Decimal(adjustment.amount):
+        raise ValidationError(
+            "Allocations exceed the adjustment amount",
+            details={
+                "adjustment_amount": str(adjustment.amount),
+                "already_allocated": str(already),
+                "requested": str(requested),
+            },
+        )
+
+    procedure_ids = [line.procedure_id for line in lines]
+    owned = {
+        pid for (pid,) in db.execute(
+            select(PatientProcedure.id).where(
+                PatientProcedure.id.in_(procedure_ids),
+                PatientProcedure.patient_id == adjustment.patient_id,
+            )
+        ).all()
+    }
+    missing = [pid for pid in procedure_ids if pid not in owned]
+    if missing:
+        raise ValidationError(
+            "Allocation targets a procedure that does not belong to this patient",
+            details={"procedure_ids": missing},
+        )
+
+    created: list[PaymentAllocation] = []
+    for line in lines:
+        alloc = PaymentAllocation(
+            patient_id=adjustment.patient_id,
+            adjustment_id=adjustment_id,
+            procedure_id=line.procedure_id,
+            provider_id=line.provider_id or adjustment.provider_id,
+            amount=line.amount,
+            alloc_type="ADJ",
+            alloc_date=line.alloc_date or adjustment.adjustment_date,
+        )
+        db.add(alloc)
+        created.append(alloc)
+    db.commit()
+    for alloc in created:
+        db.refresh(alloc)
+    redis_store.cache_delete(f"balance:{tenant_id}:{adjustment.patient_id}")
+    return created
+
+
+def list_adjustment_allocations(
+    db: Session, adjustment_id: int, tenant_id: int
+) -> list[PaymentAllocation]:
+    adjustment = db.get(PatientAdjustment, adjustment_id)
+    if adjustment is None or adjustment.tenant_id != tenant_id:
+        raise NotFoundError(f"PatientAdjustment '{adjustment_id}' was not found")
+    return list(db.execute(
+        select(PaymentAllocation)
+        .where(PaymentAllocation.adjustment_id == adjustment_id)
+        .order_by(PaymentAllocation.id.asc())
+    ).scalars().all())
+
+
+# ── CHG-5: what has already been applied to one procedure ─────────────────────
+def procedure_allocations_summary(db: Session, procedure_id: str, tenant_id: int) -> dict:
+    procedure = db.get(PatientProcedure, procedure_id)
+    if procedure is None:
+        raise NotFoundError(f"PatientProcedure '{procedure_id}' was not found")
+    _assert_patient_in_tenant(db, procedure.patient_id, tenant_id)
+    return procedure_totals_service.allocations_summary(db, procedure)
 
 
 def recalculate_claim(db: Session, claim_id: str, tenant_id: int) -> dict:

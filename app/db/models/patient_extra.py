@@ -54,7 +54,9 @@ class PatientAdjustment(Base, IntPKMixin, CreatedAtMixin):
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
     office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
     provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
-    procedure_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("patient_procedures.id"))
+    procedure_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("patient_procedures.id"), index=True
+    )
     adjustment_date: Mapped[date] = mapped_column()
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     adjustment_type: Mapped[str | None] = mapped_column(String(50))  # code from definitions 'adjustment'

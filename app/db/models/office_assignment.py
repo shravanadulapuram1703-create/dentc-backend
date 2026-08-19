@@ -72,7 +72,9 @@ class ProviderOffice(Base, IntPKMixin, CreatedAtMixin):
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     office_id: Mapped[int] = mapped_column(Integer, ForeignKey("offices.id"), index=True)
-    provider_id: Mapped[str] = mapped_column(String(50), ForeignKey("providers.id"))
+    # PROV-1: read from the provider direction too — `GET /providers?office_id=`
+    # unions this assignment with the legacy `providers.office_id` home scalar.
+    provider_id: Mapped[str] = mapped_column(String(50), ForeignKey("providers.id"), index=True)
 
 
 class OfficeNoteMacro(Base, IntPKMixin, CreatedAtMixin):

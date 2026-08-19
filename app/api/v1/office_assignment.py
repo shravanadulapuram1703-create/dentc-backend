@@ -10,7 +10,7 @@ parameter annotations must resolve to real classes for FastAPI.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Query
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
 from app.db.models import (
@@ -44,7 +44,7 @@ from app.schemas.office_assignment import (
     StrIdAssignmentSet,
 )
 from app.services import office_assignment_service as svc
-from app.services import office_setup_service
+from app.services import office_setup_service, provider_directory_service
 
 router = APIRouter(
     prefix="/offices",
@@ -95,6 +95,29 @@ _RESOURCES = [
 
 for _cfg in _RESOURCES:
     _register(*_cfg)
+
+
+# ── PROV-1: the *effective* provider set for an office ───────────────────────
+# ``GET /{office_id}/providers`` above is the assignment grid — it returns exactly
+# what its PUT replaces, so it stays untouched. Every screen that only wants "who
+# can I pick for this office" needs the union with the legacy ``providers.office_id``
+# home scalar, because the assignment table is not backfilled everywhere yet
+# (``scripts/backfill_provider_offices.py`` closes that on real data).
+@router.get(
+    "/{office_id}/providers/effective",
+    response_model=list[AssignedProviderRead],
+    operation_id="list_office_effective_providers",
+    summary="Providers serving an office: assigned ∪ home office (PROV-1)",
+)
+def list_office_effective_providers(
+    db: DbSession,
+    office_id: OfficeScope,
+    tenant_id: TenantId,
+    include_inactive: Annotated[bool, Query()] = False,
+):
+    return provider_directory_service.effective_office_providers(
+        db, office_id, tenant_id, include_inactive=include_inactive
+    )
 
 
 # ── Users (#27) — denormalized read, bulk set, copy-from ─────────────────────
