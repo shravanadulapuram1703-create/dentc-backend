@@ -21,10 +21,36 @@ naive one is *labelled* UTC rather than shifted.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Annotated
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import PlainSerializer
+
+#: Used when an office has no timezone set, or has an unparseable one.
+DEFAULT_TIMEZONE = "America/New_York"
+
+
+def office_tz(tz_name: str | None) -> ZoneInfo:
+    """Resolve an ``offices.timezone`` string, never raising.
+
+    A bad tz string on one office row must not 500 a letter render, so an
+    unknown zone degrades to :data:`DEFAULT_TIMEZONE` rather than propagating.
+    """
+    try:
+        return ZoneInfo(tz_name or DEFAULT_TIMEZONE)
+    except (ZoneInfoNotFoundError, ValueError, KeyError):
+        return ZoneInfo(DEFAULT_TIMEZONE)
+
+
+def office_today(tz_name: str | None) -> date:
+    """Today's date *where the office is* (LTR-14).
+
+    Every US practice is UTC-negative, so ``datetime.now(timezone.utc).date()``
+    is tomorrow's date for roughly the last fifth of the working day — which
+    dates an evening-signed consent form a day late.
+    """
+    return datetime.now(office_tz(tz_name)).date()
 
 
 def as_utc(value: datetime | None) -> datetime | None:
@@ -58,4 +84,12 @@ def install_utc_json_encoder() -> None:
     ENCODERS_BY_TYPE[datetime] = lambda value: isoformat_utc(value)
 
 
-__all__ = ["UtcDatetime", "as_utc", "install_utc_json_encoder", "isoformat_utc"]
+__all__ = [
+    "DEFAULT_TIMEZONE",
+    "UtcDatetime",
+    "as_utc",
+    "install_utc_json_encoder",
+    "isoformat_utc",
+    "office_today",
+    "office_tz",
+]

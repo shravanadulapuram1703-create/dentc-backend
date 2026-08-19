@@ -1,0 +1,16 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\Sravan\\Desktop\\dentc-backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [6236] using WatchFiles
+INFO:     Started server process [6376]
+INFO:     Waiting for application startup.
+2026-08-19 04:22:53,290 | INFO    | app | req=- user=- tenant=- | Starting Reckon Dental Backend (env=dev)
+2026-08-19 04:22:55,307 | WARNING | app.integrations.redis_pubsub | req=- user=- tenant=- | Messaging fan-out: Redis unavailable (Timeout connecting to server) — falling back to in-process delivery. Real-time events will NOT cross workers.
+INFO:     Application startup complete.
+2026-08-19 04:23:18,361 | WARNING | app.request | req=601790c8405240148d15e4ff225eb306 user=- tenant=- | GET /api/v1/openapi.json -> 200 (21.592s)
+2026-08-19 04:23:18,467 | INFO    | app.request | req=b74c674c017f4f8893ab8b17f2cb5d0e user=- tenant=- | GET /api/v1/openapi.json -> 200 (0.104s)
+2026-08-19 04:23:18,950 | INFO    | app.request | req=b56411adfdc34f36bea6223bc6289798 user=- tenant=- | GET /api/v1/openapi.json -> 200 (0.108s)
+2026-08-19 04:23:27,519 | INFO    | app.request | req=53d20121b7144cbb8f81fbd5f3bed390 user=- tenant=- | GET /api/v1/openapi.json -> 200 (0.096s)
+2026-08-19 04:24:11,396 | WARNING | app.integrations.redis_store | req=edb3d5a05d0f4a20926027cab366ad50 user=- tenant=- | Redis unavailable, token store degraded: Timeout connecting to server
+2026-08-19 04:24:12,993 | WARNING | app.request | req=edb3d5a05d0f4a20926027cab366ad50 user=- tenant=- | GET /api/v1/patients/83867/letter-context -> 200 (22.449s)
+2026-08-19 04:24:21,412 | INFO    | app.request | req=d84bd72b259a4c669e86e8a992e13cfb user=- tenant=- | POST /api/v1/letters/render -> 200 (0.458s)
+2026-08-19 04:28:42,336 | INFO    | app.request | req=2c76ca29810f4309aa30f54fff7f5eb1 user=- tenant=- | GET /api/v1/openapi.json -> 200 (0.094s)

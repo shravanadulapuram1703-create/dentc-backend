@@ -367,6 +367,75 @@ which had **no** backend at all:
   (regenerated). CHG-3 keeps its data-task status; `scripts/seed_medical_codes.py` loads a
   practice-supplied CSV (CPT is AMA-licensed, so no list is bundled).
 
+**Letters module** (print menu → Letters dialog → Report Viewer; LTR-1…12 of
+[docs/letters/letters_backend_devreport.md](docs/letters/letters_backend_devreport.md)
+/ [response](docs/letters/letters_backend_response.md); Alembic `e9f0a1b2c3d4`).
+The catalog (153 seeded `letter_templates`) and the consent/document stores already
+existed; what was missing was the *engine*:
+- **Server-side merge** ([app/services/letter_service.py](app/services/letter_service.py)
+  + [app/api/v1/letters.py](app/api/v1/letters.py), LTR-5). `MERGE_FIELDS` is exactly
+  the **56 `#TOKEN#`s** that appear across the seeded corpus (extracted from
+  `body_html`, so it cannot drift from the templates). `POST /letters/render` merges
+  one template for one patient — values are **HTML-escaped**, the body goes through
+  `sanitize_html`, an unresolvable token prints **blank** and is reported in
+  `unresolved_tokens` (never a visible `#TOKEN#`), and the expensive balance aggregate
+  runs only when the body actually contains `#RP_TOTAL_BAL#`. `POST /letters/render-batch`
+  makes the `CS001…CS009 - Batch Coll N` sweeps possible at all — a durable job over
+  `letter_batch_runs`/`letter_batch_items`, run inline, one bad patient records a
+  `failed` item instead of killing the sweep.
+- **`GET /patients/{id}/letter-context`** (LTR-6) collapses the dialog's 2–6 round
+  trips; `include_balance` is opt-in because that call was ~28 s cold.
+- **LTR-1 object storage**: [app/services/document_store.py](app/services/document_store.py)
+  routes `document_type=consent-form` to
+  `gs://{GCS_BUCKET_DOCUMENTS}/consent-forms/{tenant}/{patient}/{uuid}.pdf` (local disk
+  when the bucket is unset, so dev/tests need no creds), records
+  `storage_backend`/`storage_bucket`/`storage_path` on the row, and returns `file_url`
+  as a **signed URL or the `/patient-documents/{id}/content` proxy** — never `gs://`.
+  `GET /consent-forms` lists the bucket's blank masters.
+- **LTR-3** the merge blocks that had no source: `providers.address_*/city/state/zip/
+  phone/email`, `offices.corporate_name`, `account_settings.marketing_*` — each with a
+  documented fallback chain (provider→office, marketing→corporate→office).
+  **LTR-4** `#TX_PLAN_TH_NUMBER#` binds only when `treatment_plan_id` is passed.
+  **LTR-7** `GET /offices/{id}/letter-templates/effective` pins the semantic
+  **unassigned = all** (the plain assignment grid stays as-is).
+  **LTR-10** `POST /patient-consents/{id}/sign` + the published `consent_status`
+  vocabulary. **LTR-12** `/patient-documents` gains `document_type`/`office_id`/`search`
+  and the standard paginated envelope (**breaking**: was a bare array).
+- **LTR-11 is API-wide**: naive UTC `TIMESTAMP`s now serialise with an offset via
+  [app/core/datetimes.py](app/core/datetimes.py) — `UtcDatetime` in the schema factory
+  plus a `jsonable_encoder` patch for the dict-returning endpoints. OpenAPI is
+  unchanged (`format: date-time`), so Orval needs no change.
+- **Round 2 (LTR-13..16)**: the appointment merge block means *the appointment this
+  letter is about* — `#APPT_PRDR#`/`#APPT_DATE#`/`#APPT_DATETIME#` resolve
+  next appointment -> last appointment -> preferred provider, because a consent form is
+  printed at the chair (no upcoming appointment) and was rendering `Dr. ___` on a
+  signed legal document; `last_appointment_provider` is on the context payload.
+  `#TODAY_DATE#` is computed in the **printing office's** timezone via
+  `office_today()` in [app/core/datetimes.py](app/core/datetimes.py) (AppointNow's
+  `_office_tz` now delegates to the same helper) — a UTC date post-dated evening
+  consents. `/letters/render(-batch)` accept `overrides: {token: value}` +
+  `signing_provider_id` (which re-points only `#APPT_PRDR#`/`#DOC_LAST_NAME#`, never
+  the letterhead), reporting `applied_overrides`/`rejected_overrides`; unknown keys
+  are rejected, values still HTML-escaped. The catalog is now **57** = the 56 corpus
+  tokens + `APPT_DATETIME` (a deliberate FE-requested extension;
+  `tests/test_letters_module.py::CORPUS_TOKENS` pins the distinction).
+  **LTR-17**: `/letters/render` + `/letter-context` report `appointment_source`
+  (`next|last|null`) and `appointment_provider_source` (`next|last|preferred|null`)
+  plus a `fallback_tokens` `{token: tier}` map listing only *degraded* resolutions —
+  a three-tier chain can name a provider unconnected to the visit, and "caught at the
+  chair" only works if the chair can see it. A caller-overridden token is never listed;
+  render filters the map to tokens the template actually uses.
+  LTR-16: the GCS paths are covered by
+  [tests/test_document_storage.py](tests/test_document_storage.py) against a fake
+  client, and `scripts/check_document_storage.py` probes a **real** bucket in one
+  command — but no deployed bucket run has happened yet.
+- **LTR-8/9 are data tasks with tooling, not applied**:
+  `scripts/repair_letter_templates.py` (dry-run by default) repairs the `?` mojibake
+  under three narrow contextual rules — the loss is **upstream** (the corpus holds zero
+  non-ASCII bytes, so re-running the migration cannot recover it). The `channel`
+  pollution is a **field-offset** bug in the migration reader (embedded commas in the
+  HTML `BODY`); those 11 `Financial Agreement` bodies are truncated and need re-import.
+
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))
   records authenticated 2xx mutations (POST/PUT/PATCH/DELETE) to `audit_logs` via

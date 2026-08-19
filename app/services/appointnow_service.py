@@ -24,12 +24,13 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime, time, timedelta
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.datetimes import office_tz as office_timezone
 from app.core.exceptions import (
     ConflictError,
     ForbiddenError,
@@ -94,10 +95,9 @@ def _parse_date(value: str) -> date:
 
 
 def _office_tz(office: Office) -> ZoneInfo:
-    try:
-        return ZoneInfo(office.timezone or "America/New_York")
-    except (ZoneInfoNotFoundError, ValueError, KeyError):
-        return ZoneInfo("America/New_York")
+    # Shared with the Letters merge (LTR-14) — one definition of "the office's
+    # clock", so availability and #TODAY_DATE# can never disagree.
+    return office_timezone(office.timezone)
 
 
 def _office_now(office: Office) -> datetime:

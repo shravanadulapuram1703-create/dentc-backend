@@ -63,6 +63,7 @@ def render_letter(db: DbSession, tenant_id: TenantId, body: LetterRenderRequest)
         db, tenant_id,
         template_id=body.template_id, patient_id=body.patient_id,
         office_id=body.office_id, treatment_plan_id=body.treatment_plan_id,
+        signing_provider_id=body.signing_provider_id, overrides=body.overrides,
     )
 
 
@@ -78,7 +79,9 @@ def render_letter_batch(
     run = svc.run_batch(
         db, tenant_id,
         template_id=body.template_id, patient_ids=body.patient_ids,
-        office_id=body.office_id, store_html=body.store_html, user_id=current.id,
+        office_id=body.office_id, store_html=body.store_html,
+        signing_provider_id=body.signing_provider_id, overrides=body.overrides,
+        user_id=current.id,
     )
     _run, items = svc.get_batch(db, tenant_id, run.id)
     return {"batch": run, "items": items}
@@ -134,10 +137,14 @@ def get_letter_context(
         include_balance=include_balance,
     )
     values = svc.resolve_merge_fields(ctx)
+    sources = svc.appointment_sources(ctx)
     return {
         **ctx,
+        **sources,
         "merge_fields": values,
         "unresolved_tokens": sorted(k for k, v in values.items() if not v),
+        # LTR-17: tokens answered by a degraded tier of the fallback chain.
+        "fallback_tokens": svc.fallback_tokens(sources),
     }
 
 

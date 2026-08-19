@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, DbSession, PageParams, TenantId, get_current_user
 from app.schemas.common import ErrorResponse, PaginatedResponse
+from app.schemas.letters import ConsentSignRequest
 from app.schemas.patient_extra import (
     ClaimAttachmentRead,
     ClaimDetailResponse,
@@ -20,7 +21,6 @@ from app.schemas.patient_extra import (
     PatientConsentSignedRead,
     PatientDocumentRead,
 )
-from app.schemas.letters import ConsentSignRequest
 from app.services import patient_extra_service as svc
 
 _auth = [Depends(get_current_user)]
