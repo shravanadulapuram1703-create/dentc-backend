@@ -97,7 +97,7 @@ def _diff_snippets(before: str, after: str, limit: int = 8) -> list[tuple[str, s
     ``after``.
     """
     out: list[tuple[str, str]] = []
-    for i, (a, b) in enumerate(zip(before, after)):
+    for i, (a, b) in enumerate(zip(before, after, strict=False)):
         if a == b:
             continue
         lo, hi = max(0, i - 24), min(len(before), i + 24)

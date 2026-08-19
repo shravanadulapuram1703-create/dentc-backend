@@ -3828,7 +3828,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PaymentAllocationRead"
+                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
                   },
                   "title": "Response Allocate Payment"
                 }
@@ -3925,7 +3925,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PaymentAllocationRead"
+                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
                   },
                   "title": "Response Allocate Adjustment"
                 }
@@ -4012,7 +4012,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PaymentAllocationRead"
+                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
                   },
                   "title": "Response List Adjustment Allocations"
                 }
@@ -5261,7 +5261,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FeeScheduleOption"
+                    "$ref": "#/components/schemas/app__schemas__procedure_setup__FeeScheduleOption"
                   },
                   "title": "Response List Fee Schedule Options"
                 }
@@ -13419,7 +13419,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScheduleReplace"
+                "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleReplace"
               }
             }
           }
@@ -16699,7 +16699,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__schemas__provider_setup__ScheduleReplace"
+                "$ref": "#/components/schemas/ScheduleReplace"
               }
             }
           }
@@ -61428,7 +61428,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+                  "$ref": "#/components/schemas/PaymentAllocationRead"
                 }
               }
             }
@@ -61523,7 +61523,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+                  "$ref": "#/components/schemas/PaymentAllocationRead"
                 }
               }
             }
@@ -61626,7 +61626,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+                  "$ref": "#/components/schemas/PaymentAllocationRead"
                 }
               }
             }
@@ -100850,17 +100850,6 @@
           "name": {
             "type": "string",
             "title": "Name"
-          },
-          "fee_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fee Type"
           }
         },
         "type": "object",
@@ -108583,6 +108572,24 @@
             ],
             "title": "Office Id"
           },
+          "signing_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signing Provider Id"
+          },
+          "overrides": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Overrides"
+          },
           "store_html": {
             "type": "boolean",
             "title": "Store Html",
@@ -110040,6 +110047,16 @@
               }
             ]
           },
+          "last_appointment_provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LetterContextProviderRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "treatment_plan": {
             "anyOf": [
               {
@@ -110073,7 +110090,22 @@
           "today": {
             "type": "string",
             "format": "date",
-            "title": "Today"
+            "title": "Today",
+            "description": "Today in the printing office's timezone (LTR-14)"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone",
+            "examples": [
+              "America/New_York"
+            ]
           },
           "merge_fields": {
             "additionalProperties": {
@@ -110090,6 +110122,49 @@
             "type": "array",
             "title": "Unresolved Tokens",
             "description": "Catalog tokens with no value in this context"
+          },
+          "appointment_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Source",
+            "description": "Which appointment fed #APPT_DATE#/#APPT_DATETIME#: 'next' (upcoming), 'last' (most recent past), or null (none on file)",
+            "examples": [
+              "last"
+            ]
+          },
+          "appointment_provider_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Provider Source",
+            "description": "Which tier fed #APPT_PRDR#: 'next', 'last', 'preferred' (the patient's preferred provider \u2014 no appointment on file), or null",
+            "examples": [
+              "preferred"
+            ]
+          },
+          "fallback_tokens": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Fallback Tokens",
+            "description": "{token: tier} for tokens answered by a *degraded* tier. Empty when everything resolved from the upcoming appointment. A token the caller overrode is never listed.",
+            "examples": [
+              {
+                "APPT_PRDR": "preferred"
+              }
+            ]
           }
         },
         "type": "object",
@@ -110593,6 +110668,31 @@
             ],
             "title": "Treatment Plan Id",
             "description": "Binds #TX_PLAN_TH_NUMBER# (LTR-4). Without it the token prints blank."
+          },
+          "signing_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signing Provider Id",
+            "description": "The doctor named in the body \u2014 re-points #APPT_PRDR# and #DOC_LAST_NAME#. The letterhead block is left alone; move it with `overrides` if you need to."
+          },
+          "overrides": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Overrides",
+            "description": "Per-token replacements, e.g. {\"APPT_PRDR\": \"Dr. Arjun\"}. Keys must be catalog tokens; unknown keys come back in `rejected_overrides` rather than being silently accepted. Values are HTML-escaped on substitution like every other value.",
+            "examples": [
+              {
+                "APPT_PRDR": "Dr. Arjun Mehta"
+              }
+            ]
           }
         },
         "type": "object",
@@ -110654,6 +110754,90 @@
             "type": "array",
             "title": "Unknown Tokens",
             "description": "#TOKEN#s in the body that are not in the merge catalog at all"
+          },
+          "applied_overrides": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Applied Overrides",
+            "description": "Tokens whose value came from the caller (LTR-15)"
+          },
+          "rejected_overrides": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rejected Overrides",
+            "description": "Override keys that are not catalog tokens and were ignored"
+          },
+          "appointment_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Source",
+            "description": "Which appointment fed #APPT_DATE#/#APPT_DATETIME#: 'next' (upcoming), 'last' (most recent past), or null (none on file)",
+            "examples": [
+              "last"
+            ]
+          },
+          "appointment_provider_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Provider Source",
+            "description": "Which tier fed #APPT_PRDR#: 'next', 'last', 'preferred' (the patient's preferred provider \u2014 no appointment on file), or null",
+            "examples": [
+              "preferred"
+            ]
+          },
+          "fallback_tokens": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Fallback Tokens",
+            "description": "{token: tier} for tokens answered by a *degraded* tier. Empty when everything resolved from the upcoming appointment. A token the caller overrode is never listed.",
+            "examples": [
+              {
+                "APPT_PRDR": "preferred"
+              }
+            ]
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone",
+            "description": "The office clock #TODAY_DATE# was computed in (LTR-14)"
+          },
+          "today": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Today",
+            "description": "That office's current date"
           }
         },
         "type": "object",
@@ -113470,7 +113654,7 @@
           },
           "fee_schedules": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__FeeScheduleOption"
+              "$ref": "#/components/schemas/FeeScheduleOption"
             },
             "type": "array",
             "title": "Fee Schedules"
@@ -118835,7 +119019,7 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+              "$ref": "#/components/schemas/PaymentAllocationRead"
             },
             "type": "array",
             "title": "Items"
@@ -130435,13 +130619,31 @@
       },
       "PaymentAllocationRead": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
+          },
+          "legacy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Id"
+          },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -130465,17 +130667,6 @@
             ],
             "title": "Adjustment Id"
           },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
-          },
           "claim_id": {
             "anyOf": [
               {
@@ -130487,6 +130678,17 @@
             ],
             "title": "Claim Id"
           },
+          "ins_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ins Plan Id"
+          },
           "provider_id": {
             "anyOf": [
               {
@@ -130497,6 +130699,18 @@
               }
             ],
             "title": "Provider Id"
+          },
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -130514,24 +130728,22 @@
             ],
             "title": "Alloc Type"
           },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
           }
         },
         "type": "object",
         "required": [
-          "id",
           "patient_id",
-          "amount"
+          "amount",
+          "id",
+          "created_at"
         ],
         "title": "PaymentAllocationRead"
       },
@@ -136570,7 +136782,7 @@
           },
           "allocations": {
             "items": {
-              "$ref": "#/components/schemas/PaymentAllocationRead"
+              "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
             },
             "type": "array",
             "title": "Allocations"
@@ -145597,30 +145809,6 @@
               }
             ],
             "title": "Lunch End"
-          },
-          "effective_from": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Effective From"
-          },
-          "office_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Office Id",
-            "description": "NULL = applies to every office"
           }
         },
         "type": "object",
@@ -145633,18 +145821,14 @@
         "properties": {
           "days": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleDayInput"
+              "$ref": "#/components/schemas/app__schemas__provider_setup__ScheduleDayInput"
             },
             "type": "array",
-            "maxItems": 7,
-            "minItems": 1,
+            "maxItems": 70,
             "title": "Days"
           }
         },
         "type": "object",
-        "required": [
-          "days"
-        ],
         "title": "ScheduleReplace"
       },
       "ScheduleResponse": {
@@ -152486,33 +152670,15 @@
         ],
         "title": "ValidationError"
       },
-      "app__schemas__factory__PaymentAllocationRead": {
+      "app__schemas__billing__PaymentAllocationRead": {
         "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
-          },
-          "legacy_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Id"
-          },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -152536,6 +152702,17 @@
             ],
             "title": "Adjustment Id"
           },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
+          },
           "claim_id": {
             "anyOf": [
               {
@@ -152547,17 +152724,6 @@
             ],
             "title": "Claim Id"
           },
-          "ins_plan_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ins Plan Id"
-          },
           "provider_id": {
             "anyOf": [
               {
@@ -152568,18 +152734,6 @@
               }
             ],
             "title": "Provider Id"
-          },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -152597,22 +152751,24 @@
             ],
             "title": "Alloc Type"
           },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           }
         },
         "type": "object",
         "required": [
-          "patient_id",
-          "amount",
           "id",
-          "created_at"
+          "patient_id",
+          "amount"
         ],
         "title": "PaymentAllocationRead"
       },
@@ -152644,7 +152800,25 @@
         ],
         "title": "PageMeta"
       },
-      "app__schemas__office_setup__FeeScheduleOption": {
+      "app__schemas__office_setup__ScheduleReplace": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleDayInput"
+            },
+            "type": "array",
+            "maxItems": 7,
+            "minItems": 1,
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days"
+        ],
+        "title": "ScheduleReplace"
+      },
+      "app__schemas__procedure_setup__FeeScheduleOption": {
         "properties": {
           "id": {
             "type": "integer",
@@ -152653,6 +152827,17 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "fee_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Type"
           }
         },
         "type": "object",
@@ -152662,7 +152847,7 @@
         ],
         "title": "FeeScheduleOption"
       },
-      "app__schemas__office_setup__ScheduleDayInput": {
+      "app__schemas__provider_setup__ScheduleDayInput": {
         "properties": {
           "day_of_week": {
             "type": "integer",
@@ -152723,6 +152908,30 @@
               }
             ],
             "title": "Lunch End"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id",
+            "description": "NULL = applies to every office"
           }
         },
         "type": "object",
@@ -152730,20 +152939,6 @@
           "day_of_week"
         ],
         "title": "ScheduleDayInput"
-      },
-      "app__schemas__provider_setup__ScheduleReplace": {
-        "properties": {
-          "days": {
-            "items": {
-              "$ref": "#/components/schemas/ScheduleDayInput"
-            },
-            "type": "array",
-            "maxItems": 70,
-            "title": "Days"
-          }
-        },
-        "type": "object",
-        "title": "ScheduleReplace"
       }
     },
     "securitySchemes": {

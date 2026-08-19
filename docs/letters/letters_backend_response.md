@@ -2,8 +2,10 @@
 
 **Module:** Letters (New) — print menu → Letters dialog → Report Viewer → "Save PDF file"
 **Gap report answered:** [letters_backend_devreport.md](letters_backend_devreport.md) (LTR-1…12)
+**Integration round 2:** LTR-13…16 · **round 3:** LTR-17 + deploy (see the sections below)
 **Migration:** Alembic `e9f0a1b2c3d4` (`add_letters_module_gaps`)
-**Tests:** [tests/test_letters_module.py](../../tests/test_letters_module.py) — 28 cases
+**Tests:** [tests/test_letters_module.py](../../tests/test_letters_module.py) — 52 cases ·
+[tests/test_document_storage.py](../../tests/test_document_storage.py) — 20 cases
 
 ---
 
@@ -320,3 +322,315 @@ python -m scripts.repair_letter_templates --tenant 1 --show-diff \
 - **Envelope printing / PDF generation** stays in the browser. `reportlab` is already
   available server-side (statements, payment-plan contracts) if you want
   `POST /letters/render.pdf` later; the render endpoint is the half that was missing.
+
+---
+
+# Round 2 — LTR-13…16 (found during frontend integration)
+
+| ID | Status | What changed |
+|----|--------|--------------|
+| **LTR-13** | **Done** | The appointment merge block falls back next → last → preferred provider; `last_appointment_provider` added to `letter-context`; `#APPT_DATETIME#` added to the catalog |
+| **LTR-14** | **Done** | `today` / `#TODAY_DATE#` are computed in the printing office's timezone |
+| **LTR-15** | **Done** | `overrides: {token: value}` **and** `signing_provider_id` on `/letters/render` and `/letters/render-batch` |
+| **LTR-16** | **Partly** — code paths now covered by tests; a real bucket still needs one deploy | 20 tests exercise upload/signing/proxy/listing against a fake GCS client, plus `scripts/check_document_storage.py` to prove the real thing in one command |
+
+---
+
+## LTR-13 — `#APPT_PRDR#` no longer prints a blank doctor
+
+You are right that this was the serious one: `"I Leo Rob hereby authorize and request
+that Dr. and their assistants perform the specified extraction(s)"` is a defective legal
+document, not a cosmetic gap.
+
+The root cause was a wrong reading of the token on my side. I bound the appointment block
+to the *upcoming* appointment, but a consent form is printed **at the chair, after the
+visit has started** — so by definition there is no upcoming appointment, and the one that
+matters is the one happening now, which is stored as the most recent past row.
+
+The block now means **"the appointment this letter is about"**, resolved in order:
+
+| Token | Resolution order |
+|-------|-----------------|
+| `#APPT_PRDR#` | next appointment's provider → **last appointment's provider** → the patient's preferred provider |
+| `#APPT_DATE#` | next appointment → **last appointment** |
+| `#APPT_DATETIME#` | same, formatted `08/19/2026 9:00 AM` |
+
+The third fallback (preferred provider) is beyond what you asked for; I added it because
+15 templates use `#APPT_PRDR#` and a patient with **no** appointment rows at all would
+still have produced the blank-doctor consent. A named doctor who might be the wrong one
+gets caught at the chair; a blank one gets signed. Say the word if you would rather it
+stop at the last appointment.
+
+`letter-context` now also returns **`last_appointment_provider`** alongside
+`next_appointment_provider`, so the residual in the frontend can go.
+
+Verified against your two reproduction patients on the live database:
+
+| | 83867 | 83896 |
+|--|--|--|
+| `last_appointment.provider_id` | `prov-arjun-9` | `prov-23423-9` |
+| `merge_fields.APPT_PRDR` | `"Arjun"` | `"TEST PROVIDER"` |
+| `merge_fields.APPT_DATE` | `06/21/2026` | `08/16/2026` |
+| `merge_fields.APPT_DATETIME` | `06/21/2026 8:20 AM` | `08/16/2026 8:00 AM` |
+| in `unresolved_tokens`? | no | no |
+
+### One note on `#APPT_DATETIME#`
+
+It was **not** in the 56-token corpus — no migrated template uses it. I added it anyway
+since you are binding it, so the catalog is now 57 entries: the 56 corpus tokens plus this
+one deliberate extension. The test suite pins that distinction (`CORPUS_TOKENS` in
+`tests/test_letters_module.py` is the extracted ground truth), so the catalog can still
+never *lose* coverage of a token a real template uses.
+
+---
+
+## LTR-14 — `#TODAY_DATE#` is the office's date
+
+`build_context` now reads `offices.timezone` (already populated —
+`America/New_York` for office 108) and computes `today` there. Both
+`letter-context` and `/letters/render` return the `timezone` they used, so the
+frontend can drop its workstation-local override and there is no ambiguity about
+which clock produced a date on a signed form.
+
+Live right now, at `2026-08-19T05:35:57Z`:
+
+```
+UTC date                : 2026-08-19
+America/New_York        : 2026-08-19
+America/Los_Angeles     : 2026-08-18   <- differs
+Pacific/Honolulu        : 2026-08-18   <- differs
+```
+
+The helper is `office_today()` in [app/core/datetimes.py](../../app/core/datetimes.py).
+An unparseable `offices.timezone` degrades to `America/New_York` rather than 500-ing that
+office's letters. While I was there I pointed AppointNow's private copy of the same
+helper at it, so availability and `#TODAY_DATE#` cannot drift apart.
+
+The appointment "is it upcoming or past" boundary now uses the office's date too — it was
+the same UTC bug one level down.
+
+---
+
+## LTR-15 — caller-supplied values
+
+Both surfaces, on `/letters/render` and `/letters/render-batch`:
+
+```json
+{
+  "template_id": 3,
+  "patient_id": 83867,
+  "signing_provider_id": "prov-arjun-9",
+  "overrides": { "APPT_PRDR": "Dr. Arjun Mehta", "OFFICE_PHONE1": "412-555-0100" }
+}
+```
+
+The response gains `applied_overrides` and `rejected_overrides`.
+
+- **`signing_provider_id`** re-points exactly two tokens: `#APPT_PRDR#` and
+  `#DOC_LAST_NAME#` — the doctor *named in the body*. It deliberately leaves the
+  `#PAT_PREF_PROV_*#` letterhead alone, because that block is the practice's return
+  address and should not silently move because a different dentist is chairside. Use
+  `overrides` if you do want it to. An unknown provider id is a **404**.
+- **`overrides`** wins over `signing_provider_id`, so you can use both.
+- **Unknown keys are rejected, not merged** — they come back in `rejected_overrides`.
+  Silently accepting a typo would look like it worked.
+- **Values are HTML-escaped on substitution**, exactly like server-resolved values, so
+  this is not a markup-injection route.
+
+On the batch endpoint the same fields apply to every letter in the sweep — one signing
+doctor for a whole collections run.
+
+---
+
+## LTR-16 — what I could verify, and what I could not
+
+**Could not:** I have no bucket or credentials here, so nobody has yet proven that the
+upload reaches `gs://reco-documents/consent-forms/…`, that IAM signing works, or that the
+link opens from a browser. That still needs one deployed run and it is the remaining risk
+on LTR-1.
+
+**Did do**, so that run is a formality rather than a debugging session:
+
+1. **20 tests** ([tests/test_document_storage.py](../../tests/test_document_storage.py))
+   drive the real code with a fake GCS client, covering the branches that were previously
+   only exercised in production: consent-prefix vs generic-prefix routing, signed-URL
+   `file_url`, `DOCUMENT_URL_MODE=proxy`, **signing unavailable → proxy fallback**,
+   `PUBLIC_API_BASE_URL` absolutisation, signed URLs not being persisted, the `/content`
+   proxy streaming and enforcing tenancy, upload failure falling back to local rather than
+   losing a consent, GCS blobs surviving a row delete, and `GET /consent-forms` filtering
+   by prefix.
+
+2. **A one-command probe:** `python -m scripts.check_document_storage`. Run it in the
+   deployed environment after setting the env vars. It writes a throwaway object, reads it
+   back through both the signed URL and the proxy seam, compares bytes, lists the consent
+   prefix, then deletes it — and exits non-zero on the first failure, so it works as a
+   deploy gate. It never touches a patient record.
+
+```bash
+GCS_BUCKET_DOCUMENTS=reco-documents PUBLIC_API_BASE_URL=https://<api-host> \
+  python -m scripts.check_document_storage
+```
+
+The check most likely to fail is signing: on Cloud Run the runtime service account needs
+`roles/iam.serviceAccountTokenCreator` **on itself**. If it does not have it the probe
+warns rather than fails, and `file_url` falls back to the `/content` proxy — which works,
+just with the bytes passing through the API.
+
+---
+
+## Still open (unchanged)
+
+- **LTR-8 / LTR-9** — a human decision, not code. Nothing applied. Read the
+  `--show-diff` output before authorising `--apply`; the 11 truncated
+  `Financial Agreement` bodies need re-import from `LETTERS.txt` either way.
+- **Batch letters** — `/letters/render-batch` is deliberately unwired. It belongs to a
+  collections queue screen, not the per-patient dialog.
+
+---
+
+# Round 3 — deploy + LTR-17 (2026-08-19)
+
+## The deploy problem: found and fixed locally
+
+You were right, and the cause was mundane. The local backend was
+`uvicorn app.main:app --host 0.0.0.0 --port 8000` — **started without `--reload`**, at
+23:19 on 8/18, i.e. before the round-2 edits landed. It was serving a stale in-memory
+build of this same working tree. Nothing was wrong with the code; it had simply never
+been loaded.
+
+**The local dev backend now serves the round-2 + LTR-17 build**, restarted with
+`--reload` so a code change is picked up automatically and this cannot recur:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Verified against the running server on `127.0.0.1:8000`:
+
+```
+LetterRenderRequest  : office_id, overrides, patient_id, signing_provider_id,
+                       template_id, treatment_plan_id
+LetterRenderResponse : applied_overrides, appointment_provider_source, appointment_source,
+                       fallback_tokens, letter_type, merge_fields, patient_id,
+                       rejected_overrides, rendered_html, template_id, timezone, title,
+                       today, unknown_tokens, unresolved_tokens
+LetterContextResponse: appointment_provider_source, appointment_source, balance,
+                       fallback_tokens, last_appointment, last_appointment_provider,
+                       merge_fields, next_appointment, next_appointment_provider, office,
+                       patient, provider, referred_by, responsible_party, timezone, today,
+                       treatment_plan, treatment_plan_teeth, unresolved_tokens
+```
+
+Your reproduction cases, run against that live server with a real bearer token:
+
+```
+GET /api/v1/patients/83867/letter-context
+  APPT_PRDR                   = "Arjun"          (was "")
+  APPT_DATE                   = "06/21/2026"
+  APPT_DATETIME               = "06/21/2026 8:20 AM"
+  today / timezone            = 2026-08-19 / America/New_York
+  appointment_source          = "last"
+  appointment_provider_source = "last"
+  fallback_tokens             = {"APPT_DATE":"last","APPT_DATETIME":"last","APPT_PRDR":"last"}
+  APPT_PRDR in unresolved_tokens = False
+
+POST /api/v1/letters/render {"template_id":114,"patient_id":83867,
+                             "signing_provider_id":"prov-arjun-9",
+                             "overrides":{"APPT_PRDR":"Dr. Arjun Mehta"}}
+  applied_overrides  = ["APPT_PRDR","DOC_LAST_NAME"]
+  rejected_overrides = []
+  body → "…request that Dr. Dr. Arjun Mehta and their assistants perform the specified teeth…"
+```
+
+**Small note from that last line:** template 114 has a literal `Dr. ` in front of
+`#APPT_PRDR#`, so an override value of `"Dr. Arjun Mehta"` renders as "Dr. Dr. Arjun
+Mehta". The server's own resolution returns the bare `"Arjun"` for exactly this reason.
+Send the name without the honorific and the templates that supply their own read
+correctly.
+
+### Cloud Run is **not** deployed, and I did not deploy it
+
+`.github/workflows/deploy-cloud-run.yml` triggers on push to
+**`feature/phase_data_migration`**. The work is on `feature/uat-realse` and is currently
+uncommitted in the working tree. Pushing to a branch that auto-deploys a shared
+environment is your call, not something I should do unprompted — so
+`https://dentc-backend-…run.app` still serves round 1. Commit and merge to that branch
+when you want it live.
+
+## The timezone field name — pinned
+
+It is **`timezone`**, a sibling of `today`, on **both** `letter-context` and the
+`/letters/render` response. It is a full IANA zone id (`"America/New_York"`), sourced from
+`offices.timezone` for the printing office. Pin your probe to that name; the other
+spellings will never appear.
+
+Your gating approach is right, and the field is a sound marker — it is only present on a
+build that also dates letters in the office's zone.
+
+## Answers noted
+
+- **Third fallback stays.** Now visible rather than silent — see LTR-17 below.
+- **`signing_provider_id` vs `overrides` per Signature Type** — your table is exactly the
+  intended split, and needs nothing from the backend. `signing_provider_id` moves
+  `#APPT_PRDR#` *and* `#DOC_LAST_NAME#` together (they are one identity); sending
+  `overrides: {"DOC_LAST_NAME": "…"}` alone leaves `#APPT_PRDR#` on the treating provider,
+  which is the Hygienist / Assistant / Office Manager case. Both are covered by tests.
+
+---
+
+## LTR-17 — the appointment block reports which tier answered
+
+**Done.** Both `GET /patients/{id}/letter-context` and `POST /letters/render` now return:
+
+| Field | Values | Meaning |
+|---|---|---|
+| `appointment_source` | `"next"` · `"last"` · `null` | which appointment fed `#APPT_DATE#` / `#APPT_DATETIME#` |
+| `appointment_provider_source` | `"next"` · `"last"` · `"preferred"` · `null` | which tier fed `#APPT_PRDR#` |
+| `fallback_tokens` | `{token: tier}` | only the **degraded** resolutions |
+
+Two scalars rather than one, because they genuinely disagree: a past appointment whose
+`provider_id` no longer resolves gives `appointment_source: "last"` with
+`appointment_provider_source: "preferred"`. There is a test for exactly that row.
+
+`fallback_tokens` is the one to drive the preview from — it is empty whenever everything
+came from the upcoming appointment, so a non-empty map *is* the set of values to annotate:
+
+```json
+{ "APPT_PRDR": "preferred" }
+```
+→ "provider taken from the patient's preferred provider — no appointment on file"
+
+```json
+{ "APPT_DATE": "last", "APPT_DATETIME": "last", "APPT_PRDR": "last" }
+```
+→ "from the visit on 06/21/2026"
+
+Two refinements worth knowing:
+
+- **An overridden token is never listed.** If the dialog supplied `#APPT_PRDR#` (via
+  `overrides` or `signing_provider_id`) the value came from the user, so there is nothing
+  to warn about — `fallback_tokens` comes back `{}` while
+  `appointment_provider_source` still reports the underlying tier for anyone who wants it.
+- **`/letters/render` only lists tokens the template actually contains.** A warning about
+  `#APPT_DATE#` on a letter that does not print a date is noise; `letter-context` reports
+  everything, since it has no template in hand.
+
+When nothing can answer at all (no appointments *and* no preferred provider), both scalars
+are `null` and `fallback_tokens` is `{}` — the token is genuinely unresolved and stays in
+`unresolved_tokens`, which is the existing warning path.
+
+---
+
+## Tests
+
+52 cases in [tests/test_letters_module.py](../../tests/test_letters_module.py)
+(9 new for LTR-17) and 20 in
+[tests/test_document_storage.py](../../tests/test_document_storage.py). The LTR-17 set
+covers each tier, the disagreeing-tier row, override suppression, and the
+template-filtered list.
+
+## Unchanged
+
+- **LTR-8 / LTR-9** — still awaiting a human `--apply` decision. Nothing mutated.
+- **LTR-16** — still needs one deployed run with `GCS_BUCKET_DOCUMENTS` set;
+  `python -m scripts.check_document_storage` is the one-command check.

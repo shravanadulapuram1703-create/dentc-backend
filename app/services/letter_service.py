@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import html
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -41,6 +41,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.datetimes import DEFAULT_TIMEZONE, office_today
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.html_sanitize import sanitize_html
 from app.db.models import (
@@ -123,15 +124,29 @@ MERGE_FIELDS: tuple[tuple[str, str, str], ...] = (
     ("RP_ZIP", "responsible_party", "Responsible party ZIP"),
     ("RP_EMAIL", "responsible_party", "Responsible party email"),
     ("RP_TOTAL_BAL", "responsible_party", "Account balance"),
-    # Appointment
-    ("APPT_DATE", "appointment", "Next appointment date"),
-    ("APPT_PRDR", "appointment", "Next appointment provider"),
+    # Appointment. LTR-13: these mean "the appointment this letter is about" —
+    # the upcoming one when there is one, otherwise the most recent past one.
+    # A consent form is printed at the chair *after* the visit is under way, so
+    # binding them to the future alone left "Dr. ___" blank on a signed document.
+    ("APPT_DATE", "appointment", "Appointment date (next, else last)"),
+    ("APPT_DATETIME", "appointment", "Appointment date and time (next, else last)"),
+    ("APPT_PRDR", "appointment", "Appointment provider (next, else last, else preferred)"),
     # Misc
-    ("TODAY_DATE", "misc", "Today's date"),
+    ("TODAY_DATE", "misc", "Today's date, in the printing office's timezone"),
     ("TX_PLAN_TH_NUMBER", "treatment_plan", "Treatment-plan tooth number(s)"),
 )
 
 MERGE_FIELD_NAMES = frozenset(token for token, _g, _l in MERGE_FIELDS)
+
+#: The 56 tokens actually present in the seeded 153-template corpus. The catalog
+#: above is a **superset**: ``APPT_DATETIME`` is an extension the frontend asked
+#: for (LTR-13) that no migrated template uses yet. Keeping the corpus set
+#: explicit is what lets ``tests/test_letters_module.py`` prove the catalog still
+#: covers every token a real template can contain.
+CORPUS_TOKENS = MERGE_FIELD_NAMES - {"APPT_DATETIME"}
+
+#: LTR-13 fallback tiers for the appointment block, best first.
+APPOINTMENT_TIERS = ("next", "last", "preferred")
 
 #: Tokens whose value costs a full balance aggregate. The dialog only pays for
 #: that when the chosen template actually contains one (LTR-6).
@@ -172,6 +187,15 @@ def _date(value: date | datetime | None) -> str:
     if isinstance(value, datetime):
         value = value.date()
     return value.strftime("%m/%d/%Y")
+
+
+def _datetime(day: date | None, at: time | None) -> str:
+    """``08/19/2026 9:00 AM`` — LTR-13's ``#APPT_DATETIME#``."""
+    if day is None:
+        return ""
+    if at is None:
+        return _date(day)
+    return f"{_date(day)} {at.strftime('%I:%M %p').lstrip('0')}"
 
 
 def _money(value: Decimal | float | int | None) -> str:
@@ -274,7 +298,6 @@ def build_context(
     template actually contains ``#RP_TOTAL_BAL#``.
     """
     patient = _require_patient(db, tenant_id, patient_id)
-    today = datetime.now(timezone.utc).date()
 
     office = db.execute(
         select(Office).where(
@@ -282,6 +305,12 @@ def build_context(
             Office.tenant_id == tenant_id,
         )
     ).scalar_one_or_none() if (office_id or patient.home_office_id) else None
+
+    # LTR-14: "today" is the *printing office's* today, not the server's. Every
+    # US practice is UTC-negative, so a UTC date is tomorrow's date for the last
+    # few hours of the working day — which post-dates an evening consent form.
+    tz_name = (getattr(office, "timezone", None) or DEFAULT_TIMEZONE)
+    today = office_today(tz_name)
 
     provider = db.get(Provider, patient.preferred_provider_id) if patient.preferred_provider_id else None
     if provider is not None and provider.tenant_id != tenant_id:
@@ -294,7 +323,11 @@ def build_context(
     rp = resolve_responsible_party(db, tenant_id, patient.responsible_party_id)
     referred_by = _referred_by(db, tenant_id, patient)
     next_appt, last_appt = _appointments(db, patient_id, today)
-    appt_provider = db.get(Provider, next_appt.provider_id) if next_appt else None
+    # LTR-13: resolve BOTH appointment providers. The merge falls back from the
+    # upcoming appointment to the last one, so a consent form printed mid-visit
+    # names the treating doctor instead of "Dr. ___".
+    next_appt_provider = db.get(Provider, next_appt.provider_id) if next_appt else None
+    last_appt_provider = db.get(Provider, last_appt.provider_id) if last_appt else None
 
     plan, plan_teeth = _treatment_plan_teeth(db, treatment_plan_id) if treatment_plan_id else (None, [])
 
@@ -311,13 +344,65 @@ def build_context(
         "responsible_party": rp,
         "referred_by": referred_by,
         "next_appointment": next_appt,
-        "next_appointment_provider": appt_provider,
+        "next_appointment_provider": next_appt_provider,
         "last_appointment": last_appt,
+        "last_appointment_provider": last_appt_provider,
         "treatment_plan": plan,
         "treatment_plan_teeth": plan_teeth,
         "balance": balance,
         "today": today,
+        "timezone": tz_name,
     }
+
+
+# ── LTR-17: which tier of the fallback chain actually answered ───────────────
+def appointment_sources(ctx: dict[str, Any]) -> dict[str, str | None]:
+    """Report where the appointment block's values came from.
+
+    The LTR-13 chain is a real improvement over a blank doctor, but it can now
+    print a provider with no connection to the visit — for a patient with no
+    appointment rows at all, ``#APPT_PRDR#`` is simply the preferred provider.
+    "Caught at the chair" only works if the person at the chair can see it, so
+    the tier is reported rather than left implicit.
+
+    Two separate answers because they can genuinely disagree: a last appointment
+    whose ``provider_id`` no longer resolves gives ``appointment_source="last"``
+    with ``appointment_provider_source="preferred"``.
+    """
+    if ctx.get("next_appointment"):
+        appt_src = "next"
+    elif ctx.get("last_appointment"):
+        appt_src = "last"
+    else:
+        appt_src = None
+
+    if ctx.get("next_appointment_provider"):
+        prov_src = "next"
+    elif ctx.get("last_appointment_provider"):
+        prov_src = "last"
+    elif ctx.get("provider"):
+        prov_src = "preferred"
+    else:
+        prov_src = None
+
+    return {"appointment_source": appt_src, "appointment_provider_source": prov_src}
+
+
+def fallback_tokens(sources: dict[str, str | None]) -> dict[str, str]:
+    """``{token: tier}`` for tokens that did **not** come from the ideal source.
+
+    Only degraded resolutions are listed, so a non-empty map is exactly the set
+    of values the preview should annotate. A token resolved from the upcoming
+    appointment is not a fallback and never appears.
+    """
+    out: dict[str, str] = {}
+    if sources.get("appointment_source") == "last":
+        out["APPT_DATE"] = "last"
+        out["APPT_DATETIME"] = "last"
+    prov = sources.get("appointment_provider_source")
+    if prov in ("last", "preferred"):
+        out["APPT_PRDR"] = prov
+    return out
 
 
 # ── Token resolution ─────────────────────────────────────────────────────────
@@ -335,11 +420,24 @@ def resolve_merge_fields(ctx: dict[str, Any]) -> dict[str, str]:
     account: AccountSettings | None = ctx.get("account")
     rp: ResponsibleParty | None = ctx.get("responsible_party")
     ref: Referral | None = ctx.get("referred_by")
-    appt: Appointment | None = ctx.get("next_appointment")
-    appt_prov: Provider | None = ctx.get("next_appointment_provider")
     balance: dict | None = ctx.get("balance")
     teeth: list[str] = ctx.get("treatment_plan_teeth") or []
-    today: date = ctx.get("today") or datetime.now(timezone.utc).date()
+    today: date = ctx.get("today") or office_today(ctx.get("timezone"))
+
+    # LTR-13: the appointment block means "the appointment this letter is
+    # about". A consent form is printed at the chair, after the visit has
+    # started, so there is no *upcoming* appointment — binding these to the
+    # future alone printed "I hereby authorize Dr. ___" on a signed legal
+    # document. Fall through: next appointment -> last appointment.
+    appt: Appointment | None = ctx.get("next_appointment") or ctx.get("last_appointment")
+    appt_prov: Provider | None = (
+        ctx.get("next_appointment_provider")
+        or ctx.get("last_appointment_provider")
+        # Last resort: the patient's preferred provider. 15 templates use
+        # #APPT_PRDR#, including consent forms, and a named doctor that might be
+        # the wrong one is caught at the chair — a blank one is signed.
+        or ctx.get("provider")
+    )
 
     def _o(attr: str) -> str:
         return str(getattr(office, attr, None) or "") if office else ""
@@ -452,7 +550,15 @@ def resolve_merge_fields(ctx: dict[str, Any]) -> dict[str, str]:
         "RP_EMAIL": rp_email,
         "RP_TOTAL_BAL": _money(balance.get("balance")) if balance else "",
         "APPT_DATE": _date(getattr(appt, "date", None)),
-        "APPT_PRDR": (getattr(appt_prov, "name", "") or "") if appt_prov else "",
+        "APPT_DATETIME": _datetime(
+            getattr(appt, "date", None), getattr(appt, "start_time", None)
+        ),
+        "APPT_PRDR": (
+            getattr(appt_prov, "name", "")
+            or _full_name(
+                getattr(appt_prov, "first_name", None), getattr(appt_prov, "last_name", None)
+            )
+        ) if appt_prov else "",
         "TODAY_DATE": _date(today),
         "TX_PLAN_TH_NUMBER": ", ".join(teeth),
     }
@@ -494,6 +600,58 @@ def get_template(db: Session, tenant_id: int, template_id: int) -> LetterTemplat
     return tpl
 
 
+#: LTR-15: which tokens ``signing_provider_id`` re-points. Deliberately just the
+#: doctor *named in the body* — the ``PAT_PREF_PROV_*`` letterhead block is the
+#: practice's return address and should not silently change because a different
+#: dentist is chairside. Use ``overrides`` if you do want to move it too.
+SIGNING_PROVIDER_TOKENS = ("APPT_PRDR", "DOC_LAST_NAME")
+
+
+def apply_overrides(
+    db: Session,
+    tenant_id: int,
+    values: dict[str, str],
+    *,
+    signing_provider_id: str | None = None,
+    overrides: dict[str, str] | None = None,
+) -> tuple[dict[str, str], list[str], list[str]]:
+    """Layer caller-supplied values over the resolved ones (LTR-15).
+
+    Returns ``(values, applied, rejected)``. ``signing_provider_id`` is applied
+    first so an explicit ``overrides`` entry always wins over it.
+
+    Only catalog tokens are accepted — an unknown key is *reported*, not merged,
+    because silently accepting one would let a typo look like it worked. The
+    values themselves stay unescaped here; :func:`render_body` escapes every
+    substitution, so a caller cannot inject markup this way.
+    """
+    applied: list[str] = []
+    rejected: list[str] = []
+
+    if signing_provider_id:
+        provider = db.get(Provider, signing_provider_id)
+        if provider is None or provider.tenant_id != tenant_id:
+            raise NotFoundError(f"Provider '{signing_provider_id}' was not found")
+        name = provider.name or _full_name(provider.first_name, provider.last_name)
+        resolved = {
+            "APPT_PRDR": name,
+            "DOC_LAST_NAME": provider.last_name or _last_name_of(name),
+        }
+        for token in SIGNING_PROVIDER_TOKENS:
+            values[token] = resolved[token]
+            applied.append(token)
+
+    for token, value in (overrides or {}).items():
+        if token not in MERGE_FIELD_NAMES:
+            rejected.append(token)
+            continue
+        values[token] = "" if value is None else str(value)
+        if token not in applied:
+            applied.append(token)
+
+    return values, applied, rejected
+
+
 def render_template(
     db: Session,
     tenant_id: int,
@@ -502,6 +660,8 @@ def render_template(
     patient_id: int,
     office_id: int | None = None,
     treatment_plan_id: str | None = None,
+    signing_provider_id: str | None = None,
+    overrides: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """LTR-5: merge one template for one patient, server-side."""
     tpl = get_template(db, tenant_id, template_id)
@@ -514,6 +674,17 @@ def render_template(
         include_balance=bool(required & BALANCE_TOKENS),
     )
     values = resolve_merge_fields(ctx)
+    sources = appointment_sources(ctx)
+    values, applied, rejected = apply_overrides(
+        db, tenant_id, values,
+        signing_provider_id=signing_provider_id, overrides=overrides,
+    )
+    # LTR-17: a token the caller supplied is not a fallback — its value came from
+    # the dialog, not from the chain. Only report what this letter actually uses.
+    fallbacks = {
+        token: tier for token, tier in fallback_tokens(sources).items()
+        if token in required and token not in applied
+    }
     rendered, unresolved = render_body(tpl.body_html, values)
     return {
         "template_id": tpl.id,
@@ -525,6 +696,16 @@ def render_template(
         "unresolved_tokens": unresolved,
         "merge_fields": {k: v for k, v in values.items() if k in required},
         "unknown_tokens": sorted(required - MERGE_FIELD_NAMES),
+        # LTR-15: what the caller changed, and which keys were not catalog tokens.
+        "applied_overrides": sorted(applied),
+        "rejected_overrides": sorted(rejected),
+        # LTR-17: which tier of the appointment fallback chain answered, so the
+        # preview can say "no appointment on file" instead of silently naming a doctor.
+        "fallback_tokens": fallbacks,
+        **sources,
+        # LTR-14: the clock this render used, so the caller can stop second-guessing it.
+        "timezone": ctx.get("timezone"),
+        "today": ctx.get("today"),
     }
 
 
@@ -536,6 +717,8 @@ def run_batch(
     patient_ids: list[int],
     office_id: int | None = None,
     store_html: bool = False,
+    signing_provider_id: str | None = None,
+    overrides: dict[str, str] | None = None,
     user_id: int | None = None,
 ) -> LetterBatchRun:
     """LTR-5: render one template across a patient list as a durable job.
@@ -563,7 +746,12 @@ def run_batch(
     run = LetterBatchRun(
         tenant_id=tenant_id, office_id=office_id, template_id=template_id,
         status="running", requested=len(patient_ids),
-        options={"store_html": store_html}, created_by=user_id,
+        options={
+            "store_html": store_html,
+            "signing_provider_id": signing_provider_id,
+            "overrides": overrides or {},
+        },
+        created_by=user_id,
     )
     db.add(run)
     db.commit()
@@ -575,6 +763,7 @@ def run_batch(
             result = render_template(
                 db, tenant_id, template_id=template_id,
                 patient_id=patient_id, office_id=office_id,
+                signing_provider_id=signing_provider_id, overrides=overrides,
             )
         except Exception as exc:  # noqa: BLE001 - one bad row must not kill the sweep
             failed += 1

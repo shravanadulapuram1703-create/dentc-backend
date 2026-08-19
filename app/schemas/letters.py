@@ -63,6 +63,21 @@ class LetterRenderRequest(BaseModel):
         None,
         description="Binds #TX_PLAN_TH_NUMBER# (LTR-4). Without it the token prints blank.",
     )
+    # LTR-15: let the caller supply values the server cannot know.
+    signing_provider_id: str | None = Field(
+        None,
+        description="The doctor named in the body — re-points #APPT_PRDR# and "
+                    "#DOC_LAST_NAME#. The letterhead block is left alone; move it "
+                    "with `overrides` if you need to.",
+    )
+    overrides: dict[str, str] = Field(
+        default_factory=dict,
+        description="Per-token replacements, e.g. {\"APPT_PRDR\": \"Dr. Arjun\"}. "
+                    "Keys must be catalog tokens; unknown keys come back in "
+                    "`rejected_overrides` rather than being silently accepted. "
+                    "Values are HTML-escaped on substitution like every other value.",
+        examples=[{"APPT_PRDR": "Dr. Arjun Mehta"}],
+    )
 
 
 class LetterRenderResponse(BaseModel):
@@ -82,12 +97,48 @@ class LetterRenderResponse(BaseModel):
         default_factory=list,
         description="#TOKEN#s in the body that are not in the merge catalog at all",
     )
+    applied_overrides: list[str] = Field(
+        default_factory=list, description="Tokens whose value came from the caller (LTR-15)"
+    )
+    rejected_overrides: list[str] = Field(
+        default_factory=list,
+        description="Override keys that are not catalog tokens and were ignored",
+    )
+    # LTR-17: with a three-tier chain, #APPT_PRDR# can name a provider with no
+    # connection to the visit. Report which tier answered so the preview can say
+    # so instead of silently printing a name.
+    appointment_source: str | None = Field(
+        None,
+        description="Which appointment fed #APPT_DATE#/#APPT_DATETIME#: "
+                    "'next' (upcoming), 'last' (most recent past), or null (none on file)",
+        examples=["last"],
+    )
+    appointment_provider_source: str | None = Field(
+        None,
+        description="Which tier fed #APPT_PRDR#: 'next', 'last', 'preferred' "
+                    "(the patient's preferred provider — no appointment on file), or null",
+        examples=["preferred"],
+    )
+    fallback_tokens: dict[str, str] = Field(
+        default_factory=dict,
+        description="{token: tier} for tokens answered by a *degraded* tier. Empty "
+                    "when everything resolved from the upcoming appointment. A token "
+                    "the caller overrode is never listed.",
+        examples=[{"APPT_PRDR": "preferred"}],
+    )
+    timezone: str | None = Field(
+        None, description="The office clock #TODAY_DATE# was computed in (LTR-14)"
+    )
+    today: date | None = Field(None, description="That office's current date")
 
 
 class LetterBatchRequest(BaseModel):
     template_id: int
     patient_ids: list[int] = Field(..., min_length=1)
     office_id: int | None = None
+    # LTR-15: one signing doctor / one set of values for the whole sweep.
+    signing_provider_id: str | None = None
+    overrides: dict[str, str] = Field(default_factory=dict)
     store_html: bool = Field(
         False,
         description="Retain each rendered body on the run (off by default — a batch "
@@ -111,17 +162,43 @@ class LetterContextResponse(ORMModel):
     next_appointment: _LetterAppointmentRead | None = None  # type: ignore[valid-type]
     next_appointment_provider: _LetterProviderRead | None = None  # type: ignore[valid-type]
     last_appointment: _LetterAppointmentRead | None = None  # type: ignore[valid-type]
+    # LTR-13: the appointment merge block falls back to the last visit, so the
+    # provider that feeds it has to be in the payload too.
+    last_appointment_provider: _LetterProviderRead | None = None  # type: ignore[valid-type]
     treatment_plan: _LetterPlanRead | None = None  # type: ignore[valid-type]
     treatment_plan_teeth: list[str] = Field(default_factory=list)
     balance: dict[str, Any] | None = Field(
         None, description="Only present when include_balance=true (the slow aggregate)"
     )
-    today: date
+    today: date = Field(..., description="Today in the printing office's timezone (LTR-14)")
+    timezone: str | None = Field(None, examples=["America/New_York"])
     merge_fields: dict[str, str] = Field(
         default_factory=dict, description="Every catalog token resolved for this patient"
     )
     unresolved_tokens: list[str] = Field(
         default_factory=list, description="Catalog tokens with no value in this context"
+    )
+    # LTR-17: with a three-tier chain, #APPT_PRDR# can name a provider with no
+    # connection to the visit. Report which tier answered so the preview can say
+    # so instead of silently printing a name.
+    appointment_source: str | None = Field(
+        None,
+        description="Which appointment fed #APPT_DATE#/#APPT_DATETIME#: "
+                    "'next' (upcoming), 'last' (most recent past), or null (none on file)",
+        examples=["last"],
+    )
+    appointment_provider_source: str | None = Field(
+        None,
+        description="Which tier fed #APPT_PRDR#: 'next', 'last', 'preferred' "
+                    "(the patient's preferred provider — no appointment on file), or null",
+        examples=["preferred"],
+    )
+    fallback_tokens: dict[str, str] = Field(
+        default_factory=dict,
+        description="{token: tier} for tokens answered by a *degraded* tier. Empty "
+                    "when everything resolved from the upcoming appointment. A token "
+                    "the caller overrode is never listed.",
+        examples=[{"APPT_PRDR": "preferred"}],
     )
 
 
