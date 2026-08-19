@@ -57,6 +57,18 @@ class AccountSettings(Base, IntPKMixin, TimestampMixin):
     oid: Mapped[str | None] = mapped_column(String(50))
     logo_url: Mapped[str | None] = mapped_column(String(500))
 
+    # ── Basic: marketing address (LTR-3) ────────────────────────────────────
+    # The #MARKET_*# merge block used by 30 letter templates — the practice's
+    # public/marketing identity, which is not necessarily the corporate entity
+    # nor the printing office. Falls back to corporate_*, then to the office.
+    marketing_name: Mapped[str | None] = mapped_column(String(255))
+    marketing_address_1: Mapped[str | None] = mapped_column(String(255))
+    marketing_address_2: Mapped[str | None] = mapped_column(String(255))
+    marketing_city: Mapped[str | None] = mapped_column(String(100))
+    marketing_state: Mapped[str | None] = mapped_column(String(50))
+    marketing_zip: Mapped[str | None] = mapped_column(String(20))
+    marketing_phone: Mapped[str | None] = mapped_column(String(20))
+
     # ── Basic: statement address ────────────────────────────────────────────
     statement_use_corporate: Mapped[bool] = mapped_column(Boolean, default=True)
     statement_address_1: Mapped[str | None] = mapped_column(String(255))

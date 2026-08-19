@@ -28,6 +28,12 @@ class PatientDocument(Base, IntPKMixin, CreatedAtMixin):
     file_path: Mapped[str] = mapped_column(String(500))  # internal storage path
     file_url: Mapped[str] = mapped_column(String(500))   # served URL
     description: Mapped[str | None] = mapped_column(String(500))
+    # LTR-1 ask #3: where the bytes actually live, so the UI can show provenance
+    # and a migration of the pre-GCS rows is auditable. ``storage_path`` is the
+    # object key inside ``storage_bucket`` (GCS) or the path under UPLOAD_DIR (local).
+    storage_backend: Mapped[str] = mapped_column(String(20), default="local")  # local | gcs
+    storage_bucket: Mapped[str | None] = mapped_column(String(255))
+    storage_path: Mapped[str | None] = mapped_column(String(500))
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
@@ -103,11 +109,23 @@ class PatientConsent(Base, IntPKMixin, CreatedAtMixin):
     plan_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("treatment_plans.id"))
     title: Mapped[str | None] = mapped_column(String(255))
     rendered_html: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|signed|declined
+    # LTR-10: the published vocabulary (definitions group ``consent_status``).
+    # pending  — created, nothing captured yet
+    # printed  — rendered + handed to the patient on paper (no signature yet)
+    # signed   — a signature (drawn capture or scanned wet copy) is attached
+    # declined — the patient refused
+    # voided   — superseded / entered in error
+    status: Mapped[str] = mapped_column(String(20), default="pending")
     signature_data: Mapped[str | None] = mapped_column(Text)  # base64 capture (or print/scan)
     document_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patient_documents.id"))
     signed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     signed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # LTR-10: who physically signed (the patient / a guardian) and how, as opposed
+    # to ``signed_by`` which is the staff user that captured it.
+    signer_name: Mapped[str | None] = mapped_column(String(255))
+    signer_relationship: Mapped[str | None] = mapped_column(String(50))
+    signature_method: Mapped[str | None] = mapped_column(String(20))  # drawn | scanned | verbal
+    declined_reason: Mapped[str | None] = mapped_column(String(500))
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 

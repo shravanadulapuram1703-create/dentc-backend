@@ -17,6 +17,7 @@ from app.api.v1 import (
     imaging,
     insurance,
     ledger,
+    letters,
     messaging,
     messaging_ws,
     office_assignment,
@@ -110,7 +111,15 @@ api_router.include_router(pick_lists.router)
 # progress-note sign, duplicate-check (before generic CRUD for literal paths).
 api_router.include_router(patients_extra.documents_router)
 api_router.include_router(patients_extra.claims_router)
+api_router.include_router(patients_extra.consents_router)
 api_router.include_router(patients_extra.dup_router)
+# Letters module: merge-field catalog + server-side render/batch (LTR-5), the
+# aggregate /patients/{id}/letter-context (LTR-6) and the consent-form bucket
+# listing (LTR-1). Before generic CRUD so /letters/* and the literal
+# /patients/{id}/letter-context win over /{item_id}.
+api_router.include_router(letters.router)
+api_router.include_router(letters.patient_router)
+api_router.include_router(letters.consent_forms_router)
 # Add-Patient intake extras: /patients/register (composite) + /patients/{id}/opening-balance
 # + /patients/{id}/account-plans (LEG-5), and /responsible-parties/{id}/patients roster (LEG-14).
 # Before generic CRUD so these literal sub-paths win over /{item_id}.

@@ -7,17 +7,20 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Path, Query, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 
-from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
-from app.schemas.common import ErrorResponse
+from app.api.deps import CurrentUser, DbSession, PageParams, TenantId, get_current_user
+from app.schemas.common import ErrorResponse, PaginatedResponse
 from app.schemas.patient_extra import (
     ClaimAttachmentRead,
     ClaimDetailResponse,
     ClaimStatusUpdate,
     DuplicateCheckRequest,
     DuplicateCheckResponse,
+    PatientConsentSignedRead,
     PatientDocumentRead,
 )
+from app.schemas.letters import ConsentSignRequest
 from app.services import patient_extra_service as svc
 
 _auth = [Depends(get_current_user)]
@@ -27,9 +30,26 @@ _errs = {401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 404: {"mo
 documents_router = APIRouter(prefix="/patient-documents", tags=["Patients"], dependencies=_auth, responses=_errs)
 
 
-@documents_router.get("", response_model=list[PatientDocumentRead], operation_id="list_patient_documents")
-def list_documents(db: DbSession, tenant_id: TenantId, patient_id: Annotated[int, Query()]):
-    return svc.list_documents(db, tenant_id, patient_id)
+@documents_router.get(
+    "",
+    response_model=PaginatedResponse[PatientDocumentRead],
+    operation_id="list_patient_documents",
+    summary="Patient documents, filtered and paged (LTR-12)",
+)
+def list_documents(
+    db: DbSession,
+    tenant_id: TenantId,
+    page: PageParams,
+    patient_id: Annotated[int | None, Query(description="Scope to one patient")] = None,
+    document_type: Annotated[str | None, Query(description="e.g. consent-form")] = None,
+    office_id: Annotated[int | None, Query()] = None,
+):
+    items, total = svc.list_documents(
+        db, tenant_id, patient_id,
+        document_type=document_type, office_id=office_id,
+        search=page.search, page=page.page, size=page.size,
+    )
+    return PaginatedResponse.build(items, total, page.page, page.size)
 
 
 @documents_router.post("", response_model=PatientDocumentRead, status_code=status.HTTP_201_CREATED,
@@ -53,6 +73,28 @@ async def upload_document(
 @documents_router.get("/{document_id}", response_model=PatientDocumentRead, operation_id="get_patient_document")
 def get_document(db: DbSession, tenant_id: TenantId, document_id: Annotated[int, Path()]):
     return svc.get_document(db, tenant_id, document_id)
+
+
+@documents_router.get(
+    "/{document_id}/content",
+    operation_id="get_patient_document_content",
+    summary="Stream a document's bytes with the caller's tenant checks applied (LTR-1)",
+    response_class=StreamingResponse,
+)
+def get_document_content(db: DbSession, tenant_id: TenantId, document_id: Annotated[int, Path()]):
+    """The browser-facing read path for documents held in object storage.
+
+    The frontend must never hold bucket credentials and cannot address ``gs://``,
+    so either it gets a short-lived signed URL (``file_url``) or it comes here and
+    we stream the object after re-checking tenancy.
+    """
+    doc, body, content_type, size = svc.open_document(db, tenant_id, document_id)
+    headers = {"Content-Disposition": f'inline; filename="{doc.file_name}"'}
+    if size is not None:
+        headers["Content-Length"] = str(size)
+    return StreamingResponse(
+        body, media_type=content_type or "application/octet-stream", headers=headers
+    )
 
 
 @documents_router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT, operation_id="delete_patient_document")
@@ -106,6 +148,38 @@ def delete_claim_attachment(db: DbSession, tenant_id: TenantId, claim_id: Annota
 
 # Progress-note sign + per-note attachments moved to app/api/v1/progress_notes.py
 # (PN-2 over-the-shoulder signing + PN-3 attachments).
+
+
+# ── Consent signing (LTR-10) ─────────────────────────────────────────────────
+# The generic CRUD router owns /patient-consents; this adds the one operation the
+# resource had no way to express — capturing a signature, from a drawn canvas or
+# from an uploaded scan of the wet-signed paper copy.
+consents_router = APIRouter(prefix="/patient-consents", tags=["Patients"], dependencies=_auth, responses=_errs)
+
+
+@consents_router.get(
+    "/statuses",
+    operation_id="list_patient_consent_statuses",
+    summary="The published patient_consents.status vocabulary",
+)
+def list_consent_statuses():
+    return {
+        "statuses": list(svc.CONSENT_STATUSES),
+        "signature_methods": list(svc.SIGNATURE_METHODS),
+    }
+
+
+@consents_router.post(
+    "/{consent_id}/sign",
+    response_model=PatientConsentSignedRead,
+    operation_id="sign_patient_consent",
+    summary="Attach a signature (drawn capture or scanned copy) to a consent record",
+)
+def sign_consent(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser,
+    consent_id: Annotated[int, Path()], body: ConsentSignRequest,
+):
+    return svc.sign_consent(db, tenant_id, consent_id, body.model_dump(exclude_unset=True), current.id)
 
 
 # ── Duplicate check ──────────────────────────────────────────────────────────

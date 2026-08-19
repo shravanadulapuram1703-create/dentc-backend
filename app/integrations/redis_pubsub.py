@@ -25,6 +25,12 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Reader backoff after a read failure: starts small and doubles to a ceiling, so a
+# sustained fault (Redis down) costs a couple of log lines a minute rather than one
+# a second for the life of the process.
+_MIN_BACKOFF_SECONDS = 1.0
+_MAX_BACKOFF_SECONDS = 30.0
+
 try:  # pragma: no cover - import guard
     import redis.asyncio as _aioredis
     from redis.exceptions import RedisError
@@ -46,6 +52,12 @@ class RedisFanout:
         # Channel -> number of local sockets interested. Unsubscribe at zero.
         self._refs: dict[str, int] = {}
         self._lock = asyncio.Lock()
+        # Gates the read loop. redis-py raises "pubsub connection not set" when
+        # get_message() is called before anything is subscribed, and the reader
+        # starts at boot while the first subscription only arrives with the first
+        # WebSocket. Without this gate that mismatch spins on the exception once a
+        # second forever on any node holding no sockets.
+        self._has_subs = asyncio.Event()
         self.available = False
 
     async def start(self, sink: Callable[[str, str], Awaitable[None]]) -> None:
@@ -97,6 +109,7 @@ class RedisFanout:
         self._pubsub = None
         self._client = None
         self._refs.clear()
+        self._has_subs.clear()
         self.available = False
 
     async def subscribe(self, channel: str) -> None:
@@ -110,6 +123,10 @@ class RedisFanout:
                 await self._pubsub.subscribe(channel)
             except RedisError as exc:
                 logger.warning("Fan-out subscribe failed (%s): %s", channel, exc)
+            else:
+                # Only wake the reader once a subscription really exists, else it
+                # goes straight back to the error it was parked on.
+                self._has_subs.set()
 
     async def unsubscribe(self, channel: str) -> None:
         if not self.available or self._pubsub is None:
@@ -120,6 +137,8 @@ class RedisFanout:
                 self._refs[channel] = remaining
                 return
             self._refs.pop(channel, None)
+            if not self._refs:
+                self._has_subs.clear()
             try:
                 await self._pubsub.unsubscribe(channel)
             except RedisError as exc:
@@ -128,11 +147,16 @@ class RedisFanout:
     async def _read_loop(self) -> None:
         if self._pubsub is None:
             return
+        backoff = _MIN_BACKOFF_SECONDS
         while True:
             try:
+                # No channels on this node yet — park here instead of polling a
+                # pubsub with no connection, which would just raise.
+                await self._has_subs.wait()
                 message = await self._pubsub.get_message(
                     ignore_subscribe_messages=True, timeout=5.0
                 )
+                backoff = _MIN_BACKOFF_SECONDS  # healthy read — reset the backoff
                 if message is None:
                     continue
                 if self._sink is not None:
@@ -142,8 +166,11 @@ class RedisFanout:
             except Exception as exc:  # noqa: BLE001
                 # Never let one bad frame kill the reader — that would silently
                 # stop real-time delivery for every socket on this node.
-                logger.warning("Messaging fan-out read error: %s", exc)
-                await asyncio.sleep(1.0)
+                logger.warning(
+                    "Messaging fan-out read error (retry in %.0fs): %s", backoff, exc
+                )
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, _MAX_BACKOFF_SECONDS)
 
 
 fanout = RedisFanout()

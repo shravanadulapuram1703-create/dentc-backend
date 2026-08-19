@@ -109,7 +109,13 @@ from app.db.models.codes import (
     PrescriptionLibrary,
     ProcedureCode,
 )
-from app.db.models.comms import LetterTemplate, PostcardTemplate, SmsMessage
+from app.db.models.comms import (
+    LetterBatchItem,
+    LetterBatchRun,
+    LetterTemplate,
+    PostcardTemplate,
+    SmsMessage,
+)
 from app.db.models.messaging import (
     Conversation,
     ConversationParticipant,
@@ -250,6 +256,7 @@ __all__ = [
     "QuestionnaireOption",
     # communications
     "SmsMessage", "LetterTemplate", "PostcardTemplate",
+    "LetterBatchRun", "LetterBatchItem",
     # direct messaging
     "Conversation", "ConversationParticipant", "Message", "MessageReceipt",
     "MessageRecipientState", "MessageAttachment", "MessageReaction", "UserPresence",

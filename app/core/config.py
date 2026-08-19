@@ -155,6 +155,36 @@ class Settings(BaseSettings):
     # Log every imaging binary read to audit_logs (HIPAA access trail).
     IMAGING_AUDIT_READS: bool = True
 
+    # ── Patient documents / consent forms (object storage, LTR-1) ────────────
+    # The practice keeps every consent PDF in a cloud bucket, not on the app
+    # server's disk (a Cloud Run container restart loses local uploads and nothing
+    # else in the estate can find them). When GCS_BUCKET_DOCUMENTS is set,
+    # ``patient-documents`` writes there; leave it unset and uploads stay on the
+    # local filesystem so dev/tests work without cloud creds.
+    GCS_BUCKET_DOCUMENTS: str | None = None          # e.g. "reco-documents"
+    # Object-key prefix per document class. ``consent-form`` uploads land under
+    # CONSENT prefix (gs://<bucket>/consent-forms/{tenant}/{patient}/{uuid}.pdf);
+    # everything else under the generic prefix.
+    GCS_CONSENT_FORMS_PREFIX: str = "consent-forms"
+    GCS_DOCUMENTS_PREFIX: str = "patient-documents"
+    # The document_type values routed to the consent-forms prefix.
+    CONSENT_DOCUMENT_TYPES: list[str] = Field(
+        default_factory=lambda: ["consent-form", "consent_form", "consent"]
+    )
+    # TTL of the GCS signed URL handed to the browser for a document (PHI link).
+    DOCUMENT_SIGNED_URL_TTL_SECONDS: int = 900  # 15 min
+    # "auto" = signed URL when GCS signing works, else the API proxy; force with
+    # gcs|proxy (proxy always returns the /patient-documents/{id}/content URL).
+    DOCUMENT_URL_MODE: Literal["auto", "gcs", "proxy"] = "auto"
+    # Absolute, browser-reachable origin of THIS API. Used to fully-qualify
+    # ``file_url`` (LTR-1 ask #2 — the frontend cannot resolve a server-relative
+    # path against a different origin). Unset = relative URLs, as before.
+    PUBLIC_API_BASE_URL: str | None = None
+
+    # ── Letters (server-side merge/render, LTR-5) ────────────────────────────
+    # Cap on how many patients one batch letter run may cover in a request.
+    LETTERS_BATCH_MAX_PATIENTS: int = 500
+
     # ── Direct Messaging ─────────────────────────────────────────────────────
     # Presence key TTL. Must exceed the client's 30s heartbeat with headroom, or a
     # slightly late ping flaps the user to offline (requirements §12).

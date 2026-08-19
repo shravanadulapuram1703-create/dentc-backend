@@ -120,6 +120,28 @@ def list_office_effective_providers(
     )
 
 
+# ── LTR-7: the *effective* letter catalog for an office ──────────────────────
+# ``GET /{office_id}/letter-templates`` is the assignment grid and returns [] for
+# every office (the legacy join was never migrated). The Letters dialog needs a
+# printable list, so this endpoint pins the semantic: unassigned = the whole
+# tenant catalog; assigned = exactly the assigned set.
+@router.get(
+    "/{office_id}/letter-templates/effective",
+    response_model=list[AssignedLetterTemplateRead],
+    operation_id="list_office_effective_letter_templates",
+    summary="Letters this office can print: its assignment, or the full catalog when unassigned (LTR-7)",
+)
+def list_office_effective_letter_templates(
+    db: DbSession,
+    office_id: OfficeScope,
+    tenant_id: TenantId,
+    include_inactive: Annotated[bool, Query()] = False,
+):
+    return svc.get_effective_letter_templates(
+        db, office_id, tenant_id, include_inactive=include_inactive
+    )
+
+
 # ── Users (#27) — denormalized read, bulk set, copy-from ─────────────────────
 @router.get("/{office_id}/users", response_model=list[UserRead], operation_id="list_office_users")
 def list_office_users(db: DbSession, office_id: OfficeScope, tenant_id: TenantId):

@@ -9,19 +9,21 @@ from sqlalchemy.orm import Session
 
 from app.core import filestore
 from app.core.config import settings as cfg
-from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.db.models import (
     ClaimAttachment,
     InsuranceClaim,
     LedgerInsuranceDetail,
     Office,
     Patient,
+    PatientConsent,
     PatientDocument,
     PatientProcedure,
     PaymentAllocation,
     Provider,
 )
 from app.schemas.patient_extra import DuplicateCandidate
+from app.services import document_store
 
 _MAX_UPLOAD = 10 * 1024 * 1024  # 10 MB
 
@@ -41,14 +43,56 @@ def _require_patient(db: Session, patient_id: int, tenant_id: int) -> Patient:
 
 
 # ── Patient documents ────────────────────────────────────────────────────────
-def list_documents(db: Session, tenant_id: int, patient_id: int) -> list[PatientDocument]:
-    return list(db.execute(
-        select(PatientDocument).where(
-            PatientDocument.tenant_id == tenant_id,
-            PatientDocument.patient_id == patient_id,
-            PatientDocument.is_deleted.is_(False),
-        ).order_by(PatientDocument.created_at.desc())
+def list_documents(
+    db: Session, tenant_id: int, patient_id: int | None = None, *,
+    document_type: str | None = None, office_id: int | None = None,
+    search: str | None = None, page: int = 1, size: int = 20,
+) -> tuple[list[PatientDocument], int]:
+    """LTR-12: filtered + paged, matching the rest of the API.
+
+    The Letters history only wants ``document_type=consent-form``; before this it
+    had to fetch every document a patient had ever had and filter client-side.
+    ``patient_id`` stays optional so an office-wide document search is possible,
+    but tenancy is always enforced.
+    """
+    clauses = [
+        PatientDocument.tenant_id == tenant_id,
+        PatientDocument.is_deleted.is_(False),
+    ]
+    if patient_id is not None:
+        clauses.append(PatientDocument.patient_id == patient_id)
+    if document_type:
+        clauses.append(PatientDocument.document_type == document_type)
+    if office_id is not None:
+        clauses.append(PatientDocument.office_id == office_id)
+    if search:
+        term = f"%{search.strip()}%"
+        clauses.append(or_(
+            PatientDocument.file_name.ilike(term),
+            PatientDocument.description.ilike(term),
+        ))
+
+    total = db.execute(
+        select(func.count()).select_from(PatientDocument).where(*clauses)
+    ).scalar_one()
+    rows = list(db.execute(
+        select(PatientDocument).where(*clauses)
+        .order_by(PatientDocument.created_at.desc(), PatientDocument.id.desc())
+        .offset((max(page, 1) - 1) * size).limit(size)
     ).scalars().all())
+    for row in rows:
+        _stamp_url(row)
+    return rows, total
+
+
+def _stamp_url(doc: PatientDocument) -> PatientDocument:
+    """LTR-1 ask #2: hand back a URL the browser can actually fetch.
+
+    Set on the in-memory row only — a signed URL is short-lived, so persisting it
+    would serve an expired link on the next read.
+    """
+    doc.file_url = document_store.public_url(doc)
+    return doc
 
 
 def get_document(db: Session, tenant_id: int, doc_id: int) -> PatientDocument:
@@ -59,7 +103,7 @@ def get_document(db: Session, tenant_id: int, doc_id: int) -> PatientDocument:
     ).scalar_one_or_none()
     if doc is None or doc.is_deleted:
         raise NotFoundError(f"Document '{doc_id}' was not found")
-    return doc
+    return _stamp_url(doc)
 
 
 def create_document(
@@ -70,24 +114,135 @@ def create_document(
     _require_patient(db, patient_id, tenant_id)
     if len(data) > _MAX_UPLOAD:
         raise ValidationError("File exceeds 10 MB limit", code="file_too_large")
-    rel, url = filestore.save_file(f"patient_documents/{patient_id}", file_name, data)
+    # LTR-1: consent forms go to gs://{bucket}/consent-forms/..., everything else
+    # to the generic document prefix; local disk when no bucket is configured.
+    stored = document_store.store(
+        tenant_id=tenant_id, patient_id=patient_id, document_type=document_type,
+        file_name=file_name, content_type=content_type, data=data,
+    )
     doc = PatientDocument(
         tenant_id=tenant_id, patient_id=patient_id, office_id=office_id,
         document_type=document_type, description=description, file_name=file_name,
-        content_type=content_type, file_size=len(data), file_path=rel, file_url=url,
+        content_type=content_type, file_size=len(data),
+        file_path=stored.path, file_url=stored.url,
+        storage_backend=stored.backend, storage_bucket=stored.bucket,
+        storage_path=stored.path,
         created_by=user_id,
     )
     db.add(doc)
     db.commit()
     db.refresh(doc)
-    return doc
+    return _stamp_url(doc)
+
+
+def open_document(db: Session, tenant_id: int, doc_id: int):  # noqa: ANN201
+    """Streaming body + headers for ``GET /patient-documents/{id}/content``."""
+    doc = get_document(db, tenant_id, doc_id)
+    try:
+        body, content_type, size = document_store.open_stream(doc)
+    except FileNotFoundError as exc:  # blob gone / storage unavailable
+        raise NotFoundError(f"Document '{doc_id}' content is not available") from exc
+    return doc, body, content_type or doc.content_type, size
 
 
 def delete_document(db: Session, tenant_id: int, doc_id: int) -> None:
     doc = get_document(db, tenant_id, doc_id)
     doc.is_deleted = True
-    filestore.delete_file(doc.file_path)
+    document_store.delete(doc)
     db.commit()
+
+
+# ── Consent signing (LTR-10) ─────────────────────────────────────────────────
+# The published ``patient_consents.status`` vocabulary. Also seeded as the
+# ``consent_status`` definitions group so the FE renders labels from the backend.
+CONSENT_STATUSES = ("pending", "printed", "signed", "declined", "voided")
+SIGNATURE_METHODS = ("drawn", "scanned", "verbal")
+
+# A drawn signature arrives as a data-URL PNG from a canvas. Cap it: the column is
+# TEXT, and an uncapped base64 blob is an easy way to bloat the row.
+_MAX_SIGNATURE_CHARS = 512 * 1024
+
+
+def _require_consent(db: Session, tenant_id: int, consent_id: int) -> PatientConsent:
+    row = db.execute(
+        select(PatientConsent).where(
+            PatientConsent.id == consent_id, PatientConsent.tenant_id == tenant_id
+        )
+    ).scalar_one_or_none()
+    if row is None or row.is_deleted:
+        raise NotFoundError(f"Consent '{consent_id}' was not found")
+    return row
+
+
+def sign_consent(
+    db: Session, tenant_id: int, consent_id: int, payload: dict, user_id: int | None,
+) -> PatientConsent:
+    """Capture a signature against an existing consent row.
+
+    Two routes into the same record, mirroring how a practice actually works:
+
+    * ``signature_data`` — a base64 canvas capture signed on-screen.
+    * ``document_id``    — an already-uploaded scan of the wet-signed paper copy,
+      which must belong to the same tenant *and* the same patient as the consent.
+
+    One of the two is required unless the caller is recording a ``declined``
+    outcome. Signing is idempotent-ish but not silent: re-signing an already
+    signed consent is a conflict, because the earlier signature is the record.
+    """
+    consent = _require_consent(db, tenant_id, consent_id)
+
+    status = (payload.get("status") or "signed").strip().lower()
+    if status not in CONSENT_STATUSES:
+        raise ValidationError(
+            f"status must be one of {', '.join(CONSENT_STATUSES)}", code="invalid_status"
+        )
+
+    signature = payload.get("signature_data")
+    document_id = payload.get("document_id")
+    method = (payload.get("signature_method") or "").strip().lower() or None
+    if method and method not in SIGNATURE_METHODS:
+        raise ValidationError(
+            f"signature_method must be one of {', '.join(SIGNATURE_METHODS)}",
+            code="invalid_signature_method",
+        )
+
+    if status == "signed":
+        if consent.status == "signed":
+            raise ConflictError(
+                f"Consent '{consent_id}' is already signed", code="already_signed"
+            )
+        if not signature and document_id is None:
+            raise ValidationError(
+                "Signing requires either signature_data or document_id",
+                code="signature_required",
+            )
+        if signature and len(signature) > _MAX_SIGNATURE_CHARS:
+            raise ValidationError("Signature payload is too large", code="signature_too_large")
+
+    if document_id is not None:
+        doc = get_document(db, tenant_id, int(document_id))
+        if doc.patient_id != consent.patient_id:
+            raise ValidationError(
+                "document_id belongs to a different patient", code="document_patient_mismatch"
+            )
+        consent.document_id = doc.id
+        method = method or "scanned"
+    elif signature:
+        method = method or "drawn"
+
+    if signature:
+        consent.signature_data = signature
+    consent.status = status
+    consent.signature_method = method
+    consent.signer_name = payload.get("signer_name") or consent.signer_name
+    consent.signer_relationship = payload.get("signer_relationship") or consent.signer_relationship
+    consent.declined_reason = payload.get("declined_reason") or consent.declined_reason
+    if status in ("signed", "declined"):
+        consent.signed_by = user_id
+        consent.signed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(consent)
+    return consent
 
 
 # ── Claim attachments ────────────────────────────────────────────────────────

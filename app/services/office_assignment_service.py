@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Office, User, UserOffice
+from app.db.models import LetterTemplate, Office, OfficeLetterTemplate, User, UserOffice
 
 # ── Generic catalog↔office assignment ────────────────────────────────────────
 def get_assigned(db: Session, link_model: type, fk_attr: str, target_model: type, target_pk: str, office_id: int) -> list:
@@ -77,3 +77,37 @@ def copy_users_from(db: Session, target_office_id: int, source_office_id: int) -
         db.add(UserOffice(user_id=uid, office_id=target_office_id, is_primary=False))
     db.commit()
     return get_office_users(db, target_office_id)
+
+
+# ── LTR-7: the *effective* letter catalog for an office ──────────────────────
+def get_effective_letter_templates(
+    db: Session, office_id: int, tenant_id: int, *, include_inactive: bool = False
+) -> list[LetterTemplate]:
+    """Letters an office can actually print.
+
+    ``GET /{office_id}/letter-templates`` above is the assignment grid — it
+    returns exactly what its PUT replaces, so it stays as-is and returns ``[]``
+    for an office nobody has curated. That is *correct* as an assignment, but the
+    Letters dialog needs a usable list, and the legacy join was never migrated
+    (every office checked came back empty).
+
+    So the semantic is pinned here and documented for the frontend:
+    **unassigned = all**. An office with no curated assignment sees the full
+    tenant catalog; the moment one template is assigned, the office sees exactly
+    its assigned set. Seed the join with ``scripts/seed_office_letter_templates.py``
+    to move an office from the first mode to the second.
+    """
+    stmt = select(LetterTemplate).where(LetterTemplate.tenant_id == tenant_id)
+    if not include_inactive:
+        stmt = stmt.where(LetterTemplate.is_active.is_(True))
+
+    assigned_ids = list(db.execute(
+        select(OfficeLetterTemplate.letter_template_id).where(
+            OfficeLetterTemplate.office_id == office_id
+        )
+    ).scalars().all())
+    if assigned_ids:
+        stmt = stmt.where(LetterTemplate.id.in_(assigned_ids))
+    return list(db.execute(
+        stmt.order_by(LetterTemplate.letter_type, LetterTemplate.name)
+    ).scalars().all())
