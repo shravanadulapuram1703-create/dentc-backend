@@ -131,6 +131,14 @@ class Settings(BaseSettings):
     UPLOAD_URL_BASE: str = "/uploads"
     LOGO_MAX_BYTES: int = 2 * 1024 * 1024  # 2 MB
     LOGO_ALLOWED_TYPES: list[str] = Field(default_factory=lambda: ["image/jpeg", "image/png"])
+    # NOTE-DOC-3: ``UPLOAD_DIR`` holds BOTH branding assets (logos, watermarks) and
+    # PHI (patient documents, claim/progress-note attachments). Only these subdirs
+    # are mounted as public static files; everything else under UPLOAD_DIR is
+    # reachable exclusively through an authenticated, tenant-checked ``/content``
+    # endpoint. Adding a subdir here makes it world-readable — do not add a PHI one.
+    UPLOAD_PUBLIC_SUBDIRS: list[str] = Field(
+        default_factory=lambda: ["logos", "office_logos", "provider_watermarks"]
+    )
 
     # ── Imaging / object storage (GCS) ───────────────────────────────────────
     # DICOM originals + derived (thumbnail/web) buckets. When both are unset the
@@ -167,9 +175,36 @@ class Settings(BaseSettings):
     # everything else under the generic prefix.
     GCS_CONSENT_FORMS_PREFIX: str = "consent-forms"
     GCS_DOCUMENTS_PREFIX: str = "patient-documents"
-    # The document_type values routed to the consent-forms prefix.
+    # The document_type values routed to the consent-forms prefix. ``CF`` is the
+    # code the Notes screen sends for "Consent Form" (NOTE-DOC-4); without it a
+    # consent uploaded from Notes would land under the generic prefix.
     CONSENT_DOCUMENT_TYPES: list[str] = Field(
-        default_factory=lambda: ["consent-form", "consent_form", "consent"]
+        default_factory=lambda: ["consent-form", "consent_form", "consent", "CF"]
+    )
+    # ── Patient-document upload rules (NOTE-DOC-5) ───────────────────────────
+    # Enforced server-side by ``app.core.filestore.validate_upload`` on every
+    # binary upload route, and published verbatim by
+    # ``GET /patient-documents/limits`` so the UI states the same numbers.
+    DOCUMENT_MAX_BYTES: int = 10 * 1024 * 1024  # 10 MB
+    DOCUMENT_ALLOWED_TYPES: list[str] = Field(
+        default_factory=lambda: [
+            "application/pdf",
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/tiff",
+            "image/bmp",
+            "image/webp",
+        ]
+    )
+    # Browsers and scanners routinely send ``application/octet-stream`` (or a
+    # wrong type) for a perfectly good PDF, so the extension is the second half
+    # of the check — a file passes when BOTH its extension and its declared type
+    # are acceptable, and an unhelpful declared type defers to the extension.
+    DOCUMENT_ALLOWED_EXTENSIONS: list[str] = Field(
+        default_factory=lambda: [
+            ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".tif", ".tiff", ".bmp", ".webp",
+        ]
     )
     # TTL of the GCS signed URL handed to the browser for a document (PHI link).
     DOCUMENT_SIGNED_URL_TTL_SECONDS: int = 900  # 15 min

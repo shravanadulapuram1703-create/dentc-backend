@@ -126,6 +126,12 @@ def public_url(doc) -> str:  # noqa: ANN001 - PatientDocument (import cycle othe
     GCS rows get a signed URL when signing works; otherwise (and always in
     ``DOCUMENT_URL_MODE=proxy``) the authenticated streaming endpoint, which
     applies the caller's tenant checks before a byte moves.
+
+    NOTE-DOC-3: local rows now get the same authenticated endpoint. They used to
+    hand back the row's ``/uploads/...`` path, which was served by a public static
+    mount — anyone with the path read the document without logging in. There is
+    no longer a public route for it, so the proxy is both the safe answer and the
+    only working one.
     """
     if getattr(doc, "storage_backend", LOCAL) == GCS and doc.storage_bucket and doc.storage_path:
         if settings.DOCUMENT_URL_MODE != "proxy":
@@ -136,10 +142,7 @@ def public_url(doc) -> str:  # noqa: ANN001 - PatientDocument (import cycle othe
             )
             if signed:
                 return signed
-        return absolute_url(content_path(doc.id))
-    # Local rows keep the existing /uploads path, absolutised when configured.
-    url = doc.file_url or ""
-    return absolute_url(url) if url.startswith("/") else url
+    return absolute_url(content_path(doc.id))
 
 
 def open_stream(doc) -> tuple[Iterator[bytes], str | None, int | None]:  # noqa: ANN001

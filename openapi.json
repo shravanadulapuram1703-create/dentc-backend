@@ -3828,7 +3828,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
+                    "$ref": "#/components/schemas/PaymentAllocationRead"
                   },
                   "title": "Response Allocate Payment"
                 }
@@ -3925,7 +3925,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
+                    "$ref": "#/components/schemas/PaymentAllocationRead"
                   },
                   "title": "Response Allocate Adjustment"
                 }
@@ -4012,7 +4012,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
+                    "$ref": "#/components/schemas/PaymentAllocationRead"
                   },
                   "title": "Response List Adjustment Allocations"
                 }
@@ -5261,7 +5261,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__schemas__procedure_setup__FeeScheduleOption"
+                    "$ref": "#/components/schemas/FeeScheduleOption"
                   },
                   "title": "Response List Fee Schedule Options"
                 }
@@ -10240,6 +10240,18 @@
             "description": "Scope to one appointment status"
           },
           {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "SCHED-DEL-1: include soft-deleted (archived) appointments. Off by default \u2014 the calendar wants live appointments only.",
+              "default": false,
+              "title": "Include Archived"
+            },
+            "description": "SCHED-DEL-1: include soft-deleted (archived) appointments. Off by default \u2014 the calendar wants live appointments only."
+          },
+          {
             "name": "X-Tenant-ID",
             "in": "header",
             "required": false,
@@ -10363,6 +10375,100 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentSchedulerRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointment_id}/restore": {
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Un-archive a soft-deleted appointment (SCHED-DEL-2)",
+        "description": "SCHED-DEL-2: soft delete is intentional (HIPAA-adjacent history \u2014 an\nappointment that existed is a fact about the patient's record), so DELETE stays\nsoft. This is the missing other half: the archived rows are listable via\n``GET /appointments?is_archived=true`` and this puts one back on the calendar.",
+        "operationId": "restore_appointment",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Appointment Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -19053,6 +19159,87 @@
         }
       }
     },
+    "/api/v1/procedure-code-categories": {
+      "get": {
+        "tags": [
+          "Procedures"
+        ],
+        "summary": "Procedure-code categories with code counts",
+        "description": "Renders the Quick Add / picker category buttons without paging the whole\n~1,100-code catalog first.",
+        "operationId": "list_procedure_code_categories",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Count (and list) only active codes.",
+              "default": false,
+              "title": "Active Only"
+            },
+            "description": "Count (and list) only active codes."
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProcedureCodeCategory"
+                  },
+                  "title": "Response List Procedure Code Categories"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/icd-codes/bulk-status": {
       "post": {
         "tags": [
@@ -19690,6 +19877,63 @@
         }
       }
     },
+    "/api/v1/patient-documents/limits": {
+      "get": {
+        "tags": [
+          "Patients"
+        ],
+        "summary": "The upload size cap and content-type allow-list the API enforces (NOTE-DOC-5)",
+        "description": "Published so the file picker states exactly the limits the API enforces.\n\nDeclared before ``/{document_id}`` so the literal path wins over the int\nparameter.",
+        "operationId": "get_patient_document_limits",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadLimits"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/patient-documents/{document_id}": {
       "get": {
         "tags": [
@@ -20302,6 +20546,102 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/insurance-claims/{claim_id}/attachments/{attachment_id}/content": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Stream a claim attachment with the caller's tenant checks applied (NOTE-DOC-3)",
+        "description": "Claim attachments used to be handed back as a public ``/uploads/...`` URL,\nreadable with no token and no tenant check. That mount is gone; this is the\nread path.",
+        "operationId": "get_claim_attachment_content",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Claim Id"
+            }
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Attachment Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
           },
           "401": {
             "content": {
@@ -22042,6 +22382,43 @@
         }
       }
     },
+    "/api/v1/metadata/patient-flag-rules": {
+      "get": {
+        "tags": [
+          "Patients"
+        ],
+        "summary": "Mutual-exclusion / implication rules for the Patient Status, Coverage Type and Patient Type checkboxes",
+        "description": "Serves the same rule table the API enforces on write.\n\nThe form needs this logic to tick and untick boxes as the user clicks;\nreading it from here keeps the two halves from drifting, so a rule added to\n``patient_rules_service`` reaches the UI without a frontend release.",
+        "operationId": "get_patient_flag_rules",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientFlagRules"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/responsible-parties/{rp_id}/patients": {
       "get": {
         "tags": [
@@ -22506,6 +22883,102 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/progress-notes/{note_id}/attachments/{attachment_id}/content": {
+      "get": {
+        "tags": [
+          "Clinical"
+        ],
+        "summary": "Stream a note attachment with the caller's tenant checks applied (NOTE-DOC-3)",
+        "description": "Note attachments used to be handed back as a public ``/uploads/...`` URL,\nreadable with no token and no tenant check. That mount is gone; this is the\nread path \u2014 and it is what ``file_url`` now points at.",
+        "operationId": "get_progress_note_attachment_content",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Attachment Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
           },
           "401": {
             "content": {
@@ -34940,6 +35413,24 @@
               "title": "Is Archived"
             },
             "description": "Filter by is_archived"
+          },
+          {
+            "name": "document_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by document_id",
+              "title": "Document Id"
+            },
+            "description": "Filter by document_id"
           },
           {
             "name": "page",
@@ -49570,6 +50061,60 @@
             "description": "Filter by provider_id"
           },
           {
+            "name": "treatment_plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by treatment_plan_id",
+              "title": "Treatment Plan Id"
+            },
+            "description": "Filter by treatment_plan_id"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status",
+              "title": "Status"
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "is_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by is_archived",
+              "title": "Is Archived"
+            },
+            "description": "Filter by is_archived"
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -61428,7 +61973,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentAllocationRead"
+                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
                 }
               }
             }
@@ -61523,7 +62068,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentAllocationRead"
+                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
                 }
               }
             }
@@ -61626,7 +62171,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentAllocationRead"
+                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
                 }
               }
             }
@@ -74101,6 +74646,669 @@
         }
       }
     },
+    "/api/v1/campaigns": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "List campaigns",
+        "operationId": "list_campaigns",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by office_id",
+              "title": "Office Id"
+            },
+            "description": "Filter by office_id"
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by channel",
+              "title": "Channel"
+            },
+            "description": "Filter by channel"
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by is_active",
+              "title": "Is Active"
+            },
+            "description": "Filter by is_active"
+          },
+          {
+            "name": "start_date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "start_date >= (inclusive lower bound)",
+              "title": "Start Date From"
+            },
+            "description": "start_date >= (inclusive lower bound)"
+          },
+          {
+            "name": "start_date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "start_date <= (inclusive upper bound)",
+              "title": "Start Date To"
+            },
+            "description": "start_date <= (inclusive upper bound)"
+          },
+          {
+            "name": "end_date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "end_date >= (inclusive lower bound)",
+              "title": "End Date From"
+            },
+            "description": "end_date >= (inclusive lower bound)"
+          },
+          {
+            "name": "end_date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "end_date <= (inclusive upper bound)",
+              "title": "End Date To"
+            },
+            "description": "end_date <= (inclusive upper bound)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Column to sort by",
+              "title": "Sort"
+            },
+            "description": "Column to sort by"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Free-text search",
+              "title": "Search"
+            },
+            "description": "Free-text search"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_CampaignRead_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Create campaign",
+        "operationId": "create_campaign",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{item_id}": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Get campaign by id",
+        "operationId": "get_campaign",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "campaign identifier",
+              "title": "Item Id"
+            },
+            "description": "campaign identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Update campaign",
+        "operationId": "update_campaign",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "campaign identifier",
+              "title": "Item Id"
+            },
+            "description": "campaign identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Delete campaign",
+        "operationId": "delete_campaign",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "campaign identifier",
+              "title": "Item Id"
+            },
+            "description": "campaign identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
     "/api/v1/time-clock-entries": {
       "get": {
         "tags": [
@@ -85408,6 +86616,17 @@
             ],
             "title": "Lab Cost"
           },
+          "lab_dds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lab Dds"
+          },
           "lab_sent_on": {
             "anyOf": [
               {
@@ -85703,6 +86922,39 @@
             ],
             "title": "Status"
           },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "provider_units": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Units"
+          },
+          "bill_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bill To"
+          },
           "material_id": {
             "anyOf": [
               {
@@ -85846,6 +87098,32 @@
             "type": "string",
             "title": "Status"
           },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "provider_units": {
+            "type": "integer",
+            "title": "Provider Units"
+          },
+          "bill_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bill To"
+          },
           "material_id": {
             "anyOf": [
               {
@@ -85889,6 +87167,7 @@
           "fee",
           "insurance_estimate",
           "status",
+          "provider_units",
           "is_archived",
           "id",
           "created_at"
@@ -86040,6 +87319,39 @@
               }
             ],
             "title": "Status"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "provider_units": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Units"
+          },
+          "bill_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bill To"
           },
           "material_id": {
             "anyOf": [
@@ -86205,6 +87517,17 @@
               }
             ],
             "title": "Lab Cost"
+          },
+          "lab_dds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lab Dds"
           },
           "lab_sent_on": {
             "anyOf": [
@@ -86561,6 +87884,11 @@
           "is_posted": {
             "type": "boolean",
             "title": "Is Posted",
+            "default": false
+          },
+          "is_archived": {
+            "type": "boolean",
+            "title": "Is Archived",
             "default": false
           },
           "posted_on": {
@@ -87031,6 +88359,17 @@
               }
             ],
             "title": "Lab Cost"
+          },
+          "lab_dds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lab Dds"
           },
           "lab_sent_on": {
             "anyOf": [
@@ -89823,6 +91162,295 @@
           "conditions"
         ],
         "title": "BulkChartConditionsResult"
+      },
+      "CampaignCreate": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name"
+        ],
+        "title": "CampaignCreate"
+      },
+      "CampaignRead": {
+        "properties": {
+          "tenant_id": {
+            "type": "integer",
+            "title": "Tenant Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "code",
+          "name",
+          "is_active",
+          "id",
+          "created_at"
+        ],
+        "title": "CampaignRead"
+      },
+      "CampaignUpdate": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "CampaignUpdate"
       },
       "CariesRiskAssessmentCreate": {
         "properties": {
@@ -97891,6 +99519,54 @@
         "title": "ConversationUpdate",
         "description": "PATCH body \u2014 every field optional; only the caller's participant row moves."
       },
+      "CoverageSlotRef": {
+        "properties": {
+          "legacy_plan_type": {
+            "type": "string",
+            "title": "Legacy Plan Type"
+          },
+          "insurance_type": {
+            "type": "string",
+            "title": "Insurance Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "legacy_plan_type",
+          "insurance_type"
+        ],
+        "title": "CoverageSlotRef"
+      },
+      "CoverageTypeRules": {
+        "properties": {
+          "no_coverage_is_derived": {
+            "type": "boolean",
+            "title": "No Coverage Is Derived",
+            "default": true
+          },
+          "no_coverage_excludes": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageSlotRef"
+            },
+            "type": "array",
+            "title": "No Coverage Excludes"
+          },
+          "ranks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ranks"
+          },
+          "requires_lower_rank": {
+            "type": "boolean",
+            "title": "Requires Lower Rank",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "CoverageTypeRules"
+      },
       "DeclineInput": {
         "properties": {
           "reason": {
@@ -100850,6 +102526,17 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "fee_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Type"
           }
         },
         "type": "object",
@@ -108860,6 +110547,17 @@
             ],
             "title": "Lab Cost"
           },
+          "lab_dds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lab Dds"
+          },
           "lab_sent_on": {
             "anyOf": [
               {
@@ -113654,7 +115352,7 @@
           },
           "fee_schedules": {
             "items": {
-              "$ref": "#/components/schemas/FeeScheduleOption"
+              "$ref": "#/components/schemas/app__schemas__office_setup__FeeScheduleOption"
             },
             "type": "array",
             "title": "Fee Schedules"
@@ -117855,6 +119553,26 @@
         ],
         "title": "PaginatedResponse[AuditLogRead]"
       },
+      "PaginatedResponse_CampaignRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[CampaignRead]"
+      },
       "PaginatedResponse_CariesRiskAssessmentRead_": {
         "properties": {
           "items": {
@@ -119019,7 +120737,7 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/PaymentAllocationRead"
+              "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
             },
             "type": "array",
             "title": "Items"
@@ -122311,6 +124029,27 @@
         "type": "object",
         "title": "PatientEmergencyContactUpdate"
       },
+      "PatientFlagRules": {
+        "properties": {
+          "patient_type": {
+            "$ref": "#/components/schemas/PatientTypeRules"
+          },
+          "patient_status": {
+            "$ref": "#/components/schemas/PatientStatusRules"
+          },
+          "coverage_type": {
+            "$ref": "#/components/schemas/CoverageTypeRules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_type",
+          "patient_status",
+          "coverage_type"
+        ],
+        "title": "PatientFlagRules",
+        "description": "The Add/Edit Patient checkbox-integrity rules, served as data so the form\ndrives its own tick/untick behaviour from the same table the API enforces."
+      },
       "PatientImagingResponse": {
         "properties": {
           "patient_id": {
@@ -123854,6 +125593,17 @@
             ],
             "title": "Notes Html"
           },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
           "is_archived": {
             "anyOf": [
               {
@@ -123883,6 +125633,103 @@
           "notes"
         ],
         "title": "PatientNoteCreate"
+      },
+      "PatientNoteDocumentRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "file_name": {
+            "type": "string",
+            "title": "File Name"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size"
+          },
+          "document_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Type"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "file_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Url"
+          },
+          "storage_backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Backend"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "file_name"
+        ],
+        "title": "PatientNoteDocumentRef",
+        "description": "The attached document, denormalised onto the note.\n\nDeliberately a subset of ``PatientDocumentRead``: enough to render a link and\na file chip (name, type, size), never the internal ``file_path``."
       },
       "PatientNoteRead": {
         "properties": {
@@ -123950,6 +125797,17 @@
             ],
             "title": "Notes Html"
           },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
           "is_archived": {
             "type": "boolean",
             "title": "Is Archived"
@@ -124000,6 +125858,38 @@
               }
             ],
             "title": "Updated At"
+          },
+          "document": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientNoteDocumentRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "updated_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By Name"
           }
         },
         "type": "object",
@@ -124081,6 +125971,17 @@
               }
             ],
             "title": "Notes Html"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
           },
           "is_archived": {
             "anyOf": [
@@ -129866,6 +131767,95 @@
         "type": "object",
         "title": "PatientSignatureUpdate"
       },
+      "PatientStatusImplication": {
+        "properties": {
+          "when": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "When"
+          },
+          "then": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Then"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "when",
+          "then",
+          "reason"
+        ],
+        "title": "PatientStatusImplication"
+      },
+      "PatientStatusRules": {
+        "properties": {
+          "implications": {
+            "items": {
+              "$ref": "#/components/schemas/PatientStatusImplication"
+            },
+            "type": "array",
+            "title": "Implications"
+          }
+        },
+        "type": "object",
+        "title": "PatientStatusRules"
+      },
+      "PatientTypeExclusion": {
+        "properties": {
+          "codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Codes"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codes",
+          "labels",
+          "reason"
+        ],
+        "title": "PatientTypeExclusion"
+      },
+      "PatientTypeRules": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field",
+            "default": "patient_types"
+          },
+          "exclusions": {
+            "items": {
+              "$ref": "#/components/schemas/PatientTypeExclusion"
+            },
+            "type": "array",
+            "title": "Exclusions"
+          }
+        },
+        "type": "object",
+        "title": "PatientTypeRules"
+      },
       "PatientUpdate": {
         "properties": {
           "home_office_id": {
@@ -130619,31 +132609,13 @@
       },
       "PaymentAllocationRead": {
         "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
-          },
-          "legacy_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Id"
-          },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -130667,6 +132639,17 @@
             ],
             "title": "Adjustment Id"
           },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
+          },
           "claim_id": {
             "anyOf": [
               {
@@ -130678,17 +132661,6 @@
             ],
             "title": "Claim Id"
           },
-          "ins_plan_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ins Plan Id"
-          },
           "provider_id": {
             "anyOf": [
               {
@@ -130699,18 +132671,6 @@
               }
             ],
             "title": "Provider Id"
-          },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -130728,22 +132688,24 @@
             ],
             "title": "Alloc Type"
           },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           }
         },
         "type": "object",
         "required": [
-          "patient_id",
-          "amount",
           "id",
-          "created_at"
+          "patient_id",
+          "amount"
         ],
         "title": "PaymentAllocationRead"
       },
@@ -136782,7 +138744,7 @@
           },
           "allocations": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
+              "$ref": "#/components/schemas/PaymentAllocationRead"
             },
             "type": "array",
             "title": "Allocations"
@@ -136809,6 +138771,30 @@
         ],
         "title": "ProcedureAllocationsSummary",
         "description": "CHG-5: what has already been applied to one procedure, and by what."
+      },
+      "ProcedureCodeCategory": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "code_count": {
+            "type": "integer",
+            "title": "Code Count",
+            "default": 0
+          },
+          "active_code_count": {
+            "type": "integer",
+            "title": "Active Code Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "category"
+        ],
+        "title": "ProcedureCodeCategory",
+        "description": "One row of the category taxonomy behind the Quick Add category buttons.\n\nThe picker used to derive its categories by paging the whole 1,100-code\ncatalog; this is the taxonomy on its own."
       },
       "ProcedureCodeCreate": {
         "properties": {
@@ -145809,6 +147795,30 @@
               }
             ],
             "title": "Lunch End"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id",
+            "description": "NULL = applies to every office"
           }
         },
         "type": "object",
@@ -145821,7 +147831,7 @@
         "properties": {
           "days": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__provider_setup__ScheduleDayInput"
+              "$ref": "#/components/schemas/ScheduleDayInput"
             },
             "type": "array",
             "maxItems": 70,
@@ -150514,6 +152524,41 @@
         ],
         "title": "TrendBucket"
       },
+      "UploadLimits": {
+        "properties": {
+          "max_bytes": {
+            "type": "integer",
+            "title": "Max Bytes"
+          },
+          "max_megabytes": {
+            "type": "number",
+            "title": "Max Megabytes"
+          },
+          "allowed_content_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Content Types"
+          },
+          "allowed_extensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Extensions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_bytes",
+          "max_megabytes",
+          "allowed_content_types",
+          "allowed_extensions"
+        ],
+        "title": "UploadLimits",
+        "description": "NOTE-DOC-5: the server-enforced upload rules, published so the UI states\nthe same numbers it is validated against instead of hardcoding its own."
+      },
       "UserCompleteCreate": {
         "properties": {
           "email": {
@@ -152670,15 +154715,33 @@
         ],
         "title": "ValidationError"
       },
-      "app__schemas__billing__PaymentAllocationRead": {
+      "app__schemas__factory__PaymentAllocationRead": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
+          },
+          "legacy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Id"
+          },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -152702,17 +154765,6 @@
             ],
             "title": "Adjustment Id"
           },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
-          },
           "claim_id": {
             "anyOf": [
               {
@@ -152724,6 +154776,17 @@
             ],
             "title": "Claim Id"
           },
+          "ins_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ins Plan Id"
+          },
           "provider_id": {
             "anyOf": [
               {
@@ -152734,6 +154797,18 @@
               }
             ],
             "title": "Provider Id"
+          },
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -152751,24 +154826,22 @@
             ],
             "title": "Alloc Type"
           },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
           }
         },
         "type": "object",
         "required": [
-          "id",
           "patient_id",
-          "amount"
+          "amount",
+          "id",
+          "created_at"
         ],
         "title": "PaymentAllocationRead"
       },
@@ -152800,25 +154873,7 @@
         ],
         "title": "PageMeta"
       },
-      "app__schemas__office_setup__ScheduleReplace": {
-        "properties": {
-          "days": {
-            "items": {
-              "$ref": "#/components/schemas/ScheduleDayInput"
-            },
-            "type": "array",
-            "maxItems": 7,
-            "minItems": 1,
-            "title": "Days"
-          }
-        },
-        "type": "object",
-        "required": [
-          "days"
-        ],
-        "title": "ScheduleReplace"
-      },
-      "app__schemas__procedure_setup__FeeScheduleOption": {
+      "app__schemas__office_setup__FeeScheduleOption": {
         "properties": {
           "id": {
             "type": "integer",
@@ -152827,17 +154882,6 @@
           "name": {
             "type": "string",
             "title": "Name"
-          },
-          "fee_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fee Type"
           }
         },
         "type": "object",
@@ -152847,7 +154891,7 @@
         ],
         "title": "FeeScheduleOption"
       },
-      "app__schemas__provider_setup__ScheduleDayInput": {
+      "app__schemas__office_setup__ScheduleDayInput": {
         "properties": {
           "day_of_week": {
             "type": "integer",
@@ -152908,30 +154952,6 @@
               }
             ],
             "title": "Lunch End"
-          },
-          "effective_from": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Effective From"
-          },
-          "office_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Office Id",
-            "description": "NULL = applies to every office"
           }
         },
         "type": "object",
@@ -152939,6 +154959,24 @@
           "day_of_week"
         ],
         "title": "ScheduleDayInput"
+      },
+      "app__schemas__office_setup__ScheduleReplace": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleDayInput"
+            },
+            "type": "array",
+            "maxItems": 7,
+            "minItems": 1,
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days"
+        ],
+        "title": "ScheduleReplace"
       }
     },
     "securitySchemes": {

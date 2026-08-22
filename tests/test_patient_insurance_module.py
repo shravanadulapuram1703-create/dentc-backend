@@ -58,6 +58,12 @@ def test_subscriber_new_fields_persist(client, carrier_plan):
 # ── INS-PT-3: secondary-subscriber relationship-to-primary persists ──────────
 def test_patient_insurance_sec_sub_rel(client, patient, carrier_plan):
     _carrier, plan = carrier_plan
+    # A secondary slot now requires its primary (Coverage Type ordinal integrity) —
+    # which is also what makes "relationship to the PRIMARY subscriber" meaningful.
+    assert client.post(f"{PREFIX}/patient-insurance", json={
+        "patient_id": patient.id, "ins_plan_id": plan.id,
+        "legacy_plan_type": "D", "insurance_type": "primary",
+    }).status_code == 201
     r = client.post(f"{PREFIX}/patient-insurance", json={
         "patient_id": patient.id, "ins_plan_id": plan.id,
         "legacy_plan_type": "D", "insurance_type": "secondary",

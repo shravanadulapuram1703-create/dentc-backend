@@ -43,10 +43,14 @@ def list_scheduler_appointments(
     office_id: Annotated[int | None, Query()] = None,
     provider_id: Annotated[str | None, Query(description="Scope to one provider (MP-7 / G8)")] = None,
     status: Annotated[str | None, Query(description="Scope to one appointment status")] = None,
+    include_archived: Annotated[bool, Query(
+        description="SCHED-DEL-1: include soft-deleted (archived) appointments. "
+                    "Off by default — the calendar wants live appointments only.",
+    )] = False,
 ):
     return svc.list_scheduler_appointments(
         db, tenant_id, date_from=date_from, date_to=date_to, office_id=office_id,
-        provider_id=provider_id, status=status,
+        provider_id=provider_id, status=status, include_archived=include_archived,
     )
 
 
@@ -64,13 +68,43 @@ def update_appointment_status(
         add_to_call_list=body.add_to_call_list, actor_id=current.id,
     )
     # Reuse the denormalized shape (single-row) for a consistent response.
+    # include_archived: the row being transitioned is the one we must find, even if
+    # it is archived — the feed's default filter would otherwise hide it from itself.
+    rows = svc.list_scheduler_appointments(
+        db, tenant_id, office_id=appt.office_id, include_archived=True,
+    )
+    match = next((r for r in rows if r["id"] == appt.id), None)
+    return match or {
+        "id": appt.id, "office_id": appt.office_id, "date": appt.date,
+        "start_time": appt.start_time, "end_time": appt.end_time, "duration": appt.duration,
+        "status": appt.status, "is_missed": appt.is_missed, "is_cancelled": appt.is_cancelled,
+        "is_blocked": appt.is_blocked, "is_archived": appt.is_archived,
+        "confirmed_on": appt.confirmed_on,
+        "checked_in_on": appt.checked_in_on, "checked_out_on": appt.checked_out_on,
+    }
+
+
+@appt_router.post("/{appointment_id}/restore", response_model=AppointmentSchedulerRead,
+                  operation_id="restore_appointment",
+                  summary="Un-archive a soft-deleted appointment (SCHED-DEL-2)")
+def restore_appointment(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser,
+    appointment_id: Annotated[str, Path()],
+):
+    """SCHED-DEL-2: soft delete is intentional (HIPAA-adjacent history — an
+    appointment that existed is a fact about the patient's record), so DELETE stays
+    soft. This is the missing other half: the archived rows are listable via
+    ``GET /appointments?is_archived=true`` and this puts one back on the calendar.
+    """
+    appt = svc.restore_appointment(db, tenant_id, appointment_id, actor_id=current.id)
     rows = svc.list_scheduler_appointments(db, tenant_id, office_id=appt.office_id)
     match = next((r for r in rows if r["id"] == appt.id), None)
     return match or {
         "id": appt.id, "office_id": appt.office_id, "date": appt.date,
         "start_time": appt.start_time, "end_time": appt.end_time, "duration": appt.duration,
         "status": appt.status, "is_missed": appt.is_missed, "is_cancelled": appt.is_cancelled,
-        "is_blocked": appt.is_blocked, "confirmed_on": appt.confirmed_on,
+        "is_blocked": appt.is_blocked, "is_archived": appt.is_archived,
+        "confirmed_on": appt.confirmed_on,
         "checked_in_on": appt.checked_in_on, "checked_out_on": appt.checked_out_on,
     }
 

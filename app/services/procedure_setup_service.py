@@ -7,7 +7,7 @@ per-code insurance rules are tenant-scoped.
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
@@ -49,6 +49,35 @@ def stats(db: Session) -> dict:
         "ortho": int(ortho),
         "by_category": by_category,
     }
+
+
+# ── APPT-10: category taxonomy ───────────────────────────────────────────────
+def list_categories(db: Session, *, active_only: bool = False) -> list[dict]:
+    """The distinct procedure-code categories with their code counts.
+
+    Sourced from ``procedure_codes.category`` (the same column ``stats()`` groups
+    by) so the taxonomy can never drift from the catalog it describes. NULL/blank
+    categories collapse into "Uncategorized" — the codes still exist and the
+    picker must be able to reach them.
+    """
+    stmt = select(
+        ProcedureCode.category,
+        func.count(),
+        func.sum(case((ProcedureCode.is_active.is_(True), 1), else_=0)),
+    ).group_by(ProcedureCode.category)
+    if active_only:
+        stmt = stmt.where(ProcedureCode.is_active.is_(True))
+
+    rolled: dict[str, list[int]] = {}
+    for cat, total, active in db.execute(stmt).all():
+        key = (cat or "").strip() or "Uncategorized"
+        bucket = rolled.setdefault(key, [0, 0])
+        bucket[0] += int(total or 0)
+        bucket[1] += int(active or 0)
+    return [
+        {"category": key, "code_count": counts[0], "active_code_count": counts[1]}
+        for key, counts in sorted(rolled.items(), key=lambda kv: kv[0].lower())
+    ]
 
 
 # ── PROC-2: provider↔procedure permission set ────────────────────────────────

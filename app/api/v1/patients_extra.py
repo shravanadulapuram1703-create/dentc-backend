@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, Path, Query, Response, Uploa
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, DbSession, PageParams, TenantId, get_current_user
+from app.core import filestore
 from app.schemas.common import ErrorResponse, PaginatedResponse
 from app.schemas.letters import ConsentSignRequest
 from app.schemas.patient_extra import (
@@ -20,6 +21,7 @@ from app.schemas.patient_extra import (
     DuplicateCheckResponse,
     PatientConsentSignedRead,
     PatientDocumentRead,
+    UploadLimits,
 )
 from app.services import patient_extra_service as svc
 
@@ -68,6 +70,21 @@ async def upload_document(
         description=description, file_name=file.filename or "document",
         content_type=file.content_type, data=data, user_id=current.id,
     )
+
+
+@documents_router.get(
+    "/limits",
+    response_model=UploadLimits,
+    operation_id="get_patient_document_limits",
+    summary="The upload size cap and content-type allow-list the API enforces (NOTE-DOC-5)",
+)
+def get_document_limits():
+    """Published so the file picker states exactly the limits the API enforces.
+
+    Declared before ``/{document_id}`` so the literal path wins over the int
+    parameter.
+    """
+    return filestore.upload_limits()
 
 
 @documents_router.get("/{document_id}", response_model=PatientDocumentRead, operation_id="get_patient_document")
@@ -135,6 +152,28 @@ async def upload_claim_attachment(
         db, tenant_id, claim_id, attachment_type=attachment_type,
         file_name=file.filename or "attachment", content_type=file.content_type,
         data=data, user_id=current.id,
+    )
+
+
+@claims_router.get(
+    "/{claim_id}/attachments/{attachment_id}/content",
+    operation_id="get_claim_attachment_content",
+    summary="Stream a claim attachment with the caller's tenant checks applied (NOTE-DOC-3)",
+    response_class=StreamingResponse,
+)
+def get_claim_attachment_content(
+    db: DbSession, tenant_id: TenantId,
+    claim_id: Annotated[str, Path()], attachment_id: Annotated[int, Path()],
+):
+    """Claim attachments used to be handed back as a public ``/uploads/...`` URL,
+    readable with no token and no tenant check. That mount is gone; this is the
+    read path."""
+    att, body, content_type, size = svc.open_claim_attachment(db, tenant_id, claim_id, attachment_id)
+    headers = {"Content-Disposition": f'inline; filename="{att.file_name}"'}
+    if size is not None:
+        headers["Content-Length"] = str(size)
+    return StreamingResponse(
+        body, media_type=content_type or "application/octet-stream", headers=headers
     )
 
 

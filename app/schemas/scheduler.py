@@ -37,6 +37,10 @@ class AppointmentSchedulerRead(BaseModel):
     is_cancelled: bool = False
     is_blocked: bool = False
     is_posted: bool = False
+    # SCHED-DEL-1: DELETE soft-archives the row. The feed now excludes archived
+    # appointments by default; the flag is exposed so a caller that opts back in
+    # with ``?include_archived=true`` can tell the tombstones apart.
+    is_archived: bool = False
     posted_on: datetime | None = None
     confirmed_on: datetime | None = None
     checked_in_on: datetime | None = None

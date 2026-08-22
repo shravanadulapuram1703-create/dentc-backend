@@ -436,6 +436,117 @@ existed; what was missing was the *engine*:
   pollution is a **field-offset** bug in the migration reader (embedded commas in the
   HTML `BODY`); those 11 `Financial Agreement` bodies are truncated and need re-import.
 
+**Add / Edit Appointment module** (scheduler → Add Appointment / double-click an
+appointment; APPT-PROC-1…4, SCHED-DEL-1/2, APPT-5…12 of
+[docs/scheduler/add_edit_appointment_backend_devreport.md](docs/scheduler/add_edit_appointment_backend_devreport.md)
+/ [response](docs/scheduler/add_edit_appointment_backend_response.md); Alembic
+`f0a1b2c3d4e5`).
+- **SCHED-DEL-1 is the load-bearing fix**: `DELETE /appointments/{id}` is a *soft*
+  delete, but `GET /appointments/scheduler` returned the tombstones — so a deleted
+  appointment reappeared on every refetch, and every consumer of the feed
+  (dashboard KPIs, report metrics, lab tracking, patient overview) inherited the
+  bug. The feed now filters `is_archived=false` by default (`?include_archived=true`
+  opts back in) and `AppointmentSchedulerRead` exposes `is_archived`. The FE's
+  subtract-the-archived-ids workaround can be deleted.
+  **SCHED-DEL-2**: soft delete is deliberate (`sms_messages`/`patient_procedures`
+  reference the appointment, plus audit history) — the missing half was
+  `POST /appointments/{id}/restore` (idempotent, tenant-checked).
+- **APPT-PROC-4** the same shape one level down: `appointment-procedures` opts into
+  `CrudConfig.hide_soft_deleted`, so a removed line stops coming back;
+  `?is_archived=true` still surfaces it.
+- Additive columns: `appointment_procedures.duration_minutes` (**nullable on
+  purpose** — Calc Time must tell "unset" from "0 minutes" so it can fall back to
+  `default_duration_minutes`) / `provider_units` / `bill_to` (APPT-PROC-1/2/3),
+  `appointments.lab_dds` (APPT-5, free text — legacy lab slips carry initials or an
+  outside dentist, so a providers FK would make it unfillable).
+- **APPT-7** new `campaigns` catalog ([app/db/models/comms.py](app/db/models/comms.py))
+  behind the Campaign ID box; `appointments.campaign_id` stays a **string holding
+  the code**, so a free-typed migrated value still saves.
+- **APPT-10** `GET /procedure-code-categories` (grouped from the same
+  `procedure_codes.category` column `/stats` uses, so it cannot drift).
+- **APPT-8/9 were seeded, not just tooled**: every `requires_*` flag was false
+  across all 1,122 codes, so enforcement could never fire.
+  `scripts/seed_procedure_code_rules.py` derives them from the **CDT family ranges**
+  (the published `D<category><series>` taxonomy — no licensed CDT file), plus
+  per-family `default_duration_minutes` and CHG-2 `surface_rules` for the families
+  whose descriptor *is* the surface count. Applied: 418 flag sets, 693 durations,
+  15 surface rules. `default_fee` is **not** invented — fee schedules stay the
+  source of truth (`--fee-schedule-id` copies a real schedule into the blanks).
+- **APPT-6 needed no work** — explosion codes have been a resource since CHG-4
+  (`/explosion-codes`, `/explosion-code-items`, `/explosion-codes/{code}/expand`);
+  the FE removed the filter believing there was no backend.
+- **APPT-11/12 confirmed as-is**: `patients.phone` *is* the home number (the
+  `home_phone` column lives on `responsible_parties`, a different entity);
+  `chart_no` is **not** unique and cannot be — 10,045 duplicated
+  `(tenant_id, chart_no)` groups across 83,898 migrated patients — so the numeric
+  `patients.id` is the only safe key.
+
+**Add/Edit Patient checkbox integrity** (Patient Status / Coverage Type / Patient
+Type panels; [docs/patients/patient_flag_rules_backend_response.md](docs/patients/patient_flag_rules_backend_response.md)).
+Every box in the three panels was independently selectable, so a patient could be
+saved as both a *Child* and a *Senior Citizen*, or flagged **No Correspondence**
+while automated e-mail/SMS stayed on — and the API persisted it, so the recall
+sweeps, batch letters and SMS reminder job all inherited the contradiction. The
+rule table lives once in
+[app/services/patient_rules_service.py](app/services/patient_rules_service.py)
+and is enforced on **every** write path (`PatientCRUD.create/update`,
+`POST /patients/register`, `PatientInsuranceCRUD`), so no client can route around
+it. **Two rule kinds, deliberately different**: *implications* (`no_correspondence
+⇒ no_auto_email/no_auto_sms`; `is_active=false ⇒ add_to_quickfill=false`) are
+**auto-applied** and returned corrected — the combination is unambiguous;
+*exclusions* (`CH ⊕ SR`) are **422** because there is no way to know which the
+user meant and silently dropping one discards intent. Implications evaluate
+against the **merge of payload + stored row**, so a PATCH carrying only the
+touched box still reaches flags already true in the DB. Coverage: an active slot
+requires an active slot one rank below **of the same plan type**
+(`primary→secondary→tertiary→quaternary`, per `D`/`M`); inactive slots are never
+checked. **`No Coverage` has no column and must not get one** — it is the derived
+"zero active slots" state; a column would be a second source of truth that can
+disagree with the slots. `GET /metadata/patient-flag-rules` publishes the table so
+the form drives its tick/untick from the same source (add a rule → UI picks it up,
+no FE release). Migrated rows are **not** rewritten — a stored `["CH","SR"]`
+survives until edited.
+
+**Patient Notes document upload/download** (Patient → Notes → New Note →
+*Documents (Upload)* / *Document (Scan)*; NOTE-DOC-1…5 of
+[docs/patient_note_documents_backend_devreport.md](docs/patient_note_documents_backend_devreport.md)
+/ [response](docs/patient_note_documents_backend_response.md); Alembic
+`a1b2c3d4e5f7`). The binary store was already right — the gaps were around it.
+- **NOTE-DOC-1** `patient_notes.document_id` (FK → `patient_documents.id`,
+  nullable) is the link that let a file be uploaded but never recorded as
+  belonging to a note, so re-opening the note could not find it.
+  `PatientNoteCRUD` ([app/services/patient_note_service.py](app/services/patient_note_service.py))
+  enforces **same tenant + same patient** on create *and* PATCH (422
+  `document_patient_mismatch`) — a note renders inside one patient's chart, so a
+  mis-pointed id is a PHI disclosure, not a cosmetic bug; a PATCH carrying only
+  `document_id` checks against the note's **stored** `patient_id`.
+  `enrich_patient_notes` embeds a `document` block (name/type/size/`file_url`) on
+  `PatientNoteRead` so a 40-row Notes list doesn't fan out 40
+  `GET /patient-documents/{id}`. **Deleting a note never deletes the document** —
+  it is a patient-level record that also lists under `/patient-documents` and may
+  back a consent; an undeleted note pointing at nothing would be worse.
+- **NOTE-DOC-3 was the load-bearing fix**: `app.mount(UPLOAD_URL_BASE, StaticFiles(UPLOAD_DIR))`
+  was a *blanket* mount, so every patient document, **claim attachment** and
+  **progress-note attachment** under it was readable with no token and no tenant
+  check. Only `settings.UPLOAD_PUBLIC_SUBDIRS` (logos / office_logos /
+  provider_watermarks) is mounted now; `document_store.public_url` returns the
+  authenticated `/content` proxy for **local** rows too (it used to fall back to
+  the public path), and the two attachment kinds gained the `/content` route they
+  never had (`…/attachments/{id}/content` on progress-notes and insurance-claims),
+  which is what their `file_url` now points at. **Breaking**: `file_url` is never
+  a `/uploads` path again.
+- **NOTE-DOC-5** `filestore.validate_upload` is the single rule set (size cap +
+  extension **and** content-type allow-list) applied on every binary upload route;
+  an *uninformative* declared type (`application/octet-stream`, empty) defers to
+  the extension, because scanners send that for real PDFs and rejecting them would
+  break Document (Scan) for no security gain. Published at
+  `GET /patient-documents/limits` so the picker states what the server enforces.
+- **NOTE-DOC-2** needed no code — `GCS_BUCKET_DOCUMENTS` routes to
+  `gs://{bucket}/patient-documents/{tenant}/{patient}/{uuid}{ext}` already (LTR-1);
+  it is a deploy-config flip. **NOTE-DOC-4** seeds the `document_type` definitions
+  group (14 codes); `CF` is also added to `CONSENT_DOCUMENT_TYPES` so a consent
+  uploaded from Notes lands under the consent-forms prefix with the rest.
+
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))
   records authenticated 2xx mutations (POST/PUT/PATCH/DELETE) to `audit_logs` via

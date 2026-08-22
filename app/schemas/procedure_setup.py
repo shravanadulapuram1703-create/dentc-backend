@@ -31,6 +31,19 @@ class ProcedureCodeStats(BaseModel):
     by_category: dict[str, int] = Field(default_factory=dict, description="category → count")
 
 
+# ── APPT-10: procedure-code category taxonomy ────────────────────────────────
+class ProcedureCodeCategory(BaseModel):
+    """One row of the category taxonomy behind the Quick Add category buttons.
+
+    The picker used to derive its categories by paging the whole 1,100-code
+    catalog; this is the taxonomy on its own.
+    """
+
+    category: str
+    code_count: int = 0
+    active_code_count: int = 0
+
+
 # ── PROC-6: lightweight fee-schedule id→name projection ──────────────────────
 class FeeScheduleOption(BaseModel):
     id: int

@@ -41,7 +41,10 @@ def test_patient_document_upload_list_delete(client, patient):
                      files={"file": ("card.pdf", b"%PDF-1.4 fake", "application/pdf")})
     assert up.status_code == 201, up.text
     doc = up.json()
-    assert doc["file_url"].endswith(".pdf") and "file_path" not in doc
+    # NOTE-DOC-3: file_url is the authenticated /content route (or a signed GCS
+    # URL when a bucket is configured) — never the public /uploads path.
+    assert doc["file_url"].endswith(f"/patient-documents/{doc['id']}/content")
+    assert "file_path" not in doc
     # LTR-12: the list is now the standard paginated envelope, like every other list.
     assert client.get(
         f"/api/v1/patient-documents?patient_id={patient.id}"

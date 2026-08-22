@@ -8,6 +8,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core import filestore
+from app.core.config import settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.db.models import (
     ClaimAttachment,
@@ -24,7 +25,9 @@ from app.db.models import (
 from app.schemas.patient_extra import DuplicateCandidate
 from app.services import document_store
 
-_MAX_UPLOAD = 10 * 1024 * 1024  # 10 MB
+# NOTE-DOC-5: the size cap and the type allow-list live in ``filestore`` so every
+# upload route enforces one rule set and ``GET /patient-documents/limits`` can
+# publish it. (Was a bare 10 MB check here with no type validation at all.)
 
 # Duplicate check: scan a wider window than we return, so scoring (not the SQL
 # LIMIT) decides which candidates the user sees.
@@ -111,8 +114,7 @@ def create_document(
     file_name: str, content_type: str | None, data: bytes, user_id: int | None,
 ) -> PatientDocument:
     _require_patient(db, patient_id, tenant_id)
-    if len(data) > _MAX_UPLOAD:
-        raise ValidationError("File exceeds 10 MB limit", code="file_too_large")
+    filestore.validate_upload(file_name, content_type, data)
     # LTR-1: consent forms go to gs://{bucket}/consent-forms/..., everything else
     # to the generic document prefix; local disk when no bucket is configured.
     stored = document_store.store(
@@ -255,11 +257,12 @@ def _require_claim(db: Session, claim_id: str, tenant_id: int) -> InsuranceClaim
 
 def list_claim_attachments(db: Session, tenant_id: int, claim_id: str) -> list[ClaimAttachment]:
     _require_claim(db, claim_id, tenant_id)
-    return list(db.execute(
+    rows = list(db.execute(
         select(ClaimAttachment).where(
             ClaimAttachment.claim_id == claim_id, ClaimAttachment.is_deleted.is_(False)
         ).order_by(ClaimAttachment.created_at.desc())
     ).scalars().all())
+    return stamp_claim_attachment_urls(claim_id, rows)
 
 
 def create_claim_attachment(
@@ -267,18 +270,58 @@ def create_claim_attachment(
     file_name: str, content_type: str | None, data: bytes, user_id: int | None,
 ) -> ClaimAttachment:
     _require_claim(db, claim_id, tenant_id)
-    if len(data) > _MAX_UPLOAD:
-        raise ValidationError("File exceeds 10 MB limit", code="file_too_large")
-    rel, url = filestore.save_file(f"claim_attachments/{claim_id}", file_name, data)
+    filestore.validate_upload(file_name, content_type, data)
+    rel, _public = filestore.save_file(f"claim_attachments/{claim_id}", file_name, data)
     att = ClaimAttachment(
         tenant_id=tenant_id, claim_id=claim_id, attachment_type=attachment_type,
         file_name=file_name, content_type=content_type, file_size=len(data),
-        file_path=rel, file_url=url, created_by=user_id,
+        # NOTE-DOC-3: file_url is the authenticated /content route, stamped once
+        # the row has an id. Never the public /uploads path — this is PHI.
+        file_path=rel, file_url="", created_by=user_id,
     )
     db.add(att)
     db.commit()
     db.refresh(att)
+    att.file_url = _claim_attachment_url(claim_id, att.id)
     return att
+
+
+def _claim_attachment_url(claim_id: str, att_id: int) -> str:
+    """The authenticated streaming URL for a claim attachment (NOTE-DOC-3).
+
+    Claim attachments used to be handed back as ``/uploads/...``, served by a
+    public static mount with no token and no tenant check. That mount is gone.
+    """
+    return document_store.absolute_url(
+        f"{settings.API_V1_PREFIX}/insurance-claims/{claim_id}/attachments/{att_id}/content"
+    )
+
+
+def stamp_claim_attachment_urls(
+    claim_id: str, rows: list[ClaimAttachment],
+) -> list[ClaimAttachment]:
+    for row in rows:
+        row.file_url = _claim_attachment_url(claim_id, row.id)
+    return rows
+
+
+def open_claim_attachment(db: Session, tenant_id: int, claim_id: str, att_id: int):  # noqa: ANN201
+    """Body + headers for ``GET /insurance-claims/{id}/attachments/{id}/content``."""
+    _require_claim(db, claim_id, tenant_id)
+    att = db.execute(
+        select(ClaimAttachment).where(
+            ClaimAttachment.id == att_id,
+            ClaimAttachment.claim_id == claim_id,
+            ClaimAttachment.tenant_id == tenant_id,
+        )
+    ).scalar_one_or_none()
+    if att is None or att.is_deleted:
+        raise NotFoundError(f"Attachment '{att_id}' was not found")
+    try:
+        body, size = filestore.open_stream(att.file_path)
+    except FileNotFoundError as exc:
+        raise NotFoundError(f"Attachment '{att_id}' content is not available") from exc
+    return att, body, att.content_type, size
 
 
 def delete_claim_attachment(db: Session, tenant_id: int, att_id: int) -> None:
