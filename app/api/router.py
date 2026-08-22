@@ -99,6 +99,8 @@ api_router.include_router(provider_setup.carrier_router)
 # Procedure Code supplements (stats / per-code insurance-rules). Before generic
 # CRUD so /procedure-codes/stats wins over /procedure-codes/{item_id} (the code).
 api_router.include_router(procedure_codes.router)
+# APPT-10: procedure-code category taxonomy (own prefix, no CRUD collision).
+api_router.include_router(procedure_codes.category_router)
 # ICD codes bulk-status. Before generic CRUD so /icd-codes/bulk-status wins.
 api_router.include_router(icd_codes.router)
 # Insurance supplements (eligibility verify). Before generic CRUD so
@@ -124,6 +126,8 @@ api_router.include_router(letters.consent_forms_router)
 # + /patients/{id}/account-plans (LEG-5), and /responsible-parties/{id}/patients roster (LEG-14).
 # Before generic CRUD so these literal sub-paths win over /{item_id}.
 api_router.include_router(patient_intake.router)
+# Add/Edit Patient checkbox-integrity rules (/metadata/patient-flag-rules).
+api_router.include_router(patient_intake.metadata_router)
 api_router.include_router(patient_intake.rp_router)
 api_router.include_router(patient_intake.appt_router)
 # Progress-notes supplements: sign (PN-2) + per-note attachments (PN-3) + macro

@@ -136,6 +136,49 @@ class RegisterResponse(BaseModel):
     opening_balance_seeded: bool = False
 
 
+# ── Add/Edit Patient checkbox rules ──────────────────────────────────────────
+class PatientTypeExclusion(BaseModel):
+    codes: list[str]
+    labels: list[str]
+    reason: str
+
+
+class PatientStatusImplication(BaseModel):
+    when: dict[str, bool]
+    then: dict[str, bool]
+    reason: str
+
+
+class PatientTypeRules(BaseModel):
+    field: str = "patient_types"
+    exclusions: list[PatientTypeExclusion] = Field(default_factory=list)
+
+
+class PatientStatusRules(BaseModel):
+    implications: list[PatientStatusImplication] = Field(default_factory=list)
+
+
+class CoverageSlotRef(BaseModel):
+    legacy_plan_type: str
+    insurance_type: str
+
+
+class CoverageTypeRules(BaseModel):
+    no_coverage_is_derived: bool = True
+    no_coverage_excludes: list[CoverageSlotRef] = Field(default_factory=list)
+    ranks: list[str] = Field(default_factory=list)
+    requires_lower_rank: bool = True
+
+
+class PatientFlagRules(BaseModel):
+    """The Add/Edit Patient checkbox-integrity rules, served as data so the form
+    drives its own tick/untick behaviour from the same table the API enforces."""
+
+    patient_type: PatientTypeRules
+    patient_status: PatientStatusRules
+    coverage_type: CoverageTypeRules
+
+
 # ── Account plans (LEG-5) ─────────────────────────────────────────────────────
 class AccountPlanRead(ORMModel):
     """A plan already attached to a patient's account — the legacy *Account Plans*

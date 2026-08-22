@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
 from app.schemas.common import ErrorResponse
 from app.schemas.procedure_setup import (
+    ProcedureCodeCategory,
     ProcedureCodeStats,
     ProcedureInsuranceRuleCreate,
     ProcedureInsuranceRuleRead,
@@ -92,3 +93,33 @@ def update_procedure_insurance_rule(
 def delete_procedure_insurance_rule(db: DbSession, tenant_id: TenantId, code: CodePath, rule_id: int):
     svc.delete_insurance_rule(db, tenant_id, code, rule_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── APPT-10: the category taxonomy as its own resource ───────────────────────
+# Its own prefix rather than /procedure-codes/categories: the code catalog is a
+# global (untenanted) list whose ids are the codes themselves, and a sibling
+# resource keeps the Orval-generated hook name honest.
+category_router = APIRouter(
+    prefix="/procedure-code-categories",
+    tags=["Procedures"],
+    dependencies=[Depends(get_current_user)],
+    responses={401: {"model": ErrorResponse}},
+)
+
+
+@category_router.get(
+    "",
+    response_model=list[ProcedureCodeCategory],
+    operation_id="list_procedure_code_categories",
+    summary="Procedure-code categories with code counts",
+)
+def list_procedure_code_categories(
+    db: DbSession,
+    tenant_id: TenantId,
+    active_only: Annotated[bool, Query(
+        description="Count (and list) only active codes.",
+    )] = False,
+):
+    """Renders the Quick Add / picker category buttons without paging the whole
+    ~1,100-code catalog first."""
+    return svc.list_categories(db, active_only=active_only)

@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Body, Depends, File, Form, Path, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
 from app.schemas.common import ErrorResponse
@@ -82,6 +83,28 @@ async def upload_attachment(
         db, tenant_id, note_id, attachment_type=attachment_type, description=description,
         file_name=file.filename or "attachment", content_type=file.content_type,
         data=data, user_id=current.id,
+    )
+
+
+@router.get(
+    "/{note_id}/attachments/{attachment_id}/content",
+    operation_id="get_progress_note_attachment_content",
+    summary="Stream a note attachment with the caller's tenant checks applied (NOTE-DOC-3)",
+    response_class=StreamingResponse,
+)
+def get_attachment_content(
+    db: DbSession, tenant_id: TenantId,
+    note_id: Annotated[int, Path()], attachment_id: Annotated[int, Path()],
+):
+    """Note attachments used to be handed back as a public ``/uploads/...`` URL,
+    readable with no token and no tenant check. That mount is gone; this is the
+    read path — and it is what ``file_url`` now points at."""
+    att, body, content_type, size = svc.open_attachment(db, tenant_id, note_id, attachment_id)
+    headers = {"Content-Disposition": f'inline; filename="{att.file_name}"'}
+    if size is not None:
+        headers["Content-Length"] = str(size)
+    return StreamingResponse(
+        body, media_type=content_type or "application/octet-stream", headers=headers
     )
 
 

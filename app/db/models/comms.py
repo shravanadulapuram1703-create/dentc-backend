@@ -1,14 +1,14 @@
 """Communications domain models.
 
 sms_messages · letter_templates · postcard_templates ·
-letter_batch_runs · letter_batch_items
+letter_batch_runs · letter_batch_items · campaigns
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin
@@ -103,3 +103,32 @@ class LetterBatchItem(Base, IntPKMixin, CreatedAtMixin):
     rendered_html: Mapped[str | None] = mapped_column(Text)
     document_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patient_documents.id"))
     error: Mapped[str | None] = mapped_column(Text)
+
+
+class Campaign(Base, IntPKMixin, CreatedAtMixin):
+    """APPT-7: the marketing campaign an appointment can be attributed to.
+
+    ``appointments.campaign_id`` was free text with nothing to pick from, so the
+    field was an unvalidated box and campaign roll-ups were impossible. This is
+    the catalog behind it: the appointment still stores the campaign **code**
+    (a string, unchanged on the wire), and this table gives the picker its
+    options and the reports a name/date-window to group by.
+    """
+
+    __tablename__ = "campaigns"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "code", name="uq_campaigns_tenant_code"),
+    )
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
+    code: Mapped[str] = mapped_column(String(100), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
+    # Marketing channel (mail / email / sms / referral / web / other) — free text so
+    # a practice can name its own; the FE offers the common set.
+    channel: Mapped[str | None] = mapped_column(String(50))
+    start_date: Mapped[date | None]
+    end_date: Mapped[date | None]
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))

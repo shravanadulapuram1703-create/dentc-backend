@@ -78,3 +78,13 @@ class DuplicateCheckResponse(BaseModel):
 class DocumentResult(BaseModel):
     id: int
     file_url: str
+
+
+class UploadLimits(BaseModel):
+    """NOTE-DOC-5: the server-enforced upload rules, published so the UI states
+    the same numbers it is validated against instead of hardcoding its own."""
+
+    max_bytes: int
+    max_megabytes: float
+    allowed_content_types: list[str]
+    allowed_extensions: list[str]

@@ -37,6 +37,10 @@ class Appointment(Base, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text)
     has_lab: Mapped[bool] = mapped_column(Boolean, default=False)
     lab_cost: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    # APPT-5: the LAB section's "DDS" input — the dentist the lab case is for.
+    # Free text rather than a providers FK: legacy lab slips carry initials or an
+    # outside dentist's name, neither of which resolves to a provider row.
+    lab_dds: Mapped[str | None] = mapped_column(String(100))
     lab_sent_on: Mapped[date | None]
     lab_due_on: Mapped[date | None]
     lab_received_on: Mapped[date | None]
@@ -73,6 +77,13 @@ class AppointmentProcedure(Base, IntPKMixin, CreatedAtMixin):
     est_patient: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     billing_order: Mapped[str | None] = mapped_column(String(10))
     status: Mapped[str] = mapped_column(String(20), default="Planned")
+    # APPT-PROC-1: per-line chair time. Nullable so "not set" stays distinct from
+    # "zero minutes" — Calc Time falls back to procedure_codes.default_duration_minutes.
+    duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    # APPT-PROC-2: legacy "P. Units" — how many provider units the line consumes.
+    provider_units: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # APPT-PROC-3: billing intent for the line — "P" patient / "I" insurance.
+    bill_to: Mapped[str | None] = mapped_column(String(1))
     material_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("chart_materials.id"))
     notes: Mapped[str | None] = mapped_column(Text)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)

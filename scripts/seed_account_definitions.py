@@ -140,6 +140,27 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
     # Referral Setup -> Referral Sources (referral dev-report): the referrals
     # ``referral_type`` column is a direction code, not the above lead-source list.
     "referral_direction": [("0", "Referred By"), ("1", "Referred To")],
+    # NOTE-DOC-4: ``patient_documents.document_type`` — the sub-type dropdown on
+    # Patient -> Notes -> New Note -> Documents (Upload), which was hardcoded in
+    # the frontend and so could not be maintained by the practice. key1 is the
+    # stored code; practices extend the list through the /definitions CRUD.
+    # ``CF`` also routes to the consent-forms bucket prefix (CONSENT_DOCUMENT_TYPES).
+    "document_type": [
+        ("CF", "Consent Form"),
+        ("IC", "Insurance Card"),
+        ("ID", "Photo ID"),
+        ("XR", "X-Ray / Image"),
+        ("RX", "Prescription"),
+        ("RF", "Referral Letter"),
+        ("LB", "Lab Report"),
+        ("MH", "Medical History"),
+        ("TP", "Treatment Plan"),
+        ("FA", "Financial Agreement"),
+        ("EOB", "Explanation of Benefits"),
+        ("CR", "Correspondence"),
+        ("PH", "Patient Photo"),
+        ("OT", "Other"),
+    ],
     # ── Auxiliary code tables (Setup -> Procedure Codes), AUX-1 / AUX-2 ──────────
     # Modifier Codes — standard CPT/HCPCS modifiers (key1 = code, description = label).
     "MODIFIER": [

@@ -18,6 +18,7 @@ from app.schemas.patient_intake import (
     AccountPlanRead,
     OpeningBalanceIn,
     OpeningBalanceRead,
+    PatientFlagRules,
     RegisterRequest,
     RegisterResponse,
     RosterPatientRead,
@@ -25,6 +26,7 @@ from app.schemas.patient_intake import (
 from app.schemas.patient_overview import PatientOverviewResponse
 from app.services import patient_intake_service as svc
 from app.services import patient_overview_service as overview_svc
+from app.services import patient_rules_service
 
 _errs = {401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}}
 router = APIRouter(prefix="/patients", tags=["Patients"], dependencies=[Depends(get_current_user)], responses=_errs)
@@ -134,3 +136,29 @@ def list_family_appointments(
     return overview_svc.get_family_appointments(
         db, tenant_id, responsible_party_id, upcoming_only=upcoming_only
     )
+
+
+# ── Add/Edit Patient checkbox rules ──────────────────────────────────────────
+# No prefix: this is form metadata, not a patient sub-resource, and it sits
+# beside the other /metadata/* policy endpoints (e.g. /metadata/refund-policy).
+metadata_router = APIRouter(
+    tags=["Patients"],
+    dependencies=[Depends(get_current_user)],
+    responses={401: {"model": ErrorResponse}},
+)
+
+
+@metadata_router.get(
+    "/metadata/patient-flag-rules",
+    response_model=PatientFlagRules,
+    operation_id="get_patient_flag_rules",
+    summary="Mutual-exclusion / implication rules for the Patient Status, Coverage Type and Patient Type checkboxes",
+)
+def patient_flag_rules():
+    """Serves the same rule table the API enforces on write.
+
+    The form needs this logic to tick and untick boxes as the user clicks;
+    reading it from here keeps the two halves from drifting, so a rule added to
+    ``patient_rules_service`` reaches the UI without a frontend release.
+    """
+    return patient_rules_service.published_rules()

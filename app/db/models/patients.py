@@ -209,6 +209,15 @@ class PatientNote(Base, IntPKMixin, TimestampMixin):
     note_type: Mapped[str | None] = mapped_column(String(20))
     notes: Mapped[str] = mapped_column(Text)
     notes_html: Mapped[str | None] = mapped_column(Text)
+    # NOTE-DOC-1: the file a "Documents (Upload)" / "Document (Scan)" note is about.
+    # The client uploads to POST /patient-documents first (which is what puts the
+    # bytes in GCS under the patient's id) and saves the returned id here, so the
+    # note can be re-opened and the file viewed/downloaded. Nullable: every other
+    # note type carries no file. The document row is patient-level and outlives the
+    # note — deleting the note clears the link, it does not delete the document.
+    document_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("patient_documents.id"), index=True
+    )
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))

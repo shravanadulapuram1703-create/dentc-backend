@@ -29,7 +29,7 @@ from app.db.models import (
     ResponsibleParty,
 )
 from app.integrations import redis_store
-from app.services import balance_service, patient_extra_service
+from app.services import balance_service, patient_extra_service, patient_rules_service
 from app.services.patient_service import assign_chart_no
 
 _BUCKETS = ("current", "over_30", "over_60", "over_90", "over_120")
@@ -102,7 +102,13 @@ def register_patient(db: Session, tenant_id: int, req, *, user_id: int | None = 
     A failure anywhere rolls the whole thing back, so registration never leaves a
     patient with only some of its related records (the client-chained flow could).
     """
-    payload = req.patient.model_dump(exclude_unset=True)
+    # Add/Edit Patient checkbox integrity: contradictory Patient Type tags are
+    # rejected and the implied Patient Status flags forced, before the duplicate
+    # check — registration must not be able to route around the rules that
+    # PATCH /patients/{id} enforces.
+    payload = patient_rules_service.normalize_patient_payload(
+        req.patient.model_dump(exclude_unset=True)
+    )
 
     # KAN-108: Quick Save posts straight here, so the duplicate guard has to live
     # server-side — a client that forgets to call /patients/check-duplicate must

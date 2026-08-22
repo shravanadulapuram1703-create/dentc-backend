@@ -85,13 +85,27 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
-    # Serve uploaded assets (e.g. account logos). Swap for object storage in prod.
+    # Serve uploaded *branding* assets (account/office logos, provider watermarks).
+    #
+    # NOTE-DOC-3: UPLOAD_DIR previously hung off a single blanket mount, which made
+    # every patient document, claim attachment and progress-note attachment under
+    # it world-readable — no token, no tenant check, PHI to anyone who obtained or
+    # guessed the path. Only the non-PHI subdirs in UPLOAD_PUBLIC_SUBDIRS are
+    # mounted now; the PHI paths are reachable solely through the authenticated
+    # ``/content`` endpoints, which re-check tenancy before a byte moves.
     import os
 
     from fastapi.staticfiles import StaticFiles
 
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    app.mount(settings.UPLOAD_URL_BASE, StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+    for subdir in settings.UPLOAD_PUBLIC_SUBDIRS:
+        directory = os.path.join(settings.UPLOAD_DIR, subdir)
+        os.makedirs(directory, exist_ok=True)
+        app.mount(
+            f"{settings.UPLOAD_URL_BASE}/{subdir}",
+            StaticFiles(directory=directory),
+            name=f"uploads_{subdir}",
+        )
 
     @app.get("/health", tags=["Meta"], operation_id="health_check")
     def health() -> dict[str, str]:

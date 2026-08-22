@@ -28,7 +28,8 @@ from app.services.enrich_service import (
 )
 from app.services.payment_plan_service import PaymentPlanCRUD
 from app.services.provider_directory_service import ProviderCRUD
-from app.services.patient_service import PatientCRUD
+from app.services.patient_note_service import PatientNoteCRUD, enrich_patient_notes
+from app.services.patient_service import PatientCRUD, PatientInsuranceCRUD
 from app.services.perio_service import attach_actor_names
 from app.services.progress_notes_service import ProgressNoteCRUD, enrich_progress_notes
 from app.services.treatment_service import TreatmentPlanItemCRUD
@@ -71,6 +72,11 @@ from app.schemas.enriched import (
     TreatmentPlanUpdate,
 )
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
+from app.schemas.patient_note import (
+    PatientNoteCreate,
+    PatientNoteRead,
+    PatientNoteUpdate,
+)
 from app.schemas.payment_plan import (
     OrthoPlanCreate,
     OrthoPlanRead,
@@ -195,10 +201,13 @@ _PATIENTS = [
     ),
     # legacy_plan_type ("D"/"M") + insurance_type ("primary"…) address one slot
     # (INS-PT); is_active toggles a slot on/off.
+    # PatientInsuranceCRUD enforces the Coverage Type panel's ordinal integrity:
+    # an active secondary slot requires an active primary of the same plan type.
     _cfg(m.PatientInsurance, "PatientInsurance", "patient-insurance", "Patients",
          "patient_insurance", "patient_insurance",
          filters=("patient_id", "insurance_type", "ins_plan_id",
-                  "legacy_plan_type", "is_active")),
+                  "legacy_plan_type", "is_active"),
+         crud_class=PatientInsuranceCRUD),
     _cfg(m.PatientAlert, "PatientAlert", "patient-alerts", "Patients",
          "patient_alert", "patient_alerts", filters=("patient_id", "is_active")),
     _cfg(m.AccountNote, "AccountNote", "account-notes", "Patients",
@@ -220,10 +229,23 @@ _PATIENTS = [
          # PO-6: legacy_id lets the FE resolve patients.referred_by (a legacy referral id).
          filters=("patient_id", "office_id", "referral_type", "reason_code", "legacy_id"),
          soft_field=None),
-    _cfg(m.PatientNote, "PatientNote", "patient-notes", "Patients",
-         "patient_note", "patient_notes",
-         filters=("patient_id", "note_type", "is_deleted", "is_archived"),
-         soft_field="is_deleted", soft_value=True),
+    # NOTE-DOC-1: a note can reference an uploaded document. PatientNoteCRUD
+    # enforces that the document is in the same tenant and on the same patient;
+    # enrich_patient_notes denormalises it onto the read so the Notes list renders
+    # a view/download link without a per-row GET /patient-documents/{id}.
+    CrudConfig(
+        model=m.PatientNote,
+        create_schema=PatientNoteCreate,
+        update_schema=PatientNoteUpdate,
+        read_schema=PatientNoteRead,
+        prefix="patient-notes", tag="Patients",
+        singular="patient_note", plural="patient_notes",
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("patient_id", "note_type", "is_deleted", "is_archived", "document_id"),
+        soft_delete_field="is_deleted", soft_delete_value=True,
+        crud_class=PatientNoteCRUD,
+        read_enrich=enrich_patient_notes,
+    ),
     _cfg(m.PatientRecall, "PatientRecall", "patient-recalls", "Patients",
          "patient_recall", "patient_recalls", filters=("patient_id", "status", "is_active")),
     # GAP-AP-16: per-patient Yes/No medical-alert responses (MEDALERT catalog).
@@ -377,10 +399,15 @@ _SCHEDULING = [
          filters=("patient_id", "provider_id", "operatory_id", "office_id", "date",
                   "status", "is_archived"),
          ranges=("date",), soft_field="is_archived", soft_value=True),
+    # APPT-PROC-4: DELETE soft-archives the line, so the default listing must hide
+    # archived rows (hide_soft_deleted) — otherwise a removed procedure comes back
+    # on the next load and every client has to filter. ``?is_archived=true`` still
+    # surfaces them on purpose, matching /treatment-plan-items.
     _cfg(m.AppointmentProcedure, "AppointmentProcedure", "appointment-procedures", "Appointments",
          "appointment_procedure", "appointment_procedures",
-         filters=("appointment_id", "procedure_code", "provider_id"),
-         soft_field="is_archived", soft_value=True),
+         filters=("appointment_id", "procedure_code", "provider_id", "treatment_plan_id",
+                  "status", "is_archived"),
+         soft_field="is_archived", soft_value=True, hide_soft_deleted=True),
     # AppointNow reason catalog (Setup surface for the online-booking reasons that
     # drive chair-time duration). The public AN-1/AN-3 endpoints read it directly;
     # this generic CRUD lets staff customise it per office.
@@ -687,6 +714,14 @@ _COMMS = [
          filters=("letter_type", "is_active")),
     _cfg(m.PostcardTemplate, "PostcardTemplate", "postcard-templates", "Communications",
          "postcard_template", "postcard_templates", search=("name",), soft_field=None),
+    # APPT-7: the catalog behind the appointment's Campaign ID box. The appointment
+    # still stores the campaign *code* as a string (no wire change) — this makes it
+    # a picker instead of free text, and gives reports something to group by.
+    _cfg(m.Campaign, "Campaign", "campaigns", "Communications", "campaign", "campaigns",
+         search=("code", "name", "description"),
+         sortable=("code", "name", "start_date", "created_at"),
+         filters=("office_id", "channel", "is_active"),
+         ranges=("start_date", "end_date")),
 ]
 
 # ── Staff & operations ─────────────────────────────────────────────────────

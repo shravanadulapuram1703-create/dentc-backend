@@ -128,6 +128,7 @@ def list_scheduler_appointments(
     db: Session, tenant_id: int, *, date_from: date | None = None,
     date_to: date | None = None, office_id: int | None = None,
     provider_id: str | None = None, status: str | None = None,
+    include_archived: bool = False,
 ) -> list[dict]:
     stmt = (
         select(Appointment, Patient, Provider, Operatory)
@@ -137,6 +138,13 @@ def list_scheduler_appointments(
         .outerjoin(Operatory, Operatory.id == Appointment.operatory_id)
         .where(Office.tenant_id == tenant_id)
     )
+    # SCHED-DEL-1: DELETE /appointments/{id} is a *soft* delete. The calendar feed
+    # used to hand the tombstones straight back, so a deleted appointment
+    # reappeared on every refetch (and every other consumer of this feed had the
+    # same defect). Archived rows are excluded by default; a caller that genuinely
+    # wants them asks for them.
+    if not include_archived:
+        stmt = stmt.where(Appointment.is_archived.is_(False))
     if office_id is not None:
         stmt = stmt.where(Appointment.office_id == office_id)
     if provider_id is not None:  # SCHED/MP-7/Reports-G8: server-side provider scoping
@@ -191,6 +199,7 @@ def list_scheduler_appointments(
             "is_cancelled": appt.is_cancelled,
             "is_blocked": appt.is_blocked,
             "is_posted": appt.is_posted,
+            "is_archived": appt.is_archived,
             "posted_on": appt.posted_on,
             "confirmed_on": appt.confirmed_on,
             "checked_in_on": appt.checked_in_on,
@@ -248,6 +257,24 @@ def update_status(
         appt.updated_by = actor_id
     db.commit()
     db.refresh(appt)
+    return appt
+
+
+def restore_appointment(
+    db: Session, tenant_id: int, appt_id: str, *, actor_id: int | None = None
+) -> Appointment:
+    """SCHED-DEL-2: put a soft-deleted appointment back on the calendar.
+
+    Idempotent — restoring a live appointment is a no-op rather than an error, so
+    a double-click on Undo does not 409.
+    """
+    appt = _appointment_in_tenant(db, appt_id, tenant_id)
+    if appt.is_archived:
+        appt.is_archived = False
+        if actor_id is not None:
+            appt.updated_by = actor_id
+        db.commit()
+        db.refresh(appt)
     return appt
 
 

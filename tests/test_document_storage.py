@@ -204,8 +204,10 @@ def test_upload_failure_falls_back_to_local_rather_than_losing_the_consent(
     monkeypatch.setattr(obj, "upload_bytes", _boom)
     doc = _upload_consent(client, patient).json()
     assert doc["storage_backend"] == "local"
-    assert doc["file_url"].startswith("/uploads/")
-    # And it is still readable through the proxy.
+    # NOTE-DOC-3: the local fallback is served by the authenticated proxy, not by
+    # the old public /uploads path — a failed bucket write must not downgrade a
+    # consent form to an unauthenticated URL.
+    assert doc["file_url"] == f"/api/v1/patient-documents/{doc['id']}/content"
     assert client.get(f"/api/v1/patient-documents/{doc['id']}/content").status_code == 200
 
 

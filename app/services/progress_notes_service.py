@@ -37,8 +37,22 @@ from app.db.models import (
 from app.services import auth_service
 from app.services.user_admin_service import resolve_user_names
 
-_MAX_UPLOAD = 10 * 1024 * 1024  # 10 MB
 _TEXT_FIELDS = ("notes", "notes_html", "tooth", "surface", "region", "note_date")
+
+
+def _attachment_url(note_id: int, att_id: int) -> str:
+    """NOTE-DOC-3: the authenticated streaming URL for a note attachment.
+
+    Attachments used to be handed back as ``/uploads/...``, served by a public
+    static mount with no token and no tenant check. That mount is gone; this is
+    the only way to read the bytes.
+    """
+    from app.core.config import settings
+    from app.services import document_store
+
+    return document_store.absolute_url(
+        f"{settings.API_V1_PREFIX}/progress-notes/{note_id}/attachments/{att_id}/content"
+    )
 
 
 def _note_is_locked(note: ProgressNote, today: date) -> bool:
@@ -162,7 +176,7 @@ def sign_progress_note(
 # ── PN-3: per-note attachments ───────────────────────────────────────────────
 def list_attachments(db: Session, tenant_id: int, note_id: int) -> list[ProgressNoteAttachment]:
     _require_note(db, note_id, tenant_id)
-    return list(
+    rows = list(
         db.execute(
             select(ProgressNoteAttachment)
             .where(
@@ -172,6 +186,9 @@ def list_attachments(db: Session, tenant_id: int, note_id: int) -> list[Progress
             .order_by(ProgressNoteAttachment.created_at.desc())
         ).scalars().all()
     )
+    for row in rows:
+        row.file_url = _attachment_url(note_id, row.id)
+    return rows
 
 
 def create_attachment(
@@ -180,18 +197,39 @@ def create_attachment(
     data: bytes, user_id: int | None,
 ) -> ProgressNoteAttachment:
     _require_note(db, note_id, tenant_id)
-    if len(data) > _MAX_UPLOAD:
-        raise ValidationError("File exceeds 10 MB limit", code="file_too_large")
-    rel, url = filestore.save_file(f"progress_note_attachments/{note_id}", file_name, data)
+    filestore.validate_upload(file_name, content_type, data)
+    rel, _public = filestore.save_file(f"progress_note_attachments/{note_id}", file_name, data)
     att = ProgressNoteAttachment(
         tenant_id=tenant_id, progress_note_id=note_id, attachment_type=attachment_type,
         description=description, file_name=file_name, content_type=content_type,
-        file_size=len(data), file_path=rel, file_url=url, created_by=user_id,
+        # NOTE-DOC-3: file_url is the authenticated /content route, stamped once
+        # the row has an id. Never the public /uploads path.
+        file_size=len(data), file_path=rel, file_url="", created_by=user_id,
     )
     db.add(att)
     db.commit()
     db.refresh(att)
+    att.file_url = _attachment_url(note_id, att.id)
     return att
+
+
+def open_attachment(db: Session, tenant_id: int, note_id: int, att_id: int):  # noqa: ANN201
+    """Body + headers for ``GET /progress-notes/{id}/attachments/{id}/content``."""
+    _require_note(db, note_id, tenant_id)
+    att = db.execute(
+        select(ProgressNoteAttachment).where(
+            ProgressNoteAttachment.id == att_id,
+            ProgressNoteAttachment.progress_note_id == note_id,
+            ProgressNoteAttachment.tenant_id == tenant_id,
+        )
+    ).scalar_one_or_none()
+    if att is None or att.is_deleted:
+        raise NotFoundError(f"Attachment '{att_id}' was not found")
+    try:
+        body, size = filestore.open_stream(att.file_path)
+    except FileNotFoundError as exc:
+        raise NotFoundError(f"Attachment '{att_id}' content is not available") from exc
+    return att, body, att.content_type, size
 
 
 def delete_attachment(db: Session, tenant_id: int, note_id: int, att_id: int) -> None:

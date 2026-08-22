@@ -110,6 +110,7 @@ from app.db.models.codes import (
     ProcedureCode,
 )
 from app.db.models.comms import (
+    Campaign,
     LetterBatchItem,
     LetterBatchRun,
     LetterTemplate,
@@ -256,7 +257,7 @@ __all__ = [
     "QuestionnaireOption",
     # communications
     "SmsMessage", "LetterTemplate", "PostcardTemplate",
-    "LetterBatchRun", "LetterBatchItem",
+    "LetterBatchRun", "LetterBatchItem", "Campaign",
     # direct messaging
     "Conversation", "ConversationParticipant", "Message", "MessageReceipt",
     "MessageRecipientState", "MessageAttachment", "MessageReaction", "UserPresence",
