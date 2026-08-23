@@ -15,9 +15,8 @@ The two legacy ledgers are **the same screen**; only the feed's scope differs:
 
 Both render one chronological grid mixing procedure charges, payments, adjustments and
 claim transactions, with a per-row running balance, a Grand-Total footer, a `Prn`
-row-selection column driving Create Claim, transaction-level drill-down hyperlinks,
-date-range + type filtering, sorting, pagination, a legacy BALANCES table and a
-CONTRACTS (payment-plan) panel.
+row-selection column driving Create Claim, date-range + type filtering, sorting,
+pagination, a legacy BALANCES table and a CONTRACTS (payment-plan) panel.
 
 ---
 
@@ -30,7 +29,7 @@ the previous client-side merge of `/patient-procedures` + `/patient-payments` +
 
 | Legacy column | Source (snake_case, bound directly) |
 | --- | --- |
-| Prn | derived — checkbox enabled only on a `charge` row that is `unbilled` **and** not on Hold Claim |
+| Prn | derived — checkbox enabled only when `unbilled === true` on a `charge` row |
 | Date | `AccountLedgerRow.entry_date` |
 | Patient | account member name (`GET /patients?responsible_party_id=`) |
 | Office | `office_short_id` (falls back to `GET /offices` for claim rows) |
@@ -40,7 +39,7 @@ the previous client-side merge of `/patient-procedures` + `/patient-payments` +
 | T | `transaction_kind` (`P` debit / `C` credit) |
 | N | `unbilled` |
 | Description | `$<amount> <description>` |
-| Bill | `"H"` when the charge is on Hold Claim, else `billing_status` (claim rows: claim number) |
+| Bill | `billing_status` (claim rows: claim number) |
 | Provider | `provider_name` |
 | Est Pat / Est Ins | `patient_estimate` / `insurance_estimate` |
 | Amount | signed: `charge` minus the absolute `credit` — see **AL-9** |
@@ -55,42 +54,6 @@ the previous client-side merge of `/patient-procedures` + `/patient-payments` +
 - **Create Claim** acts on the **checked rows only**. Rows spanning several account
   members produce one claim per patient. Uses `createInsuranceClaim` +
   `updatePatientProcedure` (the charge row's `source_id` *is* the `patient_procedures.id`).
-- **Drill-down** (legacy hyperlink behaviour — the window depends on BOTH the column
-  clicked and the transaction type):
-
-  | Column | charge | payment | adjustment | claim |
-  | --- | --- | --- | --- | --- |
-  | **Date** | *Edit Treatment* | *Edit Payment* | — | full *Primary Dental Insurance Claim* screen |
-  | **Description** | — | — | — | *Claim Details* popup |
-  | **Amount** | *Payment Allocation Detail* | *Payment Allocation Detail* | *Payment Allocation Detail* | — (a claim row carries no amount) |
-
-  - *Edit Treatment* / *Edit Payment* → `EditTransactionModal.tsx`. Re-fetches the source
-    record by id (`GET /patient-procedures/{id}` / `GET /patient-payments/{id}`) rather
-    than reusing the denormalised feed row; Save/Delete call the matching PATCH/DELETE.
-    Fee and Est Ins lock once a procedure carries a `claim_id`.
-  - *Primary Dental Insurance Claim* → the existing `components/patient/ClaimDetail.tsx`
-    at `/patient/:id/claim/:claimId`, reused unchanged (its CANCEL already returns to
-    `/patient/:id/ledger`).
-  - *Claim Details* → `ClaimDetailsModal.tsx`. The compact legacy summary: Claim Info /
-    Claim Status / Claim Amount / Insurance Payment blocks over `GET /insurance-claims/
-    {id}/detail`, plus "Transactions Associated With This Claim" and Unclose Claim
-    (`POST /insurance-claims/{id}/status`). Total UCR is summed from the claim's
-    procedures; Check #/Bank #/EOB # come off the coverage row.
-  - *Payment Allocation Detail* → `PaymentAllocationModal.tsx`. For a charge,
-    `GET /patient-procedures/{id}/allocations-summary`; for a payment/adjustment,
-    `GET /payment-allocations?payment_id=|adjustment_id=`. Each line's counterpart is
-    resolved against the ledger feed already in memory, so it shows the same patient /
-    office / provider / description text the grid does.
-
-  Both popups render their transaction grid with the **shared `LedgerGrid.tsx`**, so a
-  transaction looks identical wherever it appears. Closing any of them returns to the
-  ledger with its filters, sort, page and selection intact.
-- **Hold Claim** — the legacy per-procedure hold. The checkbox lives in the *Edit
-  Treatment* window (`hold_claim` on `patient_procedures`, saved with the rest of the
-  form). A held charge renders a red **H** in the Bill column, its `Prn` checkbox is
-  disabled with an explanatory tooltip, and it is therefore excluded from Create Claim.
-  Clearing the hold makes it claim-eligible again on the next refresh. The flag is joined
-  client-side because the feed does not carry it — see **AL-17**.
 - **BALANCES** renders the legacy table (aggregate "Account Balance" row + one row per
   account member) from `GET /patients/{id}/balance`, except the Balance column — see AL-9.
 - **CONTRACTS** ← `GET /patient-payment-plans`, `/patient-ins-payment-plans`,
@@ -166,73 +129,6 @@ the previous client-side merge of `/patient-procedures` + `/patient-payments` +
   `/patients/{id}/account-ledger`, return `patient_id` + `patient_name` on each row, and
   server-paginate the merged feed. Same for `/patients/{id}/balance`.
 
-### AL-13 — Edit Treatment / Edit Payment windows: fields with no backend column
-The legacy detail windows carry fields the backend does not store. They render disabled,
-with a shared "no backend column yet" footnote, for layout parity:
-
-| Window | Field | Note |
-| --- | --- | --- |
-| Edit Treatment | Duration (mins) | no duration column on `patient_procedures` |
-| Edit Treatment | ADVANCED (per-carrier estimate split) | no per-claim-order estimate breakdown on a charge |
-| Edit Treatment | Contract PlanID | no contract-plan link on a posted charge |
-| Edit Treatment | Referral Type / Referring Dentist | referral data is not carried per transaction |
-| Edit Treatment | Fee Schedule Used | the applied schedule is not recorded on the charge |
-| Edit Payment | EOB # | no `eob_number` column on `patient_payments` |
-| Edit Payment | Apply To / Posted From | no allocation-origin field on the payment record |
-| both | Modified By / Modified On | `patient_procedures` and `patient_payments` have `created_by`/`created_at` only — no modified audit pair (related to AL-10) |
-| both | ICD-10 / Dental Cross Coding | no diagnostic-code resource |
-
-"Transaction Date" is shown from `created_at`; the legacy window treats it as a distinct
-posting date from DOS, which the backend does not model separately.
-
-**Suggested:** add the audit pair (`modified_by`/`modified_at`) first — it is the field
-office staff actually use — then `duration`, `eob_number` and the applied
-`fee_schedule_id` on the charge.
-
-### AL-14 — Feed descriptions are inconsistently money-prefixed
-- **Observed:** `AccountLedgerRow.description` is a plain code description for procedures
-  ("Bitewings - Four Radiographic Images") but arrives already money-prefixed for some
-  migrated payments ("$-89 Payment - Insurance Check No: 78687655 Notes:").
-- **Impact:** the grid composes the legacy `$<amount> <text>` string, which produced
-  "$0 $-89 Payment - …" on those rows. The frontend now skips its prefix when the text
-  already starts with `$`.
-- **Suggested:** return `description` as plain text on every row and leave presentation to
-  the client.
-
-### AL-15 — `allocations-summary.remaining_amount` is always 0
-- **Observed:** `GET /patient-procedures/PROC-90393354/allocations-summary` returns
-  `fee: "75.00"` with no allocations, yet `remaining_amount: "0"`. `paid_to_date`,
-  `insurance_paid_to_date` and `adjusted_to_date` are also `"0"` on procedures that do
-  have allocations elsewhere.
-- **Impact:** the legacy "Outstanding Amount" line on the Payment Allocation Detail popup
-  cannot use it. The frontend computes it as `|transaction amount| - Σ|allocations|`.
-- **Suggested:** compute `remaining_amount` as fee minus allocated (payments +
-  adjustments), and populate the `*_to_date` roll-ups.
-
-### AL-16 — Migrated payment allocations carry no procedure link
-- **Observed:** most migrated `payment_allocations` rows have `procedure_id: null`,
-  `amount: "0.00"` and `alloc_type: "A"` (e.g. ids 1-4, legacy ids 109207-109210). Only
-  allocations created in the new app carry a real `procedure_id` and amount.
-- **Impact:** the Payment Allocation Detail popup is empty for historical payments, so
-  offices cannot see how a legacy payment was applied.
-- **Suggested:** backfill `procedure_id` and `amount` from the legacy ledger-allocation
-  table during migration.
-
-### AL-17 — Hold Claim is invisible to the ledger feed
-- **Missing:** `AccountLedgerRow` has no `hold_claim`, and `GET /patient-procedures`
-  offers no `hold_claim` filter (only `billing_status`, `claim_id`, `is_void`, …).
-- **Impact:** to render the legacy "H" indicator and to keep held charges out of Create
-  Claim, the frontend walks `GET /patient-procedures?patient_id=…` (200 per page, capped
-  at the feed's 500-row window) **per account member** and builds a Set of held ids. On a
-  five-member account that is five extra list calls just to colour one column.
-- **Suggested:** add `hold_claim` to `AccountLedgerRow` (cheapest fix — it is already on
-  the underlying row), or failing that a `hold_claim` query filter on
-  `GET /patient-procedures`.
-- **Note:** the backend correctly persists `hold_claim` via
-  `PATCH /patient-procedures/{id}`; it just is not exposed anywhere the ledger can read
-  cheaply. Whether the backend *itself* excludes held procedures when a claim is built is
-  unverified — the frontend currently enforces it by disabling selection.
-
 ### AL-3 — "Ortho - Patient Payment Plan" has no backend resource
 - **Missing:** the Contracts tab has three panels - Regular-Patient, Ortho-Patient,
   Ortho-Insurance. The backend exposes `patient-payment-plans` (maps cleanly to
@@ -277,9 +173,6 @@ office staff actually use — then `duration`, `eob_number` and the applied
 - Transactions Entry tabs (`AddProceduresTab` / `PaymentsTab` / `AdjustmentsTab`) hosted
   in `TransactionEntryModal` - Add Procedure / Payments / Adjustments.
 - `createInsuranceClaim` / `updatePatientProcedure` - Create Claim flow.
-- `components/patient/ClaimDetail.tsx` - the claim drill-down target, unchanged.
-- `useProviderDirectory` / `providerOptionLabel`, `useDefinitions('payment_method')`,
-  `procedureCodeService.codeDescription`, `useBodyScrollLock` - inside the detail window.
 - Generated Orval client for every call (no raw axios).
 
 **New / changed:**
@@ -290,11 +183,6 @@ office staff actually use — then `duration`, `eob_number` and the applied
 - `accountLedgerModel.ts` - `LedgerRow`, `signedAmount`, `apiRow`, `claimRow`,
   running-balance computation, filter/sort helpers.
 - `accountLedgerService.ts` - `loadAccountMembers`, `loadLedgerFeed`, `loadPaymentPlans`.
-- `EditTransactionModal.tsx` - the legacy Edit Treatment / Edit Payment drill-down window.
-- `ClaimDetailsModal.tsx` - the legacy Claim Details popup (claim-row Description).
-- `PaymentAllocationModal.tsx` - the legacy Payment Allocation Detail popup (Amount).
-- `LedgerGrid.tsx` - the grid extracted out of `LedgerPage` so the ledger, the Claim
-  Details popup and any future consumer render a transaction identically.
 
 **Removed:**
 - `src/features/account-ledger/AccountLedgerPage.tsx` - folded into `LedgerPage`.

@@ -10,7 +10,7 @@ from migration.config import cfg
 from migration.utils.reader import read_denticon_file, read_folder
 from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import (
-    clean, parse_date, parse_decimal, parse_bool,
+    clean, parse_date, parse_datetime, parse_decimal, parse_bool,
     route_ledger_row, map_payment_method, LTYPE_PAYMENT_TYPE
 )
 
@@ -18,6 +18,8 @@ COLS = [
     "id", "patient_id", "office_id", "legacy_id", "is_archived",
     "payment_date", "amount", "payment_type", "payment_method",
     "check_number", "provider_id", "notes", "is_void",
+    # AL-10: who posted it — see s28.
+    "created_by", "created_by_legacy", "created_at",
 ]
 
 
@@ -36,6 +38,7 @@ def run(conn, maps: dict) -> dict:
     patient_map  = maps["patient_map"]
     provider_map = maps["provider_map"]
     office_map   = maps["office_map"]
+    user_map     = {str(k).strip().lower(): v for k, v in maps.get("user_map", {}).items()}
 
     payment_map: dict[str, str] = {}
     skipped = 0
@@ -81,6 +84,9 @@ def run(conn, maps: dict) -> dict:
             provider_map.get(prid),
             clean(row.get("NOTES")),
             parse_bool(row.get("ISVOID", "False")),
+            user_map.get((row.get("CREATEDBY") or "").strip().lower()),
+            clean(row.get("CREATEDBY")),
+            parse_datetime(row.get("CREATEDON") or ""),
         ))
         payment_map[ledger_id] = db_pk
 

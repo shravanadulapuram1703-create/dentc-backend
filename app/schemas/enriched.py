@@ -32,6 +32,8 @@ PatientProcedureRead = create_model(
     insurance_paid_to_date=(Decimal, Decimal("0")),
     adjusted_to_date=(Decimal, Decimal("0")),
     remaining_amount=(Decimal, Decimal("0")),
+    # AL-15: the legacy "Outstanding Amount" — fee minus everything applied.
+    outstanding_amount=(Decimal, Decimal("0")),
 )
 
 _ppay_base = build_schemas(m.PatientPayment, "PatientPaymentFull")[2]

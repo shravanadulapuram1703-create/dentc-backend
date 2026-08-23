@@ -38,6 +38,13 @@ from app.db.models import (
     PatientRefund,
     Provider,
 )
+# AL-9: one convention for what a patient_payments row does to a balance.
+from app.services.ledger_sign import (
+    payment_credit,
+    payment_delta,
+    sum_payment_credit,
+    sum_payment_debit,
+)
 
 _ZERO = Decimal("0")
 
@@ -88,8 +95,14 @@ def office_financial_summary(db: Session, office_id: int, tenant_id: int) -> dic
             PatientProcedure.is_archived.is_(False),
         )
     ).one()
+    # AL-9: sum the settled credit, not the raw signed `amount`.
     paid = db.execute(
-        select(func.coalesce(func.sum(PatientPayment.amount), 0)).where(
+        select(sum_payment_credit()).where(
+            PatientPayment.office_id == office_id, PatientPayment.is_void.is_(False)
+        )
+    ).scalar_one()
+    payment_debits = db.execute(
+        select(sum_payment_debit()).where(
             PatientPayment.office_id == office_id, PatientPayment.is_void.is_(False)
         )
     ).scalar_one()
@@ -116,7 +129,7 @@ def office_financial_summary(db: Session, office_id: int, tenant_id: int) -> dic
         "patient_count": count,
         "as_of": _now().isoformat(),
         # (charged/paid/adjusted/refunded retained internally for parity, not exposed)
-        "_charged": _d(charged), "_paid": _d(paid),
+        "_charged": _d(charged) + _d(payment_debits), "_paid": _d(paid),
         "_adjusted": _d(adjusted), "_refunded": _d(refunded),
     }
 
@@ -131,8 +144,8 @@ def _office_balance_split(db: Session, office_id: int) -> tuple[Decimal, Decimal
             PatientProcedure.is_archived.is_(False),
         ).group_by(PatientProcedure.patient_id)
     ).all())
-    pay_rows = dict(db.execute(
-        select(PatientPayment.patient_id, func.coalesce(func.sum(PatientPayment.amount), 0)).where(
+    pay_rows = dict(db.execute(  # AL-9
+        select(PatientPayment.patient_id, sum_payment_credit() - sum_payment_debit()).where(
             PatientPayment.office_id == office_id, PatientPayment.is_void.is_(False)
         ).group_by(PatientPayment.patient_id)
     ).all())
@@ -180,7 +193,7 @@ def collections_summary(
     ).all()
     ins = pat = _ZERO
     for ptype, amount in rows:
-        value = _d(amount)
+        value = payment_credit(amount, ptype)  # AL-9
         if (ptype or "").lower().startswith("ins") or "insurance" in (ptype or "").lower():
             ins += value
         else:
@@ -369,7 +382,9 @@ def transaction_feed(
                 "source_id": pay.id, "entry_date": pay.payment_date, "patient_id": pay.patient_id,
                 "office_id": pay.office_id, "provider_id": pay.provider_id,
                 "code": pay.payment_type, "description": pay.notes or pay.payment_type,
-                "amount": -_d(pay.amount), "status": pay.payment_type,
+                # AL-9: signed ledger delta — negative credits the account.
+                "amount": payment_delta(pay.amount, pay.payment_type),
+                "status": pay.payment_type,
             })
 
     if tt in ("all", "adjustment"):

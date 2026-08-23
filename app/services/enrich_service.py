@@ -80,7 +80,7 @@ def enrich_patient_procedure(db: Session, items, tenant_id=None) -> None:  # noq
     """CHG-5: patient/provider names **plus** the per-procedure applied totals the
     "Procedures To Post" grid needs (Pat Paid / Pat Adj / Rem Amt). Batched, so a
     page costs a fixed handful of statements."""
-    from app.services.procedure_totals_service import ZERO, applied_totals
+    from app.services.procedure_totals_service import ZERO, applied_totals, patient_share
 
     rows = list(items)
     enrich_patient_provider(db, rows)
@@ -90,8 +90,11 @@ def enrich_patient_procedure(db: Session, items, tenant_id=None) -> None:  # noq
         r.paid_to_date = applied.get("paid_to_date", ZERO)
         r.insurance_paid_to_date = applied.get("insurance_paid_to_date", ZERO)
         r.adjusted_to_date = applied.get("adjusted_to_date", ZERO)
-        r.remaining_amount = (
-            Decimal(r.patient_estimate or 0) - r.paid_to_date - r.adjusted_to_date
+        # AL-15: patient_estimate is 0.00 on essentially every migrated row, so a
+        # bare subtraction reported "nothing outstanding" on unpaid charges.
+        r.remaining_amount = patient_share(r) - r.paid_to_date - r.adjusted_to_date
+        r.outstanding_amount = (
+            Decimal(r.fee or 0) - r.paid_to_date - r.insurance_paid_to_date - r.adjusted_to_date
         )
 
 

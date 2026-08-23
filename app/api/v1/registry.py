@@ -26,6 +26,7 @@ from app.services.enrich_service import (
     enrich_payment_plan,
     enrich_treatment_plan,
 )
+from app.services.patient_procedure_service import PatientProcedureCRUD
 from app.services.payment_plan_service import PaymentPlanCRUD
 from app.services.provider_directory_service import ProviderCRUD
 from app.services.patient_note_service import PatientNoteCRUD, enrich_patient_notes
@@ -464,10 +465,16 @@ _CLINICAL = [
         singular="patient_procedure", plural="patient_procedures", pk_type=str,
         sortable_fields=("date_of_service", "created_at"),
         # treatment_plan_id: planned→completed lineage filter (REST).
+        # AL-17: hold_claim — the ledger needs held charges kept out of Create
+        # Claim; without a filter the grid pulled every procedure to find them.
         filter_fields=("patient_id", "appointment_id", "provider_id", "procedure_code",
-                       "claim_id", "office_id", "billing_status", "treatment_plan_id", "is_void"),
+                       "claim_id", "office_id", "billing_status", "treatment_plan_id",
+                       "hold_claim", "fee_schedule_id", "is_void"),
         range_fields=("date_of_service",), soft_delete_field="is_void", soft_delete_value=True,
         default_sort="created_at", read_enrich=enrich_patient_procedure,
+        # AL-17: a held charge must not be claimable from any caller, not just from
+        # the one screen that disables the checkbox.
+        crud_class=PatientProcedureCRUD,
     ),
     # Server-side chart filters (REST capability §6): procedure_code / chart_as /
     # is_inactive / group_id / status so the chart can be queried by ADA code,

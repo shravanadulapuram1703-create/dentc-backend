@@ -113,7 +113,7 @@ def test_consent_form_lands_under_the_consent_prefix(client, db_session, patient
     assert doc["storage_backend"] == "gcs"
     assert doc["storage_bucket"] == BUCKET
     assert doc["storage_path"].startswith(
-        f"consent-forms/{db_session._tenant_id}/{patient.id}/"
+        f"documents/consent-forms/{db_session._tenant_id}/{patient.id}/"
     )
     assert doc["storage_path"].endswith(".pdf")
     assert doc["storage_path"] in gcs.store
@@ -125,8 +125,75 @@ def test_other_document_types_use_the_generic_prefix(client, patient, gcs):
         data={"patient_id": str(patient.id), "document_type": "insurance_card"},
         files={"file": ("card.png", b"\x89PNG", "image/png")},
     ).json()
-    assert doc["storage_path"].startswith("patient-documents/")
-    assert not doc["storage_path"].startswith("consent-forms/")
+    assert doc["storage_path"].startswith("documents/general/")
+
+
+def test_every_prefix_lives_under_one_documents_root(client, patient, gcs):
+    """The bucket has a single shape — no top-level branch per document class."""
+    paths = [
+        _upload_consent(client, patient).json()["storage_path"],
+        client.post(
+            "/api/v1/patient-documents",
+            data={"patient_id": str(patient.id), "document_type": "insurance_card"},
+            files={"file": ("card.png", b"\x89PNG", "image/png")},
+        ).json()["storage_path"],
+        client.post(
+            "/api/v1/patient-documents",
+            data={"patient_id": str(patient.id), "document_type": "CF", "context": "note"},
+            files={"file": ("scan.pdf", b"%PDF", "application/pdf")},
+        ).json()["storage_path"],
+    ]
+    assert all(p.startswith("documents/") for p in paths), paths
+
+
+# ── NOTE-DOC-2: the notes folder ─────────────────────────────────────────────
+def test_a_notes_upload_lands_under_the_notes_prefix(client, db_session, patient, gcs):
+    doc = client.post(
+        "/api/v1/patient-documents",
+        data={"patient_id": str(patient.id), "document_type": "XR", "context": "note"},
+        files={"file": ("xray.png", b"\x89PNG", "image/png")},
+    ).json()
+    assert doc["storage_backend"] == "gcs"
+    assert doc["storage_path"].startswith(
+        f"documents/notes/{db_session._tenant_id}/{patient.id}/"
+    )
+    assert doc["storage_path"] in gcs.store
+
+
+def test_note_context_beats_the_consent_document_type(client, patient, gcs):
+    """A consent form uploaded from Notes is filed with the note. This is the one
+    case where the two routing rules disagree, so it is pinned deliberately."""
+    doc = client.post(
+        "/api/v1/patient-documents",
+        data={"patient_id": str(patient.id), "document_type": "CF", "context": "note"},
+        files={"file": ("consent.pdf", b"%PDF", "application/pdf")},
+    ).json()
+    assert doc["storage_path"].startswith("documents/notes/")
+    assert not doc["storage_path"].startswith("documents/consent-forms/")
+
+
+def test_an_unknown_context_is_rejected_not_silently_defaulted(client, patient, gcs):
+    """A typo would otherwise bury the file in the general folder, invisibly."""
+    r = client.post(
+        "/api/v1/patient-documents",
+        data={"patient_id": str(patient.id), "context": "notez"},
+        files={"file": ("x.pdf", b"%PDF", "application/pdf")},
+    )
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "invalid_document_context"
+    assert gcs.store == {}  # and nothing was written
+
+
+def test_the_local_fallback_mirrors_the_object_key(client, patient):
+    """No bucket configured: the path on disk is the key the object would have
+    had, so a dev tree and the bucket are readable the same way."""
+    doc = client.post(
+        "/api/v1/patient-documents",
+        data={"patient_id": str(patient.id), "context": "note"},
+        files={"file": ("scan.pdf", b"%PDF", "application/pdf")},
+    ).json()
+    assert doc["storage_backend"] == "local"
+    assert doc["storage_path"].startswith("documents/notes/")
 
 
 # ── URLs ─────────────────────────────────────────────────────────────────────
@@ -223,11 +290,12 @@ def test_deleting_a_gcs_document_keeps_the_blob(client, patient, gcs):
 
 # ── GET /consent-forms ───────────────────────────────────────────────────────
 def test_consent_forms_lists_the_bucket_masters(client, gcs):
-    gcs.store["consent-forms/_masters/a01-extraction.pdf"] = FakeBlob(
-        "consent-forms/_masters/a01-extraction.pdf", b"%PDF-1.4 master", "application/pdf"
+    gcs.store["documents/consent-forms/_masters/a01-extraction.pdf"] = FakeBlob(
+        "documents/consent-forms/_masters/a01-extraction.pdf",
+        b"%PDF-1.4 master", "application/pdf",
     )
-    gcs.store["patient-documents/1/2/other.pdf"] = FakeBlob(
-        "patient-documents/1/2/other.pdf", b"%PDF", "application/pdf"
+    gcs.store["documents/general/1/2/other.pdf"] = FakeBlob(
+        "documents/general/1/2/other.pdf", b"%PDF", "application/pdf"
     )
     body = client.get("/api/v1/consent-forms").json()
     assert body["is_configured"] is True
@@ -235,7 +303,23 @@ def test_consent_forms_lists_the_bucket_masters(client, gcs):
     names = [i["name"] for i in body["items"]]
     assert names == ["a01-extraction.pdf"]  # the generic-prefix object is excluded
     assert body["items"][0]["url"].startswith("https://")
-    assert body["items"][0]["storage_path"].startswith("consent-forms/")
+    assert body["items"][0]["storage_path"].startswith("documents/consent-forms/")
+
+
+def test_consent_forms_survives_a_bucket_it_cannot_list(client, gcs, monkeypatch):
+    """A configured bucket whose service account lacks ``storage.objects.list``
+    used to 500 the Letters dialog. Found for real: the deploy's ADC was the DICOM
+    ingest account, which has no access to the documents bucket."""
+    def _denied(*_a, **_kw):
+        raise RuntimeError("403 does not have storage.objects.list access")
+
+    monkeypatch.setattr(gcs, "list_blobs", _denied)
+    r = client.get("/api/v1/consent-forms")
+    assert r.status_code == 200, r.text
+    assert r.json()["items"] == []
+    # ...but it still reports the bucket as configured, so "empty" is not
+    # mistaken for "not set up".
+    assert r.json()["is_configured"] is True
 
 
 def test_consent_forms_accepts_a_custom_prefix(client, gcs):
@@ -246,15 +330,20 @@ def test_consent_forms_accepts_a_custom_prefix(client, gcs):
 
 
 # ── Key construction (what the probe script asserts against a real bucket) ───
-@pytest.mark.parametrize(("doc_type", "expected_prefix"), [
-    ("consent-form", "consent-forms/"),
-    ("consent_form", "consent-forms/"),
-    ("consent", "consent-forms/"),
-    ("xray", "patient-documents/"),
-    (None, "patient-documents/"),
+@pytest.mark.parametrize(("doc_type", "context", "expected_prefix"), [
+    ("consent-form", None, "documents/consent-forms/"),
+    ("consent_form", None, "documents/consent-forms/"),
+    ("consent", None, "documents/consent-forms/"),
+    ("CF", None, "documents/consent-forms/"),
+    ("xray", None, "documents/general/"),
+    (None, None, "documents/general/"),
+    # Context wins over document type — including over a consent type.
+    (None, "note", "documents/notes/"),
+    ("xray", "note", "documents/notes/"),
+    ("CF", "note", "documents/notes/"),
 ])
-def test_object_key_routing(doc_type, expected_prefix, gcs):
-    key = document_store.object_key(1, 42, doc_type, "f.pdf")
+def test_object_key_routing(doc_type, context, expected_prefix, gcs):
+    key = document_store.object_key(1, 42, doc_type, "f.pdf", context)
     assert key.startswith(expected_prefix)
     assert "/1/42/" in key
 

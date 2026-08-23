@@ -11,7 +11,7 @@ from migration.config import cfg
 from migration.utils.reader import read_denticon_file, read_folder
 from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import (
-    clean, parse_date, parse_decimal, parse_bool,
+    clean, parse_date, parse_datetime, parse_decimal, parse_bool, parse_int,
     map_billing_order, route_ledger_row
 )
 
@@ -23,6 +23,16 @@ COLS = [
     "apply_to", "billing_order",
     "billing_status", "hold_claim", "is_void",
     "material_id", "notes",
+    # AL-6/AL-10: DURATION and CREATEDBY/CREATEDON used to be dropped, so the
+    # ledger's Durati… and User columns were blank for every migrated row.
+    # LEDGER.CLAIMID (which is what makes `unbilled` trustworthy) is NOT set here —
+    # insurance_claims is step 30, so the FK would not yet resolve; both it and the
+    # already-migrated rows are handled by
+    # scripts/backfill_ledger_source_fields.py, which runs after the full pass.
+    "duration_minutes", "created_by", "created_by_legacy", "created_at",
+    # AL-15: PATPAID/PATADJUST are the only surviving record of what was applied
+    # to a charge — the allocation export's AMOUNT is 0.0000 on every row (AL-16).
+    "pat_paid", "pat_adjust",
 ]
 
 
@@ -44,6 +54,9 @@ def run(conn, maps: dict) -> dict:
     appt_map      = maps.get("appt_map", {})
     proc_code_set = maps.get("proc_code_set", set())
     material_map  = maps.get("material_map", {})
+    # AL-10: CREATEDBY holds the Denticon login (SHORTID); users.legacy_id is keyed
+    # on the same string. Matched case-insensitively — the export is inconsistent.
+    user_map      = {str(k).strip().lower(): v for k, v in maps.get("user_map", {}).items()}
 
     procedure_map: dict[str, str] = {}
     skipped = 0
@@ -102,6 +115,12 @@ def run(conn, maps: dict) -> dict:
             parse_bool(row.get("ISVOID", "False")),
             material_map.get((row.get("MATERIALID") or "").strip()),
             clean(row.get("NOTES")),
+            parse_int(row.get("DURATION")),
+            user_map.get((row.get("CREATEDBY") or "").strip().lower()),
+            clean(row.get("CREATEDBY")),
+            parse_datetime(row.get("CREATEDON") or ""),
+            parse_decimal(row.get("PATPAID") or "0"),
+            parse_decimal(row.get("PATADJUST") or "0"),
         ))
         procedure_map[ledger_id] = db_pk
 

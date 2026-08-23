@@ -23,6 +23,8 @@ from decimal import Decimal
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
+from app.services.ledger_sign import sum_payment_credit
+
 from app.db.models import (
     Appointment,
     InsuranceClaim,
@@ -82,7 +84,8 @@ def _production(db: Session, tenant_id: int, office_id: int | None,
 def _collections(db: Session, tenant_id: int, office_id: int | None,
                  date_from: date, date_to: date) -> float:
     stmt = (
-        select(func.coalesce(func.sum(PatientPayment.amount), 0))
+        # AL-9: collections are the rows' credits, not their raw signed amounts.
+        select(sum_payment_credit())
         .join(Patient, Patient.id == PatientPayment.patient_id)
         .where(
             Patient.tenant_id == tenant_id,
@@ -183,7 +186,7 @@ def _ar_components(db: Session, tenant_id: int, office_id: int | None,
         )
     )
     pay_stmt = (
-        select(func.coalesce(func.sum(PatientPayment.amount), 0))
+        select(sum_payment_credit())  # AL-9
         .join(Patient, Patient.id == PatientPayment.patient_id)
         .where(
             Patient.tenant_id == tenant_id,
@@ -351,7 +354,7 @@ def get_trends(db: Session, tenant_id: int, office_id: int | None,
         .group_by(PatientProcedure.date_of_service)
     )
     coll_stmt = (
-        select(PatientPayment.payment_date, func.coalesce(func.sum(PatientPayment.amount), 0))
+        select(PatientPayment.payment_date, sum_payment_credit())  # AL-9
         .join(Patient, Patient.id == PatientPayment.patient_id)
         .where(
             Patient.tenant_id == tenant_id,

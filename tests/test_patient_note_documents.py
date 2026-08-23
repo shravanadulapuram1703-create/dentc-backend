@@ -80,6 +80,25 @@ def test_note_carries_the_uploaded_document_and_renders_a_link(client, patient):
     assert content.content == b"%PDF-1.4 scan"
 
 
+def test_the_full_notes_flow_files_the_document_under_documents_notes(client, patient):
+    """End to end, the way the Notes screen does it: upload with context=note,
+    save the note with the returned id, re-open, download."""
+    doc = client.post(
+        "/api/v1/patient-documents",
+        data={"patient_id": str(patient.id), "document_type": "CF", "context": "note"},
+        files={"file": ("consent.pdf", b"%PDF-1.4 note file", "application/pdf")},
+    ).json()
+    assert doc["storage_path"].startswith("documents/notes/")
+
+    note = client.post("/api/v1/patient-notes", json={
+        "patient_id": patient.id, "note_type": "DOC", "notes": "Uploaded from Notes",
+        "document_id": doc["id"],
+    }).json()
+    reopened = client.get(f"/api/v1/patient-notes/{note['id']}").json()
+    got = client.get(reopened["document"]["file_url"])
+    assert got.status_code == 200 and got.content == b"%PDF-1.4 note file"
+
+
 def test_notes_list_embeds_the_document_without_a_per_row_fetch(client, patient):
     doc = _upload(client, patient)
     client.post("/api/v1/patient-notes", json={
@@ -252,6 +271,9 @@ def test_limits_endpoint_publishes_what_the_server_enforces(client):
     assert body["max_bytes"] == settings.DOCUMENT_MAX_BYTES
     assert body["allowed_content_types"] == settings.DOCUMENT_ALLOWED_TYPES
     assert ".pdf" in body["allowed_extensions"] and ".png" in body["allowed_extensions"]
+    # The picker also learns which context values the upload accepts, rather than
+    # hardcoding "note" and finding out at runtime that it was rejected.
+    assert body["allowed_contexts"] == ["note"]
 
 
 # ── NOTE-DOC-4: the document_type vocabulary ─────────────────────────────────
@@ -266,10 +288,13 @@ def test_document_type_definitions_group_is_seeded(client, db_session):
     assert "OT" in codes
 
 
-def test_a_consent_form_from_notes_routes_to_the_consent_prefix():
-    """The Notes screen sends ``CF``; without it in CONSENT_DOCUMENT_TYPES a
-    consent uploaded from Notes would land under the generic prefix."""
+def test_cf_is_a_recognised_consent_type():
+    """The Notes screen sends ``CF``. Outside a note it files with the practice's
+    consents; *inside* a note the note context wins — pinned in
+    ``test_document_storage.py::test_note_context_beats_the_consent_document_type``."""
     from app.services import document_store
 
     assert document_store.is_consent_type("CF") is True
-    assert document_store.object_key(1, 42, "CF", "c.pdf").startswith("consent-forms/")
+    assert document_store.object_key(1, 42, "CF", "c.pdf").startswith(
+        "documents/consent-forms/"
+    )

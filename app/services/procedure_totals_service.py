@@ -15,8 +15,25 @@ already posted:
                       its per-procedure split (ADJ-1 allocations). Never both:
                       an allocated adjustment is counted only through its
                       allocations.
-``remaining_amount``  ``patient_estimate − paid_to_date − adjusted_to_date``
+``remaining_amount``  what the patient still owes on the charge — see below
+``outstanding_amount`` ``fee`` minus everything applied (AL-15)
 ===================== =====================================================
+
+**AL-15.** These roll-ups came back ``0`` on every migrated procedure, and
+``remaining_amount`` was ``0`` even on a $75 charge with nothing paid. Two causes,
+both upstream of the arithmetic:
+
+* ``payment_allocations`` cannot supply ``paid_to_date``. The Denticon allocation
+  export holds 6,951 rows for 1.33M payments and **every ``AMOUNT`` in it is
+  ``0.0000``** (AL-16), so there was never anything to sum. What *does* survive is
+  ``LEDGER.PATPAID`` / ``PATADJUST`` — per-procedure patient money — now stored on
+  ``patient_procedures.pat_paid`` / ``pat_adjust`` and used as the floor for the
+  two roll-ups (an allocation beats it, so app-created splits still win).
+* ``remaining_amount`` was ``patient_estimate − …``, and
+  ``patient_estimate`` is ``0.00`` on 1,372,558 of 1,372,574 migrated procedures
+  (the migration never mapped a patient-estimate column; Denticon has none — the
+  patient's share is ``fee − insurance_estimate``). It now falls back to that
+  derivation when no estimate was recorded, so the number means something.
 
 Every query is batched by the id set, so enriching a page costs 4 statements
 regardless of page size.
@@ -33,6 +50,7 @@ from app.db.models import (
     LedgerInsuranceDetail,
     PatientAdjustment,
     PatientPayment,
+    PatientProcedure,
     PaymentAllocation,
 )
 
@@ -130,6 +148,16 @@ def _adjusted(db: Session, ids: list[str]) -> dict[str, Decimal]:
     return out
 
 
+def _legacy_applied(db: Session, ids: list[str]) -> dict[str, tuple[Decimal, Decimal]]:
+    """AL-15: ``(pat_paid, pat_adjust)`` per procedure — the migrated ledger's own
+    record of what was applied, and the only one that survived (see AL-16)."""
+    rows = db.execute(
+        select(PatientProcedure.id, PatientProcedure.pat_paid, PatientProcedure.pat_adjust)
+        .where(PatientProcedure.id.in_(ids))
+    ).all()
+    return {pid: (_d(paid), _d(adjust)) for pid, paid, adjust in rows}
+
+
 def applied_totals(db: Session, procedure_ids: list[str]) -> dict[str, dict[str, Decimal]]:
     """``{procedure_id: {paid_to_date, insurance_paid_to_date, adjusted_to_date}}``."""
     ids = [pid for pid in procedure_ids if pid]
@@ -138,15 +166,39 @@ def applied_totals(db: Session, procedure_ids: list[str]) -> dict[str, dict[str,
     patient_paid, insurance_alloc = _allocated(db, ids)
     insurance_detail = _insurance_details(db, ids)
     adjusted = _adjusted(db, ids)
+    legacy = _legacy_applied(db, ids)
+
+    def _pick(allocated: Decimal, legacy_value: Decimal) -> Decimal:
+        """An allocation is the more precise record, so it wins; the legacy scalar
+        fills in where there are no allocations at all — which, on migrated data,
+        is everywhere."""
+        return allocated if allocated else legacy_value
+
     return {
         pid: {
-            "paid_to_date": patient_paid.get(pid, ZERO),
+            "paid_to_date": _pick(patient_paid.get(pid, ZERO), legacy.get(pid, (ZERO, ZERO))[0]),
             "insurance_paid_to_date": insurance_alloc.get(pid, ZERO)
             + insurance_detail.get(pid, ZERO),
-            "adjusted_to_date": adjusted.get(pid, ZERO),
+            "adjusted_to_date": _pick(
+                adjusted.get(pid, ZERO), legacy.get(pid, (ZERO, ZERO))[1]
+            ),
         }
         for pid in ids
     }
+
+
+def patient_share(procedure) -> Decimal:  # noqa: ANN001
+    """What the patient is expected to owe on a charge.
+
+    ``patient_estimate`` when one was recorded; otherwise ``fee − insurance_estimate``.
+    Denticon's LEDGER has no patient-estimate column, so the stored value is ``0.00``
+    on 1,372,558 of 1,372,574 migrated procedures and the subtraction produced ``0``
+    for every historical charge."""
+    estimate = _d(procedure.patient_estimate)
+    if estimate:
+        return estimate
+    share = _d(procedure.fee) - _d(procedure.insurance_estimate)
+    return share if share > ZERO else ZERO
 
 
 def allocations_summary(db: Session, procedure) -> dict:  # noqa: ANN001
@@ -154,6 +206,7 @@ def allocations_summary(db: Session, procedure) -> dict:  # noqa: ANN001
     totals = applied_totals(db, [procedure.id]).get(procedure.id, {})
     paid = totals.get("paid_to_date", ZERO)
     adjusted = totals.get("adjusted_to_date", ZERO)
+    insurance_paid = totals.get("insurance_paid_to_date", ZERO)
     allocations = db.execute(
         select(PaymentAllocation)
         .where(PaymentAllocation.procedure_id == procedure.id)
@@ -182,9 +235,14 @@ def allocations_summary(db: Session, procedure) -> dict:  # noqa: ANN001
         "patient_estimate": _d(procedure.patient_estimate),
         "insurance_estimate": _d(procedure.insurance_estimate),
         "paid_to_date": paid,
-        "insurance_paid_to_date": totals.get("insurance_paid_to_date", ZERO),
+        "insurance_paid_to_date": insurance_paid,
         "adjusted_to_date": adjusted,
-        "remaining_amount": _d(procedure.patient_estimate) - paid - adjusted,
+        # AL-15: the patient's share, falling back to fee − insurance estimate
+        # when no patient estimate was recorded (true of all migrated rows).
+        "remaining_amount": patient_share(procedure) - paid - adjusted,
+        # AL-15: the legacy "Outstanding Amount" line — the whole charge minus
+        # everything applied to it, from any source.
+        "outstanding_amount": _d(procedure.fee) - paid - insurance_paid - adjusted,
         "allocations": list(allocations),
         "adjustments": list(adjustments),
     }

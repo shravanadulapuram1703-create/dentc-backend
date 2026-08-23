@@ -53,8 +53,13 @@ def legacy_db():
         # repoint is an ORM update, so SQLAlchemy auto-sets the onupdate column.
         c.execute(text("CREATE TABLE chart_conditions (id INTEGER PRIMARY KEY AUTOINCREMENT, "
                        "material_id INTEGER, updated_at VARCHAR)"))
-        for tbl in ("patient_procedures", "appointment_procedures"):
-            c.execute(text(f"CREATE TABLE {tbl} (id INTEGER PRIMARY KEY AUTOINCREMENT, material_id INTEGER)"))
+        # patient_procedures gained updated_at too (AL-13) — same reason as
+        # chart_conditions above: the repoint is an ORM update, so the onupdate
+        # column has to exist on the simulated legacy table.
+        c.execute(text("CREATE TABLE patient_procedures (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                       "material_id INTEGER, updated_at VARCHAR)"))
+        c.execute(text("CREATE TABLE appointment_procedures ("
+                       "id INTEGER PRIMARY KEY AUTOINCREMENT, material_id INTEGER)"))
         c.execute(text("CREATE TABLE procedure_codes (code VARCHAR PRIMARY KEY, default_material_id INTEGER)"))
     session = Session(bind=engine)
     try:

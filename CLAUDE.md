@@ -541,11 +541,103 @@ survives until edited.
   the extension, because scanners send that for real PDFs and rejecting them would
   break Document (Scan) for no security gain. Published at
   `GET /patient-documents/limits` so the picker states what the server enforces.
-- **NOTE-DOC-2** needed no code — `GCS_BUCKET_DOCUMENTS` routes to
-  `gs://{bucket}/patient-documents/{tenant}/{patient}/{uuid}{ext}` already (LTR-1);
-  it is a deploy-config flip. **NOTE-DOC-4** seeds the `document_type` definitions
-  group (14 codes); `CF` is also added to `CONSENT_DOCUMENT_TYPES` so a consent
-  uploaded from Notes lands under the consent-forms prefix with the rest.
+- **NOTE-DOC-2** every patient file now lives under one `documents/` root in
+  `gs://reco-documents` — `documents/notes/{tenant}/{patient}/{uuid}{ext}`,
+  `documents/consent-forms/…`, `documents/general/…` (was two branches at the
+  bucket root). The class is chosen by `document_store.prefix_for`, where the
+  upload **`context` beats `document_type`**: a consent form uploaded from Notes
+  files with the note, because the note is the record it belongs to. `context` is
+  a new form field on `POST /patient-documents` and **must come from the caller**
+  — the file is uploaded *before* the note row exists, so nothing server-side can
+  infer it; an unrecognised value is 422 `invalid_document_context` rather than a
+  silent fall-through, since a typo would bury a file in a folder nobody checks.
+  `DOCUMENT_CONTEXTS` is published on `/patient-documents/limits`. The local
+  fallback mirrors the object key, so `uploads/` and the bucket read alike.
+  Turning it on is still just `GCS_BUCKET_DOCUMENTS` + `PUBLIC_API_BASE_URL`.
+  **NOTE-DOC-4** seeds the `document_type` definitions group (14 codes); `CF` is
+  in `CONSENT_DOCUMENT_TYPES`, which now only decides where a consent goes when
+  it is uploaded *outside* a note.
+
+**Account Ledger second pass** (AL-3/6/8/9/10/11/12 of
+[docs/account-ledger/account_ledger_backend_devreport.md](docs/account-ledger/account_ledger_backend_devreport.md)
+/ [response](docs/account-ledger/account_ledger_backend_response.md); Alembic
+`b1c2d3e4f5a6` + `c2d3e4f5a6b7`). AL-1/2/4/5/7 shipped the denormalised
+`GET /patients/{id}/account-ledger`; this pass fixes what it computed *with*.
+- **AL-9 is the load-bearing fix**: `patient_payments.amount` carries **two** sign
+  conventions — migrated Denticon `LEDGER` rows keep the legacy signed delta
+  (a payment is **negative**: 185,885 rows), app-created rows store the positive
+  magnitude — and every consumer assumed "positive = credit", so the migrated half
+  double-negated. `/balance` returned `1093.00 − (−417.50) = 1510.50` where the
+  answer is `675.50`, and a payment made the ledger's running balance go **up**.
+  The rule now lives once in [app/services/ledger_sign.py](app/services/ledger_sign.py)
+  — `delta = amount` verbatim for `payment_type='adjustment'` (genuinely two-way,
+  so the stored sign *is* the intent), `-abs(amount)` otherwise (a payment always
+  credits) — and `balance_service`, `ledger_service`, `transactions_service`,
+  `report_service`, `statement_service`, `scheduler_service` and `refund_service`
+  all route through it. Stored data is **not** rewritten: normalising the sign
+  would destroy the only signal separating a credit adjustment from a debit one.
+  `account-ledger.amount` is now genuinely signed (`+charge`/`−credit`) with
+  `charge`/`credit` as non-negative magnitudes; `/balance` reports `total_paid`
+  positive and adds `total_payment_debits`. Rides along: `/balance` and the feeds
+  excluded archived *charges* but included archived *payments* (a no-op on current
+  data — every archived row is `0.00` — but they could never reconcile); the feed
+  takes `?include_archived=true`.
+- **AL-11** `?scope=account` merges every patient sharing the anchor's
+  `responsible_party_id` ([app/services/account_scope.py](app/services/account_scope.py),
+  raw-string match so migrated guarantors resolve), recomputes the running balance
+  across the merged feed and **server-pages** it; every row carries
+  `patient_id`/`patient_name` in both scopes. `GET /patients/{id}/account-balance`
+  is the legacy BALANCES table in one call (aggregate + `members[]`, each the
+  `/balance` payload). 15 requests for a 5-member account become 2.
+- **AL-8** `?include_claims=true` interleaves `source_type='claim'` rows — **one
+  per dated status transition** (`submitted`/`paid`/`closed`), because the legacy
+  row is the *event*, not the claim's current state. `transaction_kind='I'`;
+  `charge`/`credit` are zero and the running balance does not move (the money
+  already arrived as an insurance payment). Opt-in so `total` doesn't shift under
+  existing callers.
+- **AL-10/AL-6 were migration data loss**, not API gaps: `LEDGER.CREATEDBY`,
+  `CREATEDON`, `DURATION` and `CLAIMID` were all dropped by `s28`/`s29`.
+  New `created_by_legacy` (both tables) + `patient_procedures.duration_minutes`;
+  `s28`/`s29` now carry them, and
+  `scripts/backfill_ledger_source_fields.py` repairs migrated rows (NULL-only by
+  default, `--dry-run`/`--overwrite`/`--only`). Dry-run over 2.79M ledger rows:
+  297,671 procedures gain a `claim_id` (so `unbilled` stops being universally
+  true), 1.46M gain `created_by_legacy` but only 359,687 resolve to a `users` row
+  — **2.23M name a login that has none** (only providers were seeded as users),
+  which is exactly why `user_label` falls back to the raw legacy login.
+  `DURATION` is `0` on all but **7** rows, so the `Durati…` column will stay empty
+  — the data was never captured upstream. `At`/attachment has **no source column**
+  in the 66-column `LEDGER` export.
+- **AL-13/14/15/16/17** (a later revision of the same report, in
+  `docs/ledger/`): `hold_claim` on the feed, as a `/patient-procedures` filter,
+  **and enforced server-side** (AL-17 — the grid was walking the whole list per
+  account member to colour one column, and Create Claim is
+  `POST /insurance-claims` + `PATCH /patient-procedures{claim_id}`, so one
+  disabled checkbox in one screen was the *only* thing stopping a held charge
+  being claimed; `PatientProcedureCRUD` now 422s
+  `procedure_on_hold_claim` on the assignment, evaluating the hold against the
+  merge of payload + stored row so un-hold-and-claim in one PATCH still works); `description` is plain text on every row, a `$`-amount
+  baked into a migrated note stripped server-side (AL-14). **AL-15 had two root
+  causes**: `payment_allocations` can never supply `paid_to_date` because the
+  Denticon allocation export is **6,951 rows for 1.33M payments with `AMOUNT`
+  `0.0000` on every one** (AL-16 — unrecoverable, the link was never exported),
+  and `remaining_amount` subtracted from `patient_estimate`, which is `0.00` on
+  1,372,558 of 1,372,574 migrated rows (Denticon has no patient-estimate column —
+  the share is `fee − ESTINS`). Fixed with `patient_procedures.pat_paid`/
+  `pat_adjust` from `LEDGER.PATPAID`/`PATADJUST` (the only surviving record of
+  what was applied to a charge; a real allocation still wins), a `fee −
+  insurance_estimate` fallback, and a new `outstanding_amount`. AL-13 adds the
+  `updated_at`/`updated_by` audit pair to both ledger tables (`CRUDBase.update`
+  stamps it), `patient_payments.eob_number` and
+  `patient_procedures.fee_schedule_id`; ADVANCED / contract-plan /
+  per-transaction referral / ICD-10 stay unmodelled pending a product call.
+- **AL-12** `GET /patients/{id}/context` gains `responsible_party` (resolved by
+  numeric FK then `legacy_id`), `responsible_party_id` and `primary_insurance`;
+  `insurance[]` gains `group_number`/`plan_type`/`plan_name`. There is no
+  plan-name column in the migrated schema — `plan_name` is composed as
+  carrier + group number. **AL-3 needed no work** (`plan_type` +
+  the insurance-plan financial fields shipped in Alembic `f8a9b0c1d2e3`); the FE
+  was on a stale generated client.
 
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))

@@ -74,6 +74,21 @@ class PatientContextInsurance(BaseModel):
     insurance_type: str
     ins_plan_id: int | None = None
     carrier_name: str | None = None
+    # AL-12: the ledger title row prints "Prim. Ins" + the plan identity.
+    group_number: str | None = None
+    plan_type: str | None = None
+    legacy_plan_type: str | None = Field(None, description="'D' dental | 'M' medical")
+    plan_name: str | None = Field(None, description="Carrier + group number — no plan-name column exists")
+
+
+class PatientContextResponsibleParty(BaseModel):
+    """AL-12: "Responsible: <name>" in the ledger title row."""
+
+    id: int
+    legacy_id: str | None = None
+    name: str | None = None
+    relationship: str | None = None
+    home_phone: str | None = None
 
 
 class PatientContextVisit(BaseModel):
@@ -86,6 +101,10 @@ class PatientContext(BaseModel):
     patient: SchedulerPatientRead  # type: ignore[valid-type]
     balance: dict
     insurance: list[PatientContextInsurance]
+    # AL-12: header detail the shared patient shell could not previously show.
+    primary_insurance: PatientContextInsurance | None = None
+    responsible_party: PatientContextResponsibleParty | None = None
+    responsible_party_id: str | None = None
     visit: PatientContextVisit
     # PE-3: opening A/R buckets folded in so the Edit form hydrates from one call.
     opening_balance: dict = {}

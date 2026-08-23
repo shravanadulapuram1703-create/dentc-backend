@@ -8,7 +8,7 @@ ortho_plans · patient_plan_installments
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -20,6 +20,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -45,6 +46,15 @@ class PatientPayment(Base, CreatedAtMixin):
     notes: Mapped[str | None] = mapped_column(Text)
     is_void: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # AL-10: legacy LEDGER.CREATEDBY login string — see PatientProcedure.
+    created_by_legacy: Mapped[str | None] = mapped_column(String(50))
+    # AL-13: the Modified By/On pair behind the Edit Payment window.
+    updated_at: Mapped[datetime | None] = mapped_column(onupdate=func.now())
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # AL-13: EOB number on the payment itself. `ledger_insurance_details.eob_number`
+    # (INS-1) records it for a carrier remittance; a patient-side payment entered
+    # from an EOB had nowhere to put it.
+    eob_number: Mapped[str | None] = mapped_column(String(50))
 
 
 class InsuranceClaim(Base, CreatedAtMixin):
