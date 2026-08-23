@@ -88,3 +88,7 @@ class UploadLimits(BaseModel):
     max_megabytes: float
     allowed_content_types: list[str]
     allowed_extensions: list[str]
+    # The accepted ``context`` values on POST /patient-documents. Each maps to a
+    # folder in the storage bucket, so an unlisted value is rejected rather than
+    # silently filed under the default.
+    allowed_contexts: list[str]

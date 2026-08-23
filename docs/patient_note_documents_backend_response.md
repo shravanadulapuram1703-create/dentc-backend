@@ -147,31 +147,83 @@ production, and it is what you asked for.
 
 ## NOTE-DOC-2 — GCS
 
-No code change was needed; the routing has been in place since LTR-1 and is
-covered by `tests/test_document_storage.py` against a fake client. Uploads land
-at:
+Every patient file lives under one `documents/` root, with a folder per class:
 
 ```
-gs://{GCS_BUCKET_DOCUMENTS}/patient-documents/{tenant_id}/{patient_id}/{uuid}{ext}
-gs://{GCS_BUCKET_DOCUMENTS}/consent-forms/{tenant_id}/{patient_id}/{uuid}.pdf     # consent types
+gs://reco-documents/
+└── documents/
+    ├── notes/{tenant_id}/{patient_id}/{uuid}{ext}           # context=note
+    ├── consent-forms/{tenant_id}/{patient_id}/{uuid}.pdf    # consent document types
+    └── general/{tenant_id}/{patient_id}/{uuid}{ext}         # everything else
 ```
 
 Note the layout is `{tenant}/{patient}/…`, one level deeper than the local path
 you observed — a bucket is shared across tenants, so tenant has to be in the key.
 
+### `context` — one new field on the upload (FE change required)
+
+`POST /patient-documents` accepts a `context` form field. **Send `context=note`
+for every upload from the Notes screen** — that is what puts the file in
+`documents/notes/`. Without it the upload still succeeds, it just lands in
+`documents/general/` (or `documents/consent-forms/` for a consent sub-type).
+
+We cannot infer it: the file is uploaded *before* the note row exists, so there
+is nothing on the server that knows the upload came from Notes.
+
+```
+POST /api/v1/patient-documents
+  file=@consent.pdf
+  patient_id=83862
+  document_type=CF
+  context=note            <-- new
+```
+
+**`context` beats `document_type`.** A consent form uploaded from Notes goes to
+`documents/notes/`, not `documents/consent-forms/` — the note is the record it
+belongs to. (Uploading a consent from anywhere *else* still files it with the
+practice's consent library.)
+
+An unrecognised `context` is a **422 `invalid_document_context`** rather than a
+silent fall-through to the default — a typo would otherwise bury a note's file in
+the wrong folder with nothing to indicate it. The accepted values are published
+alongside the size/type limits:
+
+```
+GET /api/v1/patient-documents/limits
+-> {"max_bytes": ..., "allowed_contexts": ["note"], ...}
+```
+
 **To turn it on, set on the deploy:**
 
 | Var | Value |
 |-----|-------|
-| `GCS_BUCKET_DOCUMENTS` | e.g. `reco-documents` |
+| `GCS_BUCKET_DOCUMENTS` | `reco-documents` |
 | `PUBLIC_API_BASE_URL` | the API's browser-reachable origin (so proxy URLs are absolute) |
 | `DOCUMENT_URL_MODE` | `auto` (default) — signed URL when signing works, else proxy |
 | `DOCUMENT_SIGNED_URL_TTL_SECONDS` | `900` (default) |
+| `GCS_NOTES_PREFIX` | `documents/notes` (default) |
+| `GCS_CONSENT_FORMS_PREFIX` | `documents/consent-forms` (default) |
+| `GCS_DOCUMENTS_PREFIX` | `documents/general` (default) |
 
-The service account needs `roles/storage.objectAdmin` on the bucket and
-`roles/iam.serviceAccountTokenCreator` on itself for V4 signing. Without the
-signing role everything still works — `file_url` falls back to the `/content`
-proxy. Verify a real bucket in one command:
+The three prefixes are defaults — you only set them to override the layout.
+
+**The service account needs access to the bucket — this is currently the only
+thing blocking it.** `GCS_CREDENTIALS_PATH` points at
+`dicom_migration/sa-dicom-ingest.json`, i.e.
+`sa-dicom-ingest@reckon-dental.iam.gserviceaccount.com`, which has rights on the
+DICOM buckets but **none on `reco-documents`**. Probed against the live bucket:
+routing is correct, upload returns
+`403 … does not have storage.objects.create access`.
+
+```bash
+gcloud storage buckets add-iam-policy-binding gs://reco-documents --member=serviceAccount:sa-dicom-ingest@reckon-dental.iam.gserviceaccount.com --role=roles/storage.objectAdmin
+```
+
+`objectAdmin` covers create / read / list / delete. For V4 signed URLs the
+account also needs `roles/iam.serviceAccountTokenCreator` **on itself**; without
+it everything still works — `file_url` falls back to the `/content` proxy.
+
+Verify against the real bucket in one command:
 
 ```bash
 python -m scripts.check_document_storage
@@ -179,7 +231,17 @@ python -m scripts.check_document_storage
 
 If GCS is configured but an upload fails, we log the error and write the file
 locally rather than losing it. That row reports `storage_backend: "local"` — it
-is the signal that the bucket is unreachable.
+is the signal that the bucket is unreachable. The local path mirrors the object
+key it would have had, so a later sweep can lift it into the bucket unchanged.
+
+> **One thing to know before the bucket goes live.** The prefixes changed in this
+> pass — they used to be `consent-forms/` and `patient-documents/` at the bucket
+> root. Nothing needs migrating because the bucket has never been switched on
+> (`storage_backend` is `local` on every row today, and reads use each row's
+> stored `storage_path` regardless). If blank consent masters have already been
+> uploaded to `consent-forms/`, either move them under `documents/consent-forms/`
+> or call `GET /consent-forms?prefix=consent-forms` to keep listing them where
+> they are.
 
 ---
 
@@ -263,7 +325,8 @@ document prefix. Keep sending `CF` — that is what makes it work.
 
 | Method | Path | Note |
 |--------|------|------|
-| `GET` | `/api/v1/patient-documents/limits` | **new** — NOTE-DOC-5 |
+| `POST` | `/api/v1/patient-documents` | **new `context` form field** — send `context=note` from Notes |
+| `GET` | `/api/v1/patient-documents/limits` | **new** — NOTE-DOC-5, also publishes `allowed_contexts` |
 | `GET` | `/api/v1/progress-notes/{id}/attachments/{aid}/content` | **new** — NOTE-DOC-3 |
 | `GET` | `/api/v1/insurance-claims/{id}/attachments/{aid}/content` | **new** — NOTE-DOC-3 |
 | `*` | `/api/v1/patient-notes*` | `document_id` in/out; `document` block on read |

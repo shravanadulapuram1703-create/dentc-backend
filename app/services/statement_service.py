@@ -23,6 +23,8 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.services.ledger_sign import sum_payment_credit, sum_payment_debit
+
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.ids import uuid7
 from app.db.models import (
@@ -89,8 +91,14 @@ def _period_lines(
             PatientProcedure.is_void.is_(False),
             PatientProcedure.is_archived.is_(False),
         ), PatientProcedure.date_of_service)).scalar_one()
+    # AL-9: credits are always positive; a debit adjustment posted through
+    # patient_payments is a charge and is added to the charge side.
     payments = db.execute(_window(
-        select(func.coalesce(func.sum(PatientPayment.amount), 0)).where(
+        select(sum_payment_credit()).where(
+            PatientPayment.patient_id == patient_id, PatientPayment.is_void.is_(False),
+        ), PatientPayment.payment_date)).scalar_one()
+    payment_debits = db.execute(_window(
+        select(sum_payment_debit()).where(
             PatientPayment.patient_id == patient_id, PatientPayment.is_void.is_(False),
         ), PatientPayment.payment_date)).scalar_one()
     adjustments = db.execute(_window(
@@ -109,7 +117,7 @@ def _period_lines(
                 PatientProcedure.date_of_service < date_from,
             )).scalar_one()
         pre_pay = db.execute(
-            select(func.coalesce(func.sum(PatientPayment.amount), 0)).where(
+            select(sum_payment_credit() - sum_payment_debit()).where(  # AL-9
                 PatientPayment.patient_id == patient_id, PatientPayment.is_void.is_(False),
                 PatientPayment.payment_date < date_from,
             )).scalar_one()
@@ -122,7 +130,8 @@ def _period_lines(
 
     return {
         "opening": opening,
-        "charges": _d(charges),
+        # AL-9: a debit adjustment posted through patient_payments is a charge.
+        "charges": _d(charges) + _d(payment_debits),
         "payments": _d(payments),
         "adjustments": _d(adjustments),
     }

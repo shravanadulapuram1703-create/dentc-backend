@@ -170,14 +170,23 @@ class Settings(BaseSettings):
     # ``patient-documents`` writes there; leave it unset and uploads stay on the
     # local filesystem so dev/tests work without cloud creds.
     GCS_BUCKET_DOCUMENTS: str | None = None          # e.g. "reco-documents"
-    # Object-key prefix per document class. ``consent-form`` uploads land under
-    # CONSENT prefix (gs://<bucket>/consent-forms/{tenant}/{patient}/{uuid}.pdf);
-    # everything else under the generic prefix.
-    GCS_CONSENT_FORMS_PREFIX: str = "consent-forms"
-    GCS_DOCUMENTS_PREFIX: str = "patient-documents"
+    # Object-key prefix per document class. Every patient file lives under a
+    # single ``documents/`` root so the bucket has one shape rather than three
+    # top-level branches::
+    #
+    #     gs://<bucket>/documents/notes/{tenant}/{patient}/{uuid}{ext}
+    #     gs://<bucket>/documents/consent-forms/{tenant}/{patient}/{uuid}.pdf
+    #     gs://<bucket>/documents/general/{tenant}/{patient}/{uuid}{ext}
+    #
+    # Which one an upload takes is decided by ``document_store.prefix_for``:
+    # the upload *context* wins, then the document type, then the default.
+    GCS_NOTES_PREFIX: str = "documents/notes"
+    GCS_CONSENT_FORMS_PREFIX: str = "documents/consent-forms"
+    GCS_DOCUMENTS_PREFIX: str = "documents/general"
     # The document_type values routed to the consent-forms prefix. ``CF`` is the
-    # code the Notes screen sends for "Consent Form" (NOTE-DOC-4); without it a
-    # consent uploaded from Notes would land under the generic prefix.
+    # code the Notes screen sends for "Consent Form" (NOTE-DOC-4). Note this only
+    # applies when there is no upload context — a consent uploaded *from a note*
+    # is filed with the note (see ``prefix_for``).
     CONSENT_DOCUMENT_TYPES: list[str] = Field(
         default_factory=lambda: ["consent-form", "consent_form", "consent", "CF"]
     )

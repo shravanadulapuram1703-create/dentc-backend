@@ -23,6 +23,7 @@ from app.schemas.patient_extra import (
     PatientDocumentRead,
     UploadLimits,
 )
+from app.services import document_store
 from app.services import patient_extra_service as svc
 
 _auth = [Depends(get_current_user)]
@@ -63,12 +64,23 @@ async def upload_document(
     office_id: Annotated[int | None, Form()] = None,
     document_type: Annotated[str | None, Form()] = None,
     description: Annotated[str | None, Form()] = None,
+    context: Annotated[str | None, Form(
+        description="Which screen the file is attached to, e.g. 'note'. Decides the "
+                    "storage folder; see GET /patient-documents/limits for the list.",
+    )] = None,
 ):
+    """Upload a patient document.
+
+    ``context`` is what puts a Notes upload in the notes folder. It has to come
+    from the caller: the file is uploaded *before* the note row exists, so there
+    is nothing on the server to infer it from.
+    """
     data = await file.read()
     return svc.create_document(
         db, tenant_id, patient_id, office_id=office_id, document_type=document_type,
         description=description, file_name=file.filename or "document",
         content_type=file.content_type, data=data, user_id=current.id,
+        context=context,
     )
 
 
@@ -79,12 +91,16 @@ async def upload_document(
     summary="The upload size cap and content-type allow-list the API enforces (NOTE-DOC-5)",
 )
 def get_document_limits():
-    """Published so the file picker states exactly the limits the API enforces.
+    """Published so the file picker states exactly the limits the API enforces,
+    and knows which ``context`` values the upload accepts.
 
     Declared before ``/{document_id}`` so the literal path wins over the int
     parameter.
     """
-    return filestore.upload_limits()
+    return {
+        **filestore.upload_limits(),
+        "allowed_contexts": list(document_store.DOCUMENT_CONTEXTS),
+    }
 
 
 @documents_router.get("/{document_id}", response_model=PatientDocumentRead, operation_id="get_patient_document")

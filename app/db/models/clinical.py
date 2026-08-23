@@ -20,6 +20,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -60,6 +61,26 @@ class PatientProcedure(Base, CreatedAtMixin):
     treatment_plan_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("treatment_plans.id"))
     notes: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # AL-10: the legacy LEDGER.CREATEDBY login string. `created_by` can only be
+    # filled where that login still has a `users` row; the raw string is kept so
+    # the ledger's User column shows *who posted it* even for staff who left
+    # before the migration.
+    created_by_legacy: Mapped[str | None] = mapped_column(String(50))
+    # AL-6: LEDGER.DURATION — chair time booked against the charge. Nullable on
+    # purpose: "not recorded" is not "0 minutes".
+    duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    # AL-13: the Modified By/On pair the Edit Treatment window needs. `updated_by`
+    # is stamped by CRUDBase.update, matching patients/chart_conditions.
+    updated_at: Mapped[datetime | None] = mapped_column(onupdate=func.now())
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # AL-15: LEDGER.PATPAID / PATADJUST — patient money already applied to THIS
+    # charge. `payment_allocations` cannot supply it: the Denticon allocation
+    # export carries 6,951 rows for 1.33M payments and every AMOUNT in it is
+    # 0.0000, so the per-procedure roll-ups had nothing to add up (AL-16).
+    pat_paid: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    pat_adjust: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # AL-13: which fee schedule produced `fee`.
+    fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
 
 
 class ChartCondition(Base, IntPKMixin, TimestampMixin):

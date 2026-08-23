@@ -112,14 +112,17 @@ def create_document(
     db: Session, tenant_id: int, patient_id: int, *, office_id: int | None,
     document_type: str | None, description: str | None,
     file_name: str, content_type: str | None, data: bytes, user_id: int | None,
+    context: str | None = None,
 ) -> PatientDocument:
     _require_patient(db, patient_id, tenant_id)
     filestore.validate_upload(file_name, content_type, data)
-    # LTR-1: consent forms go to gs://{bucket}/consent-forms/..., everything else
-    # to the generic document prefix; local disk when no bucket is configured.
+    # LTR-1 / NOTE-DOC-2: everything lands under the bucket's ``documents/`` root
+    # — ``documents/notes/`` when the caller declares ``context=note``, else
+    # ``documents/consent-forms/`` for a consent type, else ``documents/general/``.
+    # Local disk (same layout) when no bucket is configured.
     stored = document_store.store(
         tenant_id=tenant_id, patient_id=patient_id, document_type=document_type,
-        file_name=file_name, content_type=content_type, data=data,
+        file_name=file_name, content_type=content_type, data=data, context=context,
     )
     doc = PatientDocument(
         tenant_id=tenant_id, patient_id=patient_id, office_id=office_id,

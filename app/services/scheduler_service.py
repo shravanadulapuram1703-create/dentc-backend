@@ -27,6 +27,7 @@ from app.db.models import (
     Provider,
 )
 from app.services import balance_service
+from app.services.ledger_sign import sum_payment_credit, sum_payment_debit
 from app.services.user_admin_service import resolve_user_names
 
 _ELIGIBLE = {"active", "eligible", "verified", "yes"}
@@ -81,12 +82,19 @@ def _batch_balances(db: Session, patient_ids: set[int]) -> dict[int, Decimal]:
         .group_by(PatientProcedure.patient_id)
     ).all())
     payments = dict(db.execute(
-        select(PatientPayment.patient_id, func.coalesce(func.sum(PatientPayment.amount), 0))
+        # AL-9: `amount` carries two sign conventions — sum the settled credit.
+        select(PatientPayment.patient_id, sum_payment_credit())
+        .where(PatientPayment.patient_id.in_(patient_ids), PatientPayment.is_void.is_(False))
+        .group_by(PatientPayment.patient_id)
+    ).all())
+    debits = dict(db.execute(
+        select(PatientPayment.patient_id, sum_payment_debit())
         .where(PatientPayment.patient_id.in_(patient_ids), PatientPayment.is_void.is_(False))
         .group_by(PatientPayment.patient_id)
     ).all())
     return {
-        pid: Decimal(charges.get(pid, 0)) - Decimal(payments.get(pid, 0))
+        pid: Decimal(charges.get(pid, 0)) + Decimal(debits.get(pid, 0))
+        - Decimal(payments.get(pid, 0))
         for pid in patient_ids
     }
 
@@ -285,23 +293,60 @@ def get_patient_context(db: Session, patient_id: int, tenant_id: int) -> dict:
     if patient is None:
         raise NotFoundError(f"Patient '{patient_id}' was not found")
 
+    # AL-12: the ledger title row shows "Prim. Ins" and the plan name, so the
+    # context carries the plan/group identity alongside the carrier — not just
+    # its id.
     insurance_rows = db.execute(
-        select(PatientInsurance.insurance_type, PatientInsurance.ins_plan_id, InsuranceCarrier.name)
+        select(
+            PatientInsurance.insurance_type, PatientInsurance.ins_plan_id,
+            InsuranceCarrier.name, InsurancePlan.group_number, InsurancePlan.plan_type,
+            PatientInsurance.legacy_plan_type,
+        )
         .outerjoin(InsurancePlan, InsurancePlan.id == PatientInsurance.ins_plan_id)
         .outerjoin(InsuranceCarrier, InsuranceCarrier.id == InsurancePlan.carrier_id)
         .where(PatientInsurance.patient_id == patient_id, PatientInsurance.is_active.is_(True))
     ).all()
 
     # PE-3: fold opening A/R buckets in so the Edit form hydrates from one call.
-    from app.services import patient_intake_service
+    from app.services import patient_intake_service, patient_overview_service
+
+    insurance = [
+        {
+            "insurance_type": t, "ins_plan_id": pid, "carrier_name": cname,
+            "group_number": gnum, "plan_type": ptype, "legacy_plan_type": legacy_type,
+            # The legacy title row prints the plan by carrier + group; there is no
+            # separate plan-name column in the migrated schema.
+            "plan_name": " ".join(x for x in (cname, gnum) if x) or None,
+        }
+        for t, pid, cname, gnum, ptype, legacy_type in insurance_rows
+    ]
+    # AL-12: "Responsible: <name>" in the ledger title row. `responsible_party_id`
+    # is a free-form string (numeric FK for app-created, legacy key for migrated),
+    # so it goes through the same resolver the Patient Overview uses.
+    rp = patient_overview_service.resolve_responsible_party(
+        db, tenant_id, patient.responsible_party_id
+    )
+    responsible_party = None
+    if rp is not None:
+        responsible_party = {
+            "id": rp.id,
+            "legacy_id": rp.legacy_id,
+            "name": " ".join(p for p in (rp.first_name, rp.last_name) if p).strip() or None,
+            "relationship": patient.responsible_party_relationship,
+            "home_phone": getattr(rp, "home_phone", None),
+        }
 
     return {
         "patient": patient,
         "balance": balance_service.get_patient_balance(db, patient_id, tenant_id),
-        "insurance": [
-            {"insurance_type": t, "ins_plan_id": pid, "carrier_name": cname}
-            for t, pid, cname in insurance_rows
-        ],
+        "insurance": insurance,
+        # AL-12: the primary plan the title row links to (first active D-tier slot).
+        "primary_insurance": next(
+            (i for i in insurance if (i["insurance_type"] or "").lower() == "primary"),
+            insurance[0] if insurance else None,
+        ),
+        "responsible_party": responsible_party,
+        "responsible_party_id": patient.responsible_party_id,
         "visit": {
             "first_visit": patient.first_visit,
             "last_visit": patient.last_visit,

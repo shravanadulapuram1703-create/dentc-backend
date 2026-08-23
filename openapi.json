@@ -5261,7 +5261,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FeeScheduleOption"
+                    "$ref": "#/components/schemas/app__schemas__procedure_setup__FeeScheduleOption"
                   },
                   "title": "Response List Fee Schedule Options"
                 }
@@ -5570,6 +5570,70 @@
         }
       }
     },
+    "/api/v1/patients/{patient_id}/account-balance": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "AL-11: the legacy BALANCES table \u2014 account aggregate + one row per member",
+        "description": "One call for the whole account. The per-member entries are exactly what\n``GET /patients/{id}/balance`` returns, so the ledger's BALANCES panel no longer\nneeds one request per family member.",
+        "operationId": "get_patient_account_balance",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountBalance"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patients/{patient_id}/ledger": {
       "get": {
         "tags": [
@@ -5764,7 +5828,7 @@
         "tags": [
           "Billing"
         ],
-        "summary": "Denormalised account-ledger feed (charges+payments+adjustments) with running balance (AL-1/2/4/5/7)",
+        "summary": "Denormalised account-ledger feed (charges+payments+adjustments+claims) with running balance (AL-1/2/4/5/7/8/9/11)",
         "operationId": "get_patient_account_ledger",
         "security": [
           {
@@ -5780,6 +5844,22 @@
               "type": "integer",
               "title": "Patient Id"
             }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "patient",
+                "account"
+              ],
+              "type": "string",
+              "description": "AL-11: 'patient' = this patient only; 'account' = every patient sharing the responsible_party_id, merged and server-paged",
+              "default": "patient",
+              "title": "Scope"
+            },
+            "description": "AL-11: 'patient' = this patient only; 'account' = every patient sharing the responsible_party_id, merged and server-paged"
           },
           {
             "name": "date_from",
@@ -5824,14 +5904,39 @@
                 "all",
                 "charge",
                 "payment",
-                "adjustment"
+                "adjustment",
+                "claim"
               ],
               "type": "string",
-              "description": "Type filter (AL-4)",
+              "description": "Type filter (AL-4); 'claim' needs include_claims=true",
               "default": "all",
               "title": "Transaction Type"
             },
-            "description": "Type filter (AL-4)"
+            "description": "Type filter (AL-4); 'claim' needs include_claims=true"
+          },
+          {
+            "name": "include_claims",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "AL-8: interleave claim status events (Sent/Paid/Closed) as source_type='claim'. Informational \u2014 they never move the running balance",
+              "default": false,
+              "title": "Include Claims"
+            },
+            "description": "AL-8: interleave claim status events (Sent/Paid/Closed) as source_type='claim'. Informational \u2014 they never move the running balance"
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include rows from the legacy archive export (is_archived)",
+              "default": false,
+              "title": "Include Archived"
+            },
+            "description": "Include rows from the legacy archive export (is_archived)"
           },
           {
             "name": "sort_by",
@@ -5842,7 +5947,8 @@
                 "date",
                 "code",
                 "provider",
-                "amount"
+                "amount",
+                "patient"
               ],
               "type": "string",
               "description": "Sort column (AL-5)",
@@ -13525,7 +13631,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleReplace"
+                "$ref": "#/components/schemas/ScheduleReplace"
               }
             }
           }
@@ -16805,7 +16911,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScheduleReplace"
+                "$ref": "#/components/schemas/app__schemas__provider_setup__ScheduleReplace"
               }
             }
           }
@@ -19789,6 +19895,7 @@
           "Patients"
         ],
         "summary": "Upload Document",
+        "description": "Upload a patient document.\n\n``context`` is what puts a Notes upload in the notes folder. It has to come\nfrom the caller: the file is uploaded *before* the note row exists, so there\nis nothing on the server to infer it from.",
         "operationId": "upload_patient_document",
         "security": [
           {
@@ -19883,7 +19990,7 @@
           "Patients"
         ],
         "summary": "The upload size cap and content-type allow-list the API enforces (NOTE-DOC-5)",
-        "description": "Published so the file picker states exactly the limits the API enforces.\n\nDeclared before ``/{document_id}`` so the literal path wins over the int\nparameter.",
+        "description": "Published so the file picker states exactly the limits the API enforces,\nand knows which ``context`` values the upload accepts.\n\nDeclared before ``/{document_id}`` so the literal path wins over the int\nparameter.",
         "operationId": "get_patient_document_limits",
         "responses": {
           "200": {
@@ -52607,6 +52714,42 @@
             "description": "Filter by treatment_plan_id"
           },
           {
+            "name": "hold_claim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by hold_claim",
+              "title": "Hold Claim"
+            },
+            "description": "Filter by hold_claim"
+          },
+          {
+            "name": "fee_schedule_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by fee_schedule_id",
+              "title": "Fee Schedule Id"
+            },
+            "description": "Filter by fee_schedule_id"
+          },
+          {
             "name": "is_void",
             "in": "query",
             "required": false,
@@ -82692,6 +82835,258 @@
   },
   "components": {
     "schemas": {
+      "AccountBalance": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "responsible_party_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Party Id"
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count"
+          },
+          "total_charged": {
+            "type": "number",
+            "title": "Total Charged"
+          },
+          "total_paid": {
+            "type": "number",
+            "title": "Total Paid"
+          },
+          "balance": {
+            "type": "number",
+            "title": "Balance"
+          },
+          "account_balance": {
+            "type": "number",
+            "title": "Account Balance"
+          },
+          "estimated_insurance": {
+            "type": "number",
+            "title": "Estimated Insurance",
+            "default": 0
+          },
+          "estimated_patient": {
+            "type": "number",
+            "title": "Estimated Patient",
+            "default": 0
+          },
+          "patient_balance": {
+            "type": "number",
+            "title": "Patient Balance",
+            "default": 0
+          },
+          "insurance_balance": {
+            "type": "number",
+            "title": "Insurance Balance",
+            "default": 0
+          },
+          "today_charges": {
+            "type": "number",
+            "title": "Today Charges",
+            "default": 0
+          },
+          "opening_balance": {
+            "type": "number",
+            "title": "Opening Balance",
+            "default": 0
+          },
+          "total_refunded": {
+            "type": "number",
+            "title": "Total Refunded",
+            "default": 0
+          },
+          "total_payment_debits": {
+            "type": "number",
+            "title": "Total Payment Debits",
+            "default": 0
+          },
+          "credit_balance": {
+            "type": "number",
+            "title": "Credit Balance",
+            "default": 0
+          },
+          "aging": {
+            "$ref": "#/components/schemas/BalanceAging"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/AccountBalanceMember"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "member_count",
+          "total_charged",
+          "total_paid",
+          "balance",
+          "account_balance",
+          "as_of"
+        ],
+        "title": "AccountBalance",
+        "description": "AL-11: the legacy BALANCES table \u2014 the aggregate row plus one row per member."
+      },
+      "AccountBalanceMember": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id",
+            "examples": [
+              1024
+            ]
+          },
+          "total_charged": {
+            "type": "number",
+            "title": "Total Charged",
+            "examples": [
+              2450.0
+            ]
+          },
+          "total_paid": {
+            "type": "number",
+            "title": "Total Paid",
+            "examples": [
+              1800.0
+            ]
+          },
+          "balance": {
+            "type": "number",
+            "title": "Balance",
+            "examples": [
+              650.0
+            ]
+          },
+          "account_balance": {
+            "type": "number",
+            "title": "Account Balance",
+            "description": "Alias of balance for the FE",
+            "examples": [
+              650.0
+            ]
+          },
+          "estimated_insurance": {
+            "type": "number",
+            "title": "Estimated Insurance",
+            "default": 0,
+            "examples": [
+              400.0
+            ]
+          },
+          "estimated_patient": {
+            "type": "number",
+            "title": "Estimated Patient",
+            "default": 0,
+            "examples": [
+              250.0
+            ]
+          },
+          "patient_balance": {
+            "type": "number",
+            "title": "Patient Balance",
+            "description": "Charges \u2212 payments \u2212 estimated insurance",
+            "default": 0
+          },
+          "insurance_balance": {
+            "type": "number",
+            "title": "Insurance Balance",
+            "description": "Outstanding expected-insurance portion",
+            "default": 0
+          },
+          "today_charges": {
+            "type": "number",
+            "title": "Today Charges",
+            "description": "Sum of today's non-void procedure charges",
+            "default": 0
+          },
+          "opening_balance": {
+            "type": "number",
+            "title": "Opening Balance",
+            "description": "Seeded opening A/R (GAP-AP-12); already in balance/aging",
+            "default": 0
+          },
+          "total_refunded": {
+            "type": "number",
+            "title": "Total Refunded",
+            "description": "Sum of non-void refunds (REF-1); folded into balance",
+            "default": 0
+          },
+          "total_payment_debits": {
+            "type": "number",
+            "title": "Total Payment Debits",
+            "description": "AL-9: debit adjustments posted as payments; already inside total_charged",
+            "default": 0
+          },
+          "credit_balance": {
+            "type": "number",
+            "title": "Credit Balance",
+            "description": "Refundable unapplied credit (REF-3); \u22650",
+            "default": 0
+          },
+          "aging": {
+            "$ref": "#/components/schemas/BalanceAging"
+          },
+          "recent_activity": {
+            "$ref": "#/components/schemas/BalanceRecentActivity"
+          },
+          "as_of": {
+            "type": "string",
+            "title": "As Of",
+            "description": "UTC timestamp the balance was computed"
+          },
+          "patient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Name"
+          },
+          "chart_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart No"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "total_charged",
+          "total_paid",
+          "balance",
+          "account_balance",
+          "as_of"
+        ],
+        "title": "AccountBalanceMember",
+        "description": "One account member's balance \u2014 the same payload ``/balance`` returns."
+      },
       "AccountCommunicationsRead": {
         "properties": {
           "tenant_id": {
@@ -83599,6 +83994,31 @@
             "type": "integer",
             "title": "Patient Id"
           },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "description": "AL-11: 'patient' | 'account' (the whole family)",
+            "default": "patient"
+          },
+          "responsible_party_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Party Id"
+          },
+          "patient_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Patient Ids",
+            "description": "AL-11: the account members this feed covers"
+          },
           "rows": {
             "items": {
               "$ref": "#/components/schemas/AccountLedgerRow"
@@ -83610,7 +84030,7 @@
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Grand Total",
-            "description": "Final running balance over the full account window"
+            "description": "Final running balance over the full window"
           },
           "total": {
             "type": "integer",
@@ -83664,11 +84084,34 @@
           "source_type": {
             "type": "string",
             "title": "Source Type",
-            "description": "charge | payment | adjustment"
+            "description": "charge | payment | adjustment | claim (AL-8)"
           },
           "source_id": {
             "type": "string",
-            "title": "Source Id"
+            "title": "Source Id",
+            "description": "Row key: the procedure/payment/adjustment id, or '{claim_id}:{event}'"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "patient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Name"
           },
           "code": {
             "anyOf": [
@@ -83680,7 +84123,7 @@
               }
             ],
             "title": "Code",
-            "description": "procedure_code | 'PMT' | 'PATADJ'"
+            "description": "procedure_code | 'PMT' | 'PATADJ' | 'CLM-P/S/T'"
           },
           "description": {
             "anyOf": [
@@ -83696,7 +84139,7 @@
           "transaction_kind": {
             "type": "string",
             "title": "Transaction Kind",
-            "description": "'P' (debit) | 'C' (credit) \u2014 the legacy T column"
+            "description": "'P' (debit) | 'C' (credit) | 'I' (informational claim row) \u2014 the legacy T column"
           },
           "apply_to": {
             "anyOf": [
@@ -83730,6 +84173,17 @@
               }
             ],
             "title": "Surface"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
           },
           "provider_id": {
             "anyOf": [
@@ -83822,6 +84276,112 @@
             "title": "Unbilled",
             "description": "AL-6 'N' \u2014 a procedure with no claim_id"
           },
+          "claim_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Id",
+            "description": "The claim this charge was billed on (AL-6)"
+          },
+          "hold_claim": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Claim",
+            "description": "AL-17: the legacy 'H' \u2014 this charge is held back from claims"
+          },
+          "pat_paid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Paid"
+          },
+          "pat_adjust": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Adjust"
+          },
+          "claim_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Number"
+          },
+          "claim_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Status"
+          },
+          "claim_event": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Event",
+            "description": "AL-8: submitted | paid | closed | created \u2014 which transition this row is"
+          },
+          "total_billed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Billed"
+          },
+          "total_paid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Paid"
+          },
           "user_id": {
             "anyOf": [
               {
@@ -83842,25 +84402,74 @@
                 "type": "null"
               }
             ],
-            "title": "User Label"
+            "title": "User Label",
+            "description": "AL-10: the poster \u2014 live user short_id/username, else the legacy login"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "updated_by_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By Label"
           },
           "charge": {
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Charge",
+            "description": "Debit magnitude, always >= 0",
             "default": "0"
           },
           "credit": {
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Credit",
+            "description": "Credit magnitude, always >= 0",
             "default": "0"
           },
           "amount": {
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount",
-            "description": "Signed: +charge / -credit",
+            "description": "AL-9: genuinely signed \u2014 +charge / -credit",
             "default": "0"
           },
           "running_balance": {
@@ -90909,6 +91518,18 @@
               }
             ],
             "title": "Description"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context",
+            "description": "Which screen the file is attached to, e.g. 'note'. Decides the storage folder; see GET /patient-documents/limits for the list."
           }
         },
         "type": "object",
@@ -93309,6 +93930,86 @@
               }
             ],
             "title": "Created By"
+          },
+          "created_by_legacy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Legacy"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "pat_paid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Paid"
+          },
+          "pat_adjust": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Adjust"
+          },
+          "fee_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Schedule Id"
           },
           "created_at": {
             "type": "string",
@@ -97347,6 +98048,86 @@
               }
             ],
             "title": "Created By"
+          },
+          "created_by_legacy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Legacy"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "pat_paid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Paid"
+          },
+          "pat_adjust": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Adjust"
+          },
+          "fee_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Schedule Id"
           },
           "created_at": {
             "type": "string",
@@ -102526,17 +103307,6 @@
           "name": {
             "type": "string",
             "title": "Name"
-          },
-          "fee_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fee Type"
           }
         },
         "type": "object",
@@ -115352,7 +116122,7 @@
           },
           "fee_schedules": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__FeeScheduleOption"
+              "$ref": "#/components/schemas/FeeScheduleOption"
             },
             "type": "array",
             "title": "Fee Schedules"
@@ -122151,6 +122921,12 @@
             "description": "Sum of non-void refunds (REF-1); folded into balance",
             "default": 0
           },
+          "total_payment_debits": {
+            "type": "number",
+            "title": "Total Payment Debits",
+            "description": "AL-9: debit adjustments posted as payments; already inside total_charged",
+            "default": 0
+          },
           "credit_balance": {
             "type": "number",
             "title": "Credit Balance",
@@ -122904,6 +123680,37 @@
             "type": "array",
             "title": "Insurance"
           },
+          "primary_insurance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientContextInsurance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "responsible_party": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientContextResponsibleParty"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "responsible_party_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Party Id"
+          },
           "visit": {
             "$ref": "#/components/schemas/PatientContextVisit"
           },
@@ -122950,6 +123757,52 @@
               }
             ],
             "title": "Carrier Name"
+          },
+          "group_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Number"
+          },
+          "plan_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Type"
+          },
+          "legacy_plan_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Plan Type",
+            "description": "'D' dental | 'M' medical"
+          },
+          "plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name",
+            "description": "Carrier + group number \u2014 no plan-name column exists"
           }
         },
         "type": "object",
@@ -122957,6 +123810,64 @@
           "insurance_type"
         ],
         "title": "PatientContextInsurance"
+      },
+      "PatientContextResponsibleParty": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "legacy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "home_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "PatientContextResponsibleParty",
+        "description": "AL-12: \"Responsible: <name>\" in the ledger title row."
       },
       "PatientContextVisit": {
         "properties": {
@@ -126205,6 +127116,28 @@
               }
             ],
             "title": "Is Void"
+          },
+          "created_by_legacy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Legacy"
+          },
+          "eob_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eob Number"
           }
         },
         "type": "object",
@@ -127524,6 +128457,51 @@
             ],
             "title": "Created By"
           },
+          "created_by_legacy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Legacy"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "eob_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eob Number"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -127703,6 +128681,28 @@
               }
             ],
             "title": "Is Void"
+          },
+          "created_by_legacy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Legacy"
+          },
+          "eob_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eob Number"
           }
         },
         "type": "object",
@@ -128493,6 +129493,69 @@
               }
             ],
             "title": "Notes"
+          },
+          "created_by_legacy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Legacy"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "pat_paid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Paid"
+          },
+          "pat_adjust": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Adjust"
+          },
+          "fee_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Schedule Id"
           }
         },
         "type": "object",
@@ -128731,6 +129794,86 @@
             ],
             "title": "Created By"
           },
+          "created_by_legacy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Legacy"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "pat_paid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Paid"
+          },
+          "pat_adjust": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Adjust"
+          },
+          "fee_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Schedule Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -128780,6 +129923,12 @@
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Amount",
+            "default": "0"
+          },
+          "outstanding_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Outstanding Amount",
             "default": "0"
           }
         },
@@ -129095,6 +130244,69 @@
               }
             ],
             "title": "Notes"
+          },
+          "created_by_legacy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Legacy"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "pat_paid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Paid"
+          },
+          "pat_adjust": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat Adjust"
+          },
+          "fee_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Schedule Id"
           }
         },
         "type": "object",
@@ -138740,7 +139952,14 @@
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Amount",
-            "description": "patient_estimate \u2212 paid \u2212 adjusted"
+            "description": "AL-15: the patient's share still owed \u2014 patient_estimate (or fee \u2212 insurance_estimate when none was recorded) \u2212 paid \u2212 adjusted"
+          },
+          "outstanding_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Outstanding Amount",
+            "description": "AL-15: fee \u2212 paid \u2212 insurance_paid \u2212 adjusted (the legacy Outstanding line)",
+            "default": "0"
           },
           "allocations": {
             "items": {
@@ -147795,30 +149014,6 @@
               }
             ],
             "title": "Lunch End"
-          },
-          "effective_from": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Effective From"
-          },
-          "office_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Office Id",
-            "description": "NULL = applies to every office"
           }
         },
         "type": "object",
@@ -147834,11 +149029,15 @@
               "$ref": "#/components/schemas/ScheduleDayInput"
             },
             "type": "array",
-            "maxItems": 70,
+            "maxItems": 7,
+            "minItems": 1,
             "title": "Days"
           }
         },
         "type": "object",
+        "required": [
+          "days"
+        ],
         "title": "ScheduleReplace"
       },
       "ScheduleResponse": {
@@ -152547,6 +153746,13 @@
             },
             "type": "array",
             "title": "Allowed Extensions"
+          },
+          "allowed_contexts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Contexts"
           }
         },
         "type": "object",
@@ -152554,7 +153760,8 @@
           "max_bytes",
           "max_megabytes",
           "allowed_content_types",
-          "allowed_extensions"
+          "allowed_extensions",
+          "allowed_contexts"
         ],
         "title": "UploadLimits",
         "description": "NOTE-DOC-5: the server-enforced upload rules, published so the UI states\nthe same numbers it is validated against instead of hardcoding its own."
@@ -154873,7 +156080,7 @@
         ],
         "title": "PageMeta"
       },
-      "app__schemas__office_setup__FeeScheduleOption": {
+      "app__schemas__procedure_setup__FeeScheduleOption": {
         "properties": {
           "id": {
             "type": "integer",
@@ -154882,6 +156089,17 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "fee_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Type"
           }
         },
         "type": "object",
@@ -154891,7 +156109,7 @@
         ],
         "title": "FeeScheduleOption"
       },
-      "app__schemas__office_setup__ScheduleDayInput": {
+      "app__schemas__provider_setup__ScheduleDayInput": {
         "properties": {
           "day_of_week": {
             "type": "integer",
@@ -154952,6 +156170,30 @@
               }
             ],
             "title": "Lunch End"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id",
+            "description": "NULL = applies to every office"
           }
         },
         "type": "object",
@@ -154960,22 +156202,18 @@
         ],
         "title": "ScheduleDayInput"
       },
-      "app__schemas__office_setup__ScheduleReplace": {
+      "app__schemas__provider_setup__ScheduleReplace": {
         "properties": {
           "days": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleDayInput"
+              "$ref": "#/components/schemas/app__schemas__provider_setup__ScheduleDayInput"
             },
             "type": "array",
-            "maxItems": 7,
-            "minItems": 1,
+            "maxItems": 70,
             "title": "Days"
           }
         },
         "type": "object",
-        "required": [
-          "days"
-        ],
         "title": "ScheduleReplace"
       }
     },

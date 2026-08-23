@@ -30,6 +30,7 @@ from app.db.models import (
     PatientRefund,
 )
 from app.integrations import redis_store
+from app.services.ledger_sign import payment_credit, payment_delta
 
 _CACHE_TTL = 30
 
@@ -108,8 +109,13 @@ def _opening(db: Session, patient_id: int) -> dict[str, float]:
     return {col: _f(getattr(row, col)) for col in _OPENING_BUCKETS}
 
 
-def _payments(db: Session, patient_id: int, today: date) -> tuple[Decimal, dict]:
-    """One pass over ``patient_payments``: total paid + the recent-activity block.
+def _payments(db: Session, patient_id: int, today: date) -> tuple[Decimal, Decimal, dict]:
+    """One pass over ``patient_payments``: total paid, debit adjustments and the
+    recent-activity block.
+
+    AL-9: "total paid" is the sum of the rows' **credits**, always positive, and a
+    ``payment_type='adjustment'`` row posted as a debit is returned separately so it
+    can be added to the charge side instead of subtracted from it.
 
     PP-5: the total, today's total and the two "most recent payment" probes were
     four separate statements; the rows are few enough per patient that reading
@@ -125,15 +131,23 @@ def _payments(db: Session, patient_id: int, today: date) -> tuple[Decimal, dict]
         ).where(
             PatientPayment.patient_id == patient_id,
             PatientPayment.is_void.is_(False),
+            # AL-9: charges already exclude archived rows; credits must match, or the
+            # balance and the ledger feed cannot reconcile.
+            PatientPayment.is_archived.is_(False),
         )
     ).all()
 
     total = Decimal(0)
+    debits = Decimal(0)
     today_total = Decimal(0)
     last: dict[str, tuple] = {}
     for pay_date, amount, pay_type, pay_id in rows:
-        value = Decimal(amount or 0)
+        # AL-9: one convention for both sign histories — see ledger_sign.
+        delta = payment_delta(amount, pay_type)
+        value = payment_credit(amount, pay_type)
         total += value
+        if delta > 0:
+            debits += delta
         if pay_date == today:
             today_total += value
         kind = "ins" if (pay_type or "").lower().startswith("ins") or "insurance" in (
@@ -149,7 +163,7 @@ def _payments(db: Session, patient_id: int, today: date) -> tuple[Decimal, dict]
 
     last_ins_date, last_ins_amt = _out("ins")
     last_pat_date, last_pat_amt = _out("pat")
-    return total, {
+    return total, debits, {
         "today": _f(today_total),
         "last_ins": last_ins_date.isoformat() if last_ins_date else None,
         "last_pat": last_pat_date.isoformat() if last_pat_date else None,
@@ -186,13 +200,15 @@ def get_patient_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
 
     # PP-5: two scans total (procedures + payments) instead of six statements.
     charged, est_ins, est_pat, today_charges, aging = _charges(db, patient_id, today)
-    paid, recent = _payments(db, patient_id, today)
+    paid, payment_debits, recent = _payments(db, patient_id, today)
     refunded = _refunds_total(db, patient_id)
 
     # GAP-AP-12: fold seeded opening A/R into charges, balance and aging.
     opening = _opening(db, patient_id)
     opening_total = Decimal(str(sum(opening.values())))
-    charged_total = charged + opening_total
+    # AL-9: a debit adjustment posted through patient_payments is a charge, not a
+    # negative credit — it belongs on the charge side of the subtraction.
+    charged_total = charged + opening_total + payment_debits
 
     # REF-1: a refund undoes a credit — net payments are payments − refunds.
     net_paid = paid - refunded
@@ -220,6 +236,8 @@ def get_patient_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
         "opening_balance": _f(opening_total),
         # REF-1/3: refunds issued + the refundable credit (a negative balance).
         "total_refunded": _f(refunded),
+        # AL-9: debit adjustments posted as payments (already inside total_charged).
+        "total_payment_debits": _f(payment_debits),
         "credit_balance": _f(-balance if balance < 0 else Decimal(0)),
         "aging": aging,
         "recent_activity": recent,
@@ -227,3 +245,56 @@ def get_patient_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
     }
     redis_store.cache_set(_cache_key(tenant_id, patient_id), json.dumps(result), _CACHE_TTL)
     return result
+
+
+# ── AL-11: account (family) scope ────────────────────────────────────────────
+def get_account_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
+    """The legacy **BALANCES** table in one call: the aggregate "Account Balance"
+    row plus one row per account member.
+
+    The frontend previously issued one ``GET /patients/{id}/balance`` per member
+    (5 members = 5 requests) and summed client-side. Members come from
+    ``account_scope`` — every patient sharing the anchor's ``responsible_party_id``.
+    Each member entry is the *same* payload ``/patients/{id}/balance`` returns, so
+    nothing new has to be learned to render it.
+    """
+    from app.services import account_scope
+
+    patient = account_scope.load_patient(db, patient_id, tenant_id)
+    members = account_scope.account_members(db, patient, tenant_id)
+
+    entries = []
+    for member in members:
+        entry = get_patient_balance(db, member.id, tenant_id)
+        entry["patient_name"] = account_scope.patient_name(member)
+        entry["chart_no"] = member.chart_no
+        entries.append(entry)
+
+    def _total(field: str) -> float:
+        return round(sum(e.get(field) or 0 for e in entries), 2)
+
+    aging = {
+        bucket: round(sum((e.get("aging") or {}).get(bucket) or 0 for e in entries), 2)
+        for bucket in ("current", "b30", "b60", "b90", "b120")
+    }
+    return {
+        "patient_id": patient_id,
+        "responsible_party_id": patient.responsible_party_id,
+        "member_count": len(entries),
+        "total_charged": _total("total_charged"),
+        "total_paid": _total("total_paid"),
+        "balance": _total("balance"),
+        "account_balance": _total("balance"),
+        "estimated_insurance": _total("estimated_insurance"),
+        "estimated_patient": _total("estimated_patient"),
+        "patient_balance": _total("patient_balance"),
+        "insurance_balance": _total("insurance_balance"),
+        "today_charges": _total("today_charges"),
+        "opening_balance": _total("opening_balance"),
+        "total_refunded": _total("total_refunded"),
+        "total_payment_debits": _total("total_payment_debits"),
+        "credit_balance": _total("credit_balance"),
+        "aging": aging,
+        "members": entries,
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }

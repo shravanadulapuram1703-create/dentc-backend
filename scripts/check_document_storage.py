@@ -49,6 +49,7 @@ def main() -> None:
 
     print("Document storage configuration")
     print(f"  GCS_BUCKET_DOCUMENTS      = {settings.GCS_BUCKET_DOCUMENTS!r}")
+    print(f"  GCS_NOTES_PREFIX          = {settings.GCS_NOTES_PREFIX!r}")
     print(f"  GCS_CONSENT_FORMS_PREFIX  = {settings.GCS_CONSENT_FORMS_PREFIX!r}")
     print(f"  GCS_DOCUMENTS_PREFIX      = {settings.GCS_DOCUMENTS_PREFIX!r}")
     print(f"  DOCUMENT_URL_MODE         = {settings.DOCUMENT_URL_MODE!r}")
@@ -73,6 +74,15 @@ def main() -> None:
     if not other.startswith(settings.GCS_DOCUMENTS_PREFIX + "/"):
         _fail("generic routing", f"key {other!r} is not under the generic prefix")
     _ok("generic routing", other)
+
+    # A Notes upload goes to the notes prefix — including when its sub-type is a
+    # consent form, which is the one case where the two rules disagree.
+    note_key = document_store.object_key(
+        args.tenant, 0, "CF", "probe.pdf", document_store.CONTEXT_NOTE
+    )
+    if not note_key.startswith(settings.GCS_NOTES_PREFIX + "/"):
+        _fail("note routing", f"key {note_key!r} is not under the notes prefix")
+    _ok("note routing", note_key)
 
     # 2. Upload.
     probe_key = f"{settings.GCS_CONSENT_FORMS_PREFIX}/_probe/{uuid.uuid4().hex}.pdf"

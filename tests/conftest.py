@@ -27,6 +27,14 @@ TEST_PASSWORD = "test1234"
 # helpers (balances/ledger/reports) don't pay connection timeouts.
 settings.REDIS_ENABLED = False
 
+# No cloud storage either. A developer's ``.env`` legitimately carries a real
+# ``GCS_BUCKET_DOCUMENTS``, and without this every document-upload test made a
+# live call to Google — slow, dependent on whoever's credentials happened to be
+# on the machine, and quietly falling back to local storage when they were the
+# wrong ones. Tests that want the bucket path use the ``gcs`` fixture in
+# ``test_document_storage.py``, which patches this back on with a fake client.
+settings.GCS_BUCKET_DOCUMENTS = None
+
 
 @pytest.fixture
 def db_session():

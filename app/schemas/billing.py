@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -75,7 +75,17 @@ class ProcedureAllocationsSummary(ORMModel):
     paid_to_date: Decimal = Field(..., description="Patient payments allocated to the procedure")
     insurance_paid_to_date: Decimal = Field(..., description="Carrier money posted to the procedure")
     adjusted_to_date: Decimal = Field(..., description="Non-void adjustments applied")
-    remaining_amount: Decimal = Field(..., description="patient_estimate − paid − adjusted")
+    remaining_amount: Decimal = Field(
+        ...,
+        description=(
+            "AL-15: the patient's share still owed — patient_estimate (or "
+            "fee − insurance_estimate when none was recorded) − paid − adjusted"
+        ),
+    )
+    outstanding_amount: Decimal = Field(
+        Decimal("0"),
+        description="AL-15: fee − paid − insurance_paid − adjusted (the legacy Outstanding line)",
+    )
     allocations: list[PaymentAllocationRead] = Field(default_factory=list)
     adjustments: list[PatientAdjustmentSummary] = Field(default_factory=list)
 
@@ -144,14 +154,23 @@ class AccountLedgerRow(BaseModel):
     """One fully-denormalised Account-Ledger row (no client-side lookups needed)."""
 
     entry_date: date | None = None
-    source_type: str = Field(..., description="charge | payment | adjustment")
-    source_id: str
-    code: str | None = Field(None, description="procedure_code | 'PMT' | 'PATADJ'")
+    source_type: str = Field(..., description="charge | payment | adjustment | claim (AL-8)")
+    source_id: str = Field(
+        ..., description="Row key: the procedure/payment/adjustment id, or '{claim_id}:{event}'"
+    )
+    # AL-11: present on every row so an account-scoped feed identifies its owner.
+    patient_id: int | None = None
+    patient_name: str | None = None
+    code: str | None = Field(None, description="procedure_code | 'PMT' | 'PATADJ' | 'CLM-P/S/T'")
     description: str | None = None
-    transaction_kind: str = Field(..., description="'P' (debit) | 'C' (credit) — the legacy T column")
+    transaction_kind: str = Field(
+        ..., description="'P' (debit) | 'C' (credit) | 'I' (informational claim row) — the legacy T column"
+    )
     apply_to: str | None = None
     tooth: str | None = None
     surface: str | None = None
+    # AL-6: LEDGER.DURATION — chair time booked against the charge; null = not recorded.
+    duration_minutes: int | None = None
     provider_id: str | None = None
     provider_name: str | None = None
     office_id: int | None = None
@@ -160,18 +179,47 @@ class AccountLedgerRow(BaseModel):
     insurance_estimate: Decimal | None = None
     billing_status: str | None = None
     unbilled: bool | None = Field(None, description="AL-6 'N' — a procedure with no claim_id")
+    claim_id: str | None = Field(None, description="The claim this charge was billed on (AL-6)")
+    hold_claim: bool | None = Field(
+        None, description="AL-17: the legacy 'H' — this charge is held back from claims"
+    )
+    # AL-15: patient money already applied to this charge (LEDGER.PATPAID/PATADJUST).
+    pat_paid: Decimal | None = None
+    pat_adjust: Decimal | None = None
+    # AL-8: populated on claim rows only.
+    claim_number: str | None = None
+    claim_status: str | None = None
+    claim_event: str | None = Field(
+        None, description="AL-8: submitted | paid | closed | created — which transition this row is"
+    )
+    total_billed: Decimal | None = None
+    total_paid: Decimal | None = None
     user_id: int | None = None
-    user_label: str | None = None
-    charge: Decimal = Decimal("0")
-    credit: Decimal = Decimal("0")
-    amount: Decimal = Field(Decimal("0"), description="Signed: +charge / -credit")
+    user_label: str | None = Field(
+        None, description="AL-10: the poster — live user short_id/username, else the legacy login"
+    )
+    created_at: datetime | None = None
+    # AL-13: the Modified By/On pair the Edit Treatment / Edit Payment windows need.
+    updated_at: datetime | None = None
+    updated_by: int | None = None
+    updated_by_label: str | None = None
+    charge: Decimal = Field(Decimal("0"), description="Debit magnitude, always >= 0")
+    credit: Decimal = Field(Decimal("0"), description="Credit magnitude, always >= 0")
+    amount: Decimal = Field(
+        Decimal("0"), description="AL-9: genuinely signed — +charge / -credit"
+    )
     running_balance: Decimal = Decimal("0")
 
 
 class AccountLedgerResponse(BaseModel):
     patient_id: int
+    scope: str = Field("patient", description="AL-11: 'patient' | 'account' (the whole family)")
+    responsible_party_id: str | None = None
+    patient_ids: list[int] = Field(
+        default_factory=list, description="AL-11: the account members this feed covers"
+    )
     rows: list[AccountLedgerRow]
-    grand_total: Decimal = Field(..., description="Final running balance over the full account window")
+    grand_total: Decimal = Field(..., description="Final running balance over the full window")
     total: int = Field(..., description="Total rows after the type filter")
     page: int
     size: int
@@ -198,7 +246,41 @@ class PatientBalance(BaseModel):
     today_charges: float = Field(0, description="Sum of today's non-void procedure charges")
     opening_balance: float = Field(0, description="Seeded opening A/R (GAP-AP-12); already in balance/aging")
     total_refunded: float = Field(0, description="Sum of non-void refunds (REF-1); folded into balance")
+    total_payment_debits: float = Field(
+        0, description="AL-9: debit adjustments posted as payments; already inside total_charged"
+    )
     credit_balance: float = Field(0, description="Refundable unapplied credit (REF-3); ≥0")
     aging: BalanceAging = Field(default_factory=BalanceAging)
     recent_activity: BalanceRecentActivity = Field(default_factory=BalanceRecentActivity)
     as_of: str = Field(..., description="UTC timestamp the balance was computed")
+
+
+class AccountBalanceMember(PatientBalance):
+    """One account member's balance — the same payload ``/balance`` returns."""
+
+    patient_name: str | None = None
+    chart_no: str | None = None
+
+
+class AccountBalance(BaseModel):
+    """AL-11: the legacy BALANCES table — the aggregate row plus one row per member."""
+
+    patient_id: int
+    responsible_party_id: str | None = None
+    member_count: int
+    total_charged: float
+    total_paid: float
+    balance: float
+    account_balance: float
+    estimated_insurance: float = 0
+    estimated_patient: float = 0
+    patient_balance: float = 0
+    insurance_balance: float = 0
+    today_charges: float = 0
+    opening_balance: float = 0
+    total_refunded: float = 0
+    total_payment_debits: float = 0
+    credit_balance: float = 0
+    aging: BalanceAging = Field(default_factory=BalanceAging)
+    members: list[AccountBalanceMember] = Field(default_factory=list)
+    as_of: str

@@ -32,6 +32,7 @@ from app.db.models import (
 )
 from app.integrations import redis_store
 from app.services import balance_service
+from app.services.ledger_sign import payment_credit, sum_payment_credit
 from app.services.user_admin_service import resolve_user_names
 
 _ZERO = Decimal("0")
@@ -89,8 +90,9 @@ def refundable_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
     account_balance = _d(balance["account_balance"])
     credit = -account_balance if account_balance < _ZERO else _ZERO
 
+    # AL-9: the credit actually taken in, not the raw signed `amount`.
     paid = db.execute(
-        select(func.coalesce(func.sum(PatientPayment.amount), 0)).where(
+        select(sum_payment_credit()).where(
             PatientPayment.patient_id == patient_id, PatientPayment.is_void.is_(False)
         )
     ).scalar_one()
@@ -209,7 +211,8 @@ def reverse_payment(
     if payload.get("refund_method"):
         refund = PatientRefund(
             tenant_id=tenant_id, patient_id=payment.patient_id, office_id=payment.office_id,
-            refund_date=_today(), amount=_d(payment.amount),
+            # AL-9: refund the magnitude taken in, whichever sign it is stored with.
+            refund_date=_today(), amount=payment_credit(payment.amount, payment.payment_type),
             refund_method=payload["refund_method"], reason=reason, reason_code="reversal",
             source_payment_id=payment_id, reversed_type="payment", reversed_id=payment_id,
             authorized_by=payload.get("authorized_by") or actor_id, created_by=actor_id,
