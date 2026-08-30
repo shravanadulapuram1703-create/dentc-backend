@@ -35,6 +35,16 @@ settings.REDIS_ENABLED = False
 # ``test_document_storage.py``, which patches this back on with a fake client.
 settings.GCS_BUCKET_DOCUMENTS = None
 
+# Same reasoning for Jira. A developer's ``.env`` legitimately carries real
+# ``JIRA_*`` credentials, and with them set ``jira_client.is_configured()`` is
+# True, so ``test_help_ticket_create_and_list`` filed a **live ticket** against
+# whatever project those credentials point at — and failed with a 502 when the
+# project didn't accept it. The support module's documented zero-config path
+# (a ``LOCAL-<id>`` key, no outbound call) is what the tests are meant to
+# exercise; ``test_support.py`` patches the client back in where it wants the
+# configured path.
+settings.JIRA_BASE_URL = None
+
 
 @pytest.fixture
 def db_session():

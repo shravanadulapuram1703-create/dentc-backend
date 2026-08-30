@@ -17,7 +17,21 @@ from app.db import models as m
 from app.schemas.factory import build_schemas
 
 # Create/Update keep the canonical component names; the read is enriched below.
-PatientProcedureCreate, PatientProcedureUpdate, _ = build_schemas(m.PatientProcedure, "PatientProcedure")
+_pp_create, PatientProcedureUpdate, _ = build_schemas(m.PatientProcedure, "PatientProcedure")
+
+
+class PatientProcedureCreate(_pp_create):  # type: ignore[valid-type, misc]
+    """FEE-3: ``fee`` is **optional**.
+
+    ``patient_procedures.fee`` is NOT NULL, so the factory made it required and
+    every caller had to price the charge itself — which is exactly how charges
+    ended up posting at ``0.00`` when a client fell back to the code's
+    ``default_fee``. Omit it and ``PatientProcedureCRUD`` resolves it through
+    the same server-side rules ``GET /patients/{id}/fee`` answers with. Sending
+    a fee still wins, so no existing caller changes.
+    """
+
+    fee: Decimal | None = None
 PatientPaymentCreate, PatientPaymentUpdate, _ = build_schemas(m.PatientPayment, "PatientPayment")
 InsuranceClaimCreate, InsuranceClaimUpdate, _ = build_schemas(m.InsuranceClaim, "InsuranceClaim")
 TreatmentPlanCreate, TreatmentPlanUpdate, _ = build_schemas(m.TreatmentPlan, "TreatmentPlan")
@@ -56,4 +70,16 @@ TreatmentPlanRead = create_model(
     total_fee=(Decimal, Decimal("0")),
     est_insurance=(Decimal, Decimal("0")),
     est_patient=(Decimal, Decimal("0")),
+)
+
+
+# PROV-3: ``providers.role`` is free text ("dentist", "Dentist", "Hygenist", …)
+# and ``specialty`` is blank on 96 of 97 migrated rows, so every screen that
+# needs "doctors here, hygienists there" had to normalise client-side. The
+# derived kind is now published alongside the raw role, so a misspelling in the
+# data can no longer put a hygienist in the treating-provider dropdown.
+_provider_base = build_schemas(m.Provider, "ProviderFull")[2]
+ProviderRead = create_model(
+    "ProviderRead", __base__=_provider_base,
+    provider_kind=(Optional[str], None),
 )

@@ -12,7 +12,7 @@ All monetary fields are ``Decimal``; all id fields serialise as they are stored.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -204,7 +204,15 @@ class EstimateLineResult(BaseModel):
     insurance_estimate: Decimal = Field(Decimal("0"))
     patient_estimate: Decimal = Field(Decimal("0"))
     estimated_deductible: Decimal = Field(Decimal("0"))
-    fee_source: str = Field("code_default", description="fee_schedule | code_default | override")
+    fee_source: str = Field(
+        "code_default",
+        description="override | assignment | plan_schedule | office_default | code_default",
+    )
+    fee_schedule_id: int | None = Field(None, description="The schedule the fee came from (FEE-3)")
+    # FEE-1: which coverage band the percentage was read off, so a surprising
+    # estimate can be traced to a category rather than looking arbitrary.
+    coverage_category: str | None = None
+    coverage_category_description: str | None = None
 
 
 class EstimateResult(BaseModel):
@@ -218,26 +226,51 @@ class EstimateResult(BaseModel):
 
 
 # ── INS-1: record an insurance payment with remittance identifiers ───────────
-class InsurancePaymentCreate(BaseModel):
-    patient_id: int
-    claim_id: str | None = None
-    procedure_id: str | None = None
-    office_id: int | None = None
+class _RemittanceIdentifiers(BaseModel):
+    """What the EOB says about the cheque, as opposed to the procedure."""
+
     payment_date: date | None = None
     payment_method: str | None = Field(None, examples=["check", "eft", "credit_card"])
     check_number: str | None = None
     bank_number: str | None = None
     eob_number: str | None = None
     eft_trace_number: str | None = None
+    # INS-PAY-1: the remittance note the legacy window collects. It used to be
+    # appended to the *claim's* notes with a synthetic prefix, so one line's note
+    # applied to the whole claim and could not be read back apart from it.
+    notes: str | None = None
+
+
+class _CoverageAmounts(BaseModel):
+    """Per-tier money on one procedure line.
+
+    INS-PAY-5: the tiers are symmetric. ``sec_deductible`` and every tertiary
+    field bar ``ter_ins_paid`` used to be missing, so a secondary remittance
+    could not carry a deductible and a tertiary one could not be posted at all.
+    """
+
     prim_ins_plan_id: int | None = None
-    sec_ins_plan_id: int | None = None
     prim_estimated: Decimal | None = None
+    prim_deductible: Decimal | None = None
     prim_ins_paid: Decimal | None = None
     prim_ins_adjust: Decimal | None = None
-    prim_deductible: Decimal | None = None
+    sec_ins_plan_id: int | None = None
     sec_estimated: Decimal | None = None
+    sec_deductible: Decimal | None = None
     sec_ins_paid: Decimal | None = None
     sec_ins_adjust: Decimal | None = None
+    ter_ins_plan_id: int | None = None
+    ter_estimated: Decimal | None = None
+    ter_deductible: Decimal | None = None
+    ter_ins_paid: Decimal | None = None
+    ter_ins_adjust: Decimal | None = None
+
+
+class InsurancePaymentCreate(_RemittanceIdentifiers, _CoverageAmounts):
+    patient_id: int
+    claim_id: str | None = None
+    procedure_id: str | None = None
+    office_id: int | None = None
 
 
 class InsurancePaymentRead(ORMModel):
@@ -252,11 +285,114 @@ class InsurancePaymentRead(ORMModel):
     bank_number: str | None = None
     eob_number: str | None = None
     eft_trace_number: str | None = None
+    notes: str | None = None
+    prim_deductible: Decimal | None = None
     prim_ins_paid: Decimal | None = None
     prim_ins_adjust: Decimal | None = None
+    sec_deductible: Decimal | None = None
     sec_ins_paid: Decimal | None = None
     sec_ins_adjust: Decimal | None = None
+    ter_deductible: Decimal | None = None
+    ter_ins_paid: Decimal | None = None
+    ter_ins_adjust: Decimal | None = None
+    is_void: bool = False
+    void_reason: str | None = None
     created_by: int | None = None
+
+
+# ── INS-PAY-3: one cheque, several procedures, one transaction ───────────────
+class InsurancePaymentLine(_CoverageAmounts):
+    """One procedure's share of the remittance.
+
+    A line may override any identifier from the header (a single deposit
+    occasionally covers two cheques), but normally inherits all of them.
+    """
+
+    procedure_id: str | None = None
+    office_id: int | None = None
+    payment_method: str | None = None
+    check_number: str | None = None
+    bank_number: str | None = None
+    eob_number: str | None = None
+    eft_trace_number: str | None = None
+    notes: str | None = None
+
+
+class InsurancePaymentBatchCreate(_RemittanceIdentifiers):
+    patient_id: int
+    claim_id: str | None = None
+    office_id: int | None = None
+    lines: list[InsurancePaymentLine] = Field(min_length=1)
+    #: Optional, and checked to the cent when present: the cheque total the lines
+    #: must add up to. Sending it makes the server enforce the window's
+    #: reconciliation rule, so an import cannot post an unbalanced remittance.
+    payment_amount: Decimal | None = None
+    #: INS-PAY-4 — what the user typed in "Enter Adjustment". The money itself
+    #: still rides the lines; this records the intent behind the distribution.
+    write_off_mode: Literal["amount", "percent"] | None = None
+    write_off_value: Decimal | None = None
+    #: Tick "Close Claim" and the claim is closed in the same transaction.
+    close_claim: bool = False
+
+
+class ClaimMoneyTotals(BaseModel):
+    id: str
+    claim_number: str
+    status: str
+    total_billed: Decimal
+    total_paid: Decimal
+    est_insurance: Decimal
+    #: The pre-existing (migrated) share of ``total_paid`` — see INS-PAY-2.
+    opening_paid: Decimal | None = None
+    write_off_amount: Decimal | None = None
+    write_off_mode: str | None = None
+    write_off_value: Decimal | None = None
+
+
+class InsurancePaymentBatchResult(BaseModel):
+    lines: list[InsurancePaymentRead]
+    allocated: Decimal
+    adjusted: Decimal
+    claim: ClaimMoneyTotals | None = None
+
+
+# ── INS-PAY-2: reverse a posted remittance ───────────────────────────────────
+class InsurancePaymentReverseRequest(BaseModel):
+    reason: str = Field(min_length=1, examples=["Posted against the wrong claim"])
+
+
+class InsurancePaymentReverseResult(BaseModel):
+    id: int
+    claim_id: str | None = None
+    reversed_amount: Decimal
+    reason: str
+    voided_at: datetime | None = None
+    claim: ClaimMoneyTotals | None = None
+
+
+# ── INS-PAY-7: the outstanding-claims picker ─────────────────────────────────
+class OutstandingClaim(BaseModel):
+    claim_id: str
+    claim_number: str
+    status: str
+    claim_type: str | None = None
+    billing_order: str | None = None
+    office_id: int | None = None
+    carrier_id: int | None = None
+    carrier_name: str | None = None
+    ins_plan_id: int | None = None
+    billing_provider_id: str | None = None
+    treating_provider_id: str | None = None
+    date_of_service_from: date | None = None
+    date_of_service_to: date | None = None
+    submitted_date: date | None = None
+    procedure_count: int = 0
+    total_charges: Decimal = Field(Decimal("0"))
+    est_insurance: Decimal = Field(Decimal("0"))
+    deductible_used: Decimal = Field(Decimal("0"))
+    ins_paid: Decimal = Field(Decimal("0"))
+    ins_adjusted: Decimal = Field(Decimal("0"))
+    remaining: Decimal = Field(Decimal("0"))
 
 
 # ── SVC-1: submit a claim ────────────────────────────────────────────────────
@@ -391,3 +527,52 @@ class ExplosionExpandResult(BaseModel):
     explosion_code: str
     description: str | None = None
     procedures: list[ExpandedProcedure]
+
+
+# ── FEE-3: server-side fee resolution ───────────────────────────────────────
+class FeeConflict(BaseModel):
+    """An equally-specific fee-schedule assignment that priced the code differently."""
+
+    fee_schedule_id: int
+    fee_schedule_name: str | None = None
+    fee: Decimal
+    specificity: int
+
+
+class FeeQuoteContext(BaseModel):
+    office_id: int | None = None
+    provider_id: str | None = None
+    ins_plan_id: int | None = None
+    carrier_id: int | None = None
+    office_group_id: int | None = None
+    specialty_id: str | None = None
+
+
+class FeeQuote(BaseModel):
+    procedure_code: str
+    fee: Decimal = Field(Decimal("0"), description="The resolved patient-side fee")
+    insurance_fee: Decimal = Field(Decimal("0"), description="The schedule's payer-side amount")
+    ucr_fee: Decimal | None = Field(None, description="The office UCR schedule's fee, if configured")
+    fee_schedule_id: int | None = None
+    fee_schedule_name: str | None = None
+    fee_source: str = Field(
+        "code_default",
+        description="assignment | plan_schedule | office_default | code_default",
+    )
+    specificity: int = Field(0, description="How many keys the winning assignment set")
+    conflicts: list[FeeConflict] = Field(default_factory=list)
+    context: FeeQuoteContext = Field(default_factory=FeeQuoteContext)
+
+
+# ── FEE-1: the published ADA -> coverage-category mapping ───────────────────
+class CoverageCategoryRange(BaseModel):
+    start_code: str
+    end_code: str
+
+
+class CoverageCategoryRead(BaseModel):
+    code: str = Field(description='The legacy coverage-category code, e.g. "01A"')
+    description: str
+    parent_code: str | None = Field(None, description='"03A" -> "03"; null for a top-level category')
+    cdt_ranges: list[CoverageCategoryRange] = Field(default_factory=list)
+    procedure_code_count: int = 0

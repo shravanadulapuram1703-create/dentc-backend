@@ -9,13 +9,33 @@ Overview previously fell back to displaying the numeric id).
 enforced on the generic resource — see ``patient_rules_service`` for the rule
 table and the reasoning. ``PatientInsuranceCRUD`` does the same for the Coverage
 Type panel's slots.
+
+MH-9/MH-10 — making the patient picker usable
+---------------------------------------------
+``GET /patients?search=`` had no relevance ranking, so searching ``Rob`` for the
+patient *Rob, Leo* returned hundreds of ``Robert*`` surnames paged
+alphabetically and the exact match was not in the first fifty rows — unreachable
+through any picker a user would tolerate, which is why the Copy Medical History
+dialog had to re-implement resolution on the client. :meth:`PatientCRUD._search_order`
+ranks exact chart/id and exact-name matches ahead of prefix matches ahead of
+substring matches; the caller's own ``sort`` still decides ties *within* a tier,
+so ``sort=last_name`` keeps meaning what it meant.
+
+``_extra_search_clauses`` additionally understands the ``"Last, First"`` form
+staff actually type — the plain column ilikes could never match it, because no
+single column contains the comma.
+
+MH-10: ``?phone=`` compared ``patients.phone`` only, and most patients in the
+migrated data carry a cell number and no home number, so the filter returned
+nothing for them. It now spans ``phone``/``cell_phone``/``work_phone``.
 """
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, case, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
@@ -46,6 +66,71 @@ def assign_chart_no(db: Session, obj: Patient) -> None:
 
 
 class PatientCRUD(CRUDBase[Patient]):
+    # MH-10: ``phone`` is resolved by this class, not by the generic equality
+    # pass, so one query param can reach all three number columns.
+    custom_filter_fields = ("phone",)
+
+    def _extra_list_clauses(self, filters: dict[str, Any]) -> list:
+        raw = (filters.get("phone") or "").strip()
+        if not raw:
+            return []
+        digits = re.sub(r"\D", "", raw)
+        columns = (Patient.phone, Patient.cell_phone, Patient.work_phone)
+        clauses = []
+        for column in columns:
+            clauses.append(column == raw)
+            if digits:
+                # Migrated numbers are stored unformatted, so a digits-only
+                # contains match is what finds them; a formatted stored value
+                # still matches the verbatim comparison above.
+                clauses.append(column.ilike(f"%{digits}%"))
+        return [or_(*clauses)]
+
+    def _extra_search_clauses(self, search: str) -> list:
+        """MH-9: recognise ``"Last, First"`` — the form the legacy pickers show
+        and staff therefore type. No single column contains it, so the generic
+        per-column ilike can never match."""
+        term = (search or "").strip()
+        if "," not in term:
+            return []
+        last, _, first = term.partition(",")
+        last, first = last.strip(), first.strip()
+        if not last:
+            return []
+        clause = Patient.last_name.ilike(f"{last}%")
+        if first:
+            clause = and_(clause, Patient.first_name.ilike(f"{first}%"))
+        return [clause]
+
+    def _search_order(self, search: str) -> list:
+        """Rank exact matches ahead of prefix ahead of substring (MH-9)."""
+        term = (search or "").strip()
+        if not term:
+            return []
+        lowered = term.lower()
+        last, _, first = term.partition(",")
+        last, first = last.strip().lower(), first.strip().lower()
+
+        exact = [func.lower(Patient.chart_no) == lowered]
+        if term.isdigit():
+            exact.append(Patient.id == int(term))
+        name_exact = or_(
+            func.lower(Patient.last_name) == lowered,
+            func.lower(Patient.first_name) == lowered,
+        )
+        prefix = or_(
+            func.lower(Patient.last_name).like(f"{lowered}%"),
+            func.lower(Patient.first_name).like(f"{lowered}%"),
+        )
+        branches = [(or_(*exact), literal(0)), (name_exact, literal(1))]
+        if "," in term and last:
+            pair = func.lower(Patient.last_name).like(f"{last}%")
+            if first:
+                pair = and_(pair, func.lower(Patient.first_name).like(f"{first}%"))
+            branches.append((pair, literal(2)))
+        branches.append((prefix, literal(3)))
+        return [case(*branches, else_=literal(4)).asc()]
+
     def create(
         self,
         db: Session,

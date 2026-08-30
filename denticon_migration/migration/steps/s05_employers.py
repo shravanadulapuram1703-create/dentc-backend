@@ -34,14 +34,16 @@ def run(conn, maps: dict) -> dict:
 
         cur.execute(
             """
-            INSERT INTO employers (tenant_id, legacy_id, name, address, city, state, zip, phone)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            INSERT INTO employers
+                (tenant_id, legacy_id, name, address, address2, city, state, zip, phone)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT (legacy_id) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
             """,
             (
                 tid, empid, name,
                 clean(row.get("ADDRESS1") or row.get("ADDRESS")),
+                clean(row.get("ADDRESS2")),  # INS-PT-11
                 clean(row.get("CITY")),
                 clean(row.get("STATE")),
                 clean(row.get("ZIP")),

@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
+    Employer,
     InsuranceCarrier,
     Office,
     Patient,
@@ -107,6 +108,54 @@ def enrich_patient_carrier(db: Session, items, tenant_id=None) -> None:  # noqa:
         r.carrier_name = carriers.get(r.carrier_id)
 
 
+def enrich_insurance_plan(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
+    """INS-PT-9/18 + INS-PT-8 + INS-PT-12 on ``InsurancePlanRead``.
+
+    A plan list carried ``carrier_id``/``employer_id`` only, so a 20-row Setup ->
+    Plans page cost up to **40** single-id GETs — each with its own CORS
+    preflight — before it could paint its two name columns. Both names are
+    resolved here in two batched statements regardless of page size.
+
+    ``is_dental`` comes from the carrier because that is where the category
+    actually lives (``insurance_plans`` has no dental/medical column), so the
+    plan form no longer has to fetch the carrier just to preselect its first
+    mandatory field. ``updated_by_name`` resolves the acting user and falls back
+    to the legacy ``modified_by`` login for migrated rows, which have no
+    ``users`` row to point at.
+    """
+    from app.services.insurance_service import carrier_is_dental
+    from app.services.user_admin_service import resolve_user_names
+
+    rows = list(items)
+    carrier_ids = {r.carrier_id for r in rows if getattr(r, "carrier_id", None)}
+    employer_ids = {r.employer_id for r in rows if getattr(r, "employer_id", None)}
+    carriers = {
+        c.id: c
+        for c in db.execute(
+            select(InsuranceCarrier).where(InsuranceCarrier.id.in_(carrier_ids))
+        ).scalars()
+    } if carrier_ids else {}
+    employers = {
+        e.id: e.name
+        for e in db.execute(select(Employer).where(Employer.id.in_(employer_ids))).scalars()
+    } if employer_ids else {}
+    actor_names = resolve_user_names(
+        db, {r.updated_by for r in rows if getattr(r, "updated_by", None) is not None}
+    )
+
+    for r in rows:
+        carrier = carriers.get(getattr(r, "carrier_id", None))
+        r.carrier_name = carrier.name if carrier else None
+        r.payer_id = carrier.payer_id if carrier else None
+        r.is_dental = carrier_is_dental(carrier.carrier_type) if carrier else None
+        r.employer_name = employers.get(getattr(r, "employer_id", None))
+        # created_by is the legacy Denticon login (free text); it is the name.
+        r.created_by_name = getattr(r, "created_by", None)
+        r.updated_by_name = (
+            actor_names.get(r.updated_by) if getattr(r, "updated_by", None) is not None else None
+        ) or getattr(r, "modified_by", None)
+
+
 def _actor_names(db: Session, rows, attrs: tuple[str, ...]) -> dict[int, str]:  # noqa: ANN001
     from app.services.user_admin_service import resolve_user_names
 
@@ -182,3 +231,12 @@ def enrich_treatment_plan(db: Session, items, tenant_id=None) -> None:  # noqa: 
         r.total_fee = fee
         r.est_insurance = ins
         r.est_patient = fee - ins
+
+
+def enrich_provider(db, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
+    """PROV-3: the derived ``provider_kind`` (role first, licence title as the
+    fallback). Pure per-row computation — no extra queries."""
+    from app.services.provider_directory_service import provider_kind
+
+    for row in items:
+        row.provider_kind = provider_kind(row.role, row.title)

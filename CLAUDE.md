@@ -367,6 +367,65 @@ which had **no** backend at all:
   (regenerated). CHG-3 keeps its data-task status; `scripts/seed_medical_codes.py` loads a
   practice-supplied CSV (CPT is AMA-licensed, so no list is bundled).
 
+**Transactions third pass** (FEE-1/2/3, CHG-10, PROV-3 of
+[docs/transactions/transactions_backend_devreport.md](docs/transactions/transactions_backend_devreport.md)
+/ [response](docs/transactions/transactions_backend_response_3.md); Alembic
+`d3e4f5a6b7c8`). The pricing half of the module — everything the first two passes
+computed *with*:
+- **FEE-1 is the load-bearing fix**: every coverage percentage lives in
+  `insurance_coverage_rules` (876,732 rows) banded on **Denticon coverage-category
+  codes** (`01`, `01A`, `03A`, `11B`), while a charge carries an ADA code — so
+  `estimate_service` compared `"D2393"` against the band `"03"`–`"03"`, matched
+  nothing, and returned **0 % insurance on every migrated plan**. (A minority of
+  plans band on real ADA ranges, `D0100`–`D0999`; those always worked, which is why
+  the bug looked intermittent.) The link cannot be re-read — Denticon's
+  `Codes.INSCATEGORYID` was consumed by migration step `s10` for the display label
+  and dropped — so it is reconstructed from the published **CDT family ranges**, the
+  same taxonomy `seed_procedure_code_rules.py` uses. New
+  `procedure_codes.coverage_category` (+ `?coverage_category=` filter); the range
+  table lives once in [app/services/coverage_category_service.py](app/services/coverage_category_service.py)
+  so seeder / engine / `GET /metadata/coverage-categories` cannot drift.
+  `_match_rule` matches a band as an ADA range **or** by category and is **ranked,
+  not first-wins** — an exact sub-category outranks its parent, so a crown prices at
+  the plan's `03A` 50 % rather than `03`'s 80 % (rows come back in insertion order,
+  so first-wins made the answer depend on how the plan was typed in). Applied:
+  722/1,122 codes classified, **only 2 D-shaped codes unmapped**; verified live —
+  `D2393` @ 131.00 now returns **104.80 (80 %)**, previously `0.00`. This is also the
+  blocker treatment-plan **PLAN-3** shares. An unmapped code stays **NULL**, never
+  `12` "Non-covered Services" — "unknown" and "denied" are different answers, and
+  the 167 medical/CPT codes are the former.
+- **FEE-3** fee resolution existed only in the frontend, so two clients could
+  disagree and nothing stopped a charge posting at an arbitrary fee.
+  [app/services/pricing_service.py](app/services/pricing_service.py) is the same
+  algorithm server-side (assignment specificity → plan-linked → office default →
+  code default; ties → newest row; inactive excluded) behind **three** callers so
+  they cannot diverge: `GET /patients/{id}/fee` (returns *how* it resolved, and
+  reports equally-specific `conflicts` instead of silently picking one), the estimate
+  engine, and the write path — `PatientProcedureCreate.fee` is now **optional** and
+  an omitted fee is priced server-side. An explicit fee always wins: an office may
+  charge what it decides to charge.
+- **CHG-10** `key2` was NULL on all `payment_method`/`adjustment` definitions across
+  all 43 tenants, so the pickers had nothing to group by. The cause was structural —
+  `seed_account_definitions.py` is add-only and its row shape has no `key2` slot, so
+  it could never have fixed them. New `scripts/seed_transaction_definitions.py` owns
+  both groups, **patches existing rows**, and widens them (5→11 methods, 3→12
+  adjustments); the account seeder delegates to it. `payment_method.key2` =
+  `patient|insurance`, `adjustment.key2` = `production|collection`.
+- **PROV-3** `providers.role` is free text (`dentist` 78, `Dentist` 2, `Hygenist` 1).
+  Seeded `provider_role` group + `canonical_role()` on every write + a derived
+  `provider_kind` on `ProviderRead` (a clinical role wins; otherwise the licence
+  **title** decides, so a `staff` row holding an `RDH` still lands in the hygiene
+  list) + `?role=` filter + `scripts/normalize_provider_roles.py`. Applied: 3 rows,
+  split now 80/17/2. Deliberately **not an enum** — an unrecognised role is stored as
+  written, since a 422 on save is a worse failure than an unfamiliar string.
+- **FEE-2 is tooling only, not applied**: `scripts/backfill_office_fee_schedules.py`
+  scores each active schedule against an office's own posting history (a schedule
+  that priced those charges matches them column-for-column). Dry run: 3 of 15 offices
+  clear the 60 % bar on the contracted side (offices 8/10/11), the rest genuinely
+  bill from several plan schedules. Nothing written — a wrong default silently
+  mis-prices every future charge, where NULL falls through and is visibly $0.
+  **CHG-3 is closable**: 167 CPT codes are in `procedure_codes` today.
+
 **Letters module** (print menu → Letters dialog → Report Viewer; LTR-1…12 of
 [docs/letters/letters_backend_devreport.md](docs/letters/letters_backend_devreport.md)
 / [response](docs/letters/letters_backend_response.md); Alembic `e9f0a1b2c3d4`).
@@ -558,6 +617,134 @@ survives until edited.
   in `CONSENT_DOCUMENT_TYPES`, which now only decides where a consent goes when
   it is uploaded *outside* a note.
 
+**Insurance second pass** (patient insurance slots + Setup -> Insurance -> Plans;
+INS-PT-7…21 of
+[docs/patient-insurance/patient_insurance_backend_devreport.md](docs/patient-insurance/patient_insurance_backend_devreport.md)
+/ [response](docs/patient-insurance/patient_insurance_backend_response.md); Alembic
+`e4f5a6b7c8d9`). INS-PT-1…6 shipped in the first pass (`d6e7f8a9b0c1`).
+- **INS-PT-15 is the load-bearing fix, and it is a migration bug**:
+  `s07_insurance_plans` read `row.get("GROUPNO")` where `InsPlans.txt` writes
+  **`GROUPNUMBER`** — `.get` returns `None`, so all 31,331 migrated plans stored
+  a NULL group number and never failed. That field is what the legacy "Search
+  For = Group #" dialog and **both** duplicate-prevention layers key off, so the
+  feature was correct and completely inert. The same wrong-name mistake hit the
+  BENEFIT INFO panel: `INDIVIDUALMAX`/`INDIVIDUALDEDUCTIBLE`/`INDIVIDUALORTHOMAX`/
+  `FAMILYDEDUCTIBLE` were all read under abbreviations that do not exist, and
+  only `FAMILYMAX` matched — which is why family_max was the one column with
+  data, and why plans priced as if they had **no benefit left**. `s07`/`s18`/`s05`
+  are fixed and `scripts/backfill_insurance_source_fields.py` repairs the live
+  rows (NULL-guarded; the five money columns treat `0` as empty because the
+  migration wrote a literal zero). **Applied**: group_number 8 -> 31,329;
+  individual_max 4 -> 31,263; ortho_max 3 -> 29,720; plus 46,973 `marital_status`,
+  42,604 `sub_phone`, 3,246 `sub_address2` on `insurance_subscribers` (INS-PT-1/2/4
+  had columns and no data — `RespInsplan.txt` carries `MSTATUS`/`SUBPHONE`/
+  `SUBADDRESS2` and `s18` never read them). `--group-from-subscribers` recovers
+  the group number without the export, unanimous plans only. `employers.address2`
+  (INS-PT-11) exists but `Employers.txt` is blank on all 4,302 rows — nothing to
+  backfill.
+- **INS-PT-19** duplicate prevention was client-side only. `InsurancePlanCRUD`
+  409s `duplicate_plan_group` on an active plan with the same **carrier +
+  group_number** (trimmed, case-insensitive; NULL never collides). Deliberately
+  **not** a DB constraint: two offices can legitimately hold separate plans on
+  one group and legacy allows it, so `allow_duplicate_group` overrides — a
+  constraint cannot express "refuse the *accidental* one" (and the honest cost is
+  that two concurrent saves can still both land). Same-carrier-inactive
+  (INS-PT-21) and other-carrier matches are **reported, never blocking**. The
+  guard fires on a **move**, not on stored state — the INS-PT-15 backfill put
+  3,609 groups into a real pre-existing collision, and blocking every later edit
+  of those plans would punish the repair.
+- **INS-PT-20** `GET /insurance-plans/group-availability` answers the same
+  question in one indexed lookup instead of a paginated list call per save.
+  **INS-PT-13** the same shape for names: 409 on a quick-add repeating a carrier/
+  employer name (`allow_duplicate_name`) + `…/name-availability` probes. Only
+  *create* is guarded — a rename onto a taken name is usually a deliberate merge.
+- **INS-PT-9/18** a 20-row plan grid cost up to 40 single-id GETs (each with a
+  preflight) to paint two name columns. Fixed twice over: `InsurancePlanRead` is
+  denormalised (`carrier_name`/`payer_id`/`employer_name`/`created_by_name`/
+  `updated_by_name`/`is_dental`, batched via `enrich_insurance_plan`), **and**
+  `?ids=1,2,3` batch lookup on `/insurance-carriers` + `/employers`. `is_dental`
+  on the plan read is what lets the form preselect Dental/Medical without
+  fetching the carrier.
+- **INS-PT-12** `is_dental` is now **writable** and **filterable**, and the
+  vocabulary lives once in `insurance_service.MEDICAL_TOKENS` — the read field,
+  the `?is_dental=` filter and the write canonicalisation share it, so a
+  `carrier_type` typo can no longer read as dental while matching neither filter.
+  An unrecognised value is stored **as written** (the PROV-3 call: a 422 on save
+  is worse than an unfamiliar string). **INS-PT-8** plans gain `updated_at`/
+  `updated_by` + the four legacy free-text actors mirroring the carrier, so
+  Modified stops rendering `—`; the legacy pair exists because `CREATEDBY` is a
+  Denticon login with no `users` row to FK at. **INS-PT-10** `claim_type`
+  definitions group seeded from the only two codes the export contains
+  (`1` EClaim, `0` Paper).
+- **INS-PT-7/14** per-field and partial plan search — `group_number_contains`/
+  `_startswith`, and `carrier_name`/`payer_id` which used to issue the identical
+  free-text query. Needed one engine addition: **`CrudConfig.extra_filters`**, a
+  declared, OpenAPI-visible query param that is not a plain column and is
+  resolved by the resource's `crud_class` in `_extra_list_clauses` (pairs with
+  the existing `custom_filter_fields`), plus `CrudConfig.id_in_param`.
+- **INS-PT-5 stays manual** (no clearinghouse contracted — the endpoint stamps
+  and reports `method="manual"`); **INS-PT-17** is a frontend route
+  (`GET /insurance-plans/{id}` always existed).
+
+**Insurance Payment window** (Patient -> Ledger -> claim -> INSURANCE PAYMENT;
+INS-PAY-1..8 of
+[docs/patient-insurance/insurance_payment_backend_devreport.md](docs/patient-insurance/insurance_payment_backend_devreport.md)
+/ [response](docs/patient-insurance/insurance_payment_backend_response.md); Alembic
+`f5a6b7c8d9e0` + `a6b7c8d9e0f1`).
+- **INS-PAY-2 is the critical one, and it hid a much bigger hazard.**
+  `record_insurance_payment` did `claim.total_paid += paid` and nothing ever
+  subtracted, while `recalculate` recomputed billed/estimate from the procedures
+  but **echoed** `total_paid` — so deleting a mis-keyed remittance left the claim
+  asserting money no row backed, fixable only by hand-PATCHing the claim.
+  `total_paid` is now **derived**, `DELETE` is a **void** not a removal
+  (`is_void`/`void_reason`/`voided_at`/`voided_by`, hidden from the default
+  listing), and `POST /ledger-insurance-details/{id}/reverse` is the
+  insurance counterpart to `/patient-payments/{id}/reverse` that never existed.
+  `LedgerInsuranceDetailCRUD` re-derives the claim on **every** generic CRUD
+  write too — `/reverse` fixes the intended path, but an import or an older
+  client still uses the CRUD routes.
+  **The hazard**: deriving `total_paid` from coverage rows is right for an
+  app-posted claim and catastrophic for a migrated one — 96,314 claims, 79,038
+  with a non-zero `total_paid`, and of 12,191 `ledger_insurance_details` rows
+  only 216 are attached to a claim and **none** carry an `*_ins_paid` amount
+  (the migrated total comes from the Denticon claim export). A naive derivation
+  would have zeroed all 79,038 on the first Recalculate. `insurance_claims.opening_paid`
+  holds that pre-existing carrier money and `total_paid = opening_paid + live
+  rows` — the `patient_opening_balances` shape. The baseline is seeded **inside**
+  the migration, not by a follow-up script, because a script leaves a window
+  where `recalculate` is deployed and `opening_paid` is still NULL, and that
+  window is the bug. Verified after applying: 79,038 seeded, 0 unprotected,
+  derived == stored on every claim.
+- **INS-PAY-3** `POST /ledger-insurance-details/payment-batch` — one remittance
+  header + `lines[]` in a single transaction, so a four-procedure cheque stops
+  being four POSTs that can half-fail ("posted N of M" with no rollback).
+  Two rules move server-side: an optional `payment_amount` is reconciled against
+  the lines **to the cent** before anything is written (422
+  `remittance_not_reconciled`), and a line's `procedure_id` must be on the claim
+  (422 `procedure_not_on_claim`). Negative amounts are refused everywhere —
+  backing a payment out is `/reverse`, which keeps a trail.
+- **INS-PAY-4** the claim-level "Enter Adjustment": the money stays
+  per-procedure (that is what the ledger reconciles against, so the FE's
+  distribution *is* the intended model) but the **intent** is now recorded —
+  `insurance_claims.write_off_mode`/`write_off_value` (what was typed, e.g.
+  percent/10) + `write_off_amount` (the distributed total). "A 10% claim
+  write-off" survives becoming 7.70/7.00/7.70.
+- **INS-PAY-5** the tier matrix is completed (`sec_deductible`, `ter_estimated`,
+  `ter_deductible`, `ter_ins_adjust`, `ter_posted`), so a secondary remittance
+  can carry a deductible and a tertiary one can be posted at all; all three tiers
+  build through one function and count toward `total_paid`. **INS-PAY-1**
+  `ledger_insurance_details.notes` (the note was being appended to the *claim's*
+  notes with a synthetic prefix). **INS-PAY-6** `patient_payments.eft_trace_number`
+  — `eob_number` already existed (AL-13), the FE client was stale.
+- **INS-PAY-7** `GET /patients/{id}/outstanding-claims` — charges / est ins /
+  deductible used / ins paid / ins adj / remaining per claim in three statements,
+  where a client-side picker needed one `/detail` call per claim. Voided coverage
+  is excluded; `remaining` is floored at zero (an over-payment is a credit, not a
+  negative receivable). **INS-PAY-8** `attachment_type` seeded + normalised on
+  upload from one list (`patient_extra_service.CLAIM_ATTACHMENT_TYPES`), with an
+  unrecognised value stored as written — a 422 mid-upload would leave a claim
+  that cannot be attached to.
+
 **Account Ledger second pass** (AL-3/6/8/9/10/11/12 of
 [docs/account-ledger/account_ledger_backend_devreport.md](docs/account-ledger/account_ledger_backend_devreport.md)
 / [response](docs/account-ledger/account_ledger_backend_response.md); Alembic
@@ -638,6 +825,90 @@ survives until edited.
   carrier + group number. **AL-3 needed no work** (`plan_type` +
   the insurance-plan financial fields shipped in Alembic `f8a9b0c1d2e3`); the FE
   was on a stale generated client.
+
+**Patient Medical History module** (Medical Alerts · Dental/Medical Questionnaire ·
+Signature · Copy Medical History; MH-1…16 of
+[docs/medical-history/medical_history_backend_devreport.md](docs/medical-history/medical_history_backend_devreport.md)
+/ [response](docs/medical-history/medical_history_backend_response.md); Alembic
+`a2b3c4d5e6f7`). The screen had no backend of its own — it drove the three
+generic answer resources one HTTP request per row.
+- **MH-6 is the load-bearing fix**: `patient_signatures` recorded only *that*
+  someone signed. A patient could sign, staff could then change any answer, and
+  nothing recorded that the signature predated the change — on a legal clinical
+  record. It needed no new tables: `medical_history_records` (Denticon's
+  `PatMedicalHistoryH`, which already pointed at a signature) becomes the
+  **version** row and the pre-existing `medical_history_details` holds its frozen
+  answers (`answer_type` = `alert|dental|medical`), with `content_hash`
+  (SHA-256 over the *values* sorted by code, so a no-op re-save doesn't
+  invalidate a signature) stamped on both sides. The document reports
+  `signature_status` = `signed|stale|unverifiable|unsigned`; a migrated signature
+  with no hash is **`unverifiable`, never `signed`** — asserting it attests to
+  today's answers would be the same bug with the API's authority behind it.
+  Plus `signature_type` (a medical-history, consent and financial signature were
+  indistinguishable rows), `signed_at`, `signed_by_user_id` (attester ≠ pad
+  operator). **MH-7**: `is_active`/`superseded_by_id`/`voided_at`/`voided_by` +
+  `POST /patient-signatures/{id}/void` — a *cleared* signature was previously
+  not representable at all.
+- **MH-2/3** one document. `GET /patients/{id}/medical-history`
+  ([app/api/v1/medical_history.py](app/api/v1/medical_history.py) +
+  [app/services/medical_history_service.py](app/services/medical_history_service.py))
+  replaces the 9+ request open; `PUT` reconciles the whole thing in one
+  transaction. Only codes **present** in the payload are touched (partial saves
+  are safe); a null response/answer is a reset to Not Answered and deletes the
+  row; `replace_*` is the full-section replace — legacy's **NO TO ALL ALERTS**
+  goes from ~90 sequential POSTs through a 6-connection pool to one atomic call.
+- **MH-8** `updated_by` + `answered_at` on both answer tables (`answered_at`
+  moves only when the *answer* does), and new `patient_medical_history_events` —
+  an append-only, field-level log written on every path including per-row CRUD
+  and the copy. `audit_logs` records one row per request, which for the composite
+  write is one entry for a whole document; a medical record has to answer "who
+  changed *this answer*".
+- **MH-13/16** new `patient_medical_history` 1:1 header: first-class `comments`
+  (the Additional Comments box was a magic `ADDITIONAL_COMMENTS` alert row shared
+  by two modules with nothing enforcing it — a legacy row is still *read*, then
+  retired) and per-tab `*_completed_at`/`_by`. A completion is **asserted**
+  (`mark_completed`, or signing), never inferred from `updated_at`.
+- **MH-4** `POST /patients/{id}/medical-history/copy-from/{source}?scope=`
+  replaces ~90 client reads + ~90 writes; provenance lands in three places
+  (change log `action="copy"`, the version's `source_patient_id`/`copied_at`, the
+  header's `copied_from_patient_id`).
+- **MH-1 is fixed server-side, but seeding stays gated.** The document resolves
+  each catalog from `definition_groups`/`definitions` and applies the FE's own
+  `MIN_TENANT_CATALOG_ITEMS = 10` guard, falling back to a built-in legacy
+  catalog and reporting `catalog_sources: {alerts: "builtin"|"tenant"}` — so the
+  FE can delete `legacyCatalogs.ts` today. Seeding real rows is a **one-way
+  door**: an answer is keyed by `to_code(label)`
+  ([app/services/medical_history_catalog.py](app/services/medical_history_catalog.py),
+  the FE's derivation, published at `/metadata/medical-history-rules`), so any
+  label whose code differs orphans stored answers.
+  `scripts/seed_medical_history_catalogs.py` is dry-run by default, takes
+  `--from-json` (hand over the FE file — that is the safe route), and **refuses**
+  to seed a catalog that would orphan an answered code without `--allow-orphans`.
+- **MH-5 answered**: `unknown` is a real third answer; *absent* is Not Answered,
+  and neither is ever collapsed into the other. **MH-12** enforced on the
+  composite write *and* the generic `/patient-medical-alerts` resource (else a
+  client stores the contradiction one row at a time), judged against the **merge**
+  of payload + stored rows. These are **422s, not auto-corrections** unlike the
+  patient checkbox *implications* — there is no way to know which of the two the
+  user meant. `allow_contradictions` overrides and is logged. Both published at
+  `GET /metadata/medical-history-rules`.
+- **MH-14 both ways**: the catalog's `is_flash_alert`/`blocks_charges`/`section`
+  are denormalised onto every answered row, **and** a flagged Yes propagates into
+  `patient_alerts` (new `is_flash_alert` + `source_medical_alert_id`) — the link
+  is what makes it reconcilable: un-answering deactivates exactly the row it
+  created, a hand-typed banner alert is never touched. **MH-11** decided:
+  `patient_emergency_contacts` is authoritative, the block is out of `MEDQUEST`,
+  and the composite write targets that table.
+- **MH-9/10 are API-wide**: `CRUDBase` gains `_search_order`/`_extra_search_clauses`
+  (both empty by default, so only opted-in resources change) and `PatientCRUD`
+  ranks exact chart/id → exact name → `"Last, First"` → prefix → substring, with
+  the caller's `sort` deciding ties *within* a tier. `"Last, First"` is also
+  *matched* (no single column contains the comma). **Breaking**: `?phone=` now
+  spans `phone`/`cell_phone`/`work_phone` (was exact on one column), and
+  `DELETE /patient-signatures/{id}` is now a soft delete.
+- **MH-15** `GET /patients/{id}/medical-history/pdf` (reportlab, lazy) prints
+  `signature_status` — a printed history that doesn't say the signature is stale
+  is a misleading clinical document.
 
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))

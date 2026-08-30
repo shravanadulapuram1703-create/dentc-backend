@@ -20,6 +20,8 @@ from sqlalchemy import select
 
 from app.db.models import Definition, Tenant
 from app.db.session import SessionLocal
+from app.services.patient_extra_service import CLAIM_ATTACHMENT_TYPES
+from scripts.seed_transaction_definitions import seed_for_tenant as seed_transaction_defs
 
 _STATES = [
     ("AL", "Alabama"), ("AK", "Alaska"), ("AZ", "Arizona"), ("AR", "Arkansas"),
@@ -66,15 +68,30 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
     ],
     "pronoun_field_visible": [("YES", "Yes"), ("NO", "No")],
     "comm_number_type": [("toll_free", "Toll-Free"), ("local_text", "Local Text")],
-    "payment_method": [
-        ("cash", "Cash"), ("check", "Check"), ("credit_card", "Credit Card"),
-        ("eft", "EFT"), ("insurance", "Insurance"),
-    ],
-    "adjustment": [("write_off", "Write Off"), ("courtesy", "Courtesy"), ("discount", "Discount")],
+    # NOTE: ``payment_method`` and ``adjustment`` are **not** seeded here. Both
+    # carry a ``key2`` (payment type / adjustment group) that the pickers filter
+    # on, and this script's row shape has no slot for it — seeding them here is
+    # what left key2 NULL on every tenant (CHG-10). They are owned by
+    # ``scripts/seed_transaction_definitions.py``, which ``main()`` below calls
+    # so one command still seeds a new tenant completely.
     "claim_status": [
         ("draft", "Draft"), ("submitted", "Submitted"), ("paid", "Paid"),
         ("denied", "Denied"), ("closed", "Closed"),
     ],
+    # INS-PAY-8: claim attachment types. The EOB the Insurance Payment window
+    # uploads rode a free-text ``attachment_type``, so nothing documented or
+    # enforced the spelling. Codes come from
+    # ``patient_extra_service.CLAIM_ATTACHMENT_TYPES``, which is also what
+    # normalises the value on upload — one list, so picker and store agree.
+    "attachment_type": list(CLAIM_ATTACHMENT_TYPES.items()),
+    # INS-PT-10: the carrier dialog's "Claim Type" dropdown had no label source.
+    # ``insurance_carriers.claim_type`` holds the raw legacy code, so the field
+    # rendered as free text showing "1" — and every migrated carrier is a "1",
+    # which is why it looked like a broken control rather than a missing catalog.
+    # ``Carrier.txt`` contains exactly two values across all 1,340 carriers:
+    # 1 (1,282 rows) and 0 (58). key1 is the stored code. A practice that needs a
+    # third submission route adds it through /api/v1/definitions, no release.
+    "claim_type": [("1", "EClaim (Electronic)"), ("0", "Paper Claim")],
     # Insurance Setup -> Plans/Coverage (dev-report INS-10): label the opaque codes.
     # ``insurance_plans.coverage_type`` (Denticon COVERAGETYPE, single char).
     "coverage_type": [
@@ -91,6 +108,15 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
         ("11", "Orthodontics"), ("12", "Adjunctive General Services"),
     ],
     # Security -> Users module (gaps #2/#5)
+    # PROV-3: ``providers.role`` was free text, so "dentist"/"Dentist"/"Hygenist"
+    # all coexisted and every screen normalised it client-side. This is the
+    # vocabulary ``provider_directory_service.canonical_role`` maps onto;
+    # scripts/normalize_provider_roles.py repairs the stored values.
+    "provider_role": [
+        ("dentist", "Dentist"), ("hygienist", "Hygienist"),
+        ("assistant", "Dental Assistant"), ("specialist", "Specialist"),
+        ("staff", "Staff"),
+    ],
     "user_role": [
         ("admin", "Administrator"), ("provider", "Provider"), ("front_desk", "Front Desk"),
         ("staff", "Staff"), ("super_admin", "Super Admin"),
@@ -318,7 +344,12 @@ def main() -> None:
             tenant_ids = list(db.execute(select(Tenant.id).where(Tenant.is_active.is_(True))).scalars().all())
         for tid in tenant_ids:
             n = seed_for_tenant(db, tid)
-            print(f"tenant {tid}: seeded {n} definitions ({len(GROUPS)} groups)")
+            # CHG-10: the two key2-bearing groups, seeded through their own module.
+            added, patched = seed_transaction_defs(db, tid, apply=True, overwrite=False)
+            print(
+                f"tenant {tid}: seeded {n} definitions ({len(GROUPS)} groups)"
+                f" + {added} transaction codes ({patched} key2 backfilled)"
+            )
     finally:
         db.close()
 

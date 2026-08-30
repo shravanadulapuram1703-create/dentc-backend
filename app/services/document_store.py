@@ -186,6 +186,7 @@ def public_url(doc) -> str:  # noqa: ANN001 - PatientDocument (import cycle othe
                 doc.storage_bucket, doc.storage_path,
                 ttl_seconds=settings.DOCUMENT_SIGNED_URL_TTL_SECONDS,
                 download_name=doc.file_name,
+                url_mode=settings.DOCUMENT_URL_MODE,
             )
             if signed:
                 return signed
@@ -269,6 +270,7 @@ def list_consent_masters(prefix: str | None = None, limit: int = 500) -> list[di
                 bucket, blob.name,
                 ttl_seconds=settings.DOCUMENT_SIGNED_URL_TTL_SECONDS,
                 download_name=Path(blob.name).name,
+                url_mode=settings.DOCUMENT_URL_MODE,
             ),
         })
     return out

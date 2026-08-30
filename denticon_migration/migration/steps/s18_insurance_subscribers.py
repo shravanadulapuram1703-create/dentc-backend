@@ -2,20 +2,27 @@
 STEP 18 — insurance_subscribers
 Source: RespInsplan.txt
 Returns: { respplanid_str: subscriber_db_id }
+
+INS-PT-1/2/4: ``RespInsplan.txt`` carries ``MSTATUS``, ``SUBPHONE``,
+``SUBADDRESS2`` and ``ELIGVERIFIEDON``, and none of them were read — so the
+columns added for those gaps were empty on all 65,305 migrated subscribers and
+staff had to retype what the export already held. Existing rows are repaired by
+``scripts/backfill_insurance_source_fields.py``.
 """
 
 from migration.config import cfg
 from migration.utils.reader import read_denticon_file
 from migration.utils.bulk import BulkBuffer
 from migration.utils.parsers import (
-    clean, parse_date, parse_decimal, map_gender, map_elig_status
+    clean, parse_date, parse_datetime, parse_decimal, map_gender, map_elig_status
 )
 
 COLS = [
     "tenant_id", "legacy_id", "ins_plan_id", "subscriber_patient_id", "office_id",
     "sub_first_name", "sub_last_name", "sub_mi",
-    "sub_address", "sub_city", "sub_state", "sub_zip",
-    "sub_dob", "sub_gender", "sub_ssn", "sub_member_id", "group_number",
+    "sub_address", "sub_address2", "sub_city", "sub_state", "sub_zip",
+    "sub_dob", "sub_gender", "marital_status", "sub_phone",
+    "sub_ssn", "sub_member_id", "group_number",
     "effective_date", "term_date",
     "family_max_remaining", "family_ded_remaining", "ortho_remaining",
     "anniversary_date", "elig_status", "elig_verified_on", "elig_verified_by", "elig_notes",
@@ -73,11 +80,14 @@ def run(conn, maps: dict) -> dict:
             clean(row.get("SUBLNAME")),
             clean(row.get("SUBMI")),
             clean(row.get("SUBADDRESS") or row.get("SUBADDRESS1")),
+            clean(row.get("SUBADDRESS2")),          # INS-PT-4
             clean(row.get("SUBCITY")),
             clean(row.get("SUBSTATE")),
             clean(row.get("SUBZIP")),
             parse_date(row.get("SUBBIRTHDATE") or ""),
             map_gender(row.get("SEX") or ""),
+            clean(row.get("MSTATUS")),              # INS-PT-1
+            clean(row.get("SUBPHONE")),             # INS-PT-2
             clean(row.get("SUBSSN")),
             clean(row.get("SUBID")),
             clean(row.get("GROUPNO")),
@@ -88,7 +98,7 @@ def run(conn, maps: dict) -> dict:
             parse_decimal(row.get("FAMORTHOREM") or "0"),
             parse_date(row.get("ANNIVDATE") or ""),
             map_elig_status(row.get("ELIGVERIFIED") or ""),
-            None,  # elig_verified_on — parse if field present
+            parse_datetime(row.get("ELIGVERIFIEDON") or ""),
             clean(row.get("ELIGVERIFIEDBY")),
             clean(row.get("ELIGNOTES")),
             clean(row.get("NOTES")),

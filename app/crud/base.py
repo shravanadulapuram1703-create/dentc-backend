@@ -145,7 +145,7 @@ class CRUDBase(Generic[ModelT]):
                 stmt = stmt.where(column <= bounds["le"])
 
         # free-text search across declared columns (+ related-table names, INS-9)
-        if search and (self.search_fields or self.search_relations):
+        if search:
             term = f"%{search}%"
             clauses = [getattr(self.model, f).ilike(term) for f in self.search_fields]
             for fk_attr, related, rel_fields in self.search_relations:
@@ -154,6 +154,9 @@ class CRUDBase(Generic[ModelT]):
                     or_(*[getattr(related, rf).ilike(term) for rf in rel_fields])
                 )
                 clauses.append(getattr(self.model, fk_attr).in_(sub))
+            # MH-9: a subclass can recognise a search term the plain column
+            # ilikes cannot ("Last, First" reaches two columns at once).
+            clauses.extend(self._extra_search_clauses(search))
             if clauses:
                 stmt = stmt.where(or_(*clauses))
 
@@ -161,7 +164,12 @@ class CRUDBase(Generic[ModelT]):
 
         sort_col = sort if (sort and sort in self.sortable_fields) else self.default_sort
         column = getattr(self.model, sort_col)
-        order_by = [column.desc() if order == "desc" else column.asc()]
+        # MH-9: relevance first when the caller searched. Without it an exact
+        # surname match is unreachable behind hundreds of substring hits paged
+        # alphabetically, which is what made the patient picker unusable. The
+        # caller's own sort still applies - it just decides ties within a tier.
+        order_by = self._search_order(search) if search else []
+        order_by.append(column.desc() if order == "desc" else column.asc())
         # INS-8: append the primary key as a deterministic tiebreaker so rows
         # never shift/drop/duplicate across page boundaries when the primary
         # sort column is non-unique (e.g. carriers/employers sorted by name).
@@ -174,6 +182,16 @@ class CRUDBase(Generic[ModelT]):
 
     def _extra_list_clauses(self, filters: dict[str, Any]) -> list:  # noqa: ARG002
         """WHERE clauses for :attr:`custom_filter_fields`. Overridden by subclasses."""
+        return []
+
+    def _extra_search_clauses(self, search: str) -> list:  # noqa: ARG002
+        """Extra OR-ed free-text clauses a subclass derives from the raw term."""
+        return []
+
+    def _search_order(self, search: str) -> list:  # noqa: ARG002
+        """Relevance ``ORDER BY`` terms applied ahead of the caller's sort when a
+        search term is present. Empty means "no ranking" (the historical
+        behaviour), so only resources that declare one are affected."""
         return []
 
     # ── writes ───────────────────────────────────────────────────────────

@@ -38,7 +38,52 @@ def _ok(label: str, detail: str = "") -> None:
 
 def _fail(label: str, detail: str) -> None:
     print(f"  [FAIL] {label} — {detail}")
+    _remediate(detail)
     sys.exit(1)
+
+
+def _remediate(detail: str) -> None:
+    """Turn a raw GCS 403 into the command that fixes it.
+
+    The imaging and document layers share one ``GCS_CREDENTIALS_PATH`` service
+    account, so the usual failure here is not "wrong credentials" but "the right
+    account, with no binding on *this* bucket" — which the raw API error does not
+    say out loud. It also can't tell a missing bucket from a denied one, so both
+    are covered below.
+    """
+    if "403" not in detail and "Forbidden" not in detail:
+        return
+    account = _service_account() or "<your service account>"
+    bucket = settings.GCS_BUCKET_DOCUMENTS
+    print()
+    print("  The service account has no access to this bucket. Grant it:")
+    print()
+    print(f"    gcloud storage buckets add-iam-policy-binding gs://{bucket} \\")
+    print(f"      --member=serviceAccount:{account} \\")
+    print("      --role=roles/storage.objectAdmin")
+    print()
+    print("  If that reports the bucket does not exist, create it first:")
+    print()
+    print(f"    gcloud storage buckets create gs://{bucket} --location=us-central1 \\")
+    print("      --uniform-bucket-level-access")
+    print()
+    print("  For signed URLs (inline image/PDF rendering) the account also needs")
+    print("  roles/iam.serviceAccountTokenCreator on itself. Without it the API")
+    print("  still works — file_url falls back to the /content proxy.")
+
+
+def _service_account() -> str | None:
+    """The ``client_email`` from the configured key file, if there is one."""
+    import json
+    from pathlib import Path
+
+    path = settings.GCS_CREDENTIALS_PATH
+    if not path or not Path(path).is_file():
+        return None
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8")).get("client_email")
+    except Exception:  # noqa: BLE001 - diagnostics only, never the reason we fail
+        return None
 
 
 def main() -> None:
@@ -48,6 +93,10 @@ def main() -> None:
     args = parser.parse_args()
 
     print("Document storage configuration")
+    # Shared with imaging — one key file serves both, so print who we are as well
+    # as which bucket, because the usual failure is an identity/bucket mismatch.
+    print(f"  GCS_CREDENTIALS_PATH      = {settings.GCS_CREDENTIALS_PATH!r}")
+    print(f"  service account           = {_service_account()!r}")
     print(f"  GCS_BUCKET_DOCUMENTS      = {settings.GCS_BUCKET_DOCUMENTS!r}")
     print(f"  GCS_NOTES_PREFIX          = {settings.GCS_NOTES_PREFIX!r}")
     print(f"  GCS_CONSENT_FORMS_PREFIX  = {settings.GCS_CONSENT_FORMS_PREFIX!r}")

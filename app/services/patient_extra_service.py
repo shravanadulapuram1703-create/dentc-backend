@@ -268,6 +268,55 @@ def list_claim_attachments(db: Session, tenant_id: int, claim_id: str) -> list[C
     return stamp_claim_attachment_urls(claim_id, rows)
 
 
+#: INS-PAY-8: the claim attachment-type vocabulary. ``attachment_type`` was free
+#: text, so the EOB the Insurance Payment window uploads went up as the literal
+#: string ``"EOB"`` with nothing documenting or enforcing that spelling — a
+#: second client sending ``"eob"`` or ``"Explanation of Benefits"`` would file it
+#: somewhere the EOB lookup never finds. ``scripts/seed_account_definitions.py``
+#: seeds these as the ``attachment_type`` definitions group so the picker is
+#: driven from the same list.
+#:
+#: An unrecognised value is stored **as written**, not rejected: the codes below
+#: are the ones a dental claim actually carries, but a carrier can ask for
+#: something none of them names, and a 422 mid-upload would leave the user with a
+#: claim they cannot attach to. Recognised spellings are normalised to the code.
+CLAIM_ATTACHMENT_TYPES: dict[str, str] = {
+    "EOB": "Explanation of Benefits",
+    "XRAY": "Radiograph / X-Ray",
+    "PHOTO": "Intraoral Photograph",
+    "PERIO": "Periodontal Chart",
+    "NARRATIVE": "Narrative / Letter",
+    "REFERRAL": "Referral",
+    "TXPLAN": "Treatment Plan",
+    "PREAUTH": "Pre-authorisation Response",
+    "OTHER": "Other",
+}
+
+#: Spellings seen in the wild that mean one of the codes above.
+_ATTACHMENT_TYPE_ALIASES = {
+    "explanation of benefits": "EOB",
+    "x-ray": "XRAY", "xray": "XRAY", "radiograph": "XRAY",
+    "photograph": "PHOTO", "intraoral photograph": "PHOTO", "image": "PHOTO",
+    "perio chart": "PERIO", "periodontal chart": "PERIO", "perio": "PERIO",
+    "letter": "NARRATIVE", "narrative": "NARRATIVE",
+    "treatment plan": "TXPLAN", "tx plan": "TXPLAN",
+    "pre-auth": "PREAUTH", "preauth": "PREAUTH", "pre-authorization": "PREAUTH",
+}
+
+
+def canonical_attachment_type(value: str | None) -> str | None:
+    """Normalise a written attachment type to its catalog code (INS-PAY-8)."""
+    if value is None:
+        return None
+    token = value.strip()
+    if not token:
+        return None
+    upper = token.upper()
+    if upper in CLAIM_ATTACHMENT_TYPES:
+        return upper
+    return _ATTACHMENT_TYPE_ALIASES.get(token.lower(), token)
+
+
 def create_claim_attachment(
     db: Session, tenant_id: int, claim_id: str, *, attachment_type: str | None,
     file_name: str, content_type: str | None, data: bytes, user_id: int | None,
@@ -276,7 +325,8 @@ def create_claim_attachment(
     filestore.validate_upload(file_name, content_type, data)
     rel, _public = filestore.save_file(f"claim_attachments/{claim_id}", file_name, data)
     att = ClaimAttachment(
-        tenant_id=tenant_id, claim_id=claim_id, attachment_type=attachment_type,
+        tenant_id=tenant_id, claim_id=claim_id,
+        attachment_type=canonical_attachment_type(attachment_type),
         file_name=file_name, content_type=content_type, file_size=len(data),
         # NOTE-DOC-3: file_url is the authenticated /content route, stamped once
         # the row has an id. Never the public /uploads path — this is PHI.

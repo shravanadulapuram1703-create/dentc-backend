@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query
@@ -19,15 +20,23 @@ from app.schemas.transactions import (
     ClaimStatusHistory,
     ClaimSubmitRequest,
     ClaimSubmitResult,
+    CoverageCategoryRead,
     EstimateRequest,
     EstimateResult,
     ExplosionExpandResult,
+    FeeQuote,
+    InsurancePaymentBatchCreate,
+    InsurancePaymentBatchResult,
     InsurancePaymentCreate,
     InsurancePaymentRead,
+    InsurancePaymentReverseRequest,
+    InsurancePaymentReverseResult,
+    OutstandingClaim,
     PatientInsuranceSummary,
     TodaysAppointment,
 )
-from app.services import billing_service, estimate_service
+from app.services import billing_service, estimate_service, pricing_service
+from app.services import coverage_category_service as covcat
 
 router = APIRouter(
     tags=["Billing"],
@@ -131,6 +140,88 @@ def record_insurance_payment(
     )
 
 
+# ── INS-PAY-3: post a whole remittance atomically ────────────────────────────
+@router.post(
+    "/ledger-insurance-details/payment-batch",
+    response_model=InsurancePaymentBatchResult,
+    status_code=201,
+    operation_id="record_insurance_payment_batch",
+    summary="Post one remittance across several procedures in a single transaction (INS-PAY-3)",
+)
+def record_insurance_payment_batch(
+    db: DbSession,
+    tenant_id: TenantId,
+    body: InsurancePaymentBatchCreate,
+    current=Depends(get_current_user),
+):
+    """One cheque covering four procedures used to be four POSTs, and a failure
+    on the third left the claim half-paid with nothing able to roll it back.
+
+    Every line lands or none does. When ``payment_amount`` is supplied it is
+    reconciled against the sum of the lines to the cent **before** anything is
+    written (422 ``remittance_not_reconciled``), so the window's reconciliation
+    rule is enforced server-side rather than only in the browser. ``close_claim``
+    and the INS-PAY-4 write-off intent are applied in the same transaction.
+    """
+    return billing_service.record_insurance_payment_batch(
+        db, tenant_id, body.model_dump(exclude_unset=True), actor_id=current.id
+    )
+
+
+# ── INS-PAY-2: reverse a posted remittance instead of deleting it ────────────
+@router.post(
+    "/ledger-insurance-details/{detail_id}/reverse",
+    response_model=InsurancePaymentReverseResult,
+    operation_id="reverse_insurance_payment",
+    summary="Reverse a posted insurance payment and re-derive the claim (INS-PAY-2)",
+)
+def reverse_insurance_payment(
+    db: DbSession,
+    tenant_id: TenantId,
+    detail_id: Annotated[int, Path()],
+    body: InsurancePaymentReverseRequest,
+    current=Depends(get_current_user),
+):
+    """The counterpart to ``/patient-payments/{id}/reverse``, which insurance
+    payments never had. The row is kept and marked void with a reason and an
+    actor — a ``DELETE`` destroyed the evidence and, worse, left the claim's
+    ``total_paid`` holding money no row backed."""
+    return billing_service.reverse_insurance_payment(
+        db, detail_id, tenant_id, body.model_dump(), actor_id=current.id
+    )
+
+
+# ── INS-PAY-7: the claim picker the Insurance Payment window needs ───────────
+@router.get(
+    "/patients/{patient_id}/outstanding-claims",
+    response_model=list[OutstandingClaim],
+    operation_id="list_outstanding_claims",
+    summary="Every outstanding claim for a patient with its money roll-ups (INS-PAY-7)",
+)
+def outstanding_claims(
+    db: DbSession,
+    tenant_id: TenantId,
+    patient_id: Annotated[int, Path()],
+    include_closed: Annotated[
+        bool, Query(description="Also return closed / denied / void claims")
+    ] = False,
+    date_from: Annotated[
+        date | None, Query(description="Earliest date of service (inclusive)")
+    ] = None,
+    date_to: Annotated[
+        date | None, Query(description="Latest date of service (inclusive)")
+    ] = None,
+):
+    """Charges / est ins / deductible used / ins paid / ins adj / remaining per
+    claim, aggregated server-side. Building this client-side meant one
+    ``/insurance-claims/{id}/detail`` call per claim, because neither roll-up
+    exists on ``GET /insurance-claims``."""
+    return billing_service.outstanding_claims(
+        db, patient_id, tenant_id,
+        include_closed=include_closed, date_from=date_from, date_to=date_to,
+    )
+
+
 # ── SVC-1: submit / send a claim ─────────────────────────────────────────────
 @router.post(
     "/insurance-claims/{claim_id}/submit",
@@ -230,3 +321,50 @@ def expand_explosion_code(
     office_id: Annotated[int | None, Query()] = None,
 ):
     return billing_service.expand_explosion_code(db, code, tenant_id, office_id=office_id)
+
+
+# ── FEE-3: server-side fee resolution ───────────────────────────────────────
+@router.get(
+    "/patients/{patient_id}/fee",
+    response_model=FeeQuote,
+    operation_id="get_patient_procedure_fee",
+    summary="Resolve a procedure's fee for this patient/office/provider (FEE-3)",
+)
+def patient_procedure_fee(
+    db: DbSession,
+    tenant_id: TenantId,
+    patient_id: Annotated[int, Path()],
+    procedure_code: Annotated[str, Query(description="The ADA/CDT code to price")],
+    office_id: Annotated[int | None, Query()] = None,
+    provider_id: Annotated[str | None, Query()] = None,
+    ins_plan_id: Annotated[int | None, Query(description="Override the patient's primary plan")] = None,
+):
+    """The fee the server would apply, plus **which** schedule produced it.
+
+    Fee resolution used to live only in the frontend, so two clients could
+    disagree and nothing stopped a charge posting with an arbitrary amount.
+    ``conflicts`` is non-empty when two equally-specific assignments price the
+    code differently — the UI should say so rather than pick one silently.
+    """
+    return pricing_service.resolve_procedure_fee(
+        db, tenant_id, procedure_code,
+        patient_id=patient_id,
+        office_id=office_id,
+        provider_id=provider_id,
+        ins_plan_id=ins_plan_id,
+    )
+
+
+# ── FEE-1: the published ADA -> coverage-category mapping ───────────────────
+@router.get(
+    "/metadata/coverage-categories",
+    response_model=list[CoverageCategoryRead],
+    operation_id="list_coverage_categories",
+    summary="The ADA/CDT -> insurance coverage-category mapping the estimate engine uses (FEE-1)",
+)
+def coverage_categories(db: DbSession, tenant_id: TenantId):
+    """Published so a practice can audit *why* a code was priced at a given
+    percentage, and override the classification per code
+    (``PATCH /procedure-codes/{code} {"coverage_category": "03A"}``) when the
+    CDT-range default is wrong for their plans."""
+    return covcat.catalog(db)

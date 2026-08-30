@@ -98,6 +98,16 @@ class ClaimRecalcResult(ORMModel):
     total_paid: Decimal
     est_insurance: Decimal
     procedure_count: int
+    # INS-PAY-2: ``total_paid`` is now *derived* from the live coverage rows
+    # rather than echoed back, so the count of rows behind it is the thing that
+    # explains the figure — a claim reporting money with zero rows was exactly
+    # the bug (a deleted remittance left the total standing).
+    coverage_row_count: int = 0
+    total_adjusted: Decimal = Decimal("0")
+    #: Carrier money carried over from the legacy claim, with no coverage row
+    #: behind it. ``total_paid == opening_paid + posted_paid``.
+    opening_paid: Decimal = Decimal("0")
+    posted_paid: Decimal = Decimal("0")
 
 
 class BalanceAging(BaseModel):
