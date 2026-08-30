@@ -1,4 +1,10 @@
-"""Object storage (GCS) access for the imaging layer.
+"""Object storage (GCS) access.
+
+Originally written for the imaging layer; ``document_store`` (patient documents,
+consent forms, note attachments) now shares the same lazy client, so **one**
+``GCS_CREDENTIALS_PATH`` service account serves both. The two subsystems still
+keep their own buckets, TTLs and url-modes — see the ``url_mode`` argument on
+:func:`signed_url`.
 
 Two responsibilities:
 
@@ -54,7 +60,9 @@ def _get_client() -> Any:
         else:
             _client = storage.Client()
     except Exception as exc:  # noqa: BLE001 - lib missing or no creds
-        logger.info("GCS client unavailable (imaging runs in proxy mode): %s", exc)
+        logger.info(
+            "GCS client unavailable (imaging and documents fall back to proxy/local): %s", exc
+        )
         _client = None
     return _client
 
@@ -75,6 +83,7 @@ def signed_url(
     *,
     ttl_seconds: int | None = None,
     download_name: str | None = None,
+    url_mode: str | None = None,
 ) -> str | None:
     """Return a V4 signed GET URL, or ``None`` if signing isn't available.
 
@@ -82,8 +91,14 @@ def signed_url(
     ``signBlob`` permission (runtime SA must hold ``serviceAccountTokenCreator``
     on itself). If that isn't wired, ``generate_signed_url`` raises and we return
     ``None`` so the caller proxies instead.
+
+    ``url_mode`` is the *caller's* mode setting. It exists because this function
+    is shared by imaging and documents: without it, setting
+    ``IMAGING_URL_MODE=proxy`` would silently force patient documents to proxy
+    too, no matter what ``DOCUMENT_URL_MODE`` said. Defaults to the imaging mode
+    so imaging callers are unchanged.
     """
-    if settings.IMAGING_URL_MODE == "proxy":
+    if (url_mode or settings.IMAGING_URL_MODE) == "proxy":
         return None
     client = _get_client()
     if client is None or not bucket:

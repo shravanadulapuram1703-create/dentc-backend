@@ -7,11 +7,18 @@ active coverage and the applicable fee schedule — instead of the frontend post
 
 The computation is intentionally conservative and self-contained:
 
-* **Fee** — override → the plan's fee-schedule entry → the office default
-  fee-schedule entry → the procedure code's ``default_fee``.
-* **Coverage %** — the first ``insurance_coverage_rules`` band on the patient's
-  primary plan whose ``[start_code, end_code]`` contains the code (0 % if the
-  patient has no active plan or no matching band).
+* **Fee** — override → :func:`pricing_service.resolve_procedure_fee` (FEE-3),
+  which walks ``fee_schedule_assignments`` by specificity, then the plan-linked
+  schedule, then the office default, then the code's ``default_fee``. Sharing
+  the resolver with ``GET /patients/{id}/fee`` is the point: a quote and an
+  estimate can no longer disagree about what a code costs.
+* **Coverage %** — the ``insurance_coverage_rules`` band on the patient's
+  primary plan that matches the code (0 % if the patient has no active plan or
+  no matching band). A band is matched **either** as an ADA code range
+  (``D0100``–``D0999``, which is how a minority of plans are set up) **or** by
+  the code's coverage category (FEE-1) — ``01A``, ``03``, ``11B`` — which is how
+  every migrated plan is set up. Before FEE-1 only the first form existed, so
+  the engine matched nothing and quoted 0 % insurance on real coverage.
 * **Deductible** — the plan's remaining deductible is consumed across the lines
   (unless the band waives it), reducing the insured base.
 * **Annual max** — the insurance estimate is capped by the plan's remaining max.
@@ -30,16 +37,13 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
 from app.db.models import (
-    FeeSchedule,
-    FeeScheduleAssignment,
-    FeeScheduleEntry,
     InsurancePlan,
     InsuranceCoverageRule,
-    Office,
     Patient,
     PatientInsurance,
-    ProcedureCode,
 )
+from app.services import coverage_category_service as covcat
+from app.services import pricing_service
 
 _CENTS = Decimal("0.01")
 _ZERO = Decimal("0")
@@ -87,55 +91,39 @@ def _coverage_rules(db: Session, ins_plan_id: int | None) -> list[InsuranceCover
     ).scalars().all())
 
 
-def _match_rule(rules: list[InsuranceCoverageRule], code: str) -> InsuranceCoverageRule | None:
+def _match_rule(
+    rules: list[InsuranceCoverageRule], code: str, coverage_category: str | None
+) -> InsuranceCoverageRule | None:
+    """The best band for ``code`` on this plan, or ``None``.
+
+    Two band shapes coexist in the migrated data and both are honoured:
+
+    * an **ADA range** (``start_code='D0100'``, ``end_code='D0999'``) — matched
+      numerically inside the letter family, so ``D0330`` falls in ``D0100``–
+      ``D0999`` but ``D2740`` does not;
+    * a **coverage category** (``start_code='03A'``) — matched against the
+      code's own category (FEE-1). An exact category match beats a match on its
+      parent, so a plan that itemises "Restorative: Crowns" at 50 % prices a
+      crown at 50 % even though it also bands "Restorative" at 80 %.
+
+    Ranked rather than first-wins because the rows come back in insertion order,
+    which would otherwise make the answer depend on how the plan was typed in.
+    """
+    best: InsuranceCoverageRule | None = None
+    best_score = -1
     for rule in rules:
         start, end = (rule.start_code or ""), (rule.end_code or rule.start_code or "")
-        if start and start <= code <= end:
-            return rule
-    return None
-
-
-def _fee_schedule_id(db: Session, plan: InsurancePlan | None, office_id: int | None) -> int | None:
-    """The fee schedule that applies: plan assignment → plan-linked → office default."""
-    if plan is not None:
-        assign = db.execute(
-            select(FeeScheduleAssignment.fee_schedule_id).where(
-                FeeScheduleAssignment.ins_plan_id == plan.id
-            )
-        ).scalar_one_or_none()
-        if assign:
-            return assign
-        linked = db.execute(
-            select(FeeSchedule.id).where(
-                FeeSchedule.ins_plan_id == plan.id, FeeSchedule.is_active.is_(True)
-            )
-        ).scalar_one_or_none()
-        if linked:
-            return linked
-    if office_id:
-        office = db.get(Office, office_id)
-        if office and office.default_fee_schedule_id:
-            return office.default_fee_schedule_id
-    return None
-
-
-def _fee_for(
-    db: Session, code: str, fee_schedule_id: int | None, proc: ProcedureCode | None
-) -> tuple[Decimal, str]:
-    """(fee, source): a fee-schedule entry beats the code default."""
-    if fee_schedule_id:
-        entry = db.execute(
-            select(FeeScheduleEntry).where(
-                FeeScheduleEntry.fee_schedule_id == fee_schedule_id,
-                FeeScheduleEntry.procedure_code == code,
-            )
-        ).scalars().first()
-        if entry is not None and (entry.patient_fee is not None or entry.insurance_fee is not None):
-            fee = entry.patient_fee if entry.patient_fee is not None else entry.insurance_fee
-            return _money(fee), "fee_schedule"
-    if proc is not None:
-        return _money(proc.default_fee), "code_default"
-    return _ZERO, "code_default"
+        score: int | None = None
+        if covcat.is_ada_code(start):
+            # An ADA-range band. A single-code band (start == end) is the most
+            # specific thing a plan can say about a code.
+            if covcat.in_range(code, start, end):
+                score = 3 if start == end else 1
+        else:
+            score = covcat.category_matches(start, coverage_category)
+        if score is not None and score > best_score:
+            best, best_score = rule, score
+    return best
 
 
 def estimate(
@@ -152,7 +140,16 @@ def estimate(
 
     slot, plan = _primary_coverage(db, patient_id)
     rules = _coverage_rules(db, plan.id if plan else None)
-    fee_schedule_id = _fee_schedule_id(db, plan, office_id)
+    # FEE-1: one batched lookup of every line's coverage category, so a 20-line
+    # treatment plan does not fan out 20 queries to classify its codes.
+    categories = covcat.categories_for(db, [line["procedure_code"] for line in lines])
+    # FEE-3: one pricing context for the whole estimate. It carries the resolved
+    # plan/carrier/office-group and memoises the matching fee-schedule
+    # assignments, so a 20-line plan does not re-read them 20 times.
+    ctx = pricing_service.build_context(
+        db, patient_id=patient_id, office_id=office_id,
+        ins_plan_id=plan.id if plan is not None else None,
+    )
 
     # Remaining deductible / annual max — prefer the per-patient slot figures, then plan.
     ded_remaining = _money(
@@ -173,14 +170,29 @@ def estimate(
 
     for line in lines:
         code = line["procedure_code"]
-        proc = db.get(ProcedureCode, code)
         override = line.get("fee")
+        fee_schedule_id = None
         if override is not None:
             fee, source = _money(override), "override"
         else:
-            fee, source = _fee_for(db, code, fee_schedule_id, proc)
+            # FEE-3: the same resolver ``GET /patients/{id}/fee`` answers with.
+            # A per-line provider overrides the shared context (a provider-scoped
+            # assignment is a real thing); otherwise the shared one is reused.
+            line_ctx = ctx
+            if line.get("provider_id"):
+                line_ctx = pricing_service.build_context(
+                    db, patient_id=patient_id, office_id=office_id,
+                    provider_id=line["provider_id"],
+                    ins_plan_id=plan.id if plan is not None else None,
+                )
+            quote = pricing_service.resolve_procedure_fee(
+                db, tenant_id, code, ctx=line_ctx,
+            )
+            fee, source = quote["fee"], quote["fee_source"]
+            fee_schedule_id = quote["fee_schedule_id"]
 
-        rule = _match_rule(rules, code) if plan else None
+        category = categories.get(code)
+        rule = _match_rule(rules, code, category) if plan else None
         coverage_pct = _money(rule.coverage_pct) if rule and rule.coverage_pct is not None else _ZERO
 
         # Deductible consumed on this line (unless waived), reduces the insured base.
@@ -205,6 +217,9 @@ def estimate(
             "patient_estimate": pat_est,
             "estimated_deductible": _money(line_ded),
             "fee_source": source,
+            "fee_schedule_id": fee_schedule_id,
+            "coverage_category": category,
+            "coverage_category_description": covcat.describe(category),
         })
         total_fee += fee
         total_ins += ins_est

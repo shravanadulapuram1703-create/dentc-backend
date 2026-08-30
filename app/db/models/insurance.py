@@ -22,6 +22,11 @@ class Employer(Base, IntPKMixin, TimestampMixin):
     legacy_id: Mapped[str | None] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(255))
     address: Mapped[str | None] = mapped_column(String(255))
+    # INS-PT-11: the legacy EMPLOYER DETAILS dialog has two address lines. They
+    # were being joined on a newline into ``address`` client-side, which made the
+    # second line unaddressable (and unsearchable) — ``insurance_carriers`` has
+    # carried ``address2`` since INS-4, so this is the same shape.
+    address2: Mapped[str | None] = mapped_column(String(255))
     city: Mapped[str | None] = mapped_column(String(100))
     state: Mapped[str | None] = mapped_column(String(50))
     zip: Mapped[str | None] = mapped_column(String(20))
@@ -77,7 +82,17 @@ class InsuranceCarrier(Base, IntPKMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class InsurancePlan(Base, IntPKMixin, CreatedAtMixin):
+class InsurancePlan(Base, IntPKMixin, TimestampMixin):
+    """A plan row is shared by every patient linked to it, which is why the patient
+    screen renders it read-only and edits belong in Setup -> Insurance -> Plans.
+
+    INS-PT-8: the Setup grid shows **Created** and **Modified** as *date + user*.
+    ``TimestampMixin`` supplies ``updated_at``; ``updated_by`` is the server-stamped
+    actor (``CRUDBase.update``); the four legacy free-text columns mirror
+    ``insurance_carriers`` so a migrated row can still name who touched it in
+    Denticon, where no ``users`` row exists to point at.
+    """
+
     __tablename__ = "insurance_plans"
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
@@ -96,6 +111,13 @@ class InsurancePlan(Base, IntPKMixin, CreatedAtMixin):
     # LEG-7: legacy plan header "Anni. Date Exp" alongside the anniversary date.
     anniversary_expiry_date: Mapped[date | None]
     coverage_type: Mapped[str | None] = mapped_column(String(10))
+    # INS-PT-8: legacy free-text audit (migrated source), same shape as the carrier.
+    created_on: Mapped[datetime | None]
+    created_by: Mapped[str | None] = mapped_column(String(100))
+    modified_on: Mapped[datetime | None]
+    modified_by: Mapped[str | None] = mapped_column(String(100))
+    # INS-PT-8: server-maintained modified actor (``updated_at`` via TimestampMixin).
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 

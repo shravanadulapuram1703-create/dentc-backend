@@ -51,6 +51,9 @@ class FakeBlob:
 
         return io.BytesIO(self._data)
 
+    def generate_signed_url(self, **_kw) -> str:  # noqa: ANN003
+        return f"https://storage.googleapis.com/{self.name}?X-Goog-Signature=real"
+
 
 class FakeBucket:
     def __init__(self, store: dict[str, FakeBlob]):
@@ -327,6 +330,25 @@ def test_consent_forms_accepts_a_custom_prefix(client, gcs):
     body = client.get("/api/v1/consent-forms?prefix=blank-forms").json()
     assert [i["name"] for i in body["items"]] == ["x.pdf"]
     assert body["storage_prefix"] == "blank-forms"
+
+
+# ── Imaging and documents share one client, not one url-mode ────────────────
+def test_document_signing_is_not_governed_by_the_imaging_url_mode(monkeypatch):
+    """``obj.signed_url`` is shared with imaging. It used to short-circuit on
+    ``IMAGING_URL_MODE`` for *every* caller, so switching imaging to proxy would
+    silently stop patient documents being signed however ``DOCUMENT_URL_MODE``
+    was set. Nothing in the imaging layer has tests, so this pins it here."""
+    fake = FakeClient()
+    monkeypatch.setattr(obj, "_get_client", lambda: fake)
+    monkeypatch.setattr(settings, "IMAGING_URL_MODE", "proxy")
+
+    # Default (no url_mode) is still the imaging mode — imaging is unchanged.
+    assert obj.signed_url(BUCKET, "dicom/x.dcm") is None
+    # The documents caller passes its own mode and is unaffected.
+    signed = obj.signed_url(BUCKET, "documents/notes/1/2/x.pdf", url_mode="auto")
+    assert signed is not None and "X-Goog-Signature" in signed
+    # ...and honours its own proxy setting.
+    assert obj.signed_url(BUCKET, "documents/notes/1/2/x.pdf", url_mode="proxy") is None
 
 
 # ── Key construction (what the probe script asserts against a real bucket) ───

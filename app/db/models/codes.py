@@ -22,6 +22,14 @@ class ProcedureCode(Base, CreatedAtMixin):
     legacy_code: Mapped[str | None] = mapped_column(String(20))
     description: Mapped[str] = mapped_column(String(500))
     category: Mapped[str] = mapped_column(String(100), index=True)
+    # FEE-1: the *insurance* coverage category this code bands into
+    # ("01A", "03", "11B", …). ``category`` above is a display label; the
+    # coverage percentages in ``insurance_coverage_rules`` are keyed on these
+    # legacy category codes, so without this column no ADA code could ever match
+    # a band and every estimate came back at 0 % coverage. Seeded from the CDT
+    # family ranges by ``scripts/seed_coverage_categories.py``; a stored value
+    # always beats the derived one, so a practice override survives a re-seed.
+    coverage_category: Mapped[str | None] = mapped_column(String(20), index=True)
     default_fee: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
     default_duration_minutes: Mapped[int | None]
     requires_tooth: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -18,13 +18,27 @@ from app.crud.router_factory import CrudConfig, register_crud
 from app.db import models as m
 from app.schemas.factory import build_schemas
 from app.services.enrich_service import (
+    enrich_insurance_plan,
     enrich_ortho_plan,
     enrich_patient_carrier,
     enrich_patient_office,
     enrich_patient_procedure,
     enrich_patient_provider,
     enrich_payment_plan,
+    enrich_provider,
     enrich_treatment_plan,
+)
+from app.services.billing_service import LedgerInsuranceDetailCRUD
+from app.services.insurance_service import (
+    EmployerCRUD,
+    InsuranceCarrierCRUD,
+    InsurancePlanCRUD,
+)
+from app.services.medical_history_service import (
+    PatientMedicalAlertCRUD,
+    PatientQuestionnaireResponseCRUD,
+    enrich_medical_alerts,
+    enrich_questionnaire_responses,
 )
 from app.services.patient_procedure_service import PatientProcedureCRUD
 from app.services.payment_plan_service import PaymentPlanCRUD
@@ -40,9 +54,15 @@ from app.schemas.fee_schedule import (
     FeeScheduleUpdate,
 )
 from app.schemas.insurance import (
+    EmployerCreate,
+    EmployerRead,
+    EmployerUpdate,
     InsuranceCarrierCreate,
     InsuranceCarrierRead,
     InsuranceCarrierUpdate,
+    InsurancePlanCreate,
+    InsurancePlanRead,
+    InsurancePlanUpdate,
 )
 from app.schemas.perio import (
     PerioChartSettingCreate,
@@ -68,6 +88,7 @@ from app.schemas.enriched import (
     PatientProcedureCreate,
     PatientProcedureRead,
     PatientProcedureUpdate,
+    ProviderRead,
     TreatmentPlanCreate,
     TreatmentPlanRead,
     TreatmentPlanUpdate,
@@ -90,6 +111,9 @@ from app.schemas.patient_catalog import (
     PatientMedicalAlertCreate,
     PatientMedicalAlertRead,
     PatientMedicalAlertUpdate,
+    PatientQuestionnaireResponseCreate,
+    PatientQuestionnaireResponseRead,
+    PatientQuestionnaireResponseUpdate,
 )
 from app.schemas.progress_notes import (
     ProgressNoteCreate,
@@ -157,6 +181,10 @@ def _cfg(
     )
 
 
+# PROV-3: built once so the OpenAPI components ``ProviderCreate``/``ProviderUpdate``
+# are defined exactly once (the read is the enriched one from schemas.enriched).
+_PROVIDER_CREATE, _PROVIDER_UPDATE, _ = build_schemas(m.Provider, "Provider")
+
 # ── Organisation ───────────────────────────────────────────────────────────
 _ORG = [
     _cfg(m.Tenant, "Tenant", "tenants", "Organization", "tenant", "tenants",
@@ -166,9 +194,25 @@ _ORG = [
     # PROV-1: ProviderCRUD widens ``?office_id=`` to the provider_offices join ∪ the
     # legacy home-office scalar — a provider serves many offices, so the scalar
     # alone returned an empty list for most offices.
-    _cfg(m.Provider, "Provider", "providers", "Organization", "provider", "providers",
-         pk_type=str, search=("name", "specialty", "npi"), filters=("office_id", "is_active"),
-         crud_class=ProviderCRUD),
+    # PROV-3: ``role`` is canonicalised on write and the derived ``provider_kind``
+    # rides on the read, so the "doctors here, hygienists there" split stops
+    # being a client-side heuristic over free text. ``?role=`` filters on the
+    # stored value; run scripts/normalize_provider_roles.py so it is uniform.
+    CrudConfig(
+        model=m.Provider,
+        create_schema=_PROVIDER_CREATE,
+        update_schema=_PROVIDER_UPDATE,
+        read_schema=ProviderRead,
+        prefix="providers", tag="Organization",
+        singular="provider", plural="providers",
+        pk_type=str, pk_name="id",
+        search_fields=("name", "specialty", "npi"),
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("office_id", "is_active", "role"),
+        default_sort="created_at",
+        read_enrich=enrich_provider,
+        crud_class=ProviderCRUD,
+    ),
     _cfg(m.Operatory, "Operatory", "operatories", "Organization", "operatory", "operatories",
          pk_type=str, search=("name",), filters=("office_id", "is_active")),
     _cfg(m.UserOffice, "UserOffice", "user-offices", "Organization", "user_office", "user_offices",
@@ -189,7 +233,10 @@ _PATIENTS = [
         read_schema=PatientRead,
         prefix="patients", tag="Patients",
         singular="patient", plural="patients",
-        search_fields=("first_name", "last_name", "chart_no", "email", "phone"),
+        # MH-9: staff search by chart number and by phone as well as by name;
+        # PatientCRUD ranks the hits and understands the "Last, First" form.
+        search_fields=("first_name", "last_name", "chart_no", "email", "phone",
+                       "cell_phone", "work_phone"),
         sortable_fields=("created_at", "id", "last_name", "first_name", "dob"),
         filter_fields=("home_office_id", "is_active", "preferred_provider_id", "chart_no",
                        "dob", "ssn", "medicaid_id", "email", "phone", "gender",
@@ -213,17 +260,29 @@ _PATIENTS = [
          "patient_alert", "patient_alerts", filters=("patient_id", "is_active")),
     _cfg(m.AccountNote, "AccountNote", "account-notes", "Patients",
          "account_note", "account_notes", filters=("patient_id",), soft_field=None),
+    # MH-6/MH-7: ``signature_type`` separates a medical-history signature from a
+    # consent or financial one, and DELETE is now a soft delete (``is_active``)
+    # so a cleared signature is representable instead of destroyed - the void
+    # endpoint (/patient-signatures/{id}/void) is the attributable form.
     _cfg(m.PatientSignature, "PatientSignature", "patient-signatures", "Patients",
-         "patient_signature", "patient_signatures", filters=("patient_id",), soft_field=None),
+         "patient_signature", "patient_signatures",
+         filters=("patient_id", "signature_type", "is_user_sig", "is_active",
+                  "content_hash"),
+         soft_field="is_active", soft_value=False),
     # PLAN-7: per-patient consent capture (template rendered with patient/plan data,
     # optionally signed + stored). Distinct from tenant-level account consents.
     _cfg(m.PatientConsent, "PatientConsent", "patient-consents", "Patients",
          "patient_consent", "patient_consents",
          filters=("patient_id", "plan_id", "template_id", "status"),
          soft_field="is_deleted", soft_value=True),
+    # MH-6: a medical_history_records row is one *version* of a patient's medical
+    # history - the thing a signature attests to. ``content_hash`` is the
+    # fingerprint shared with patient_signatures.
     _cfg(m.MedicalHistoryRecord, "MedicalHistoryRecord", "medical-history-records", "Patients",
          "medical_history_record", "medical_history_records",
-         filters=("patient_id",), soft_field="is_archived", soft_value=True),
+         filters=("patient_id", "signature_id", "scope", "content_hash",
+                  "source_patient_id"),
+         soft_field="is_archived", soft_value=True),
     _cfg(m.Referral, "Referral", "referrals", "Patients", "referral", "referrals",
          search=("first_name", "last_name", "specialty", "practice_name"),
          # Left-rail SEARCH ON (referral_type direction) + TYPE (reason_code) server filters.
@@ -251,6 +310,10 @@ _PATIENTS = [
          "patient_recall", "patient_recalls", filters=("patient_id", "status", "is_active")),
     # GAP-AP-16: per-patient Yes/No medical-alert responses (MEDALERT catalog).
     # LEG-2: custom schemas constrain response to the tri-state yes|no|unknown.
+    # MH-12/MH-14: PatientMedicalAlertCRUD enforces the contradiction rules and
+    # propagates a flagged Yes answer into patient_alerts on the *generic*
+    # resource too, so no client can route around the composite write; the
+    # read denormalises the Setup catalog's flash-alert/charge-block flags.
     CrudConfig(
         model=m.PatientMedicalAlert,
         create_schema=PatientMedicalAlertCreate,
@@ -260,12 +323,24 @@ _PATIENTS = [
         singular="patient_medical_alert", plural="patient_medical_alerts",
         filter_fields=("patient_id", "alert_code", "response", "is_active"),
         default_sort="created_at",
+        crud_class=PatientMedicalAlertCRUD,
+        read_enrich=enrich_medical_alerts,
     ),
     # GAP-AP-17: per-patient Dental/Medical questionnaire answers.
-    _cfg(m.PatientQuestionnaireResponse, "PatientQuestionnaireResponse",
-         "patient-questionnaire-responses", "Patients",
-         "patient_questionnaire_response", "patient_questionnaire_responses",
-         filters=("patient_id", "questionnaire_type", "question_code", "is_active")),
+    # MH-8: updated_by / answered_at + the resolved "Modified By" name.
+    CrudConfig(
+        model=m.PatientQuestionnaireResponse,
+        create_schema=PatientQuestionnaireResponseCreate,
+        update_schema=PatientQuestionnaireResponseUpdate,
+        read_schema=PatientQuestionnaireResponseRead,
+        prefix="patient-questionnaire-responses", tag="Patients",
+        singular="patient_questionnaire_response", plural="patient_questionnaire_responses",
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("patient_id", "questionnaire_type", "question_code", "is_active"),
+        default_sort="created_at",
+        crud_class=PatientQuestionnaireResponseCRUD,
+        read_enrich=enrich_questionnaire_responses,
+    ),
     _cfg(m.PatientEmergencyContact, "PatientEmergencyContact", "patient-emergency-contacts",
          "Patients", "patient_emergency_contact", "patient_emergency_contacts",
          filters=("patient_id", "is_active", "is_primary")),
@@ -287,10 +362,30 @@ _PATIENTS = [
 
 # ── Insurance ──────────────────────────────────────────────────────────────
 _INSURANCE = [
-    _cfg(m.Employer, "Employer", "employers", "Insurance", "employer", "employers",
-         search=("name", "city"), soft_field=None),
+    # INS-PT-13: EmployerCRUD 409s on a quick-add that repeats an existing name
+    # (``allow_duplicate_name`` overrides). INS-PT-9/18: ``?ids=`` batch lookup so
+    # a plan grid resolves its employer column in one request, not 20.
+    CrudConfig(
+        model=m.Employer,
+        create_schema=EmployerCreate,
+        update_schema=EmployerUpdate,
+        read_schema=EmployerRead,
+        prefix="employers", tag="Insurance",
+        singular="employer", plural="employers",
+        search_fields=("name", "city"),
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("legacy_id",),
+        default_sort="created_at",
+        soft_delete_field=None,
+        id_in_param=True,
+        crud_class=EmployerCRUD,
+    ),
     # Carrier uses a custom Read schema (computed ``is_dental``, INS-2) and exposes
     # the server-side ``carrier_type`` filter that splits Dental/Medical (INS-1).
+    # INS-PT-12: ``is_dental`` is now writable *and* filterable — the filter shares
+    # the read field's vocabulary, so a carrier that reads as dental cannot fail to
+    # filter as dental (which is what a ``carrier_type`` typo used to cause).
+    # INS-PT-13: name-collision guard. INS-PT-9/18: ``?ids=`` batch lookup.
     CrudConfig(
         model=m.InsuranceCarrier,
         create_schema=InsuranceCarrierCreate,
@@ -300,19 +395,47 @@ _INSURANCE = [
         singular="insurance_carrier", plural="insurance_carriers",
         search_fields=("name", "payer_id"),
         sortable_fields=_DEFAULT_SORT,
-        filter_fields=("is_active", "carrier_type", "insurance_type"),
+        filter_fields=("is_active", "carrier_type", "insurance_type", "payer_id"),
+        extra_filters=(("is_dental", bool),),
         default_sort="created_at",
+        id_in_param=True,
+        crud_class=InsuranceCarrierCRUD,
     ),
-    _cfg(m.InsurancePlan, "InsurancePlan", "insurance-plans", "Insurance",
-         "insurance_plan", "insurance_plans", search=("group_number", "plan_type"),
-         # INS-9: also match a plan by its carrier/employer name (plans store only ids).
-         search_relations=(
-             ("carrier_id", m.InsuranceCarrier, ("name", "payer_id")),
-             ("employer_id", m.Employer, ("name",)),
-         ),
-         # LEG-5: exact Group # filter (the legacy "Search For = Group #" option);
-         # free-text `search` already covers group_number too.
-         filters=("carrier_id", "employer_id", "is_active", "group_number")),
+    # INS-PT-8/9/18: the read carries carrier/employer names, the derived
+    # ``is_dental`` and the Created/Modified actors, so the Setup grid stops
+    # fanning out ~40 GETs per page and stops rendering Modified as "—".
+    # INS-PT-19: InsurancePlanCRUD is the server-side duplicate authority.
+    # INS-PT-7/14: per-field + partial searches the free-text ``search`` cannot do.
+    CrudConfig(
+        model=m.InsurancePlan,
+        create_schema=InsurancePlanCreate,
+        update_schema=InsurancePlanUpdate,
+        read_schema=InsurancePlanRead,
+        prefix="insurance-plans", tag="Insurance",
+        singular="insurance_plan", plural="insurance_plans",
+        search_fields=("group_number", "plan_type"),
+        # INS-9: also match a plan by its carrier/employer name (plans store only ids).
+        search_relations=(
+            ("carrier_id", m.InsuranceCarrier, ("name", "payer_id")),
+            ("employer_id", m.Employer, ("name",)),
+        ),
+        sortable_fields=_DEFAULT_SORT,
+        # LEG-5: exact Group # filter (the legacy "Search For = Group #" option);
+        # free-text `search` already covers group_number too.
+        filter_fields=("carrier_id", "employer_id", "is_active", "group_number",
+                       "coverage_type", "plan_type"),
+        # INS-PT-14/7: partial group match + the two per-field searches ("Carrier
+        # Name" and "Payer ID" used to issue the identical query).
+        extra_filters=(
+            ("group_number_contains", str),
+            ("group_number_startswith", str),
+            ("carrier_name", str),
+            ("payer_id", str),
+        ),
+        default_sort="created_at",
+        crud_class=InsurancePlanCRUD,
+        read_enrich=enrich_insurance_plan,
+    ),
     _cfg(m.InsuranceSubscriber, "InsuranceSubscriber", "insurance-subscribers", "Insurance",
          "insurance_subscriber", "insurance_subscribers",
          search=("sub_first_name", "sub_last_name", "sub_member_id"),
@@ -337,7 +460,8 @@ _CODES = [
         pk_type=str, pk_name="code",
         search_fields=("code", "description", "category"),
         sortable_fields=("code", "category"),
-        filter_fields=("category", "is_active", "is_ortho", "chart_category"),
+        filter_fields=("category", "is_active", "is_ortho", "chart_category",
+                       "coverage_category"),
         default_sort="created_at",
     ),
     # FeeSchedule uses shared schemas (reused by the restore/new-version router)
@@ -609,9 +733,17 @@ _BILLING = [
     ),
     _cfg(m.ClaimSubmission, "ClaimSubmission", "claim-submissions", "Billing",
          "claim_submission", "claim_submissions", filters=("claim_id", "batch_id"), soft_field=None),
+    # INS-PAY-2: DELETE used to remove a posted remittance outright while the
+    # claim kept the money — a mis-keyed payment permanently overstated what the
+    # carrier had paid, with no record it had ever existed. It is now a **void**
+    # (``is_void``), hidden from the default listing, and
+    # ``POST /ledger-insurance-details/{id}/reverse`` is the route that also
+    # records who reversed it and why. ``?is_void=true`` still surfaces them.
     _cfg(m.LedgerInsuranceDetail, "LedgerInsuranceDetail", "ledger-insurance-details", "Billing",
          "ledger_insurance_detail", "ledger_insurance_details",
-         filters=("patient_id", "claim_id", "procedure_id"), soft_field=None),
+         filters=("patient_id", "claim_id", "procedure_id", "is_void"),
+         soft_field="is_void", soft_value=True, hide_soft_deleted=True,
+         crud_class=LedgerInsuranceDetailCRUD),
     _cfg(m.PaymentAllocation, "PaymentAllocation", "payment-allocations", "Billing",
          "payment_allocation", "payment_allocations",
          filters=("patient_id", "payment_id", "adjustment_id", "procedure_id", "claim_id"),
@@ -697,6 +829,7 @@ _REFERENCE = [
          "fee_schedule_assignment", "fee_schedule_assignments",
          filters=("fee_schedule_id", "ins_plan_id", "provider_id", "office_id",
                   "office_group_id", "carrier_id"), soft_field=None),
+    # MH-6: the frozen answers of one version; ``answer_type`` says which tab.
     _cfg(m.MedicalHistoryDetail, "MedicalHistoryDetail", "medical-history-details", "Patients",
          "medical_history_detail", "medical_history_details",
          filters=("history_id",), soft_field=None),

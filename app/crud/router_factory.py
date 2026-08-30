@@ -41,6 +41,17 @@ class CrudConfig:
     search_relations: tuple[tuple[str, type, tuple[str, ...]], ...] = ()
     filter_fields: tuple[str, ...] = ()
     range_fields: tuple[str, ...] = ()  # emit {f}_from / {f}_to typed query params
+    # INS-PT-7/14: declared query params that are NOT plain columns — a partial
+    # match (``group_number_contains``), or a filter that has to reach a related
+    # table (``carrier_name``). Each entry is ``(param_name, python_type)``; the
+    # value is passed through to ``crud.list(filters=...)`` and resolved by the
+    # crud_class in ``_extra_list_clauses``. Declaring it here is what makes it
+    # visible in OpenAPI, so Orval generates a typed argument for it.
+    extra_filters: tuple[tuple[str, type], ...] = ()
+    # INS-PT-9/18: expose ``?ids=1,2,3`` on the list route. A plan grid resolves
+    # up to 40 carrier/employer names per page; without this each one is its own
+    # GET (plus a CORS preflight).
+    id_in_param: bool = False
     default_sort: str = "created_at"
     soft_delete_field: str | None = "is_active"
     soft_delete_value: bool = False
@@ -67,6 +78,24 @@ def _col_pytype(columns, name: str) -> type | None:  # noqa: ANN001
         return str
 
 
+def _parse_ids(raw, pk_type: type):  # noqa: ANN001
+    """``"3,7, 9"`` -> ``[3, 7, 9]``. Unparseable entries are dropped rather than
+    422'd: the batch lookup is a convenience over a name-resolution fan-out, and
+    one bad id should not blank a whole grid page."""
+    if raw is None:
+        return None
+    out = []
+    for chunk in str(raw).split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        try:
+            out.append(pk_type(chunk))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def _make_list_endpoint(cfg: "CrudConfig", crud: CRUDBase, plural: str):
     """Build a list handler whose signature declares one typed, OpenAPI-visible
     ``Query`` param per filter field (+ ``{f}_from``/``{f}_to`` per range field),
@@ -74,9 +103,14 @@ def _make_list_endpoint(cfg: "CrudConfig", crud: CRUDBase, plural: str):
     columns = sa_inspect(cfg.model).columns
     eq_fields = [f for f in cfg.filter_fields if f in columns]
     rng_fields = [f for f in cfg.range_fields if f in columns]
+    extra_fields = [f for f, _ in cfg.extra_filters]
 
     def list_items(db, tenant_id, page, **kwargs):  # noqa: ANN001
         filters = {f: kwargs.get(f) for f in eq_fields}
+        # Non-column filters ride in the same dict; CRUDBase's equality pass skips
+        # anything the model has no attribute for, so only the crud_class sees them.
+        filters.update({f: kwargs.get(f) for f in extra_fields})
+        id_in = _parse_ids(kwargs.get("ids"), cfg.pk_type) if cfg.id_in_param else None
         range_filters: dict[str, dict[str, Any]] = {}
         for f in rng_fields:
             lo, hi = kwargs.get(f"{f}_from"), kwargs.get(f"{f}_to")
@@ -96,6 +130,7 @@ def _make_list_endpoint(cfg: "CrudConfig", crud: CRUDBase, plural: str):
             search=page.search,
             filters=filters,
             range_filters=range_filters,
+            id_in=id_in,
         )
         if cfg.read_enrich is not None and items:
             cfg.read_enrich(db, items, tenant_id)
@@ -114,6 +149,27 @@ def _make_list_endpoint(cfg: "CrudConfig", crud: CRUDBase, plural: str):
                 inspect.Parameter.KEYWORD_ONLY,
                 default=Query(None, description=f"Filter by {f}"),
                 annotation=Optional[pytype],
+            )
+        )
+    for f, pytype in cfg.extra_filters:
+        params.append(
+            inspect.Parameter(
+                f,
+                inspect.Parameter.KEYWORD_ONLY,
+                default=Query(None, description=f"Filter by {f}"),
+                annotation=Optional[pytype],
+            )
+        )
+    if cfg.id_in_param:
+        params.append(
+            inspect.Parameter(
+                "ids",
+                inspect.Parameter.KEYWORD_ONLY,
+                default=Query(
+                    None,
+                    description="Comma-separated list of ids to return (batch lookup)",
+                ),
+                annotation=Optional[str],
             )
         )
     for f in rng_fields:

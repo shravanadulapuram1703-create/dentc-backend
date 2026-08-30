@@ -18,6 +18,7 @@ from app.api.v1 import (
     insurance,
     ledger,
     letters,
+    medical_history,
     messaging,
     messaging_ws,
     office_assignment,
@@ -103,9 +104,14 @@ api_router.include_router(procedure_codes.router)
 api_router.include_router(procedure_codes.category_router)
 # ICD codes bulk-status. Before generic CRUD so /icd-codes/bulk-status wins.
 api_router.include_router(icd_codes.router)
-# Insurance supplements (eligibility verify). Before generic CRUD so
-# /insurance-subscribers/{id}/verify-eligibility wins over /{item_id}.
+# Insurance supplements (eligibility verify INS-PT-5, the group-number and
+# carrier/employer name availability probes INS-PT-20/13). Before generic CRUD so
+# /insurance-subscribers/{id}/verify-eligibility, /insurance-plans/group-availability
+# and /{insurance-carriers,employers}/name-availability win over /{item_id}.
 api_router.include_router(insurance.router)
+api_router.include_router(insurance.plans_router)
+api_router.include_router(insurance.carriers_router)
+api_router.include_router(insurance.employers_router)
 # Pick List supplements (atomic items replace + cascade delete). Before generic
 # CRUD so /questionnaire-headers/{id}/options & /{id}/cascade win over /{item_id}.
 api_router.include_router(pick_lists.router)
@@ -126,6 +132,14 @@ api_router.include_router(letters.consent_forms_router)
 # + /patients/{id}/account-plans (LEG-5), and /responsible-parties/{id}/patients roster (LEG-14).
 # Before generic CRUD so these literal sub-paths win over /{item_id}.
 api_router.include_router(patient_intake.router)
+# Patient Medical History: the composite document (MH-2/3), server-side copy
+# (MH-4), the signed-version + signature surface (MH-6/7), the change log (MH-8)
+# and the printed form (MH-15). Before generic CRUD so
+# /patients/{id}/medical-history* and /patient-signatures/{id}/void win over the
+# generic /{item_id} routes.
+api_router.include_router(medical_history.router)
+api_router.include_router(medical_history.signature_router)
+api_router.include_router(medical_history.metadata_router)
 # Add/Edit Patient checkbox-integrity rules (/metadata/patient-flag-rules).
 api_router.include_router(patient_intake.metadata_router)
 api_router.include_router(patient_intake.rp_router)

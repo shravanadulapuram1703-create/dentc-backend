@@ -2,15 +2,27 @@
 
 patients · patient_insurance · patient_alerts · account_notes ·
 patient_signatures · medical_history_records · referrals · patient_notes ·
-patient_recalls · caries_risk_assessments
+patient_recalls · caries_risk_assessments · patient_medical_history ·
+patient_medical_history_events
 """
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
@@ -133,6 +145,14 @@ class PatientAlert(Base, IntPKMixin, CreatedAtMixin):
     legacy_id: Mapped[str | None] = mapped_column(String(20))
     alert: Mapped[str] = mapped_column(Text)
     blocks_charges: Mapped[bool] = mapped_column(Boolean, default=False)
+    # MH-14: a banner alert can be raised by the patient answering "yes" to a
+    # catalog item flagged ``is_flash_alert``/``blocks_charges`` in Setup. The
+    # link is kept so the propagation is reconcilable — un-answering the medical
+    # alert deactivates exactly the row it created, never a hand-typed one.
+    is_flash_alert: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_medical_alert_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("patient_medical_alerts.id"), index=True
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     deactivated_on: Mapped[date | None] = mapped_column(Date)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
@@ -149,7 +169,22 @@ class AccountNote(Base, IntPKMixin, CreatedAtMixin):
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
-class PatientSignature(Base, IntPKMixin, CreatedAtMixin):
+class PatientSignature(Base, IntPKMixin, TimestampMixin):
+    """A captured signature.
+
+    MH-6: a signature used to say only *that* someone signed, never *what* they
+    signed - staff could change any medical-history answer afterwards and nothing
+    recorded that the signature predated the change. ``content_hash`` freezes the
+    signed content (the same hash is stamped on the ``medical_history_records``
+    version row, which owns the frozen answers as ``medical_history_details``),
+    and ``signature_type`` separates a medical-history signature from a consent
+    or financial-policy one - they were indistinguishable rows on one patient.
+
+    MH-7: signatures were append-only with no way to represent a cleared one.
+    ``is_active`` + ``superseded_by_id`` follow the soft-delete pattern used
+    elsewhere, so "newest row wins" stops being a client-side guess.
+    """
+
     __tablename__ = "patient_signatures"
 
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
@@ -158,17 +193,60 @@ class PatientSignature(Base, IntPKMixin, CreatedAtMixin):
     signature_len: Mapped[int | None]
     device_source: Mapped[str | None] = mapped_column(String(20))
     is_user_sig: Mapped[bool] = mapped_column(Boolean, default=False)
+    # MH-6: what kind of record this attests to (medical_history|consent|financial|...).
+    signature_type: Mapped[str | None] = mapped_column(String(30), index=True)
+    # MH-6: when the pad was signed, and who is *attesting* - distinct from
+    # ``created_by``, which is whoever operated the pad.
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    signed_by_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # MH-6: SHA-256 over the canonicalised answers as they stood at signing.
+    content_hash: Mapped[str | None] = mapped_column(String(64))
+    # MH-7: supersede / void instead of piling up rows.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    superseded_by_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("patient_signatures.id")
+    )
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime)
+    voided_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
-class MedicalHistoryRecord(Base, IntPKMixin, CreatedAtMixin):
+class MedicalHistoryRecord(Base, IntPKMixin, TimestampMixin):
+    """MH-6/MH-16: one *completion* of a patient's medical history - the version
+    a signature attests to, not the live answers.
+
+    The header already existed (Denticon ``PatMedicalHistoryH``) and already
+    pointed at a signature; what it lacked was any record of the content. The
+    frozen answers live in ``medical_history_details`` (the pre-existing detail
+    table, one row per question) and ``content_hash`` is the fingerprint shared
+    with ``patient_signatures.content_hash``.
+    """
+
     __tablename__ = "medical_history_records"
 
+    # Added so the version rows are tenant-scoped like every other root table;
+    # backfilled from ``patients`` for migrated rows.
+    tenant_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20))
     signature_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patient_signatures.id"))
+    # Which part of the document this version covers: all|alerts|dental|medical.
+    scope: Mapped[str | None] = mapped_column(String(20))
+    content_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    item_count: Mapped[int | None] = mapped_column(Integer)
+    # MH-13: the Additional Comments box as it stood in this version.
+    comments: Mapped[str | None] = mapped_column(Text)
+    # MH-16: "the patient reviewed and confirmed this on ..." - a real completion,
+    # not a row's ``updated_at``.
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    completed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # MH-4: provenance when this version was produced by Copy Medical History.
+    source_patient_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patients.id"))
+    copied_at: Mapped[datetime | None] = mapped_column(DateTime)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class Referral(Base, IntPKMixin, CreatedAtMixin):
@@ -256,6 +334,10 @@ class MedicalHistoryDetail(Base, IntPKMixin, CreatedAtMixin):
     answer_code: Mapped[str | None] = mapped_column(String(20))
     answer_text: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
+    # MH-6: which tab the frozen answer came from (alert|dental|medical). Without
+    # it a snapshot cannot be replayed back onto the three screens it came from.
+    answer_type: Mapped[str | None] = mapped_column(String(20), index=True)
+    section: Mapped[str | None] = mapped_column(String(100))
 
 
 class CariesRiskAssessment(Base, IntPKMixin, TimestampMixin):
@@ -317,10 +399,18 @@ class PatientMedicalAlert(Base, IntPKMixin, TimestampMixin):
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
     alert_code: Mapped[str] = mapped_column(String(50))  # code from definitions 'MEDALERT'
     alert_label: Mapped[str | None] = mapped_column(String(255))
-    response: Mapped[str | None] = mapped_column(String(10))  # yes|no
+    # MH-5: yes|no|unknown. A *missing row* is "Not Answered"; ``unknown`` is the
+    # explicit third answer ("patient does not know"). The two are different
+    # clinical facts, so absence is never rewritten to ``unknown``.
+    response: Mapped[str | None] = mapped_column(String(10))
     comments: Mapped[str | None] = mapped_column(Text)
+    # MH-16: when this answer was last actually answered by/for the patient -
+    # distinct from ``updated_at``, which also moves on an incidental edit.
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # MH-8: legacy prints "Modified By" on this screen; CRUDBase.update stamps it.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class PatientQuestionnaireResponse(Base, IntPKMixin, TimestampMixin):
@@ -335,8 +425,12 @@ class PatientQuestionnaireResponse(Base, IntPKMixin, TimestampMixin):
     question_code: Mapped[str] = mapped_column(String(50))
     question_text: Mapped[str | None] = mapped_column(Text)
     answer: Mapped[str | None] = mapped_column(Text)
+    # MH-16: see PatientMedicalAlert.answered_at.
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # MH-8: "Modified By" on the questionnaire tabs.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class PatientOpeningBalance(Base, IntPKMixin, TimestampMixin):
@@ -418,3 +512,74 @@ class ResponsibleParty(Base, IntPKMixin, TimestampMixin):
     responsible_party_notes: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class PatientMedicalHistory(Base, IntPKMixin, TimestampMixin):
+    """MH-13/MH-16: the per-patient medical-history *header* - the one row the
+    three answer tables hang off.
+
+    Two things had nowhere to live before it. The Medical Alerts tab's
+    100-character Additional Comments box was being written as an alert row with
+    the reserved code ``ADDITIONAL_COMMENTS`` (a convention shared by two modules
+    with nothing enforcing it, polluting the alert list for every other
+    consumer); and "the patient reviewed and confirmed this on DD/MM/YYYY" had no
+    field at all - a row's ``updated_at`` is not the same fact, because editing
+    one answer does not mean the whole form was reviewed.
+    """
+
+    __tablename__ = "patient_medical_history"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    patient_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("patients.id"), unique=True, index=True
+    )
+    # MH-13: first-class Additional Comments.
+    comments: Mapped[str | None] = mapped_column(Text)
+    # MH-16: per-questionnaire completion, one pair per tab.
+    alerts_completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    alerts_completed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    dental_completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    dental_completed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    medical_completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    medical_completed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # MH-6: the signature currently standing over this document.
+    last_signature_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("patient_signatures.id")
+    )
+    last_version_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("medical_history_records.id")
+    )
+    # MH-4: Copy Medical History provenance on the target chart.
+    copied_from_patient_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patients.id"))
+    copied_at: Mapped[datetime | None] = mapped_column(DateTime)
+    copied_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class PatientMedicalHistoryEvent(Base, IntPKMixin, CreatedAtMixin):
+    """MH-8: the append-only change log over medical-history answers.
+
+    ``audit_logs`` records one row per authenticated mutation, which for the
+    composite ``PUT`` is a single entry for a whole document - it cannot answer
+    "who changed *this answer* and when", which is the question a medical record
+    has to be able to answer. This table is field-level and written by the
+    service on every path that touches an answer, including the composite write
+    and the copy.
+    """
+
+    __tablename__ = "patient_medical_history_events"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    # alert | dental | medical | comments | signature | copy
+    entity_type: Mapped[str] = mapped_column(String(20), index=True)
+    entity_id: Mapped[int | None] = mapped_column(Integer)
+    code: Mapped[str | None] = mapped_column(String(50))
+    label: Mapped[str | None] = mapped_column(Text)
+    # create | update | delete | sign | void | copy | complete
+    action: Mapped[str] = mapped_column(String(20))
+    old_value: Mapped[str | None] = mapped_column(Text)
+    new_value: Mapped[str | None] = mapped_column(Text)
+    source_patient_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patients.id"))
+    changed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))

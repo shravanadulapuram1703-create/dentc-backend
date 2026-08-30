@@ -207,13 +207,25 @@ GET /api/v1/patient-documents/limits
 
 The three prefixes are defaults — you only set them to override the layout.
 
-**The service account needs access to the bucket — this is currently the only
-thing blocking it.** `GCS_CREDENTIALS_PATH` points at
-`dicom_migration/sa-dicom-ingest.json`, i.e.
-`sa-dicom-ingest@reckon-dental.iam.gserviceaccount.com`, which has rights on the
-DICOM buckets but **none on `reco-documents`**. Probed against the live bucket:
-routing is correct, upload returns
+### Credentials are shared with imaging — by design
+
+There is one GCS client ([`object_storage._get_client`](../app/integrations/object_storage.py)),
+built from the single `GCS_CREDENTIALS_PATH`, used by both the imaging layer and
+patient documents. There is no separate document credential to configure. The two
+subsystems keep their own **buckets**, **signed-URL TTLs** and **url-modes**, but
+authenticate as the same service account.
+
+**That account needs a binding on the documents bucket — currently the only thing
+blocking this.** `GCS_CREDENTIALS_PATH` is
+`dicom_migration/sa-dicom-ingest.json` =
+`sa-dicom-ingest@reckon-dental.iam.gserviceaccount.com`, which has object access
+on the DICOM buckets and **none on `reco-documents`**. Probed against the live
+bucket: routing correct, `list` 403, upload
 `403 … does not have storage.objects.create access`.
+
+`gs://reco-documents` **does exist** (US, uniform bucket-level access enabled) —
+so it is an IAM binding that is missing, not the bucket. UBLA means object ACLs
+are ignored; an IAM binding is the only thing that will work.
 
 ```bash
 gcloud storage buckets add-iam-policy-binding gs://reco-documents --member=serviceAccount:sa-dicom-ingest@reckon-dental.iam.gserviceaccount.com --role=roles/storage.objectAdmin

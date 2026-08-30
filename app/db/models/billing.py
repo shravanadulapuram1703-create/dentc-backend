@@ -55,6 +55,11 @@ class PatientPayment(Base, CreatedAtMixin):
     # (INS-1) records it for a carrier remittance; a patient-side payment entered
     # from an EOB had nowhere to put it.
     eob_number: Mapped[str | None] = mapped_column(String(50))
+    # INS-PAY-6: "Insurance Check to Previous Balance" posts an *unallocated*
+    # carrier cheque here, so the electronic-deposit trace has to live on the
+    # payment too — otherwise an EFT landing on the account cannot be reconciled
+    # against the carrier's remittance advice at all.
+    eft_trace_number: Mapped[str | None] = mapped_column(String(100))
 
 
 class InsuranceClaim(Base, CreatedAtMixin):
@@ -72,6 +77,15 @@ class InsuranceClaim(Base, CreatedAtMixin):
     date_of_service_to: Mapped[date | None]
     total_billed: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total_paid: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    # INS-PAY-2: carrier money that predates this system's own coverage rows.
+    # ``total_paid`` is derived (opening_paid + the live ledger_insurance_details
+    # rows) so a reversed or deleted remittance stops leaving the claim claiming
+    # money nothing backs — but 79,038 migrated claims carry a paid total that
+    # came from the Denticon export with **no** coverage row behind it, and
+    # deriving from rows alone would zero every one. Same shape as
+    # patient_opening_balances: A/R that predates the system, added to what the
+    # app posts rather than pretended away.
+    opening_paid: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     est_insurance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     submitted_date: Mapped[date | None]
     paid_date: Mapped[date | None]
@@ -82,6 +96,16 @@ class InsuranceClaim(Base, CreatedAtMixin):
     ins_plan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_plans.id"))
     is_preauth: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text)
+    # ── INS-PAY-4: the Insurance Payment window's claim-level "Enter Adjustment"
+    # The money stays per-procedure (``ledger_insurance_details.*_ins_adjust`` is
+    # what the ledger reconciles against), but the *intent* — "a 10% claim
+    # write-off" — was lost the moment it was distributed across the lines.
+    # ``write_off_mode``/``write_off_value`` record what the user actually
+    # entered; ``write_off_amount`` is the distributed total, so a claim-level
+    # report does not have to re-sum the lines to answer "what was written off".
+    write_off_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    write_off_mode: Mapped[str | None] = mapped_column(String(10))  # amount | percent
+    write_off_value: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
@@ -114,14 +138,24 @@ class LedgerInsuranceDetail(Base, IntPKMixin, CreatedAtMixin):
     prim_ins_paid: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     prim_ins_adjust: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     sec_estimated: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # INS-PAY-5: the secondary/tertiary tiers were only half modelled — a
+    # secondary remittance could not carry a deductible and a tertiary one could
+    # not be posted at all. These complete the per-tier matrix (estimated /
+    # deductible / ins_paid / ins_adjust / plan_id / posted), so all three tiers
+    # post through the identical path instead of the primary being special.
+    sec_deductible: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     sec_ins_paid: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     sec_ins_adjust: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    ter_estimated: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    ter_deductible: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     ter_ins_paid: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    ter_ins_adjust: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     prim_ins_plan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_plans.id"))
     sec_ins_plan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_plans.id"))
     ter_ins_plan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_plans.id"))
     prim_posted: Mapped[bool] = mapped_column(Boolean, default=False)
     sec_posted: Mapped[bool] = mapped_column(Boolean, default=False)
+    ter_posted: Mapped[bool] = mapped_column(Boolean, default=False)
     # ── INS-1: carrier-remittance identifiers on a posted insurance payment ────
     # The reconciliation identifiers the EOB carries; without them a posted
     # insurance payment can't be matched back to the carrier's remittance.
@@ -131,6 +165,20 @@ class LedgerInsuranceDetail(Base, IntPKMixin, CreatedAtMixin):
     bank_number: Mapped[str | None] = mapped_column(String(100))
     eob_number: Mapped[str | None] = mapped_column(String(100))
     eft_trace_number: Mapped[str | None] = mapped_column(String(100))
+    # INS-PAY-1: the remittance note the legacy window collects. It was being
+    # appended to the *claim's* notes with a synthetic prefix, which put one
+    # line's note on the whole claim and made it unparseable.
+    notes: Mapped[str | None] = mapped_column(Text)
+    # ── INS-PAY-2: a posted remittance is voided, never deleted ───────────────
+    # DELETE used to remove the row outright while ``insurance_claims.total_paid``
+    # kept the money, so a mis-keyed remittance permanently overstated what the
+    # carrier had paid. The row now survives its own reversal (mirroring
+    # ``patient_payments.is_void``) and ``recalculate_claim`` recomputes the
+    # claim from the rows that are still live.
+    is_void: Mapped[bool] = mapped_column(Boolean, default=False)
+    void_reason: Mapped[str | None] = mapped_column(Text)
+    voided_at: Mapped[datetime | None]
+    voided_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 

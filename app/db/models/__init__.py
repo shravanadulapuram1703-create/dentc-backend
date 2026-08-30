@@ -167,6 +167,8 @@ from app.db.models.patients import (
     PatientAlert,
     PatientInsurance,
     PatientMedicalAlert,
+    PatientMedicalHistory,
+    PatientMedicalHistoryEvent,
     PatientNote,
     PatientOpeningBalance,
     PatientQuestionnaireResponse,
@@ -237,6 +239,7 @@ __all__ = [
     "PatientSignature", "MedicalHistoryRecord", "MedicalHistoryDetail",
     "Referral", "PatientNote", "PatientRecall", "CariesRiskAssessment",
     "PatientMedicalAlert", "PatientQuestionnaireResponse", "PatientOpeningBalance",
+    "PatientMedicalHistory", "PatientMedicalHistoryEvent",
     "ResponsibleParty",
     # scheduling
     "Appointment", "AppointmentProcedure",

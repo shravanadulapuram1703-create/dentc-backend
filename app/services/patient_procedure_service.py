@@ -1,4 +1,4 @@
-"""Charge-row rules that must hold whoever is writing (AL-17).
+"""Charge-row rules that must hold whoever is writing (AL-17, FEE-3).
 
 **Hold Claim.** ``patient_procedures.hold_claim`` is the legacy per-procedure hold:
 the charge is deliberately kept back from insurance. The ledger renders a red **H**
@@ -21,6 +21,16 @@ Deliberately narrow:
   claiming is a normal thing to do; doing it by accident is not.
 * Nothing rewrites history: the 297,624 migrated charges that gained a ``claim_id``
   from the source export are untouched, hold or no hold.
+
+**Server-side pricing (FEE-3).** Fee resolution used to exist only in the
+frontend, so nothing stopped a charge being posted with an arbitrary amount —
+and a client that fell back to ``procedure_codes.default_fee`` posted ``0.00``,
+which is ``default_fee`` on every migrated code. A create that omits ``fee``
+is now priced through :func:`pricing_service.resolve_procedure_fee`, the same
+resolver behind ``GET /patients/{id}/fee`` and the estimate engine. An
+explicitly supplied fee always wins: the office is allowed to charge what it
+decides to charge, and refusing the write would break every legitimate
+off-schedule adjustment.
 """
 
 from __future__ import annotations
@@ -32,6 +42,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationError
 from app.crud.base import CRUDBase
 from app.db.models import PatientProcedure
+from app.services import pricing_service
 
 
 def _truthy(value: Any) -> bool:  # noqa: ANN401
@@ -58,7 +69,31 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
 
     def create(self, db: Session, data: dict, *, tenant_id=None, created_by=None):  # noqa: ANN001, ANN201
         _reject_held_claim(_truthy(data.get("hold_claim")), data.get("claim_id"))
-        return super().create(db, data, tenant_id=tenant_id, created_by=created_by)
+        payload = self._price(db, dict(data), tenant_id)
+        return super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
+
+    @staticmethod
+    def _price(db: Session, data: dict, tenant_id: int | None) -> dict:
+        """Fill ``fee`` (and the fee provenance) when the caller omitted it."""
+        if data.get("fee") is not None or tenant_id is None:
+            return data
+        code = data.get("procedure_code")
+        if not code:
+            return data
+        quote = pricing_service.resolve_procedure_fee(
+            db, tenant_id, code,
+            patient_id=data.get("patient_id"),
+            office_id=data.get("office_id"),
+            provider_id=data.get("provider_id"),
+        )
+        data["fee"] = quote["fee"]
+        # Provenance only where the caller left it blank — never overwrite an
+        # explicit value.
+        if data.get("fee_schedule_id") is None and quote["fee_schedule_id"]:
+            data["fee_schedule_id"] = quote["fee_schedule_id"]
+        if data.get("ucr_fee") is None and quote["ucr_fee"] is not None:
+            data["ucr_fee"] = quote["ucr_fee"]
+        return data
 
     def update(self, db: Session, obj_id, data: dict, *, tenant_id=None, updated_by=None):  # noqa: ANN001, ANN201
         if data.get("claim_id"):
