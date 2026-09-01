@@ -159,7 +159,7 @@ def upgrade() -> None:
         "patient_alerts", ["source_medical_alert_id"],
     )
     op.create_foreign_key(
-        "fk_patient_alerts_source_medical_alert_id_patient_medical_alerts",
+        "fk_patient_alerts_source_medical_alert_id",
         "patient_alerts", "patient_medical_alerts", ["source_medical_alert_id"], ["id"],
     )
 
@@ -237,7 +237,7 @@ def downgrade() -> None:
     op.drop_table("patient_medical_history")
 
     op.drop_constraint(
-        "fk_patient_alerts_source_medical_alert_id_patient_medical_alerts",
+        "fk_patient_alerts_source_medical_alert_id",
         "patient_alerts", type_="foreignkey",
     )
     op.drop_index("ix_patient_alerts_source_medical_alert_id", table_name="patient_alerts")
