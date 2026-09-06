@@ -3828,7 +3828,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
+                    "$ref": "#/components/schemas/PaymentAllocationRead"
                   },
                   "title": "Response Allocate Payment"
                 }
@@ -3925,7 +3925,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
+                    "$ref": "#/components/schemas/PaymentAllocationRead"
                   },
                   "title": "Response Allocate Adjustment"
                 }
@@ -4012,7 +4012,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
+                    "$ref": "#/components/schemas/PaymentAllocationRead"
                   },
                   "title": "Response List Adjustment Allocations"
                 }
@@ -20161,6 +20161,365 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/insurance-plans/metadata": {
+      "get": {
+        "tags": [
+          "Insurance"
+        ],
+        "summary": "Catalogues behind the INSURANCE DETAILS wizard (PLAN-DTL-1/4)",
+        "description": "Frequency-limitation ordinals (what ``freq_limit`` stores), the default\nCOVERAGE & LIMITATIONS table a new plan starts with, the FREQ-tab code\ngroups and the PLAN-tab field vocabularies \u2014 from the tenant's\n``definitions`` where it has them, else the built-in legacy lists\n(``catalog_sources`` says which).",
+        "operationId": "get_insurance_plan_metadata",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsurancePlanMetadata"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/insurance-plans/{plan_id}/coverage-rules": {
+      "get": {
+        "tags": [
+          "Insurance"
+        ],
+        "summary": "A plan's coverage rules + frequency code groups in one call",
+        "operationId": "get_insurance_plan_coverage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCoverageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Insurance"
+        ],
+        "summary": "Replace a plan's coverage rules and/or frequency code groups atomically (PLAN-DTL-8)",
+        "description": "One transaction for what used to be ~30 sequential POSTs.\n\nA section that is ``null`` is untouched. For a section that is sent: an\nitem carrying the ``id`` of a row on this plan is updated in place (id and\n``legacy_id`` survive), an item without one is inserted, and existing rows\nnot mentioned are deleted. Any failure rolls the whole call back \u2014 no\npartial table.",
+        "operationId": "replace_insurance_plan_coverage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanCoverageReplaceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCoverageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/insurance-plans/{plan_id}/copy-from/{source_plan_id}": {
+      "post": {
+        "tags": [
+          "Insurance"
+        ],
+        "summary": "COPY FROM EXISTING \u2014 copy another plan's coverage table (and optionally its plan fields)",
+        "operationId": "copy_insurance_plan_from",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "source_plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Plan Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PlanCopyRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCoverageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         }
       }
@@ -44324,6 +44683,42 @@
             "description": "Filter by ins_plan_id"
           },
           {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by category",
+              "title": "Category"
+            },
+            "description": "Filter by category"
+          },
+          {
+            "name": "start_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by start_code",
+              "title": "Start Code"
+            },
+            "description": "Filter by start_code"
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -44778,6 +45173,593 @@
               "title": "Item Id"
             },
             "description": "insurance_coverage_rule identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/insurance-plan-frequency-groups": {
+      "get": {
+        "tags": [
+          "Insurance"
+        ],
+        "summary": "List insurance plan frequency groups",
+        "operationId": "list_insurance_plan_frequency_groups",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ins_plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by ins_plan_id",
+              "title": "Ins Plan Id"
+            },
+            "description": "Filter by ins_plan_id"
+          },
+          {
+            "name": "code_group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by code_group",
+              "title": "Code Group"
+            },
+            "description": "Filter by code_group"
+          },
+          {
+            "name": "whole_mouth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by whole_mouth",
+              "title": "Whole Mouth"
+            },
+            "description": "Filter by whole_mouth"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Column to sort by",
+              "title": "Sort"
+            },
+            "description": "Column to sort by"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Free-text search",
+              "title": "Search"
+            },
+            "description": "Free-text search"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_InsurancePlanFrequencyGroupRead_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Insurance"
+        ],
+        "summary": "Create insurance plan frequency group",
+        "operationId": "create_insurance_plan_frequency_group",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsurancePlanFrequencyGroupCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsurancePlanFrequencyGroupRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/insurance-plan-frequency-groups/{item_id}": {
+      "get": {
+        "tags": [
+          "Insurance"
+        ],
+        "summary": "Get insurance plan frequency group by id",
+        "operationId": "get_insurance_plan_frequency_group",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "insurance_plan_frequency_group identifier",
+              "title": "Item Id"
+            },
+            "description": "insurance_plan_frequency_group identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsurancePlanFrequencyGroupRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Insurance"
+        ],
+        "summary": "Update insurance plan frequency group",
+        "operationId": "update_insurance_plan_frequency_group",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "insurance_plan_frequency_group identifier",
+              "title": "Item Id"
+            },
+            "description": "insurance_plan_frequency_group identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsurancePlanFrequencyGroupUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsurancePlanFrequencyGroupRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Insurance"
+        ],
+        "summary": "Delete insurance plan frequency group",
+        "operationId": "delete_insurance_plan_frequency_group",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "insurance_plan_frequency_group identifier",
+              "title": "Item Id"
+            },
+            "description": "insurance_plan_frequency_group identifier"
           },
           {
             "name": "X-Tenant-ID",
@@ -64387,7 +65369,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentAllocationRead"
+                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
                 }
               }
             }
@@ -64482,7 +65464,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentAllocationRead"
+                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
                 }
               }
             }
@@ -64585,7 +65567,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentAllocationRead"
+                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
                 }
               }
             }
@@ -101603,6 +102585,35 @@
         "type": "object",
         "title": "CodeBundleUpdate"
       },
+      "CodeGroup": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "definition_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "CodeGroup"
+      },
       "CodesViewCreate": {
         "properties": {
           "office_id": {
@@ -102671,7 +103682,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__messaging__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -102915,6 +103926,155 @@
         ],
         "title": "CoverageCategoryRead"
       },
+      "CoverageRuleItem": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "start_code": {
+            "type": "string",
+            "title": "Start Code"
+          },
+          "end_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Code"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "coverage_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Pct"
+          },
+          "ded_waived": {
+            "type": "boolean",
+            "title": "Ded Waived",
+            "default": false
+          },
+          "freq_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freq Limit",
+            "description": "Frequency ordinal; 0/null = No Limitation"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
+          },
+          "age_max": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "wait_months": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Months"
+          },
+          "age_limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Limit"
+          },
+          "wait_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Period"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_code"
+        ],
+        "title": "CoverageRuleItem",
+        "description": "One row of ``PUT /insurance-plans/{id}/coverage-rules``. ``id`` keeps an\nexisting row (updated in place); omit it to insert. ``end_code`` defaults\nto ``start_code``. Typed limits win over the legacy string mirrors."
+      },
       "CoverageSlotRef": {
         "properties": {
           "legacy_plan_type": {
@@ -102980,6 +104140,87 @@
         },
         "type": "object",
         "title": "DeclineInput"
+      },
+      "DefaultCoverageRule": {
+        "properties": {
+          "start_code": {
+            "type": "string",
+            "title": "Start Code"
+          },
+          "end_code": {
+            "type": "string",
+            "title": "End Code"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "coverage_pct": {
+            "type": "integer",
+            "title": "Coverage Pct"
+          },
+          "ded_waived": {
+            "type": "boolean",
+            "title": "Ded Waived"
+          },
+          "freq_limit": {
+            "type": "integer",
+            "title": "Freq Limit"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
+          },
+          "age_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "wait_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Months"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_code",
+          "end_code",
+          "category",
+          "description",
+          "coverage_pct",
+          "ded_waived",
+          "freq_limit",
+          "source"
+        ],
+        "title": "DefaultCoverageRule"
       },
       "DefinitionCreate": {
         "properties": {
@@ -106504,6 +107745,132 @@
           "participant_ids"
         ],
         "title": "ForwardRequest"
+      },
+      "FrequencyGroupItem": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "code_group": {
+            "type": "string",
+            "title": "Code Group"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "freq_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freq Limit"
+          },
+          "whole_mouth": {
+            "type": "boolean",
+            "title": "Whole Mouth",
+            "default": false
+          },
+          "per_day_quantity": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Day Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code_group"
+        ],
+        "title": "FrequencyGroupItem"
+      },
+      "FrequencyLimitation": {
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "Code"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "key1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key1"
+          },
+          "key2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key2"
+          },
+          "definition_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Id"
+          },
+          "legacy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "FrequencyLimitation"
       },
       "GenerateScheduleRequest": {
         "properties": {
@@ -110299,13 +111666,46 @@
           "freq_limit": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Freq Limit"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
+          },
+          "age_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "wait_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Months"
           },
           "age_limit": {
             "anyOf": [
@@ -110404,13 +111804,46 @@
           "freq_limit": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Freq Limit"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
+          },
+          "age_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "wait_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Months"
           },
           "age_limit": {
             "anyOf": [
@@ -110434,6 +111867,28 @@
             ],
             "title": "Wait Period"
           },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -110442,6 +111897,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -110541,13 +112008,46 @@
           "freq_limit": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Freq Limit"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
+          },
+          "age_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "wait_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Months"
           },
           "age_limit": {
             "anyOf": [
@@ -111915,6 +113415,28 @@
             ],
             "title": "Anniversary Date"
           },
+          "anniversary_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anniversary Month"
+          },
+          "anniversary_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anniversary Day"
+          },
           "anniversary_expiry_date": {
             "anyOf": [
               {
@@ -111937,6 +113459,109 @@
               }
             ],
             "title": "Coverage Type"
+          },
+          "fees_to_print": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees To Print"
+          },
+          "claim_option": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Option"
+          },
+          "form_to_print": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form To Print"
+          },
+          "reporting_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporting Subtype"
+          },
+          "network_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network Type"
+          },
+          "noa_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noa Only"
+          },
+          "per_visit_copay": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Visit Copay"
+          },
+          "lifetime_ortho_benefits": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifetime Ortho Benefits"
+          },
+          "plan_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Notes"
           },
           "created_on": {
             "anyOf": [
@@ -111996,6 +113621,305 @@
         ],
         "title": "InsurancePlanCreate",
         "description": "INS-PT-19: an active plan on the same carrier + group number is a 409.\n\n``allow_duplicate_group`` is the API half of the dialog's \"override\" button \u2014\ntwo offices can legitimately hold separate plans on one group, so the server\nrefuses the *accidental* duplicate rather than the duplicate."
+      },
+      "InsurancePlanFrequencyGroupCreate": {
+        "properties": {
+          "ins_plan_id": {
+            "type": "integer",
+            "title": "Ins Plan Id"
+          },
+          "code_group": {
+            "type": "string",
+            "title": "Code Group"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "freq_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freq Limit"
+          },
+          "whole_mouth": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whole Mouth"
+          },
+          "per_day_quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Day Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ins_plan_id",
+          "code_group"
+        ],
+        "title": "InsurancePlanFrequencyGroupCreate"
+      },
+      "InsurancePlanFrequencyGroupRead": {
+        "properties": {
+          "tenant_id": {
+            "type": "integer",
+            "title": "Tenant Id"
+          },
+          "ins_plan_id": {
+            "type": "integer",
+            "title": "Ins Plan Id"
+          },
+          "code_group": {
+            "type": "string",
+            "title": "Code Group"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "freq_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freq Limit"
+          },
+          "whole_mouth": {
+            "type": "boolean",
+            "title": "Whole Mouth"
+          },
+          "per_day_quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Day Quantity"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "ins_plan_id",
+          "code_group",
+          "whole_mouth",
+          "id",
+          "created_at"
+        ],
+        "title": "InsurancePlanFrequencyGroupRead"
+      },
+      "InsurancePlanFrequencyGroupUpdate": {
+        "properties": {
+          "ins_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ins Plan Id"
+          },
+          "code_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Group"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "freq_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freq Limit"
+          },
+          "whole_mouth": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whole Mouth"
+          },
+          "per_day_quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Day Quantity"
+          }
+        },
+        "type": "object",
+        "title": "InsurancePlanFrequencyGroupUpdate"
+      },
+      "InsurancePlanMetadata": {
+        "properties": {
+          "frequency_limitations": {
+            "items": {
+              "$ref": "#/components/schemas/FrequencyLimitation"
+            },
+            "type": "array",
+            "title": "Frequency Limitations"
+          },
+          "default_coverage_rules": {
+            "items": {
+              "$ref": "#/components/schemas/DefaultCoverageRule"
+            },
+            "type": "array",
+            "title": "Default Coverage Rules"
+          },
+          "code_groups": {
+            "items": {
+              "$ref": "#/components/schemas/CodeGroup"
+            },
+            "type": "array",
+            "title": "Code Groups"
+          },
+          "plan_field_options": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/PlanFieldOption"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Plan Field Options"
+          },
+          "catalog_sources": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Catalog Sources"
+          },
+          "conventions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Conventions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frequency_limitations",
+          "default_coverage_rules",
+          "code_groups",
+          "plan_field_options",
+          "catalog_sources",
+          "conventions"
+        ],
+        "title": "InsurancePlanMetadata"
       },
       "InsurancePlanRead": {
         "properties": {
@@ -112127,6 +114051,28 @@
             ],
             "title": "Anniversary Date"
           },
+          "anniversary_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anniversary Month"
+          },
+          "anniversary_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anniversary Day"
+          },
           "anniversary_expiry_date": {
             "anyOf": [
               {
@@ -112149,6 +114095,92 @@
               }
             ],
             "title": "Coverage Type"
+          },
+          "fees_to_print": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees To Print"
+          },
+          "claim_option": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Option"
+          },
+          "form_to_print": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form To Print"
+          },
+          "reporting_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporting Subtype"
+          },
+          "network_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network Type"
+          },
+          "noa_only": {
+            "type": "boolean",
+            "title": "Noa Only"
+          },
+          "per_visit_copay": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Visit Copay"
+          },
+          "lifetime_ortho_benefits": {
+            "type": "boolean",
+            "title": "Lifetime Ortho Benefits"
+          },
+          "plan_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Notes"
           },
           "created_on": {
             "anyOf": [
@@ -112304,6 +114336,8 @@
           "tenant_id",
           "carrier_id",
           "is_prepaid",
+          "noa_only",
+          "lifetime_ortho_benefits",
           "is_active",
           "id",
           "created_at"
@@ -112454,6 +114488,28 @@
             ],
             "title": "Anniversary Date"
           },
+          "anniversary_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anniversary Month"
+          },
+          "anniversary_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anniversary Day"
+          },
           "anniversary_expiry_date": {
             "anyOf": [
               {
@@ -112476,6 +114532,109 @@
               }
             ],
             "title": "Coverage Type"
+          },
+          "fees_to_print": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees To Print"
+          },
+          "claim_option": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Option"
+          },
+          "form_to_print": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form To Print"
+          },
+          "reporting_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporting Subtype"
+          },
+          "network_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network Type"
+          },
+          "noa_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noa Only"
+          },
+          "per_visit_copay": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Visit Copay"
+          },
+          "lifetime_ortho_benefits": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifetime Ortho Benefits"
+          },
+          "plan_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Notes"
           },
           "created_on": {
             "anyOf": [
@@ -118473,7 +120632,12 @@
           "response": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no",
+                  "unknown"
+                ]
               },
               {
                 "type": "null"
@@ -119940,7 +122104,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/app__schemas__medical_history__MedicalAlertIn"
+                  "$ref": "#/components/schemas/MedicalAlertIn"
                 },
                 "type": "array"
               },
@@ -126985,35 +129149,19 @@
         "properties": {
           "page": {
             "type": "integer",
-            "minimum": 1.0,
-            "title": "Page",
-            "examples": [
-              1
-            ]
+            "title": "Page"
           },
           "size": {
             "type": "integer",
-            "minimum": 1.0,
-            "title": "Size",
-            "examples": [
-              20
-            ]
+            "title": "Size"
           },
           "total": {
             "type": "integer",
-            "minimum": 0.0,
-            "title": "Total",
-            "examples": [
-              137
-            ]
+            "title": "Total"
           },
           "pages": {
             "type": "integer",
-            "minimum": 0.0,
-            "title": "Pages",
-            "examples": [
-              7
-            ]
+            "title": "Pages"
           }
         },
         "type": "object",
@@ -127035,7 +129183,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127055,7 +129203,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127075,7 +129223,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127095,7 +129243,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127115,7 +129263,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127135,7 +129283,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127155,7 +129303,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127175,7 +129323,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127195,7 +129343,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127215,7 +129363,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127235,7 +129383,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127255,7 +129403,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127275,7 +129423,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127295,7 +129443,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127315,7 +129463,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127335,7 +129483,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127355,7 +129503,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127375,7 +129523,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127395,7 +129543,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127415,7 +129563,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127435,7 +129583,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127455,7 +129603,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127475,7 +129623,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127495,7 +129643,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127515,7 +129663,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127535,7 +129683,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127555,7 +129703,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127575,7 +129723,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127595,7 +129743,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127615,7 +129763,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127635,7 +129783,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127655,7 +129803,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127675,7 +129823,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127684,6 +129832,26 @@
           "meta"
         ],
         "title": "PaginatedResponse[InsuranceCoverageRuleRead]"
+      },
+      "PaginatedResponse_InsurancePlanFrequencyGroupRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InsurancePlanFrequencyGroupRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[InsurancePlanFrequencyGroupRead]"
       },
       "PaginatedResponse_InsurancePlanRead_": {
         "properties": {
@@ -127695,7 +129863,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127715,7 +129883,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127735,7 +129903,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127755,7 +129923,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127775,7 +129943,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127795,7 +129963,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127815,7 +129983,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127835,7 +130003,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127855,7 +130023,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127875,7 +130043,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127895,7 +130063,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127915,7 +130083,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127935,7 +130103,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127955,7 +130123,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127975,7 +130143,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -127995,7 +130163,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128015,7 +130183,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128035,7 +130203,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128055,7 +130223,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128075,7 +130243,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128095,7 +130263,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128115,7 +130283,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128135,7 +130303,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128155,7 +130323,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128175,7 +130343,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128195,7 +130363,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128215,7 +130383,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128235,7 +130403,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128255,7 +130423,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128275,7 +130443,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128295,7 +130463,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128309,13 +130477,13 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/PaymentAllocationRead"
+              "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
             },
             "type": "array",
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128335,7 +130503,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128355,7 +130523,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128375,7 +130543,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128395,7 +130563,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128415,7 +130583,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128435,7 +130603,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128455,7 +130623,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128475,7 +130643,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128495,7 +130663,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128515,7 +130683,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128535,7 +130703,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128555,7 +130723,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128575,7 +130743,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128595,7 +130763,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128615,7 +130783,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128635,7 +130803,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128655,7 +130823,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128675,7 +130843,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128695,7 +130863,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128715,7 +130883,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128735,7 +130903,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128755,7 +130923,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128775,7 +130943,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128795,7 +130963,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128815,7 +130983,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128835,7 +131003,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128855,7 +131023,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128875,7 +131043,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128895,7 +131063,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128915,7 +131083,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128935,7 +131103,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128955,7 +131123,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128975,7 +131143,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -128995,7 +131163,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -129015,7 +131183,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
           }
         },
         "type": "object",
@@ -141116,31 +143284,13 @@
       },
       "PaymentAllocationRead": {
         "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
-          },
-          "legacy_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Id"
-          },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -141164,6 +143314,17 @@
             ],
             "title": "Adjustment Id"
           },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
+          },
           "claim_id": {
             "anyOf": [
               {
@@ -141175,17 +143336,6 @@
             ],
             "title": "Claim Id"
           },
-          "ins_plan_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ins Plan Id"
-          },
           "provider_id": {
             "anyOf": [
               {
@@ -141196,18 +143346,6 @@
               }
             ],
             "title": "Provider Id"
-          },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -141225,22 +143363,24 @@
             ],
             "title": "Alloc Type"
           },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           }
         },
         "type": "object",
         "required": [
-          "patient_id",
-          "amount",
           "id",
-          "created_at"
+          "patient_id",
+          "amount"
         ],
         "title": "PaymentAllocationRead"
       },
@@ -145823,6 +147963,164 @@
         "type": "object",
         "title": "PlaceOfServiceCodeUpdate"
       },
+      "PlanCopyRequest": {
+        "properties": {
+          "include_rules": {
+            "type": "boolean",
+            "title": "Include Rules",
+            "default": true
+          },
+          "include_frequency_groups": {
+            "type": "boolean",
+            "title": "Include Frequency Groups",
+            "default": true
+          },
+          "include_plan_fields": {
+            "type": "boolean",
+            "title": "Include Plan Fields",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PlanCopyRequest"
+      },
+      "PlanCoverageReplaceRequest": {
+        "properties": {
+          "rules": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CoverageRuleItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
+          },
+          "frequency_groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FrequencyGroupItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Groups"
+          }
+        },
+        "type": "object",
+        "title": "PlanCoverageReplaceRequest",
+        "description": "A section left ``null`` is untouched; a section sent as a list replaces\nthe plan's rows of that kind (see the endpoint docstring)."
+      },
+      "PlanCoverageResponse": {
+        "properties": {
+          "plan_id": {
+            "type": "integer",
+            "title": "Plan Id"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/InsuranceCoverageRuleRead"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "frequency_groups": {
+            "items": {
+              "$ref": "#/components/schemas/InsurancePlanFrequencyGroupRead"
+            },
+            "type": "array",
+            "title": "Frequency Groups"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanCoverageSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "copied_from_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copied From Plan Id"
+          },
+          "copied_plan_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Copied Plan Fields",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan_id",
+          "rules",
+          "frequency_groups"
+        ],
+        "title": "PlanCoverageResponse"
+      },
+      "PlanCoverageSummary": {
+        "properties": {
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "frequency_groups": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "PlanCoverageSummary"
+      },
+      "PlanFieldOption": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "PlanFieldOption"
+      },
       "PlanMatch": {
         "properties": {
           "id": {
@@ -147392,7 +149690,7 @@
           },
           "allocations": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
+              "$ref": "#/components/schemas/PaymentAllocationRead"
             },
             "type": "array",
             "title": "Allocations"
@@ -154533,7 +156831,7 @@
           },
           "medical_alerts": {
             "items": {
-              "$ref": "#/components/schemas/MedicalAlertIn"
+              "$ref": "#/components/schemas/app__schemas__patient_intake__MedicalAlertIn"
             },
             "type": "array",
             "title": "Medical Alerts"
@@ -156657,30 +158955,6 @@
               }
             ],
             "title": "Lunch End"
-          },
-          "effective_from": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Effective From"
-          },
-          "office_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Office Id",
-            "description": "NULL = applies to every office"
           }
         },
         "type": "object",
@@ -156693,7 +158967,7 @@
         "properties": {
           "days": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleDayInput"
+              "$ref": "#/components/schemas/ScheduleDayInput"
             },
             "type": "array",
             "maxItems": 7,
@@ -157544,6 +159818,27 @@
           "created_at"
         ],
         "title": "SchedulerPatientRead"
+      },
+      "SectionSummary": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created",
+            "default": 0
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated",
+            "default": 0
+          },
+          "deleted": {
+            "type": "integer",
+            "title": "Deleted",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "SectionSummary"
       },
       "SecuritySettings": {
         "properties": {
@@ -163606,15 +165901,77 @@
         ],
         "title": "ValidationError"
       },
-      "app__schemas__billing__PaymentAllocationRead": {
+      "app__schemas__common__PageMeta": {
         "properties": {
-          "id": {
+          "page": {
             "type": "integer",
-            "title": "Id"
+            "minimum": 1.0,
+            "title": "Page",
+            "examples": [
+              1
+            ]
           },
+          "size": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Size",
+            "examples": [
+              20
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "examples": [
+              137
+            ]
+          },
+          "pages": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Pages",
+            "examples": [
+              7
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "size",
+          "total",
+          "pages"
+        ],
+        "title": "PageMeta"
+      },
+      "app__schemas__factory__PaymentAllocationRead": {
+        "properties": {
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
+          },
+          "legacy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Id"
+          },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -163638,17 +165995,6 @@
             ],
             "title": "Adjustment Id"
           },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
-          },
           "claim_id": {
             "anyOf": [
               {
@@ -163660,6 +166006,17 @@
             ],
             "title": "Claim Id"
           },
+          "ins_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ins Plan Id"
+          },
           "provider_id": {
             "anyOf": [
               {
@@ -163670,6 +166027,18 @@
               }
             ],
             "title": "Provider Id"
+          },
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -163687,28 +166056,44 @@
             ],
             "title": "Alloc Type"
           },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "amount",
+          "id",
+          "created_at"
+        ],
+        "title": "PaymentAllocationRead"
+      },
+      "app__schemas__office_setup__FeeScheduleOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "patient_id",
-          "amount"
+          "name"
         ],
-        "title": "PaymentAllocationRead"
+        "title": "FeeScheduleOption"
       },
-      "app__schemas__medical_history__MedicalAlertIn": {
+      "app__schemas__patient_intake__MedicalAlertIn": {
         "properties": {
           "alert_code": {
             "type": "string",
@@ -163728,12 +166113,7 @@
           "response": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "yes",
-                  "no",
-                  "unknown"
-                ]
+                "type": "string"
               },
               {
                 "type": "null"
@@ -163759,53 +166139,7 @@
         ],
         "title": "MedicalAlertIn"
       },
-      "app__schemas__messaging__PageMeta": {
-        "properties": {
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "pages": {
-            "type": "integer",
-            "title": "Pages"
-          }
-        },
-        "type": "object",
-        "required": [
-          "page",
-          "size",
-          "total",
-          "pages"
-        ],
-        "title": "PageMeta"
-      },
-      "app__schemas__office_setup__FeeScheduleOption": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "FeeScheduleOption"
-      },
-      "app__schemas__office_setup__ScheduleDayInput": {
+      "app__schemas__provider_setup__ScheduleDayInput": {
         "properties": {
           "day_of_week": {
             "type": "integer",
@@ -163866,6 +166200,30 @@
               }
             ],
             "title": "Lunch End"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id",
+            "description": "NULL = applies to every office"
           }
         },
         "type": "object",
@@ -163878,7 +166236,7 @@
         "properties": {
           "days": {
             "items": {
-              "$ref": "#/components/schemas/ScheduleDayInput"
+              "$ref": "#/components/schemas/app__schemas__provider_setup__ScheduleDayInput"
             },
             "type": "array",
             "maxItems": 70,

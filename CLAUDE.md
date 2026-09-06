@@ -745,6 +745,55 @@ INS-PAY-1..8 of
   unrecognised value stored as written — a 422 mid-upload would leave a claim
   that cannot be attached to.
 
+**Insurance Plan Details wizard** (Setup -> Insurance -> Plans -> Add/Edit; the
+4-tab INSURANCE DETAILS dialog + COPY FROM EXISTING; PLAN-DTL-1..9 of
+[docs/patient-insurance/insurance_plan_details_backend_devreport.md](docs/patient-insurance/insurance_plan_details_backend_devreport.md)
+/ [response](docs/patient-insurance/insurance_plan_details_backend_response.md); Alembic
+`c8d9e0f1a2b3`). Logic in [app/services/insurance_plan_service.py](app/services/insurance_plan_service.py),
+routes on `plans_router` in [app/api/v1/insurance.py](app/api/v1/insurance.py).
+- **PLAN-DTL-1** nine PLAN/BENEFITS-tab columns on `insurance_plans` (`fees_to_print`,
+  `claim_option`, `form_to_print`, `reporting_subtype`, `network_type`, `noa_only`,
+  `per_visit_copay`, `lifetime_ortho_benefits`, `plan_notes`) — the wizard had been
+  parking them in browser localStorage. Codes stored as written; vocabularies in
+  `PLAN_FIELD_OPTIONS`, published at `GET /insurance-plans/metadata` and seeded as
+  `definitions` groups.
+- **PLAN-DTL-5 retyped `insurance_coverage_rules.freq_limit` to INTEGER in place**
+  (checked first: all 876k live values were numeric strings). `age_min`/`age_max`/
+  `wait_months` are canonical; `age_limit`/`wait_period` are **derived mirrors** the
+  server rewrites on every save (`normalise_rule_limits`) and parses when only the
+  string arrives. The backfill's one judgement call: a migrated lone `AGELIMIT` is
+  Denticon's *maximum* (19/16/13/14/18/26 are child cut-offs) -> `age_max`; an
+  app-written lone number is the wizard's *minimum* -> `age_min`.
+- **PLAN-DTL-4** `freq_limit` is a 1-based ordinal into the legacy
+  FREQUENCYLIMITATIONS list (`0`/NULL = none); the list lives once in
+  `FREQUENCY_LIMITATIONS`, is published with `definition_id`s, and
+  `definitions.sort_order` now carries the ordinal.
+- **PLAN-DTL-2** the FE's reserved-shape coverage rows (`category='FREQGRP'`,
+  `start_code='FQ01'`, whole-mouth as `age_limit='WM'`) became a real table,
+  `insurance_plan_frequency_groups` (unique per plan + code group, `/insurance-plan-frequency-groups`),
+  migrated in the Alembic revision; the coverage write path now **422s** the shape
+  (`frequency_group_row_not_coverage`) so it cannot re-accumulate.
+- **Tenancy hole closed**: `insurance_coverage_rules` has no `tenant_id`, and generic
+  CRUD only scopes models that carry one, so any tenant could read/write any rule by
+  id. `InsuranceCoverageRuleCRUD` overrides `_scope_tenant` through the owning plan.
+- **PLAN-DTL-8** `GET/PUT /insurance-plans/{id}/coverage-rules` reconciles rules +
+  frequency groups in one transaction (an item with `id` updates in place, without
+  one inserts, unmentioned rows are deleted; any error rolls back) and
+  `POST /insurance-plans/{id}/copy-from/{source}` is COPY FROM EXISTING server-side
+  (`include_plan_fields` copies BENEFITS/PLAN fields, never carrier/employer/group).
+- **PLAN-DTL-6** `definitions` had 1,144 exact duplicates (one insert per migration
+  pass, identical on every column, no inbound FKs) — collapsed + unique on
+  `(tenant_id, group_code, key1, description)`. The five wizard catalogues existed
+  on **only the migrated tenant**; `scripts/seed_insurance_plan_definitions.py`
+  seeds all 43 (account seeder delegates; PLANSUBTYPE matches on key+label because
+  "Aetna" exists under PPO and HMO).
+- **PLAN-DTL-3** `anniversary_month`/`anniversary_day` + `anniversary_date` kept in
+  sync by `fold_anniversary` (month/day win; stored year, else current year).
+- **PLAN-DTL-7 not reproducible**: the `(tenant_id, group_number)` index has
+  existed since `e4f5a6b7c8d9`, the planner uses it (0.18 ms), warm CRUD path 0.10 s;
+  `/group-availability` is the right call. **PLAN-DTL-9** on plans was a stale
+  generated client; rules gained `updated_at`/`updated_by`/`created_by`.
+
 **Account Ledger second pass** (AL-3/6/8/9/10/11/12 of
 [docs/account-ledger/account_ledger_backend_devreport.md](docs/account-ledger/account_ledger_backend_devreport.md)
 / [response](docs/account-ledger/account_ledger_backend_response.md); Alembic

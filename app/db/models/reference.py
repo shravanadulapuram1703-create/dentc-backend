@@ -6,7 +6,7 @@ questionnaire_options
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
@@ -14,6 +14,20 @@ from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
 
 class Definition(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "definitions"
+    # PLAN-DTL-6: the Denticon importer's ``ON CONFLICT DO NOTHING`` had nothing
+    # to conflict on, so every migration pass re-inserted the whole DEFINITIONS
+    # export (5x on the migrated tenant: DEFCOVERAGE 140 rows for 28 codes,
+    # FREQUENCYLIMITATIONS 65 for 13, …) and every dropdown consumer had to
+    # de-duplicate. Alembic ``c8d9e0f1a2b3`` collapses the duplicates; this is
+    # what stops them coming back. ``description`` is part of the key on
+    # purpose: a practice may legitimately keep two labels under one code
+    # (PLANTYPE rows all carry an empty ``key1`` and differ only by label).
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "group_code", "key1", "description",
+            name="uq_definitions_tenant_group_key_description",
+        ),
+    )
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20))

@@ -10,6 +10,12 @@ literal sub-paths win over ``/{item_id}``:
 * ``GET /insurance-carriers/name-availability`` and
   ``GET /employers/name-availability`` — INS-PT-13, the name-match probe the
   quick-add dialogs never had.
+* ``GET /insurance-plans/metadata`` — PLAN-DTL-1/4, the wizard's catalogues
+  (frequency ordinals, default coverage table, code groups, field vocabularies).
+* ``GET/PUT /insurance-plans/{id}/coverage-rules`` — PLAN-DTL-8, the whole
+  COVERAGE & LIMITATIONS + FREQ LIMITATION CODE GRP table in one call.
+* ``POST /insurance-plans/{id}/copy-from/{source_id}`` — COPY FROM EXISTING,
+  server-side.
 """
 
 from __future__ import annotations
@@ -25,9 +31,13 @@ from app.schemas.insurance import (
     EligibilityVerifyRequest,
     EligibilityVerifyResult,
     GroupAvailabilityResult,
+    InsurancePlanMetadata,
     NameAvailabilityResult,
+    PlanCopyRequest,
+    PlanCoverageReplaceRequest,
+    PlanCoverageResponse,
 )
-from app.services import insurance_service
+from app.services import insurance_plan_service, insurance_service
 
 _ERRORS = {401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}}
 
@@ -108,6 +118,92 @@ def check_group_availability(
     return insurance_service.group_availability(
         db, tenant_id, group_number,
         carrier_id=carrier_id, exclude_plan_id=exclude_plan_id,
+    )
+
+
+# ── PLAN-DTL-1/4: the wizard's catalogues ────────────────────────────────────
+@plans_router.get(
+    "/metadata",
+    response_model=InsurancePlanMetadata,
+    operation_id="get_insurance_plan_metadata",
+    summary="Catalogues behind the INSURANCE DETAILS wizard (PLAN-DTL-1/4)",
+)
+def get_insurance_plan_metadata(db: DbSession, tenant_id: TenantId):
+    """Frequency-limitation ordinals (what ``freq_limit`` stores), the default
+    COVERAGE & LIMITATIONS table a new plan starts with, the FREQ-tab code
+    groups and the PLAN-tab field vocabularies — from the tenant's
+    ``definitions`` where it has them, else the built-in legacy lists
+    (``catalog_sources`` says which)."""
+    return insurance_plan_service.plan_metadata(db, tenant_id)
+
+
+# ── PLAN-DTL-8: the coverage table as one document ───────────────────────────
+@plans_router.get(
+    "/{plan_id}/coverage-rules",
+    response_model=PlanCoverageResponse,
+    operation_id="get_insurance_plan_coverage",
+    summary="A plan's coverage rules + frequency code groups in one call",
+)
+def get_insurance_plan_coverage(
+    db: DbSession, tenant_id: TenantId, plan_id: Annotated[int, Path()],
+):
+    return insurance_plan_service.plan_coverage(db, plan_id, tenant_id)
+
+
+@plans_router.put(
+    "/{plan_id}/coverage-rules",
+    response_model=PlanCoverageResponse,
+    operation_id="replace_insurance_plan_coverage",
+    summary="Replace a plan's coverage rules and/or frequency code groups atomically (PLAN-DTL-8)",
+    responses={422: {"model": ErrorResponse}},
+)
+def replace_insurance_plan_coverage(
+    db: DbSession,
+    tenant_id: TenantId,
+    current: CurrentUser,
+    plan_id: Annotated[int, Path()],
+    body: PlanCoverageReplaceRequest,
+):
+    """One transaction for what used to be ~30 sequential POSTs.
+
+    A section that is ``null`` is untouched. For a section that is sent: an
+    item carrying the ``id`` of a row on this plan is updated in place (id and
+    ``legacy_id`` survive), an item without one is inserted, and existing rows
+    not mentioned are deleted. Any failure rolls the whole call back — no
+    partial table.
+    """
+    rules = [r.model_dump(exclude_unset=True) for r in body.rules] if body.rules is not None else None
+    groups = (
+        [g.model_dump(exclude_unset=True) for g in body.frequency_groups]
+        if body.frequency_groups is not None else None
+    )
+    return insurance_plan_service.replace_plan_coverage(
+        db, plan_id, tenant_id, rules=rules, frequency_groups=groups, actor_id=current.id,
+    )
+
+
+@plans_router.post(
+    "/{plan_id}/copy-from/{source_plan_id}",
+    response_model=PlanCoverageResponse,
+    operation_id="copy_insurance_plan_from",
+    summary="COPY FROM EXISTING — copy another plan's coverage table (and optionally its plan fields)",
+    responses={422: {"model": ErrorResponse}},
+)
+def copy_insurance_plan_from(
+    db: DbSession,
+    tenant_id: TenantId,
+    current: CurrentUser,
+    plan_id: Annotated[int, Path()],
+    source_plan_id: Annotated[int, Path()],
+    body: PlanCopyRequest | None = None,
+):
+    req = body or PlanCopyRequest()
+    return insurance_plan_service.copy_plan_coverage(
+        db, plan_id, source_plan_id, tenant_id,
+        include_rules=req.include_rules,
+        include_frequency_groups=req.include_frequency_groups,
+        include_plan_fields=req.include_plan_fields,
+        actor_id=current.id,
     )
 
 

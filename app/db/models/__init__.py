@@ -156,6 +156,7 @@ from app.db.models.insurance import (
     InsuranceCarrier,
     InsuranceCoverageRule,
     InsurancePlan,
+    InsurancePlanFrequencyGroup,
     InsuranceSubscriber,
 )
 from app.db.models.patients import (
@@ -230,6 +231,7 @@ __all__ = [
     # insurance
     "Employer", "InsuranceCarrier", "InsurancePlan", "InsuranceSubscriber",
     "InsuranceCoverageRule", "InsCustomCoverage", "FeeScheduleAssignment",
+    "InsurancePlanFrequencyGroup",
     # codes / fees
     "ProcedureCode", "FeeSchedule", "FeeScheduleEntry", "ChartMaterial",
     "NoteMacro", "CodeBundle", "CodeBundleItem", "PrescriptionLibrary",

@@ -21,6 +21,7 @@ from sqlalchemy import select
 from app.db.models import Definition, Tenant
 from app.db.session import SessionLocal
 from app.services.patient_extra_service import CLAIM_ATTACHMENT_TYPES
+from scripts.seed_insurance_plan_definitions import seed_for_tenant as seed_plan_defs
 from scripts.seed_transaction_definitions import seed_for_tenant as seed_transaction_defs
 
 _STATES = [
@@ -346,9 +347,13 @@ def main() -> None:
             n = seed_for_tenant(db, tid)
             # CHG-10: the two key2-bearing groups, seeded through their own module.
             added, patched = seed_transaction_defs(db, tid, apply=True, overwrite=False)
+            # PLAN-DTL-4/6: the INSURANCE DETAILS wizard catalogues (frequency
+            # ordinals, default coverage table, code groups, plan types).
+            plan = seed_plan_defs(db, tid, apply=True, overwrite=False)
             print(
                 f"tenant {tid}: seeded {n} definitions ({len(GROUPS)} groups)"
                 f" + {added} transaction codes ({patched} key2 backfilled)"
+                f" + {plan['added']} plan-wizard rows ({plan['patched']} patched)"
             )
     finally:
         db.close()

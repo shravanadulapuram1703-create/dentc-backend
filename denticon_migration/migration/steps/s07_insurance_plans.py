@@ -27,7 +27,9 @@ from migration.utils.parsers import (
 COLS = [
     "tenant_id", "carrier_id", "employer_id", "legacy_id", "group_number",
     "plan_type", "is_prepaid", "individual_max", "individual_deductible",
-    "ortho_max", "family_max", "family_deductible", "anniversary_date", "coverage_type",
+    "ortho_max", "family_max", "family_deductible", "anniversary_date",
+    # PLAN-DTL-3: the typed Month/Day pair the wizard binds to.
+    "anniversary_month", "anniversary_day", "coverage_type",
     # INS-PT-8: the Setup grid renders Created/Modified as date + user. These are
     # Denticon login strings, and most have no users row to point a FK at.
     "created_on", "created_by", "modified_on", "modified_by",
@@ -77,6 +79,7 @@ def run(conn, maps: dict) -> dict:
             skipped += 1
             continue
 
+        anniv = parse_date(row.get("ANNIVDATE") or "")
         buf.add((
             tid,
             carrier_id,
@@ -93,7 +96,9 @@ def run(conn, maps: dict) -> dict:
             parse_decimal(row.get("INDIVIDUALORTHOMAX") or row.get("ORTHOMAX") or "0"),
             parse_decimal(row.get("FAMILYMAX") or row.get("FAMMAX") or "0"),
             parse_decimal(row.get("FAMILYDEDUCTIBLE") or row.get("FAMDED") or "0"),
-            parse_date(row.get("ANNIVDATE") or ""),
+            anniv,
+            anniv.month if anniv else None,
+            anniv.day if anniv else None,
             clean(row.get("COVERAGETYPE")),
             parse_datetime(row.get("CREATEDON") or ""),
             clean(row.get("CREATEDBY")),
