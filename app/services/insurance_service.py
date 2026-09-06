@@ -31,6 +31,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, NotFoundError
+from app.services.insurance_plan_service import fold_anniversary
 from app.crud.base import CRUDBase
 from app.db.models import (
     Employer,
@@ -407,7 +408,8 @@ class InsurancePlanCRUD(CRUDBase[InsurancePlan]):
         self, db: Session, data: dict[str, Any], *,
         tenant_id: int | None = None, created_by: int | None = None,
     ) -> InsurancePlan:
-        payload = dict(data)
+        # PLAN-DTL-3: month/day and the full date are kept consistent server-side.
+        payload = fold_anniversary(dict(data))
         allow = bool(payload.pop("allow_duplicate_group", False))
         self._guard(
             db, tenant_id=tenant_id,
@@ -421,9 +423,9 @@ class InsurancePlanCRUD(CRUDBase[InsurancePlan]):
         self, db: Session, obj_id: Any, data: dict[str, Any], *,
         tenant_id: int | None = None, updated_by: int | None = None,
     ) -> InsurancePlan:
-        payload = dict(data)
-        allow = bool(payload.pop("allow_duplicate_group", False))
         existing = self.get(db, obj_id, tenant_id=tenant_id)
+        payload = fold_anniversary(dict(data), existing)
+        allow = bool(payload.pop("allow_duplicate_group", False))
         # Evaluate against the merge of payload + stored row, so a PATCH carrying
         # only the group number is still checked against the plan's own carrier
         # (and a PATCH that only moves the carrier against its stored group).

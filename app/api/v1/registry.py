@@ -29,6 +29,10 @@ from app.services.enrich_service import (
     enrich_treatment_plan,
 )
 from app.services.billing_service import LedgerInsuranceDetailCRUD
+from app.services.insurance_plan_service import (
+    InsuranceCoverageRuleCRUD,
+    InsurancePlanFrequencyGroupCRUD,
+)
 from app.services.insurance_service import (
     EmployerCRUD,
     InsuranceCarrierCRUD,
@@ -60,7 +64,13 @@ from app.schemas.insurance import (
     InsuranceCarrierCreate,
     InsuranceCarrierRead,
     InsuranceCarrierUpdate,
+    InsuranceCoverageRuleCreate,
+    InsuranceCoverageRuleRead,
+    InsuranceCoverageRuleUpdate,
     InsurancePlanCreate,
+    InsurancePlanFrequencyGroupCreate,
+    InsurancePlanFrequencyGroupRead,
+    InsurancePlanFrequencyGroupUpdate,
     InsurancePlanRead,
     InsurancePlanUpdate,
 )
@@ -441,9 +451,33 @@ _INSURANCE = [
          search=("sub_first_name", "sub_last_name", "sub_member_id"),
          # INS-11: elig_status (+ office_id) filter so verification queues are countable.
          filters=("ins_plan_id", "subscriber_patient_id", "office_id", "elig_status", "is_active")),
-    _cfg(m.InsuranceCoverageRule, "InsuranceCoverageRule", "insurance-coverage-rules", "Insurance",
-         "insurance_coverage_rule", "insurance_coverage_rules",
-         filters=("ins_plan_id",), soft_field=None),
+    # PLAN-DTL-2/5/9: typed limits, tenant scoping through the plan (the table
+    # has no tenant_id), Modified On/By, and the FREQGRP-shape refusal.
+    CrudConfig(
+        model=m.InsuranceCoverageRule,
+        create_schema=InsuranceCoverageRuleCreate,
+        update_schema=InsuranceCoverageRuleUpdate,
+        read_schema=InsuranceCoverageRuleRead,
+        prefix="insurance-coverage-rules", tag="Insurance",
+        singular="insurance_coverage_rule", plural="insurance_coverage_rules",
+        sortable_fields=_DEFAULT_SORT + ("start_code", "updated_at"),
+        filter_fields=("ins_plan_id", "category", "start_code"),
+        soft_delete_field=None,
+        crud_class=InsuranceCoverageRuleCRUD,
+    ),
+    # PLAN-DTL-2: the FREQ LIMITATION CODE GRP tab as a real resource.
+    CrudConfig(
+        model=m.InsurancePlanFrequencyGroup,
+        create_schema=InsurancePlanFrequencyGroupCreate,
+        update_schema=InsurancePlanFrequencyGroupUpdate,
+        read_schema=InsurancePlanFrequencyGroupRead,
+        prefix="insurance-plan-frequency-groups", tag="Insurance",
+        singular="insurance_plan_frequency_group", plural="insurance_plan_frequency_groups",
+        sortable_fields=_DEFAULT_SORT + ("code_group", "updated_at"),
+        filter_fields=("ins_plan_id", "code_group", "whole_mouth"),
+        soft_delete_field=None,
+        crud_class=InsurancePlanFrequencyGroupCRUD,
+    ),
 ]
 
 # ── Procedures, fees & codes ───────────────────────────────────────────────

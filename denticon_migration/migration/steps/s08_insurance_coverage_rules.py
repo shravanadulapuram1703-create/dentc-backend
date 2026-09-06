@@ -13,7 +13,18 @@ COLS = [
     "ins_plan_id", "legacy_id", "start_code", "end_code",
     "category", "description", "coverage_pct", "ded_waived",
     "freq_limit", "age_limit", "wait_period",
+    # PLAN-DTL-5: typed limits. freq_limit is INTEGER (the frequency ordinal).
+    # Denticon's AGELIMIT is a single upper bound → age_max; WAITPERIOD is months.
+    "age_min", "age_max", "wait_months",
 ]
+
+
+def _int_or_none(value):
+    text = (value or "").strip()
+    if text.isdigit():
+        n = int(text)
+        return n or None
+    return None
 
 
 def run(conn, maps: dict) -> dict:
@@ -50,9 +61,13 @@ def run(conn, maps: dict) -> dict:
             clean(row.get("DESCR")),
             parse_decimal(row.get("PCT") or "0"),
             parse_bool(row.get("DEDWAIVED", "0")),
-            clean(row.get("FREQLIMIT")),
-            clean(row.get("AGELIMIT")),
-            clean(row.get("WAITPERIOD")),
+            _int_or_none(row.get("FREQLIMIT")),
+            # Mirrors are kept canonical: "0" (none) becomes NULL.
+            str(_int_or_none(row.get("AGELIMIT"))) if _int_or_none(row.get("AGELIMIT")) else None,
+            str(_int_or_none(row.get("WAITPERIOD"))) if _int_or_none(row.get("WAITPERIOD")) else clean(row.get("WAITPERIOD")) or None,
+            None,
+            _int_or_none(row.get("AGELIMIT")),
+            _int_or_none(row.get("WAITPERIOD")),
         ))
 
     buf.flush()

@@ -1,7 +1,7 @@
 """Insurance domain models.
 
 employers · insurance_carriers · insurance_plans · insurance_subscribers ·
-insurance_coverage_rules
+insurance_coverage_rules · insurance_plan_frequency_groups
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
@@ -108,9 +108,29 @@ class InsurancePlan(Base, IntPKMixin, TimestampMixin):
     family_max: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     family_deductible: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     anniversary_date: Mapped[date | None]
+    # PLAN-DTL-3: the legacy dialog captures the anniversary as Month/Day only —
+    # a plan year "starts on 1 Jan", not "on 1 Jan 2022". The full-date column
+    # stays (migrated rows carry one); these two are the canonical *typed*
+    # answer, kept in sync by ``InsurancePlanCRUD`` whichever shape is written.
+    anniversary_month: Mapped[int | None] = mapped_column(Integer)
+    anniversary_day: Mapped[int | None] = mapped_column(Integer)
     # LEG-7: legacy plan header "Anni. Date Exp" alongside the anniversary date.
     anniversary_expiry_date: Mapped[date | None]
     coverage_type: Mapped[str | None] = mapped_column(String(10))
+    # PLAN-DTL-1: the nine PLAN/BENEFITS-tab fields that had no column, so the
+    # wizard was parking them in browser localStorage per plan id. Codes are
+    # stored as written (``insurance_plan_service.PLAN_FIELD_OPTIONS`` publishes
+    # the vocabularies) — the PROV-3 call: an unfamiliar string beats a 422 on a
+    # form the user cannot otherwise submit.
+    fees_to_print: Mapped[str | None] = mapped_column(String(20))
+    claim_option: Mapped[str | None] = mapped_column(String(20))
+    form_to_print: Mapped[str | None] = mapped_column(String(20))
+    reporting_subtype: Mapped[str | None] = mapped_column(String(50))
+    network_type: Mapped[str | None] = mapped_column(String(20))
+    noa_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    per_visit_copay: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    lifetime_ortho_benefits: Mapped[bool] = mapped_column(Boolean, default=False)
+    plan_notes: Mapped[str | None] = mapped_column(Text)
     # INS-PT-8: legacy free-text audit (migrated source), same shape as the carrier.
     created_on: Mapped[datetime | None]
     created_by: Mapped[str | None] = mapped_column(String(100))
@@ -164,7 +184,29 @@ class InsuranceSubscriber(Base, IntPKMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class InsuranceCoverageRule(Base, IntPKMixin, CreatedAtMixin):
+class InsuranceCoverageRule(Base, IntPKMixin, TimestampMixin):
+    """One row of a plan's COVERAGE & LIMITATIONS table.
+
+    Two row shapes share the table and the estimate engine honours both
+    (``estimate_service._match_rule``): a **category** row (``start_code`` =
+    ``end_code`` = a Denticon coverage-category code such as ``03A``,
+    ``category="0"``) and an **exception** row (``start_code`` = ``end_code`` =
+    an ADA code, ``category`` = the parent category code). Migrated plans also
+    band on real ADA ranges (``D0100``–``D0999``).
+
+    PLAN-DTL-5: the three limit columns were free-text strings. ``freq_limit`` is
+    now an **integer ordinal** into the frequency catalogue (PLAN-DTL-4,
+    ``insurance_plan_service.FREQUENCY_LIMITATIONS``; ``0``/NULL = no limitation)
+    and ``age_min``/``age_max``/``wait_months`` are the typed limits. The legacy
+    ``age_limit``/``wait_period`` strings are kept as **derived mirrors** —
+    written by the server from the typed columns on every save, parsed *into*
+    them when an older client still sends only the string — so no reader breaks
+    during the cutover and there is exactly one source of truth.
+
+    The table has no ``tenant_id``; ``InsuranceCoverageRuleCRUD`` scopes every
+    access through the owning plan.
+    """
+
     __tablename__ = "insurance_coverage_rules"
 
     ins_plan_id: Mapped[int] = mapped_column(Integer, ForeignKey("insurance_plans.id"), index=True)
@@ -175,9 +217,51 @@ class InsuranceCoverageRule(Base, IntPKMixin, CreatedAtMixin):
     description: Mapped[str | None] = mapped_column(String(255))
     coverage_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     ded_waived: Mapped[bool] = mapped_column(Boolean, default=False)
-    freq_limit: Mapped[str | None] = mapped_column(String(50))
+    # PLAN-DTL-4/5: 1-based ordinal into FREQUENCY_LIMITATIONS; 0 / NULL = none.
+    freq_limit: Mapped[int | None] = mapped_column(Integer)
+    # PLAN-DTL-5: typed limits (canonical).
+    age_min: Mapped[int | None] = mapped_column(Integer)
+    age_max: Mapped[int | None] = mapped_column(Integer)
+    wait_months: Mapped[int | None] = mapped_column(Integer)
+    # Legacy string mirrors — derived from the typed columns on every write.
     age_limit: Mapped[str | None] = mapped_column(String(50))
     wait_period: Mapped[str | None] = mapped_column(String(50))
+    # PLAN-DTL-9: "Modified On/By" (``updated_at`` via TimestampMixin).
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class InsurancePlanFrequencyGroup(Base, IntPKMixin, TimestampMixin):
+    """PLAN-DTL-2: one row of the legacy FREQ LIMITATION CODE GRP tab.
+
+    A code group (a ``definitions`` ``INSLIMITATIONS`` code such as ``01`` =
+    "Diagnostic: Periodic Exam (D0120)") limited to a frequency, optionally
+    whole-mouth, optionally capped per day. The frontend had been storing these
+    as reserved-shape ``insurance_coverage_rules`` rows (``category="FREQGRP"``,
+    ``start_code="FQ01"``, whole-mouth encoded as ``age_limit="WM"``) that every
+    coverage consumer had to know to skip; Alembic ``c8d9e0f1a2b3`` moves those
+    rows here and the coverage-rule write path refuses the shape from now on.
+    """
+
+    __tablename__ = "insurance_plan_frequency_groups"
+    __table_args__ = (
+        # A plan lists each code group once — the legacy grid is keyed by it.
+        UniqueConstraint("ins_plan_id", "code_group", name="uq_plan_frequency_groups_plan_code"),
+        Index("ix_plan_frequency_groups_tenant_plan", "tenant_id", "ins_plan_id"),
+    )
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    ins_plan_id: Mapped[int] = mapped_column(Integer, ForeignKey("insurance_plans.id"), index=True)
+    #: ``definitions.key1`` of the INSLIMITATIONS row (``01``, ``02A``, …).
+    code_group: Mapped[str] = mapped_column(String(20))
+    #: The code-group label at the time it was chosen (denormalised for the grid).
+    description: Mapped[str | None] = mapped_column(String(255))
+    #: Same ordinal vocabulary as ``insurance_coverage_rules.freq_limit``.
+    freq_limit: Mapped[int | None] = mapped_column(Integer)
+    whole_mouth: Mapped[bool] = mapped_column(Boolean, default=False)
+    per_day_quantity: Mapped[int | None] = mapped_column(Integer)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class InsCustomCoverage(Base, IntPKMixin, CreatedAtMixin):

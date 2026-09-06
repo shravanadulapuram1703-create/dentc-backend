@@ -13,11 +13,18 @@ which lives once, in ``app.services.insurance_service``.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, computed_field, create_model
+from pydantic import BaseModel, Field, computed_field, create_model
 
-from app.db.models import Employer, InsuranceCarrier, InsurancePlan
+from app.db.models import (
+    Employer,
+    InsuranceCarrier,
+    InsuranceCoverageRule,
+    InsurancePlan,
+    InsurancePlanFrequencyGroup,
+)
 from app.schemas.factory import build_schemas
 from app.services.insurance_service import carrier_is_dental
 
@@ -154,7 +161,147 @@ class NameAvailabilityResult(BaseModel):
     inactive_matches: list[NameMatch] = []
 
 
+# ── PLAN-DTL-2/5/9: coverage rules + frequency groups ────────────────────────
+# Built here (not in the registry) so the generic CRUD routes and the
+# plan-details endpoints share one named component each.
+InsuranceCoverageRuleCreate, InsuranceCoverageRuleUpdate, InsuranceCoverageRuleRead = build_schemas(
+    InsuranceCoverageRule, "InsuranceCoverageRule"
+)
+(
+    InsurancePlanFrequencyGroupCreate,
+    InsurancePlanFrequencyGroupUpdate,
+    InsurancePlanFrequencyGroupRead,
+) = build_schemas(InsurancePlanFrequencyGroup, "InsurancePlanFrequencyGroup")
+
+
+class CoverageRuleItem(BaseModel):
+    """One row of ``PUT /insurance-plans/{id}/coverage-rules``. ``id`` keeps an
+    existing row (updated in place); omit it to insert. ``end_code`` defaults
+    to ``start_code``. Typed limits win over the legacy string mirrors."""
+
+    id: int | None = None
+    start_code: str
+    end_code: str | None = None
+    category: str | None = None
+    description: str | None = None
+    coverage_pct: Decimal | None = None
+    ded_waived: bool = False
+    freq_limit: int | None = Field(None, ge=0, description="Frequency ordinal; 0/null = No Limitation")
+    age_min: int | None = Field(None, ge=0)
+    age_max: int | None = Field(None, ge=0)
+    wait_months: int | None = Field(None, ge=0)
+    # Legacy mirrors — accepted from older clients, parsed into the typed fields.
+    age_limit: str | None = None
+    wait_period: str | None = None
+
+
+class FrequencyGroupItem(BaseModel):
+    id: int | None = None
+    code_group: str
+    description: str | None = None
+    freq_limit: int | None = Field(None, ge=0)
+    whole_mouth: bool = False
+    per_day_quantity: int | None = Field(None, ge=0)
+
+
+class PlanCoverageReplaceRequest(BaseModel):
+    """A section left ``null`` is untouched; a section sent as a list replaces
+    the plan's rows of that kind (see the endpoint docstring)."""
+
+    rules: list[CoverageRuleItem] | None = None
+    frequency_groups: list[FrequencyGroupItem] | None = None
+
+
+class SectionSummary(BaseModel):
+    created: int = 0
+    updated: int = 0
+    deleted: int = 0
+
+
+class PlanCoverageSummary(BaseModel):
+    rules: SectionSummary | None = None
+    frequency_groups: SectionSummary | None = None
+
+
+class PlanCoverageResponse(BaseModel):
+    plan_id: int
+    rules: list[InsuranceCoverageRuleRead]  # type: ignore[valid-type]
+    frequency_groups: list[InsurancePlanFrequencyGroupRead]  # type: ignore[valid-type]
+    summary: PlanCoverageSummary | None = None
+    copied_from_plan_id: int | None = None
+    copied_plan_fields: list[str] = []
+
+
+class PlanCopyRequest(BaseModel):
+    include_rules: bool = True
+    include_frequency_groups: bool = True
+    #: Also copy the BENEFITS + PLAN-tab fields (never carrier/employer/group).
+    include_plan_fields: bool = False
+
+
+# ── PLAN-DTL-1/4: the wizard's catalogues ────────────────────────────────────
+class FrequencyLimitation(BaseModel):
+    code: int
+    label: str
+    key1: str | None = None
+    key2: str | None = None
+    definition_id: int | None = None
+    legacy_id: str | None = None
+
+
+class DefaultCoverageRule(BaseModel):
+    start_code: str
+    end_code: str
+    category: str
+    description: str
+    coverage_pct: int
+    ded_waived: bool
+    freq_limit: int
+    age_min: int | None = None
+    age_max: int | None = None
+    wait_months: int | None = None
+    source: str
+
+
+class CodeGroup(BaseModel):
+    code: str
+    label: str
+    definition_id: int | None = None
+
+
+class PlanFieldOption(BaseModel):
+    code: str
+    label: str
+
+
+class InsurancePlanMetadata(BaseModel):
+    frequency_limitations: list[FrequencyLimitation]
+    default_coverage_rules: list[DefaultCoverageRule]
+    code_groups: list[CodeGroup]
+    plan_field_options: dict[str, list[PlanFieldOption]]
+    catalog_sources: dict[str, str]
+    conventions: dict[str, str]
+
+
 __all__ = [
+    "CodeGroup",
+    "CoverageRuleItem",
+    "DefaultCoverageRule",
+    "FrequencyGroupItem",
+    "FrequencyLimitation",
+    "InsuranceCoverageRuleCreate",
+    "InsuranceCoverageRuleRead",
+    "InsuranceCoverageRuleUpdate",
+    "InsurancePlanFrequencyGroupCreate",
+    "InsurancePlanFrequencyGroupRead",
+    "InsurancePlanFrequencyGroupUpdate",
+    "InsurancePlanMetadata",
+    "PlanCopyRequest",
+    "PlanCoverageReplaceRequest",
+    "PlanCoverageResponse",
+    "PlanCoverageSummary",
+    "PlanFieldOption",
+    "SectionSummary",
     "EligibilityVerifyRequest",
     "EligibilityVerifyResult",
     "EmployerCreate",
