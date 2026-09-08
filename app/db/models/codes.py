@@ -166,6 +166,10 @@ class CodeBundleItem(Base, IntPKMixin, CreatedAtMixin):
     legacy_id: Mapped[str | None] = mapped_column(String(20))
     procedure_code: Mapped[str] = mapped_column(String(20), ForeignKey("procedure_codes.code"))
     tooth: Mapped[str | None] = mapped_column(String(10))
+    # PROC-INT-9: aligned with explosion_code_items so a bundle can pre-fill the
+    # ADD PROCEDURE DETAILS pop-up fully (surface + quadrant, not just tooth).
+    surface: Mapped[str | None] = mapped_column(String(20))
+    quadrant: Mapped[str | None] = mapped_column(String(10))
     sort_order: Mapped[int] = mapped_column(Integer, default=1)
 
 

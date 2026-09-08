@@ -35,6 +35,11 @@ class TreatmentPlanItem(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(String(500))
     tooth: Mapped[str | None] = mapped_column(String(10))
     surface: Mapped[str | None] = mapped_column(String(50))
+    # PROC-INT-5: mirror patient_procedures — a planned quadrant / lab procedure
+    # used to lose the quadrant and material chosen in ADD PROCEDURE DETAILS until
+    # it was posted. A charge posted from the item adopts both.
+    quadrant: Mapped[str | None] = mapped_column(String(10))
+    material_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("chart_materials.id"))
     priority: Mapped[int] = mapped_column(Integer, default=1)
     # PLAN-1: first-class Phase ID (was stop-gapped into billing_order, freeing it
     # to mean billing order again).

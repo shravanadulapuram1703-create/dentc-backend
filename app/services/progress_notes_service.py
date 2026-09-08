@@ -37,7 +37,10 @@ from app.db.models import (
 from app.services import auth_service
 from app.services.user_admin_service import resolve_user_names
 
-_TEXT_FIELDS = ("notes", "notes_html", "tooth", "surface", "region", "note_date")
+# PN-7 lock scope. ``note_date`` is deliberately NOT here (PN-8): doctors write
+# notes days after the visit and often pick the wrong Date of Service, so the
+# DOS stays correctable after the prior-day lock. Signing still freezes it.
+_TEXT_FIELDS = ("notes", "notes_html", "tooth", "surface", "region")
 
 
 def _attachment_url(note_id: int, att_id: int) -> str:
@@ -78,6 +81,16 @@ class ProgressNoteCRUD(CRUDBase):
                 raise ConflictError(
                     "This note is locked (signed or from a prior day) and cannot be edited",
                     details={"locked_fields": changed},
+                )
+        # PN-8: the DOS survives the prior-day lock but not a signature.
+        if obj.signed_at is not None and "note_date" in data:
+            new_dos = data["note_date"]
+            if isinstance(new_dos, str):
+                new_dos = date.fromisoformat(new_dos)
+            if new_dos != obj.note_date:
+                raise ConflictError(
+                    "This note is signed; its Date of Service can no longer be changed",
+                    details={"locked_fields": ["note_date"]},
                 )
 
         # PN-4: stamp/clear the strike-off audit on transition.

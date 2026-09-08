@@ -11,6 +11,7 @@ from app.api.v1 import (
     auth,
     balances,
     billing,
+    email,
     fee_schedules,
     groups,
     icd_codes,
@@ -35,6 +36,7 @@ from app.api.v1 import (
     provider_setup,
     reports,
     scheduler,
+    sms,
     statements,
     support,
     transactions,
@@ -59,6 +61,7 @@ api_router.include_router(groups.groups_router)
 # Service endpoints registered before generic CRUD (more specific paths first).
 api_router.include_router(billing.router)
 api_router.include_router(treatment.router)
+api_router.include_router(treatment.metadata_router)  # PROC-INT-6/8 vocabulary
 # Fee Schedule supplements (restore / new-version). Before generic CRUD so
 # /fee-schedules/{id}/restore & /new-version win over /fee-schedules/{item_id}.
 api_router.include_router(fee_schedules.router)
@@ -173,4 +176,13 @@ api_router.include_router(imaging.assets_router)
 # must never 401 (AN-12), and approval is a bespoke atomic booking.
 api_router.include_router(appointnow.public_router)
 api_router.include_router(appointnow.staff_router)
+# Patient SMS (Twilio): the send gateway + inbox/render/reminder supplements
+# (auth) and the two Twilio-signed webhooks (unauth, SMS-2). Hand-written — the
+# webhooks are the app's second anonymous surface and validate X-Twilio-Signature
+# instead of a JWT. /sms-messages and /sms-templates stay in the registry.
+api_router.include_router(sms.router)
+api_router.include_router(sms.webhook_router)
+# EMAIL-1: the e-mail counterpart (SendGrid) + its signed event webhook.
+api_router.include_router(email.router)
+api_router.include_router(email.webhook_router)
 api_router.include_router(build_entity_router())

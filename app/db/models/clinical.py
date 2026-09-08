@@ -59,6 +59,15 @@ class PatientProcedure(Base, CreatedAtMixin):
     # REST: planned→completed lineage — which treatment plan this completed procedure
     # fulfilled (mirrors appointment_procedures.treatment_plan_id).
     treatment_plan_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("treatment_plans.id"))
+    # PROC-INT-1: the *item* this charge fulfilled. `treatment_plan_id` is
+    # plan-level, so the four procedure-entry screens were pairing a charge with
+    # its planned item by code + tooth + surface — and two identical open items
+    # collapsed to one key. This FK is the canonical link; setting it is what
+    # flips the item to `status='completed'` (PROC-INT-2) and voiding the charge
+    # is what releases it.
+    treatment_plan_item_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("treatment_plan_items.id"), index=True
+    )
     notes: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     # AL-10: the legacy LEDGER.CREATEDBY login string. `created_by` can only be

@@ -5672,7 +5672,8 @@
         "tags": [
           "Treatment Plans"
         ],
-        "summary": "All of a patient's plan items in one call (PLAN-12)",
+        "summary": "All of a patient's plan items in one call, paged (PLAN-12, PROC-INT-4)",
+        "description": "Every item across every plan of the patient, tenant-scoped through the plan. **Breaking (PROC-INT-4):** returns the standard `{items, meta}` envelope \u2014 the previous bare array ignored `size`. Each item carries `procedure_id`, the live charge that fulfilled it (PROC-INT-1). `size` defaults to 200 so the reconciliation call keeps seeing the whole plan set in one page.",
         "operationId": "list_patient_treatment_plan_items",
         "security": [
           {
@@ -5700,6 +5701,93 @@
             }
           },
           {
+            "name": "include_completed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "false = only open items (status != completed)",
+              "default": true,
+              "title": "Include Completed"
+            },
+            "description": "false = only open items (status != completed)"
+          },
+          {
+            "name": "plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Limit to one plan",
+              "title": "Plan Id"
+            },
+            "description": "Limit to one plan"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact item status",
+              "title": "Status"
+            },
+            "description": "Exact item status"
+          },
+          {
+            "name": "procedure_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Procedure Code"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Size"
+            }
+          },
+          {
             "name": "X-Tenant-ID",
             "in": "header",
             "required": false,
@@ -5722,11 +5810,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TreatmentPlanItemRead"
-                  },
-                  "title": "Response List Patient Treatment Plan Items"
+                  "$ref": "#/components/schemas/PaginatedResponse_TreatmentPlanItemRead_"
                 }
               }
             }
@@ -5762,6 +5846,156 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/treatment-plan-items/{item_id}/post": {
+      "post": {
+        "tags": [
+          "Treatment Plans"
+        ],
+        "summary": "Post to Ledger: create the charge that fulfils this item and close it (PROC-INT-1/2)",
+        "description": "One transaction: a `patient_procedures` row is created with `treatment_plan_item_id` = this item (inheriting code, tooth, surface, quadrant, material, fee, estimate and provider unless overridden in the body) and the item flips to `status='completed'` with `end_date` = the service date. 409 `item_already_posted` if a live charge already fulfils the item; 422 `provider_required` / `office_required` when neither the body nor the item/plan supplies one. Voiding the charge later reopens the item.",
+        "operationId": "post_treatment_plan_item",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PostPlanItemRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientProcedureRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/metadata/procedure-entry-rules": {
+      "get": {
+        "tags": [
+          "Metadata"
+        ],
+        "summary": "Surface / quadrant / tooth vocabulary and the enforcement contract (PROC-INT-6/8)",
+        "description": "The canonical surface codes (M O I D B F L, Class V as B5/F5/L5), their storage order, the quadrant codes, Universal tooth numbering incl. supernumerary, which `procedure_codes` flags the server enforces with a 422 (and which are advisory), and the error codes a client can expect. Drive the ADD PROCEDURE DETAILS pop-up from this so every client renders what the API validates.",
+        "operationId": "get_procedure_entry_rules",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Procedure Entry Rules"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/fee-schedules/options": {
@@ -5802,7 +6036,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FeeScheduleOption"
+                    "$ref": "#/components/schemas/app__schemas__procedure_setup__FeeScheduleOption"
                   },
                   "title": "Response List Fee Schedule Options"
                 }
@@ -29393,6 +29627,925 @@
         }
       }
     },
+    "/api/v1/sms/send": {
+      "post": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Send a text to a patient via Twilio (SMS-1)",
+        "operationId": "send_sms",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsSendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsMessageRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "400": {
+            "description": "patient_opted_out / consent_override_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "duplicate_client_id (details.sms_message is the existing row)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "sms_rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "twilio_error (row persisted as failed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sms/gateway": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Is Twilio configured (live) or is the gateway in log-only mode?",
+        "operationId": "get_sms_gateway_status",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsGatewayStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/sms/sender": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Which From number / Messaging Service an office sends from (SMS-7)",
+        "operationId": "resolve_sms_sender",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsSenderResolution"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/sms/render": {
+      "post": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Render {{merge_fields}} for one patient (SMS-5)",
+        "operationId": "render_sms",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsRenderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsRenderResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/sms/inbox/summary": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Unread / needs-attention / unmatched / failed counts per office (SMS-6)",
+        "operationId": "get_sms_inbox_summary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsInboxSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/sms/inbox/mark-read": {
+      "post": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Mark every unread reply read (per patient and/or office)",
+        "operationId": "mark_sms_replies_read",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsMarkReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsMarkReadResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/sms/reminders/run": {
+      "post": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Send every due automated appointment reminder for this tenant (SMS-9)",
+        "operationId": "run_sms_reminders",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/SmsReminderRunRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsReminderRunResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/sms/metadata": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Message-type / status / intent vocabularies + merge fields",
+        "operationId": "get_sms_metadata",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsMetadata"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/email/send": {
+      "post": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Send an e-mail to a patient via SendGrid (EMAIL-1)",
+        "operationId": "send_email",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailSendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailMessageRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "502": {
+            "description": "sendgrid_error (row persisted as failed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/email/gateway": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Is SendGrid configured (live) or is the gateway in log-only mode?",
+        "operationId": "get_email_gateway_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailGatewayStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/email/metadata": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Get Email Metadata",
+        "operationId": "get_email_metadata",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailMetadata"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/tenants": {
       "get": {
         "tags": [
@@ -48225,6 +49378,24 @@
             "description": "Filter by bundle_id"
           },
           {
+            "name": "procedure_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by procedure_code",
+              "title": "Procedure Code"
+            },
+            "description": "Filter by procedure_code"
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -55272,6 +56443,42 @@
             "description": "Filter by is_archived"
           },
           {
+            "name": "tooth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by tooth",
+              "title": "Tooth"
+            },
+            "description": "Filter by tooth"
+          },
+          {
+            "name": "material_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by material_id",
+              "title": "Material Id"
+            },
+            "description": "Filter by material_id"
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -55947,6 +57154,24 @@
               "title": "Treatment Plan Id"
             },
             "description": "Filter by treatment_plan_id"
+          },
+          {
+            "name": "treatment_plan_item_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by treatment_plan_item_id",
+              "title": "Treatment Plan Item Id"
+            },
+            "description": "Filter by treatment_plan_item_id"
           },
           {
             "name": "hold_claim",
@@ -76421,6 +77646,318 @@
             "description": "Filter by is_read"
           },
           {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by office_id",
+              "title": "Office Id"
+            },
+            "description": "Filter by office_id"
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by direction",
+              "title": "Direction"
+            },
+            "description": "Filter by direction"
+          },
+          {
+            "name": "send_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by send_status",
+              "title": "Send Status"
+            },
+            "description": "Filter by send_status"
+          },
+          {
+            "name": "needs_attention",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by needs_attention",
+              "title": "Needs Attention"
+            },
+            "description": "Filter by needs_attention"
+          },
+          {
+            "name": "reply_intent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by reply_intent",
+              "title": "Reply Intent"
+            },
+            "description": "Filter by reply_intent"
+          },
+          {
+            "name": "template_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by template_id",
+              "title": "Template Id"
+            },
+            "description": "Filter by template_id"
+          },
+          {
+            "name": "twilio_sid",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by twilio_sid",
+              "title": "Twilio Sid"
+            },
+            "description": "Filter by twilio_sid"
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by client_id",
+              "title": "Client Id"
+            },
+            "description": "Filter by client_id"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by date_from",
+              "title": "Date From"
+            },
+            "description": "Filter by date_from"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by date_to",
+              "title": "Date To"
+            },
+            "description": "Filter by date_to"
+          },
+          {
+            "name": "unmatched",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by unmatched",
+              "title": "Unmatched"
+            },
+            "description": "Filter by unmatched"
+          },
+          {
+            "name": "has_reply",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by has_reply",
+              "title": "Has Reply"
+            },
+            "description": "Filter by has_reply"
+          },
+          {
+            "name": "unread_replies",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by unread_replies",
+              "title": "Unread Replies"
+            },
+            "description": "Filter by unread_replies"
+          },
+          {
+            "name": "sent_at_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "sent_at >= (inclusive lower bound)",
+              "title": "Sent At From"
+            },
+            "description": "sent_at >= (inclusive lower bound)"
+          },
+          {
+            "name": "sent_at_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "sent_at <= (inclusive upper bound)",
+              "title": "Sent At To"
+            },
+            "description": "sent_at <= (inclusive upper bound)"
+          },
+          {
+            "name": "reply_received_on_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "reply_received_on >= (inclusive lower bound)",
+              "title": "Reply Received On From"
+            },
+            "description": "reply_received_on >= (inclusive lower bound)"
+          },
+          {
+            "name": "reply_received_on_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "reply_received_on <= (inclusive upper bound)",
+              "title": "Reply Received On To"
+            },
+            "description": "reply_received_on <= (inclusive upper bound)"
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -76875,6 +78412,1272 @@
               "title": "Item Id"
             },
             "description": "sms_message identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/sms-templates": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "List sms templates",
+        "operationId": "list_sms_templates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by office_id",
+              "title": "Office Id"
+            },
+            "description": "Filter by office_id"
+          },
+          {
+            "name": "message_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by message_type",
+              "title": "Message Type"
+            },
+            "description": "Filter by message_type"
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by is_active",
+              "title": "Is Active"
+            },
+            "description": "Filter by is_active"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Column to sort by",
+              "title": "Sort"
+            },
+            "description": "Column to sort by"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Free-text search",
+              "title": "Search"
+            },
+            "description": "Free-text search"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_SmsTemplateRead_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Create sms template",
+        "operationId": "create_sms_template",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsTemplateCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsTemplateRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/sms-templates/{item_id}": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Get sms template by id",
+        "operationId": "get_sms_template",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "sms_template identifier",
+              "title": "Item Id"
+            },
+            "description": "sms_template identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsTemplateRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Update sms template",
+        "operationId": "update_sms_template",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "sms_template identifier",
+              "title": "Item Id"
+            },
+            "description": "sms_template identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsTemplateUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsTemplateRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Delete sms template",
+        "operationId": "delete_sms_template",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "sms_template identifier",
+              "title": "Item Id"
+            },
+            "description": "sms_template identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/email-messages": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "List email messages",
+        "operationId": "list_email_messages",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by patient_id",
+              "title": "Patient Id"
+            },
+            "description": "Filter by patient_id"
+          },
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by office_id",
+              "title": "Office Id"
+            },
+            "description": "Filter by office_id"
+          },
+          {
+            "name": "appointment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by appointment_id",
+              "title": "Appointment Id"
+            },
+            "description": "Filter by appointment_id"
+          },
+          {
+            "name": "message_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by message_type",
+              "title": "Message Type"
+            },
+            "description": "Filter by message_type"
+          },
+          {
+            "name": "send_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by send_status",
+              "title": "Send Status"
+            },
+            "description": "Filter by send_status"
+          },
+          {
+            "name": "is_read",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by is_read",
+              "title": "Is Read"
+            },
+            "description": "Filter by is_read"
+          },
+          {
+            "name": "sent_at_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "sent_at >= (inclusive lower bound)",
+              "title": "Sent At From"
+            },
+            "description": "sent_at >= (inclusive lower bound)"
+          },
+          {
+            "name": "sent_at_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "sent_at <= (inclusive upper bound)",
+              "title": "Sent At To"
+            },
+            "description": "sent_at <= (inclusive upper bound)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Column to sort by",
+              "title": "Sort"
+            },
+            "description": "Column to sort by"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Free-text search",
+              "title": "Search"
+            },
+            "description": "Free-text search"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_EmailMessageRead_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Create email message",
+        "operationId": "create_email_message",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailMessageCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailMessageRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/email-messages/{item_id}": {
+      "get": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Get email message by id",
+        "operationId": "get_email_message",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "email_message identifier",
+              "title": "Item Id"
+            },
+            "description": "email_message identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailMessageRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Update email message",
+        "operationId": "update_email_message",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "email_message identifier",
+              "title": "Item Id"
+            },
+            "description": "email_message identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailMessageUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailMessageRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Communications"
+        ],
+        "summary": "Delete email message",
+        "operationId": "delete_email_message",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "email_message identifier",
+              "title": "Item Id"
+            },
+            "description": "email_message identifier"
           },
           {
             "name": "X-Tenant-ID",
@@ -86626,6 +89429,60 @@
             ],
             "title": "Updated By"
           },
+          "messaging_service_sid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messaging Service Sid"
+          },
+          "sms_from_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms From Phone"
+          },
+          "sms_quiet_hours_start": {
+            "type": "integer",
+            "title": "Sms Quiet Hours Start"
+          },
+          "sms_quiet_hours_end": {
+            "type": "integer",
+            "title": "Sms Quiet Hours End"
+          },
+          "sms_reminders_enabled": {
+            "type": "boolean",
+            "title": "Sms Reminders Enabled"
+          },
+          "sms_reminder_lead_hours": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Reminder Lead Hours"
+          },
+          "sms_reminder_template_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Reminder Template Id"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -86664,6 +89521,9 @@
         "required": [
           "tenant_id",
           "comm_country",
+          "sms_quiet_hours_start",
+          "sms_quiet_hours_end",
+          "sms_reminders_enabled",
           "id",
           "created_at"
         ],
@@ -86935,6 +89795,81 @@
               }
             ],
             "title": "Telecom Verified At"
+          },
+          "messaging_service_sid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messaging Service Sid"
+          },
+          "sms_from_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms From Phone"
+          },
+          "sms_quiet_hours_start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Quiet Hours Start"
+          },
+          "sms_quiet_hours_end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Quiet Hours End"
+          },
+          "sms_reminders_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Reminders Enabled"
+          },
+          "sms_reminder_lead_hours": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Reminder Lead Hours"
+          },
+          "sms_reminder_template_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Reminder Template Id"
           },
           "ein": {
             "anyOf": [
@@ -96836,6 +99771,28 @@
             ],
             "title": "Surface"
           },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
+          },
+          "material_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Id"
+          },
           "priority": {
             "type": "integer",
             "title": "Priority"
@@ -97183,6 +100140,17 @@
               }
             ],
             "title": "Treatment Plan Id"
+          },
+          "treatment_plan_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment Plan Item Id"
           },
           "notes": {
             "anyOf": [
@@ -101452,6 +104420,17 @@
             ],
             "title": "Treatment Plan Id"
           },
+          "treatment_plan_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment Plan Item Id"
+          },
           "notes": {
             "anyOf": [
               {
@@ -102332,6 +105311,28 @@
             ],
             "title": "Tooth"
           },
+          "surface": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Surface"
+          },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
+          },
           "sort_order": {
             "anyOf": [
               {
@@ -102382,6 +105383,28 @@
               }
             ],
             "title": "Tooth"
+          },
+          "surface": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Surface"
+          },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
           },
           "sort_order": {
             "type": "integer",
@@ -102441,6 +105464,28 @@
               }
             ],
             "title": "Tooth"
+          },
+          "surface": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Surface"
+          },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
           },
           "sort_order": {
             "anyOf": [
@@ -105509,6 +108554,795 @@
         ],
         "title": "EligibilityVerifyResult"
       },
+      "EmailGatewayStatus": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "from_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Email"
+          },
+          "webhook_validation": {
+            "type": "boolean",
+            "title": "Webhook Validation"
+          },
+          "webhook_signing_ready": {
+            "type": "boolean",
+            "title": "Webhook Signing Ready"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured",
+          "mode",
+          "webhook_validation",
+          "webhook_signing_ready"
+        ],
+        "title": "EmailGatewayStatus"
+      },
+      "EmailMessageCreate": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "to_email": {
+            "type": "string",
+            "title": "To Email"
+          },
+          "from_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Email"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "body_html": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Html"
+          },
+          "body_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Text"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "send_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Send Status"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "message_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Type"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "is_read": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Read"
+          }
+        },
+        "type": "object",
+        "required": [
+          "to_email",
+          "subject"
+        ],
+        "title": "EmailMessageCreate"
+      },
+      "EmailMessageRead": {
+        "properties": {
+          "tenant_id": {
+            "type": "integer",
+            "title": "Tenant Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "to_email": {
+            "type": "string",
+            "title": "To Email"
+          },
+          "from_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Email"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "body_html": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Html"
+          },
+          "body_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Text"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "provider_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Message Id"
+          },
+          "send_status": {
+            "type": "string",
+            "title": "Send Status"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "message_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Type"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "is_read": {
+            "type": "boolean",
+            "title": "Is Read"
+          },
+          "status_payload_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Payload Hash"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "to_email",
+          "subject",
+          "send_status",
+          "is_read",
+          "id",
+          "created_at"
+        ],
+        "title": "EmailMessageRead"
+      },
+      "EmailMessageUpdate": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "to_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Email"
+          },
+          "from_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Email"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "body_html": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Html"
+          },
+          "body_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Text"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "send_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Send Status"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "message_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Type"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "is_read": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Read"
+          }
+        },
+        "type": "object",
+        "title": "EmailMessageUpdate"
+      },
+      "EmailMetadata": {
+        "properties": {
+          "message_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Message Types"
+          },
+          "send_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Send Statuses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_types",
+          "send_statuses"
+        ],
+        "title": "EmailMetadata"
+      },
+      "EmailSendRequest": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "to_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Email",
+            "description": "Defaults to the patient's e-mail"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "body_html": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Html"
+          },
+          "body_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Text"
+          },
+          "message_type": {
+            "type": "string",
+            "title": "Message Type",
+            "default": "manual"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "override_consent": {
+            "type": "boolean",
+            "title": "Override Consent",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "subject"
+        ],
+        "title": "EmailSendRequest"
+      },
       "EmergencyContactIn": {
         "properties": {
           "id": {
@@ -106416,6 +110250,17 @@
               }
             ],
             "title": "Surface"
+          },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
           }
         },
         "type": "object",
@@ -106472,6 +110317,17 @@
               }
             ],
             "title": "Surface"
+          },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
           },
           "id": {
             "type": "integer",
@@ -106564,6 +110420,17 @@
               }
             ],
             "title": "Surface"
+          },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
           }
         },
         "type": "object",
@@ -107515,17 +111382,6 @@
           "name": {
             "type": "string",
             "title": "Name"
-          },
-          "fee_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fee Type"
           }
         },
         "type": "object",
@@ -124900,7 +128756,7 @@
           },
           "fee_schedules": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__FeeScheduleOption"
+              "$ref": "#/components/schemas/FeeScheduleOption"
             },
             "type": "array",
             "title": "Fee Schedules"
@@ -124942,6 +128798,17 @@
           "is_model_office": {
             "type": "boolean",
             "title": "Is Model Office"
+          },
+          "messaging_service_sid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messaging Service Sid"
           },
           "id": {
             "type": "integer",
@@ -129553,6 +133420,26 @@
         ],
         "title": "PaginatedResponse[DefinitionRead]"
       },
+      "PaginatedResponse_EmailMessageRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EmailMessageRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[EmailMessageRead]"
+      },
       "PaginatedResponse_EmployerRead_": {
         "properties": {
           "items": {
@@ -130952,6 +134839,26 @@
           "meta"
         ],
         "title": "PaginatedResponse[SmsMessageRead]"
+      },
+      "PaginatedResponse_SmsTemplateRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SmsTemplateRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[SmsTemplateRead]"
       },
       "PaginatedResponse_StatementRead_": {
         "properties": {
@@ -133298,6 +137205,30 @@
               }
             ],
             "title": "No Auto Sms"
+          },
+          "sms_opt_out_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Opt Out At"
+          },
+          "sms_opt_in_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Opt In At"
           },
           "is_locked": {
             "anyOf": [
@@ -138625,6 +142556,17 @@
             ],
             "title": "Treatment Plan Id"
           },
+          "treatment_plan_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment Plan Item Id"
+          },
           "notes": {
             "anyOf": [
               {
@@ -138913,6 +142855,17 @@
               }
             ],
             "title": "Treatment Plan Id"
+          },
+          "treatment_plan_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment Plan Item Id"
           },
           "notes": {
             "anyOf": [
@@ -139375,6 +143328,17 @@
               }
             ],
             "title": "Treatment Plan Id"
+          },
+          "treatment_plan_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment Plan Item Id"
           },
           "notes": {
             "anyOf": [
@@ -140035,6 +143999,30 @@
           "no_auto_sms": {
             "type": "boolean",
             "title": "No Auto Sms"
+          },
+          "sms_opt_out_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Opt Out At"
+          },
+          "sms_opt_in_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Opt In At"
           },
           "is_locked": {
             "type": "boolean",
@@ -142888,6 +146876,30 @@
               }
             ],
             "title": "No Auto Sms"
+          },
+          "sms_opt_out_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Opt Out At"
+          },
+          "sms_opt_in_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Opt In At"
           },
           "is_locked": {
             "anyOf": [
@@ -148624,6 +152636,158 @@
         "type": "object",
         "title": "PostInstallmentRequest",
         "description": "Overrides for a single posting. Everything is optional \u2014 the service\nresolves each value from the contract, then the patient, before failing."
+      },
+      "PostPlanItemRequest": {
+        "properties": {
+          "date_of_service": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Service"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "hygienist_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hygienist Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee"
+          },
+          "insurance_estimate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insurance Estimate"
+          },
+          "patient_estimate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Estimate"
+          },
+          "apply_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apply To"
+          },
+          "billing_order": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billing Order"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
+          }
+        },
+        "type": "object",
+        "title": "PostPlanItemRequest",
+        "description": "Body for ``POST /treatment-plan-items/{id}/post`` (Post to Ledger).\n\nEvery field is optional: the charge inherits the item (code, tooth, surface,\nquadrant, material, fee, provider) and the plan/patient (office). Anything\ngiven here overrides the inherited value."
       },
       "PostcardTemplateCreate": {
         "properties": {
@@ -159523,6 +163687,30 @@
             "type": "boolean",
             "title": "No Auto Sms"
           },
+          "sms_opt_out_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Opt Out At"
+          },
+          "sms_opt_in_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sms Opt In At"
+          },
           "is_locked": {
             "type": "boolean",
             "title": "Is Locked"
@@ -160228,6 +164416,203 @@
         "type": "object",
         "title": "SmartAssistUpdate"
       },
+      "SmsGatewayStatus": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "live | log_only"
+          },
+          "webhook_validation": {
+            "type": "boolean",
+            "title": "Webhook Validation"
+          },
+          "webhook_signing_ready": {
+            "type": "boolean",
+            "title": "Webhook Signing Ready"
+          },
+          "status_callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Callback Url"
+          },
+          "messaging_service_configured": {
+            "type": "boolean",
+            "title": "Messaging Service Configured"
+          },
+          "quiet_hours": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quiet Hours"
+          },
+          "reminders_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminders Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured",
+          "mode",
+          "webhook_validation",
+          "webhook_signing_ready",
+          "messaging_service_configured"
+        ],
+        "title": "SmsGatewayStatus"
+      },
+      "SmsInboxOfficeSummary": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "office_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Name"
+          },
+          "unread_replies": {
+            "type": "integer",
+            "title": "Unread Replies"
+          },
+          "needs_attention": {
+            "type": "integer",
+            "title": "Needs Attention"
+          },
+          "unmatched": {
+            "type": "integer",
+            "title": "Unmatched"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "office_id",
+          "office_name",
+          "unread_replies",
+          "needs_attention",
+          "unmatched",
+          "failed"
+        ],
+        "title": "SmsInboxOfficeSummary"
+      },
+      "SmsInboxSummary": {
+        "properties": {
+          "unread_replies": {
+            "type": "integer",
+            "title": "Unread Replies"
+          },
+          "needs_attention": {
+            "type": "integer",
+            "title": "Needs Attention"
+          },
+          "unmatched": {
+            "type": "integer",
+            "title": "Unmatched"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "offices": {
+            "items": {
+              "$ref": "#/components/schemas/SmsInboxOfficeSummary"
+            },
+            "type": "array",
+            "title": "Offices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread_replies",
+          "needs_attention",
+          "unmatched",
+          "failed",
+          "offices"
+        ],
+        "title": "SmsInboxSummary"
+      },
+      "SmsMarkReadRequest": {
+        "properties": {
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          }
+        },
+        "type": "object",
+        "title": "SmsMarkReadRequest"
+      },
+      "SmsMarkReadResult": {
+        "properties": {
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated"
+        ],
+        "title": "SmsMarkReadResult"
+      },
       "SmsMessageCreate": {
         "properties": {
           "office_id": {
@@ -160363,6 +164748,137 @@
               }
             ],
             "title": "Is Read"
+          },
+          "from_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Phone"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "reply_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Intent"
+          },
+          "needs_attention": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Needs Attention"
+          },
+          "candidate_patient_ids": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Patient Ids"
+          },
+          "reminder_lead_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Lead Hours"
           }
         },
         "type": "object",
@@ -160523,6 +165039,186 @@
             ],
             "title": "Created By"
           },
+          "twilio_sid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twilio Sid"
+          },
+          "reply_twilio_sid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Twilio Sid"
+          },
+          "from_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Phone"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "reply_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Intent"
+          },
+          "needs_attention": {
+            "type": "boolean",
+            "title": "Needs Attention"
+          },
+          "candidate_patient_ids": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Patient Ids"
+          },
+          "reminder_lead_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Lead Hours"
+          },
+          "inbound_payload_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inbound Payload Hash"
+          },
+          "status_payload_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Payload Hash"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -160531,16 +165227,95 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "patient_first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient First Name"
+          },
+          "patient_last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Last Name"
+          },
+          "patient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Name"
+          },
+          "patient_chart_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Chart No"
+          },
+          "office_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Name"
+          },
+          "template_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Name"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
           }
         },
         "type": "object",
         "required": [
           "tenant_id",
           "is_read",
+          "needs_attention",
           "id",
           "created_at"
         ],
-        "title": "SmsMessageRead"
+        "title": "SmsMessageRead",
+        "description": "SMS-6: denormalised so the inbox never fans out per row."
       },
       "SmsMessageUpdate": {
         "properties": {
@@ -160677,10 +165452,751 @@
               }
             ],
             "title": "Is Read"
+          },
+          "from_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Phone"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "reply_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Intent"
+          },
+          "needs_attention": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Needs Attention"
+          },
+          "candidate_patient_ids": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Patient Ids"
+          },
+          "reminder_lead_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Lead Hours"
           }
         },
         "type": "object",
         "title": "SmsMessageUpdate"
+      },
+      "SmsMetadata": {
+        "properties": {
+          "message_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Message Types"
+          },
+          "sendable_message_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sendable Message Types"
+          },
+          "send_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Send Statuses"
+          },
+          "reply_intents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reply Intents"
+          },
+          "directions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Directions"
+          },
+          "merge_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Merge Fields"
+          },
+          "max_body_length": {
+            "type": "integer",
+            "title": "Max Body Length"
+          },
+          "stop_keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stop Keywords"
+          },
+          "start_keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Start Keywords"
+          },
+          "reply_window_hours": {
+            "type": "integer",
+            "title": "Reply Window Hours"
+          },
+          "default_reminder_body": {
+            "type": "string",
+            "title": "Default Reminder Body"
+          },
+          "default_reminder_lead_hours": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Default Reminder Lead Hours"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_types",
+          "sendable_message_types",
+          "send_statuses",
+          "reply_intents",
+          "directions",
+          "merge_fields",
+          "max_body_length",
+          "stop_keywords",
+          "start_keywords",
+          "reply_window_hours",
+          "default_reminder_body",
+          "default_reminder_lead_hours"
+        ],
+        "title": "SmsMetadata"
+      },
+      "SmsReminderRunRequest": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "SmsReminderRunRequest"
+      },
+      "SmsReminderRunResult": {
+        "properties": {
+          "tenants": {
+            "type": "integer",
+            "title": "Tenants"
+          },
+          "scanned": {
+            "type": "integer",
+            "title": "Scanned"
+          },
+          "sent": {
+            "type": "integer",
+            "title": "Sent"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "skipped": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Skipped"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenants",
+          "scanned",
+          "sent",
+          "failed",
+          "skipped",
+          "dry_run",
+          "items"
+        ],
+        "title": "SmsReminderRunResult"
+      },
+      "SmsRenderRequest": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body",
+            "description": "Raw body with {{merge_fields}}; or pass template_id"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "SmsRenderRequest"
+      },
+      "SmsRenderResult": {
+        "properties": {
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "unresolved_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unresolved Fields"
+          },
+          "context": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Context"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "message_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Type"
+          },
+          "length": {
+            "type": "integer",
+            "title": "Length"
+          },
+          "segments": {
+            "type": "integer",
+            "title": "Segments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "body",
+          "unresolved_fields",
+          "context",
+          "length",
+          "segments"
+        ],
+        "title": "SmsRenderResult"
+      },
+      "SmsSendRequest": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "to_phone": {
+            "type": "string",
+            "title": "To Phone",
+            "description": "E.164 (+1\u2026); US 10-digit numbers are normalised"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 1600,
+            "minLength": 1,
+            "title": "Body"
+          },
+          "message_type": {
+            "type": "string",
+            "title": "Message Type",
+            "description": "manual|appointment_reminder|appointment_confirmation|recall|balance|other",
+            "default": "manual"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id",
+            "description": "Idempotency key \u2014 the same value never sends twice"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "override_consent": {
+            "type": "boolean",
+            "title": "Override Consent",
+            "description": "SMS-8: required to send a *manual* text to a patient with no_auto_sms",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "to_phone",
+          "body"
+        ],
+        "title": "SmsSendRequest"
+      },
+      "SmsSenderResolution": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "from_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Phone"
+          },
+          "messaging_service_sid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messaging Service Sid"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "office_specific|multi_office_shared|tenant_default|platform_default|none"
+          }
+        },
+        "type": "object",
+        "required": [
+          "office_id",
+          "from_phone",
+          "messaging_service_sid",
+          "source"
+        ],
+        "title": "SmsSenderResolution"
+      },
+      "SmsTemplateCreate": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "message_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Type"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "body"
+        ],
+        "title": "SmsTemplateCreate"
+      },
+      "SmsTemplateRead": {
+        "properties": {
+          "tenant_id": {
+            "type": "integer",
+            "title": "Tenant Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "message_type": {
+            "type": "string",
+            "title": "Message Type"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "name",
+          "message_type",
+          "body",
+          "is_active",
+          "id",
+          "created_at"
+        ],
+        "title": "SmsTemplateRead"
+      },
+      "SmsTemplateUpdate": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "message_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Type"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "SmsTemplateUpdate"
       },
       "StatementBatchRequest": {
         "properties": {
@@ -162830,6 +168346,28 @@
             ],
             "title": "Surface"
           },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
+          },
+          "material_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Id"
+          },
           "priority": {
             "anyOf": [
               {
@@ -162903,7 +168441,9 @@
                   "unaccepted",
                   "hold",
                   "alternative",
-                  "referred_out"
+                  "referred_out",
+                  "scheduled",
+                  "completed"
                 ]
               },
               {
@@ -163026,6 +168566,28 @@
               }
             ],
             "title": "Surface"
+          },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
+          },
+          "material_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Id"
           },
           "priority": {
             "type": "integer",
@@ -163157,6 +168719,17 @@
               }
             ],
             "title": "Updated At"
+          },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
           }
         },
         "type": "object",
@@ -163245,6 +168818,28 @@
             ],
             "title": "Surface"
           },
+          "quadrant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quadrant"
+          },
+          "material_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Id"
+          },
           "priority": {
             "anyOf": [
               {
@@ -163318,7 +168913,9 @@
                   "unaccepted",
                   "hold",
                   "alternative",
-                  "referred_out"
+                  "referred_out",
+                  "scheduled",
+                  "completed"
                 ]
               },
               {
@@ -166075,24 +171672,6 @@
         ],
         "title": "PaymentAllocationRead"
       },
-      "app__schemas__office_setup__FeeScheduleOption": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "FeeScheduleOption"
-      },
       "app__schemas__patient_intake__MedicalAlertIn": {
         "properties": {
           "alert_code": {
@@ -166138,6 +171717,35 @@
           "alert_code"
         ],
         "title": "MedicalAlertIn"
+      },
+      "app__schemas__procedure_setup__FeeScheduleOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "fee_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "FeeScheduleOption"
       },
       "app__schemas__provider_setup__ScheduleDayInput": {
         "properties": {

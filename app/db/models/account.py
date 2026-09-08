@@ -17,6 +17,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Date,
     ForeignKey,
@@ -182,6 +183,22 @@ class AccountCommunications(Base, IntPKMixin, TimestampMixin):
     telecom_verified_at: Mapped[datetime | None]
     telecom_verified_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # ── SMS-7: tenant-level Twilio sender settings. The Auth Token / API secret
+    # are NOT here — they live only in the server environment (TWILIO_*). A
+    # Messaging Service SID is not a secret (it is the *from* selector).
+    messaging_service_sid: Mapped[str | None] = mapped_column(String(40))
+    # Tenant default From number (E.164) when no office assignment matches.
+    sms_from_phone: Mapped[str | None] = mapped_column(String(20))
+    # ── SMS-8: TCPA quiet hours (office-local, hour of day). Automated texts
+    # outside [start, end) are refused; a manual text is a human's decision.
+    sms_quiet_hours_start: Mapped[int] = mapped_column(Integer, default=8)
+    sms_quiet_hours_end: Mapped[int] = mapped_column(Integer, default=21)
+    # ── SMS-9: automated appointment reminders.
+    sms_reminders_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    sms_reminder_lead_hours: Mapped[list | None] = mapped_column(JSON)  # e.g. [48, 2]
+    sms_reminder_template_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("sms_templates.id")
+    )
 
 
 class OfficePhoneAssignment(Base, IntPKMixin, CreatedAtMixin):
@@ -194,6 +211,8 @@ class OfficePhoneAssignment(Base, IntPKMixin, CreatedAtMixin):
     assignment_type: Mapped[str] = mapped_column(String(30), default="office_specific")  # office_specific | multi_office_shared
     phone_number: Mapped[str | None] = mapped_column(String(20))
     is_model_office: Mapped[bool] = mapped_column(Boolean, default=False)
+    # SMS-7: per-office Messaging Service override (else the tenant's).
+    messaging_service_sid: Mapped[str | None] = mapped_column(String(40))
 
 
 class AccountHoliday(Base, IntPKMixin, TimestampMixin):

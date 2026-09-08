@@ -959,6 +959,101 @@ generic answer resources one HTTP request per row.
   `signature_status` — a printed history that doesn't say the signature is stale
   is a misleading clinical document.
 
+**Procedure entry — one path for four screens** (Transactions Entry · Account Ledger Add Proc ·
+Restorative Chart · Treatment Plan; PROC-INT-1…9 of
+[docs/procedures/procedure_entry_integration.md](docs/procedures/procedure_entry_integration.md)
+/ [response](docs/procedures/procedure_entry_backend_response.md); Alembic `d9e0f1a2b3c4`).
+- **PROC-INT-1/2** `patient_procedures.treatment_plan_item_id` is the canonical item↔charge
+  link (the FE had been pairing by code+tooth+surface, and two identical open items collapsed
+  to one key). The item's `procedure_id` on every read is **derived** from it. Setting the FK
+  is what flips the item to `status='completed'` (a real enum value now, plus `scheduled`) —
+  in the **same transaction** as the charge insert, via `PatientProcedureCRUD`
+  ([app/services/patient_procedure_service.py](app/services/patient_procedure_service.py))
+  + `bind_item_to_charge`/`release_item` in
+  [app/services/treatment_service.py](app/services/treatment_service.py); voiding /
+  re-pointing releases it back to `accepted` unless another live charge remains. A client
+  writing `completed` by hand is 422 `status_requires_charge`; un-completing under a live
+  charge is 422 `item_has_posted_charge`. `POST /treatment-plan-items/{id}/post` is Post to
+  Ledger server-side (charge + close in one call; 409 `item_already_posted`). Migrated
+  `Completed`/`Scheduled` casings were lower-cased in the migration.
+- **PROC-INT-6/8** [app/services/procedure_rules_service.py](app/services/procedure_rules_service.py)
+  is the one home for the surface vocabulary (`M O I D B F L`, order M·O/I·D·B/F·L, arch-aware
+  spelling, **Class V as a `5` suffix qualifier on B/F/L counted once**), Universal tooth
+  parsing (incl. supernumerary 51–82 / `AS`–`TS`) and the `requires_*` / surface-count /
+  `valid_teeth` / `tooth_area` / `allowed_quadrants` enforcement — run on **every** write to
+  `patient_procedures` and `treatment_plan_items` (422 with `details.code` + `details.field`),
+  normalise-only on `code_bundle_items`/`explosion_code_items`. On PATCH the rules run only when
+  the payload touches a clinical field, against the merge with the stored row — re-pricing one
+  of 1.37 M migrated charges with no tooth must not fail. `requires_lab` is deliberately
+  **advisory**. The migrated ledger keeps **quadrant codes in the `tooth` column** (`UR` 3,182
+  rows; `quadrant` is empty on all charges), so a quadrant code is a valid tooth and is mirrored
+  into `quadrant`. Published at `GET /metadata/procedure-entry-rules`.
+- **PROC-INT-3** `procedures.changed` rides the **existing messaging WebSocket** on a new
+  tenant-wide topic (`msg:{tenant}:tenant`, `messaging_events.publish_tenant`); every
+  procedure/item write announces via [app/services/procedure_events.py](app/services/procedure_events.py).
+  No per-patient subscription server-side — the client filters by `patient_id`.
+- **PROC-INT-4** `GET /patients/{id}/treatment-plan-items` returns the paginated envelope
+  (**breaking**, was a bare array ignoring `size`; default size 200) + `plan_id`/`status`/
+  `include_completed` filters. **PROC-INT-5/9** `treatment_plan_items.quadrant`/`material_id`,
+  `code_bundle_items.surface`/`quadrant`, `explosion_code_items.quadrant`.
+- **PROC-INT-7 applied**: `seed_procedure_code_rules.py` now derives `min/max_surfaces` (36),
+  `tooth_area` (12: anterior D2330–35/D2390/D2960–62, posterior D2391–94), `valid_teeth` (12),
+  arch-correct `surface_rules.allowed` (21) and `anatomy_rules.allowed_quadrants` (21), and
+  always clears junk `tooth_area` (3). `default_material_id` (tenant-scoped materials vs global
+  codes) and `draw_as` (a preference) are not derivable and left alone.
+
+**Patient SMS (Twilio) module** (Patient → Messages / SMS-Email log; SMS-1…10 + EMAIL-1 of
+[docs/sms/SMS_BACKEND_DEVREPORT.md](docs/sms/SMS_BACKEND_DEVREPORT.md) /
+[response](docs/sms/SMS_BACKEND_RESPONSE.md); Alembic `e0f1a2b3c4d5`). The app's
+**second anonymous surface** (after AppointNow) and its first outbound carrier integration.
+- **The table keeps its legacy shape on purpose**: one row per outbound text with the
+  reply on the *same* row — the FE fans `sent_text`/`reply_text` into two inbox entries.
+  A stand-alone inbound text is `sent_text IS NULL`, `direction='inbound'`. That is why
+  `reply_twilio_sid` exists beside `twilio_sid` (the reply needs its own sid for webhook
+  idempotency) and why an inbound within `SMS_REPLY_WINDOW_HOURS` of an unanswered
+  outbound lands *on that row* rather than as a new one.
+- **All Twilio traffic lives in [app/integrations/twilio_client.py](app/integrations/twilio_client.py)**
+  (raw `httpx`, no SDK): one REST call + the `X-Twilio-Signature` HMAC. With
+  `TWILIO_ACCOUNT_SID` unset the gateway is **log-only** — `POST /sms/send` still persists
+  `queued` and returns 201, nothing reaches a carrier — so tests/dev need no creds. The FE
+  probes `GET /sms/send` and treats **405** as Live; `GET /sms/gateway` is the honest
+  answer. The **Auth Token is never in the DB** — `messaging_service_sid` on
+  `account_communications` / `office_phone_assignments` is a selector, not a credential.
+- **Persist-then-send** ([app/services/sms_service.py](app/services/sms_service.py)):
+  the row is written before Twilio is called; a rejection is stored as `failed` **and**
+  surfaced as 502 `twilio_error` with the row in `details.sms_message`. 409
+  `duplicate_client_id` likewise returns the existing row in `details`. SMS-8 consent is
+  `patient_opted_out` (automated) / `consent_override_required` (manual without
+  `override_consent`); **quiet hours are office-local** (`account_communications.
+  sms_quiet_hours_*`, default 8–21) and refuse automated types only — a manual text is a
+  human's decision. `send(..., at=)` lets the reminder job judge quiet hours on *its*
+  clock; without it the whole batch was evaluated against wall-clock (this also bit the
+  test suite every evening — the seed fixture sets an always-open window).
+- **Webhooks** (`/sms/webhooks/inbound`, `/status`; async handlers, `run_in_threadpool`
+  into the sync service): signature is validated against several URL candidates
+  (request URL, `PUBLIC_API_BASE_URL` + path, both schemes, ± trailing slash) because
+  Cloud Run rewrites the scheme/host Twilio signed. Validation on + no token = **every
+  webhook refused**, never accepted unsigned. A `To` that routes nowhere is **200**, not
+  4xx (Twilio would retry forever). Inbound patient match expands E.164 into every legacy
+  storage spelling ([app/services/sms_phone.py](app/services/sms_phone.py)) and matches
+  with `IN` — no DB regex, so SQLite tests and Postgres behave alike. Confirmation
+  keywords act on the appointment (`confirm` → `Confirmed`, `reschedule` →
+  `add_to_call_list`); **`cancel` only flags `needs_attention`**, staff cancel. STOP is
+  matched on the *whole* body; "yes" re-opts-in only an opted-out patient (Twilio's own
+  rule), so "yes" to a reminder stays a confirmation. Status callbacks never regress
+  (`status_rank`). Both publish `sms.inbound`/`sms.status` on the messaging WS tenant
+  topic ([app/services/sms_events.py](app/services/sms_events.py), SMS-4).
+- `SmsMessageCRUD` normalises the FE's log-only `POST /sms-messages` fallback (direction,
+  `sent_at`, inferred `message_type`, `Success`→`delivered`) and resolves the SMS-6 inbox
+  filters (`date_from/to` on the activity timestamp, `unmatched`, `unread_replies`).
+  `infer_message_type` is the Python twin of the migration's SQL `CASE` backfill.
+- **SMS-9** `run_reminders` de-dups on `(appointment_id, message_type,
+  reminder_lead_hours)` three ways (query, deterministic `client_id`, partial unique
+  index) and skips anything older than `SMS_REMINDER_CATCHUP_HOURS` rather than blasting
+  after an outage; `scripts/run_sms_reminders.py` is the cron entry. **SMS-10**
+  `scripts/purge_sms_messages.py` blanks bodies, keeps rows. **EMAIL-1** mirrors the whole
+  shape over SendGrid ([app/services/email_service.py](app/services/email_service.py)).
+
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))
   records authenticated 2xx mutations (POST/PUT/PATCH/DELETE) to `audit_logs` via

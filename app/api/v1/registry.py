@@ -11,6 +11,8 @@ always narrows by patient/office within the authenticated tenant.
 
 from __future__ import annotations
 
+from datetime import date as _date
+
 from fastapi import APIRouter
 
 from app.crud.base import CRUDBase
@@ -48,10 +50,23 @@ from app.services.patient_procedure_service import PatientProcedureCRUD
 from app.services.payment_plan_service import PaymentPlanCRUD
 from app.services.provider_directory_service import ProviderCRUD
 from app.services.patient_note_service import PatientNoteCRUD, enrich_patient_notes
+from app.services.sms_service import SmsMessageCRUD, enrich_sms_messages
+from app.schemas.sms import (
+    EmailMessageCreate,
+    EmailMessageRead,
+    EmailMessageUpdate,
+    SmsMessageCreate,
+    SmsMessageRead,
+    SmsMessageUpdate,
+    SmsTemplateCreate,
+    SmsTemplateRead,
+    SmsTemplateUpdate,
+)
 from app.services.patient_service import PatientCRUD, PatientInsuranceCRUD
 from app.services.perio_service import attach_actor_names
 from app.services.progress_notes_service import ProgressNoteCRUD, enrich_progress_notes
-from app.services.treatment_service import TreatmentPlanItemCRUD
+from app.services.procedure_rules_service import ProcedureTemplateCRUD
+from app.services.treatment_service import TreatmentPlanItemCRUD, enrich_treatment_plan_item
 from app.schemas.fee_schedule import (
     FeeScheduleCreate,
     FeeScheduleRead,
@@ -518,8 +533,11 @@ _CODES = [
          filters=("fee_schedule_id", "procedure_code"), soft_field=None),
     _cfg(m.CodeBundle, "CodeBundle", "code-bundles", "Procedures",
          "code_bundle", "code_bundles", search=("name", "display_code"), soft_field=None),
+    # PROC-INT-9: surface + quadrant (aligned with explosion_code_items); tooth /
+    # surface / quadrant canonicalised on write, requirements not enforced (templates).
     _cfg(m.CodeBundleItem, "CodeBundleItem", "code-bundle-items", "Procedures",
-         "code_bundle_item", "code_bundle_items", filters=("bundle_id",), soft_field=None),
+         "code_bundle_item", "code_bundle_items", filters=("bundle_id", "procedure_code"),
+         soft_field=None, crud_class=ProcedureTemplateCRUD),
     _cfg(m.ChartMaterial, "ChartMaterial", "chart-materials", "Procedures",
          "chart_material", "chart_materials", search=("name",), soft_field=None),
     _cfg(m.NoteMacro, "NoteMacro", "note-macros", "Procedures",
@@ -546,7 +564,8 @@ _CODES = [
          filters=("office_id", "is_active")),
     _cfg(m.ExplosionCodeItem, "ExplosionCodeItem", "explosion-code-items", "Procedures",
          "explosion_code_item", "explosion_code_items",
-         filters=("explosion_code_id", "procedure_code"), soft_field=None),
+         filters=("explosion_code_id", "procedure_code"), soft_field=None,
+         crud_class=ProcedureTemplateCRUD),  # PROC-INT-9
 ]
 
 # ── Scheduling ─────────────────────────────────────────────────────────────
@@ -605,9 +624,12 @@ _TREATMENT = [
         pk_type=str,
         sortable_fields=("priority", "created_at"),
         filter_fields=("plan_id", "procedure_code", "status", "phase_id",
-                       "provider_id", "is_archived"),
+                       "provider_id", "is_archived", "tooth", "material_id"),
         soft_delete_field="is_archived", soft_delete_value=True,
         default_sort="created_at",
+        # PROC-INT-1: `procedure_id` = the live charge fulfilling the item.
+        read_enrich=enrich_treatment_plan_item,
+        # PROC-INT-2/3/8: status link guards, entry rules, procedures.changed push.
         crud_class=TreatmentPlanItemCRUD,
     ),
 ]
@@ -625,9 +647,10 @@ _CLINICAL = [
         # treatment_plan_id: planned→completed lineage filter (REST).
         # AL-17: hold_claim — the ledger needs held charges kept out of Create
         # Claim; without a filter the grid pulled every procedure to find them.
+        # PROC-INT-1: treatment_plan_item_id — the charge that fulfilled one item.
         filter_fields=("patient_id", "appointment_id", "provider_id", "procedure_code",
                        "claim_id", "office_id", "billing_status", "treatment_plan_id",
-                       "hold_claim", "fee_schedule_id", "is_void"),
+                       "treatment_plan_item_id", "hold_claim", "fee_schedule_id", "is_void"),
         range_fields=("date_of_service",), soft_delete_field="is_void", soft_delete_value=True,
         default_sort="created_at", read_enrich=enrich_patient_procedure,
         # AL-17: a held charge must not be claimable from any caller, not just from
@@ -880,9 +903,67 @@ _REFERENCE = [
 
 # ── Communications ─────────────────────────────────────────────────────────
 _COMMS = [
-    _cfg(m.SmsMessage, "SmsMessage", "sms-messages", "Communications",
-         "sms_message", "sms_messages", search=("sent_text", "sent_phone"),
-         filters=("patient_id", "appointment_id", "message_type", "is_read"), soft_field=None),
+    # SMS-3/6: the Twilio columns ride on the derived schema; SmsMessageCRUD
+    # resolves the inbox filters (date range on the activity timestamp,
+    # unmatched / has_reply / unread_replies) and normalises a hand-posted row
+    # (the FE's log-only fallback); enrich_sms_messages adds the patient /
+    # office / actor names so the practice-wide inbox never fans out per row.
+    CrudConfig(
+        model=m.SmsMessage,
+        create_schema=SmsMessageCreate,
+        update_schema=SmsMessageUpdate,
+        read_schema=SmsMessageRead,
+        prefix="sms-messages", tag="Communications",
+        singular="sms_message", plural="sms_messages",
+        search_fields=("sent_text", "sent_phone", "reply_text", "reply_phone"),
+        search_relations=(("patient_id", m.Patient, ("first_name", "last_name", "chart_no")),),
+        sortable_fields=("created_at", "id", "sent_at", "delivered_on", "reply_received_on"),
+        filter_fields=("patient_id", "appointment_id", "message_type", "is_read", "office_id",
+                       "direction", "send_status", "needs_attention", "reply_intent",
+                       "template_id", "twilio_sid", "client_id"),
+        range_fields=("sent_at", "reply_received_on"),
+        extra_filters=(
+            ("date_from", _date),
+            ("date_to", _date),
+            ("unmatched", bool),
+            ("has_reply", bool),
+            ("unread_replies", bool),
+        ),
+        soft_delete_field=None,
+        default_sort="created_at",
+        crud_class=SmsMessageCRUD,
+        read_enrich=enrich_sms_messages,
+    ),
+    # SMS-5: practice-authored text templates (were browser localStorage).
+    CrudConfig(
+        model=m.SmsTemplate,
+        create_schema=SmsTemplateCreate,
+        update_schema=SmsTemplateUpdate,
+        read_schema=SmsTemplateRead,
+        prefix="sms-templates", tag="Communications",
+        singular="sms_template", plural="sms_templates",
+        search_fields=("name", "body"),
+        sortable_fields=("created_at", "id", "name", "updated_at"),
+        filter_fields=("office_id", "message_type", "is_active"),
+        soft_delete_field="is_active", soft_delete_value=False,
+        default_sort="name",
+    ),
+    # EMAIL-1: the e-mail log (send goes through POST /email/send).
+    CrudConfig(
+        model=m.EmailMessage,
+        create_schema=EmailMessageCreate,
+        update_schema=EmailMessageUpdate,
+        read_schema=EmailMessageRead,
+        prefix="email-messages", tag="Communications",
+        singular="email_message", plural="email_messages",
+        search_fields=("to_email", "subject"),
+        sortable_fields=("created_at", "id", "sent_at", "delivered_at"),
+        filter_fields=("patient_id", "office_id", "appointment_id", "message_type",
+                       "send_status", "is_read"),
+        range_fields=("sent_at",),
+        soft_delete_field=None,
+        default_sort="created_at",
+    ),
     _cfg(m.LetterTemplate, "LetterTemplate", "letter-templates", "Communications",
          "letter_template", "letter_templates", search=("name", "title"),
          filters=("letter_type", "is_active")),
