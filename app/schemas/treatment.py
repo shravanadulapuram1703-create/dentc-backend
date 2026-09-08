@@ -17,9 +17,16 @@ from pydantic import BaseModel
 from app.schemas.common import ORMModel
 
 # Canonical item statuses (legacy D/A/U/H/Alt/RO). Server-side enum (report §LOW).
+# PROC-INT-2: ``completed`` is a real value — set by the server when a charge
+# references the item (``patient_procedures.treatment_plan_item_id``) and
+# released when that charge is voided; a client may only *write* it when such a
+# charge exists. ``scheduled`` is the legacy "on an appointment" state the
+# migration carried (309 rows) that the enum had been rejecting on PATCH.
 ItemStatus = Literal[
-    "diagnosed", "accepted", "unaccepted", "hold", "alternative", "referred_out"
+    "diagnosed", "accepted", "unaccepted", "hold", "alternative", "referred_out",
+    "scheduled", "completed",
 ]
+COMPLETED_STATUS = "completed"
 
 
 class TreatmentPlanSummary(BaseModel):
@@ -41,6 +48,8 @@ class TreatmentPlanItemCreate(BaseModel):
     description: Optional[str] = None
     tooth: Optional[str] = None
     surface: Optional[str] = None
+    quadrant: Optional[str] = None  # PROC-INT-5
+    material_id: Optional[int] = None  # PROC-INT-5
     priority: Optional[int] = None
     phase_id: Optional[int] = None  # PLAN-1
     insurance_estimate: Optional[Decimal] = None
@@ -61,6 +70,8 @@ class TreatmentPlanItemUpdate(BaseModel):
     description: Optional[str] = None
     tooth: Optional[str] = None
     surface: Optional[str] = None
+    quadrant: Optional[str] = None
+    material_id: Optional[int] = None
     priority: Optional[int] = None
     phase_id: Optional[int] = None
     insurance_estimate: Optional[Decimal] = None
@@ -82,6 +93,8 @@ class TreatmentPlanItemRead(ORMModel):
     description: Optional[str] = None
     tooth: Optional[str] = None
     surface: Optional[str] = None
+    quadrant: Optional[str] = None
+    material_id: Optional[int] = None
     priority: int
     phase_id: Optional[int] = None
     fee: Decimal
@@ -97,6 +110,32 @@ class TreatmentPlanItemRead(ORMModel):
     is_archived: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
+    # PROC-INT-1: the live (non-void) charge that fulfilled this item, resolved
+    # from ``patient_procedures.treatment_plan_item_id`` by the read enrich hook.
+    # Derived on purpose — the FK lives on the charge so there is one source of truth.
+    procedure_id: Optional[str] = None
+
+
+class PostPlanItemRequest(BaseModel):
+    """Body for ``POST /treatment-plan-items/{id}/post`` (Post to Ledger).
+
+    Every field is optional: the charge inherits the item (code, tooth, surface,
+    quadrant, material, fee, provider) and the plan/patient (office). Anything
+    given here overrides the inherited value.
+    """
+
+    date_of_service: Optional[date] = None
+    provider_id: Optional[str] = None
+    hygienist_id: Optional[str] = None
+    office_id: Optional[int] = None
+    fee: Optional[Decimal] = None
+    insurance_estimate: Optional[Decimal] = None
+    patient_estimate: Optional[Decimal] = None
+    apply_to: Optional[str] = None
+    billing_order: Optional[str] = None
+    appointment_id: Optional[str] = None
+    notes: Optional[str] = None
+    procedure_id: Optional[str] = None  # client-chosen charge id (else generated)
 
 
 # ── PLAN-3: insurance re-estimate ────────────────────────────────────────────

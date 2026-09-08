@@ -292,6 +292,58 @@ class Settings(BaseSettings):
     # Per-call timeout for the outbound Atlassian REST calls.
     JIRA_TIMEOUT_SECONDS: int = 15
 
+    # ── Twilio SMS (Patient -> Messages; SMS-1/2/7/8) ─────────────────────────
+    # The server holds every Twilio secret; the browser never sees one. Sending
+    # authenticates with an API key (preferred — rotatable) or the Auth Token.
+    # The Auth Token is ALSO what signs webhooks (X-Twilio-Signature), so it must
+    # be set for the two public webhook routes to accept traffic. When
+    # TWILIO_ACCOUNT_SID (+ a credential) is unset the gateway runs in "log only"
+    # mode: sends persist as ``queued`` and nothing reaches a carrier.
+    TWILIO_ACCOUNT_SID: str | None = None       # AC…
+    TWILIO_AUTH_TOKEN: str | None = None        # SECRET — webhook signatures (+ fallback auth)
+    TWILIO_API_KEY_SID: str | None = None       # SK…
+    TWILIO_API_KEY_SECRET: str | None = None    # SECRET
+    # Tenant/office rows (account_communications / office_phone_assignments)
+    # override these platform defaults (SMS-7 resolution order).
+    TWILIO_MESSAGING_SERVICE_SID: str | None = None  # MG…
+    TWILIO_DEFAULT_FROM: str | None = None           # E.164 fallback sender
+    # Where Twilio posts delivery states. When unset, derived from
+    # PUBLIC_API_BASE_URL + /api/v1/sms/webhooks/status; when neither is set no
+    # status_callback is passed (the Messaging Service's own setting applies).
+    TWILIO_STATUS_CALLBACK_URL: str | None = None
+    # Validate X-Twilio-Signature on the webhooks. Only ever disable for local
+    # tunnel testing — with it off anyone can inject "patient replies".
+    TWILIO_WEBHOOK_VALIDATE: bool = True
+    TWILIO_TIMEOUT_SECONDS: int = 15
+    TWILIO_API_BASE_URL: str = "https://api.twilio.com"
+    # SMS-8: per-tenant outbound throttle (Twilio long codes carry ~1 MPS; a
+    # Messaging Service more). Redis-backed; disabled when Redis is off.
+    SMS_RATE_LIMIT_PER_MINUTE: int = 60
+    # SMS-2: an inbound text within this window of an unanswered outbound one is
+    # stored as *its reply* (legacy row shape) rather than a stand-alone row.
+    SMS_REPLY_WINDOW_HOURS: int = 72
+    # SMS-2 step 3: optional auto-reply TwiML text on a recognised confirmation
+    # keyword. Empty = respond with an empty <Response/>.
+    SMS_CONFIRMATION_AUTO_REPLY: str | None = None
+    # SMS-9: a reminder whose send-by moment is older than this is skipped
+    # rather than blasted late after an outage.
+    SMS_REMINDER_CATCHUP_HOURS: int = 6
+    # SMS-10: retention for message bodies (None = keep). Enforced by
+    # ``scripts/purge_sms_messages.py``, never by a request path.
+    SMS_RETENTION_DAYS: int | None = None
+
+    # ── SendGrid e-mail (EMAIL-1) ────────────────────────────────────────────
+    SENDGRID_API_KEY: str | None = None          # SECRET
+    SENDGRID_FROM_EMAIL: str | None = None       # verified sender
+    SENDGRID_FROM_NAME: str | None = None
+    # Event-webhook signature verification (ECDSA public key from the SendGrid
+    # console). When unset, the webhook is accepted unsigned only if
+    # SENDGRID_WEBHOOK_VALIDATE is false.
+    SENDGRID_WEBHOOK_PUBLIC_KEY: str | None = None
+    SENDGRID_WEBHOOK_VALIDATE: bool = True
+    SENDGRID_TIMEOUT_SECONDS: int = 15
+    SENDGRID_API_BASE_URL: str = "https://api.sendgrid.com"
+
     # ── Logging ────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
     LOG_JSON: bool = False

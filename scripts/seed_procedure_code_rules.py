@@ -1,5 +1,23 @@
-"""Seed the CDT tooth / surface / quadrant / lab requirement flags and default
-chair time on ``procedure_codes`` (APPT-8, APPT-9).
+"""Seed the CDT tooth / surface / quadrant / lab requirement flags, default
+chair time and the structured enforcement columns on ``procedure_codes``
+(APPT-8, APPT-9, PROC-INT-7).
+
+PROC-INT-7 (structured columns)
+-------------------------------
+The flags were seeded; the *structured* rules the ADD PROCEDURE DETAILS pop-up
+reads were not — ``surface_rules`` on 15 codes, ``min/max_surfaces`` /
+``valid_teeth`` / ``tooth_area`` on 3 each, ``anatomy_rules`` on none, and
+``tooth_area`` holding ``'1'`` / ``'Crown'`` instead of a region — so the client
+inferred the surface count from the description text. This script now derives,
+from the same CDT family ranges: ``min_surfaces``/``max_surfaces`` (amalgam,
+composite, gold foil, inlay/onlay ladders, veneers), ``tooth_area`` (anterior
+for D2330–D2335 / D2390 / D2960–D2962, posterior for D2391–D2394), the
+``valid_teeth`` list those regions imply, arch-correct ``surface_rules.allowed``
+(M I D F L anterior, M O D B L posterior) and ``anatomy_rules.allowed_quadrants``
+for every quadrant-scoped code. Junk ``tooth_area`` values are always cleared.
+**Not** derivable here and left alone: ``default_material_id`` (``chart_materials``
+is tenant-scoped, ``procedure_codes`` is global) and ``draw_as`` (a charting
+preference, not a CDT property).
 
 Why this exists
 ---------------
@@ -184,25 +202,101 @@ def derive(code: str) -> dict | None:
 
 # Surface counts for the families where the CDT descriptor *is* the surface count
 # (D2140 one surface, D2150 two, D2160 three, D2161 four or more — and the same
-# ladder for the composite families). Feeds CHG-2 ``surface_rules`` so the
-# enforcement modal has a real min/max instead of fabricating one client-side.
+# ladder for the composite, gold-foil, inlay and onlay families). Feeds CHG-2
+# ``surface_rules`` **and** the flat ``min_surfaces``/``max_surfaces`` pair
+# (PROC-INT-7) so the enforcement pop-up has a real min/max instead of inferring
+# one from the description text.
 _SURFACE_COUNTS: dict[int, tuple[int, int]] = {
+    # amalgam
     2140: (1, 1), 2150: (2, 2), 2160: (3, 3), 2161: (4, 5),
+    # resin composite — anterior
     2330: (1, 1), 2331: (2, 2), 2332: (3, 3), 2335: (4, 5),
+    # resin composite — posterior
     2391: (1, 1), 2392: (2, 2), 2393: (3, 3), 2394: (4, 5),
+    # gold foil
     2410: (1, 1), 2420: (2, 2), 2430: (3, 3),
+    # inlay / onlay — metallic
+    2510: (1, 1), 2520: (2, 2), 2530: (3, 5),
+    2542: (2, 2), 2543: (3, 3), 2544: (4, 5),
+    # inlay / onlay — porcelain/ceramic
+    2610: (1, 1), 2620: (2, 2), 2630: (3, 5),
+    2642: (2, 2), 2643: (3, 3), 2644: (4, 5),
+    # inlay / onlay — resin-based composite
+    2650: (1, 1), 2651: (2, 2), 2652: (3, 5),
+    2662: (2, 2), 2663: (3, 3), 2664: (4, 5),
+    # labial veneers — the facial surface
+    2960: (1, 1), 2961: (1, 1), 2962: (1, 1),
 }
-_ALL_SURFACES = ["M", "O", "D", "B", "L", "I", "F"]
+
+# PROC-INT-7: the families whose CDT descriptor names the arch region. Everything
+# else stays NULL ("either") — an amalgam or a crown is not restricted by CDT.
+_TOOTH_AREA: tuple[tuple[int, int, str], ...] = (
+    (2330, 2335, "anterior"),   # resin composite, anterior
+    (2390, 2390, "anterior"),   # resin-based composite crown, anterior
+    (2391, 2394, "posterior"),  # resin composite, posterior
+    (2960, 2962, "anterior"),   # labial veneer
+)
+_VALID_TOOTH_AREAS = ("anterior", "posterior")
+
+# Same vocabulary as procedure_rules_service (kept literal here so the seeder
+# stays runnable without importing the app's request stack).
+_ANTERIOR_SURFACES = ["M", "I", "D", "F", "L"]
+_POSTERIOR_SURFACES = ["M", "O", "D", "B", "L"]
+_ALL_SURFACES = ["M", "O", "I", "D", "B", "F", "L"]
+_PERMANENT_ANTERIOR = set(range(6, 12)) | set(range(22, 28))
+_PRIMARY = "ABCDEFGHIJKLMNOPQRST"
+_PRIMARY_ANTERIOR = set("CDEFGH") | set("MNOPQR")
+_TRUE_QUADRANTS = ["UR", "UL", "LL", "LR"]
+
+
+def _cdt_number(code: str) -> int | None:
+    match = _CDT_RE.match(code.strip())
+    return int(match.group(1)) if match else None
+
+
+def tooth_area(code: str) -> str | None:
+    number = _cdt_number(code)
+    if number is None:
+        return None
+    for low, high, area in _TOOTH_AREA:
+        if low <= number <= high:
+            return area
+    return None
+
+
+def valid_teeth_for(area: str | None) -> list[str] | None:
+    """Universal ids allowed for an arch region (permanent + primary); None = all."""
+    if area == "anterior":
+        return [str(n) for n in sorted(_PERMANENT_ANTERIOR)] + sorted(_PRIMARY_ANTERIOR)
+    if area == "posterior":
+        return [str(n) for n in range(1, 33) if n not in _PERMANENT_ANTERIOR] + [
+            c for c in _PRIMARY if c not in _PRIMARY_ANTERIOR
+        ]
+    return None
 
 
 def _surface_rules(code: str) -> dict | None:
-    match = _CDT_RE.match(code.strip())
-    if match is None:
+    number = _cdt_number(code)
+    if number is None:
         return None
-    bounds = _SURFACE_COUNTS.get(int(match.group(1)))
+    bounds = _SURFACE_COUNTS.get(number)
     if bounds is None:
         return None
-    return {"min": bounds[0], "max": bounds[1], "allowed": _ALL_SURFACES}
+    area = tooth_area(code)
+    allowed = (
+        _ANTERIOR_SURFACES if area == "anterior"
+        else _POSTERIOR_SURFACES if area == "posterior"
+        else _ALL_SURFACES
+    )
+    return {"min": bounds[0], "max": bounds[1], "allowed": allowed}
+
+
+def _anatomy_rules(requires_quadrant: bool) -> dict | None:
+    """Quadrant-scoped codes accept the four true quadrants (arch/full-mouth
+    codes are a different flag the catalog does not carry)."""
+    if not requires_quadrant:
+        return None
+    return {"mode": "quadrant", "allowed_quadrants": list(_TRUE_QUADRANTS)}
 
 
 def _bool(value: str | None) -> bool | None:
@@ -264,11 +358,27 @@ def seed(
     counts = {
         "scanned": 0, "unmatched": 0, "flags_set": 0,
         "durations_set": 0, "surface_rules_set": 0, "fees_set": 0,
+        # PROC-INT-7 structured columns
+        "surface_bounds_set": 0, "tooth_area_set": 0, "tooth_area_cleared": 0,
+        "valid_teeth_set": 0, "anatomy_rules_set": 0,
     }
     for code_row in db.execute(select(ProcedureCode)).scalars():
         counts["scanned"] += 1
         derived = derive(code_row.code)
         override = overrides.get(code_row.code.upper(), {})
+
+        # PROC-INT-7: `tooth_area` held junk ('1', 'Crown', 'None') on the only
+        # rows that had it. A value outside anterior|posterior is not a region
+        # and is always cleared — regardless of --overwrite — because the
+        # enforcement engine ignores it anyway and a client rendering it would
+        # show nonsense. Runs before the CDT gate so a non-CDT code is cleaned too.
+        current_area = (code_row.tooth_area or "").strip().lower() or None
+        if code_row.tooth_area is not None and current_area not in _VALID_TOOTH_AREAS:
+            if apply_changes:
+                code_row.tooth_area = None
+            current_area = None
+            counts["tooth_area_cleared"] += 1
+
         if derived is None and not override:
             counts["unmatched"] += 1
             continue
@@ -305,6 +415,35 @@ def seed(
             if apply_changes:
                 code_row.surface_rules = rules
             counts["surface_rules_set"] += 1
+        # PROC-INT-7: the flat pair the pop-up reads alongside surface_rules.
+        if rules is not None and (
+            (code_row.min_surfaces is None and code_row.max_surfaces is None) or overwrite
+        ):
+            if apply_changes:
+                code_row.min_surfaces = rules["min"]
+                code_row.max_surfaces = rules["max"]
+            counts["surface_bounds_set"] += 1
+
+        # PROC-INT-7: arch region + the Universal teeth it allows.
+        area = tooth_area(code_row.code)
+        if area is not None and (current_area is None or overwrite):
+            if apply_changes:
+                code_row.tooth_area = area
+            counts["tooth_area_set"] += 1
+            current_area = area
+        teeth = valid_teeth_for(current_area)
+        if teeth is not None and (not code_row.valid_teeth or overwrite):
+            if apply_changes:
+                code_row.valid_teeth = teeth
+            counts["valid_teeth_set"] += 1
+
+        # PROC-INT-7: quadrant-scoped codes carry their allowed quadrants.
+        wants_quadrant = bool(values.get("requires_quadrant", code_row.requires_quadrant))
+        anatomy = _anatomy_rules(wants_quadrant)
+        if anatomy is not None and (code_row.anatomy_rules is None or overwrite):
+            if apply_changes:
+                code_row.anatomy_rules = anatomy
+            counts["anatomy_rules_set"] += 1
 
         fee = fees.get(code_row.code)
         if fee is not None and (not code_row.default_fee or overwrite):
@@ -346,6 +485,11 @@ def main() -> None:
         f"{verb}: {counts['flags_set']} requirement flag set(s), "
         f"{counts['durations_set']} duration(s), "
         f"{counts['surface_rules_set']} surface rule(s), "
+        f"{counts['surface_bounds_set']} min/max surface pair(s), "
+        f"{counts['tooth_area_set']} tooth area(s) set, "
+        f"{counts['tooth_area_cleared']} junk tooth area(s) cleared, "
+        f"{counts['valid_teeth_set']} valid_teeth list(s), "
+        f"{counts['anatomy_rules_set']} anatomy rule(s), "
         f"{counts['fees_set']} default fee(s)"
     )
     if not args.apply:

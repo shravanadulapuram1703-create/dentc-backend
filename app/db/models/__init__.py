@@ -111,11 +111,13 @@ from app.db.models.codes import (
 )
 from app.db.models.comms import (
     Campaign,
+    EmailMessage,
     LetterBatchItem,
     LetterBatchRun,
     LetterTemplate,
     PostcardTemplate,
     SmsMessage,
+    SmsTemplate,
 )
 from app.db.models.messaging import (
     Conversation,
@@ -261,7 +263,7 @@ __all__ = [
     "Definition", "DefinitionGroup", "ImagingTemplate", "QuestionnaireHeader",
     "QuestionnaireOption",
     # communications
-    "SmsMessage", "LetterTemplate", "PostcardTemplate",
+    "SmsMessage", "SmsTemplate", "EmailMessage", "LetterTemplate", "PostcardTemplate",
     "LetterBatchRun", "LetterBatchItem", "Campaign",
     # direct messaging
     "Conversation", "ConversationParticipant", "Message", "MessageReceipt",

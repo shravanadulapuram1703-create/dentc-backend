@@ -1,21 +1,45 @@
 """Communications domain models.
 
-sms_messages · letter_templates · postcard_templates ·
-letter_batch_runs · letter_batch_items · campaigns
+sms_messages · sms_templates · email_messages · letter_templates ·
+postcard_templates · letter_batch_runs · letter_batch_items · campaigns
 """
 
 from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, CreatedAtMixin, IntPKMixin
+from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
 
 
 class SmsMessage(Base, IntPKMixin, CreatedAtMixin):
+    """One row per outbound text, with the reply on the same row (legacy shape).
+
+    SMS-3 adds the Twilio correlation/delivery columns. The legacy shape is kept
+    on purpose — the frontend fans a row out into an outbound entry (``sent_text``)
+    and an inbound entry (``reply_text``); a stand-alone inbound text is a row
+    with ``sent_text IS NULL`` and ``direction='inbound'``.
+    """
+
     __tablename__ = "sms_messages"
+    __table_args__ = (
+        # SMS-1: idempotent sends — the same client_id must never send twice.
+        UniqueConstraint("tenant_id", "client_id", name="uq_sms_messages_tenant_client_id"),
+        # SMS-6: the practice-wide inbox pages by office + time.
+        Index("ix_sms_messages_office_sent_at", "office_id", "sent_at"),
+    )
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
@@ -32,6 +56,92 @@ class SmsMessage(Base, IntPKMixin, CreatedAtMixin):
     message_type: Mapped[str | None] = mapped_column(String(50))
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # ── SMS-3: Twilio correlation + delivery detail ──────────────────────────
+    twilio_sid: Mapped[str | None] = mapped_column(String(34), unique=True)
+    # The reply is stored on the outbound row (legacy parity), so its own Twilio
+    # sid needs a home too — that is what makes the inbound webhook idempotent.
+    reply_twilio_sid: Mapped[str | None] = mapped_column(String(34), unique=True)
+    from_phone: Mapped[str | None] = mapped_column(String(20))
+    direction: Mapped[str | None] = mapped_column(String(10))  # outbound | inbound
+    sent_at: Mapped[datetime | None]
+    error_code: Mapped[int | None] = mapped_column(Integer)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    segments: Mapped[int | None] = mapped_column(SmallInteger)
+    client_id: Mapped[str | None] = mapped_column(String(40))
+    template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("sms_templates.id"))
+    # SMS-2 step 3: what the patient's reply meant (confirm|reschedule|cancel|
+    # stop|start|help|other) and whether staff still need to look at it.
+    reply_intent: Mapped[str | None] = mapped_column(String(20))
+    needs_attention: Mapped[bool] = mapped_column(Boolean, default=False)
+    # SMS-2 step 1: several patients (a family) shared the inbound number and none
+    # had a recent text from this office — the row is unmatched, but staff can
+    # still see who it might be.
+    candidate_patient_ids: Mapped[list | None] = mapped_column(JSON)
+    # SMS-9: which lead-time bucket an automated reminder was sent for; part of
+    # the (appointment_id, message_type, reminder_lead_hours) dedupe key.
+    reminder_lead_hours: Mapped[int | None] = mapped_column(SmallInteger)
+    # SMS-10: SHA-256 of the raw webhook payloads that touched this row, kept for
+    # carrier disputes without retaining the (PHI-adjacent) payload itself.
+    inbound_payload_hash: Mapped[str | None] = mapped_column(String(64))
+    status_payload_hash: Mapped[str | None] = mapped_column(String(64))
+    updated_at: Mapped[datetime | None]
+
+
+class SmsTemplate(Base, IntPKMixin, TimestampMixin):
+    """SMS-5: practice-authored text templates (were browser localStorage).
+
+    ``office_id`` NULL = shared by every office of the tenant. Merge-field
+    syntax is ``{{patient_first_name}}`` etc. — see ``sms_service.MERGE_FIELDS``.
+    """
+
+    __tablename__ = "sms_templates"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    message_type: Mapped[str] = mapped_column(String(50), default="manual")
+    body: Mapped[str] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class EmailMessage(Base, IntPKMixin, CreatedAtMixin):
+    """EMAIL-1: the e-mail counterpart of ``sms_messages`` (one row per send).
+
+    ``provider_message_id`` correlates the SendGrid event webhook the same way
+    ``twilio_sid`` does for texts. ``send_status`` uses SendGrid's event
+    vocabulary (queued|processed|delivered|deferred|bounce|dropped|open|click|
+    spamreport|unsubscribe|failed).
+    """
+
+    __tablename__ = "email_messages"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "client_id", name="uq_email_messages_tenant_client_id"),
+    )
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
+    patient_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    appointment_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("appointments.id"))
+    to_email: Mapped[str] = mapped_column(String(255))
+    from_email: Mapped[str | None] = mapped_column(String(255))
+    subject: Mapped[str] = mapped_column(String(500))
+    body_html: Mapped[str | None] = mapped_column(Text)
+    body_text: Mapped[str | None] = mapped_column(Text)
+    provider: Mapped[str | None] = mapped_column(String(20))  # sendgrid | none
+    provider_message_id: Mapped[str | None] = mapped_column(String(120), index=True)
+    send_status: Mapped[str] = mapped_column(String(30), default="queued")
+    sent_at: Mapped[datetime | None]
+    delivered_at: Mapped[datetime | None]
+    opened_at: Mapped[datetime | None]
+    error_message: Mapped[str | None] = mapped_column(Text)
+    message_type: Mapped[str | None] = mapped_column(String(50))
+    client_id: Mapped[str | None] = mapped_column(String(40))
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    status_payload_hash: Mapped[str | None] = mapped_column(String(64))
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_at: Mapped[datetime | None]
 
 
 class LetterTemplate(Base, IntPKMixin, CreatedAtMixin):

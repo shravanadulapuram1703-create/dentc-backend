@@ -562,3 +562,5 @@ class ExplosionCodeItem(Base, IntPKMixin, CreatedAtMixin):
     default_fee: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     tooth: Mapped[str | None] = mapped_column(String(10))
     surface: Mapped[str | None] = mapped_column(String(20))
+    # PROC-INT-9: the one field code_bundle_items had that this table lacked.
+    quadrant: Mapped[str | None] = mapped_column(String(10))

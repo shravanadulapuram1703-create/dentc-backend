@@ -65,6 +65,10 @@ class Patient(Base, IntPKMixin, TimestampMixin):
     send_collections: Mapped[bool] = mapped_column(Boolean, default=False)
     no_auto_email: Mapped[bool] = mapped_column(Boolean, default=False)
     no_auto_sms: Mapped[bool] = mapped_column(Boolean, default=False)
+    # SMS-8: when the patient last texted STOP / START (carrier keywords). The
+    # boolean above is the switch; these are the audit trail behind it.
+    sms_opt_out_at: Mapped[datetime | None]
+    sms_opt_in_at: Mapped[datetime | None]
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     hipaa_agreement: Mapped[bool] = mapped_column(Boolean, default=False)
     guardian_name: Mapped[str | None] = mapped_column(String(255))

@@ -1,4 +1,4 @@
-"""Charge-row rules that must hold whoever is writing (AL-17, FEE-3).
+"""Charge-row rules that must hold whoever is writing (AL-17, FEE-3, PROC-INT-1/2/3/8).
 
 **Hold Claim.** ``patient_procedures.hold_claim`` is the legacy per-procedure hold:
 the charge is deliberately kept back from insurance. The ledger renders a red **H**
@@ -31,6 +31,24 @@ resolver behind ``GET /patients/{id}/fee`` and the estimate engine. An
 explicitly supplied fee always wins: the office is allowed to charge what it
 decides to charge, and refusing the write would break every legitimate
 off-schedule adjustment.
+
+**Tooth / surface / quadrant rules (PROC-INT-8).** Every create, and every
+update that touches ``procedure_code``/``tooth``/``surface``/``quadrant``, runs
+:func:`procedure_rules_service.apply_entry_rules`: the surface is canonicalised
+(``"d,o m"`` → ``"MOD"``), a legacy quadrant-in-tooth is mirrored into
+``quadrant``, and the code's ``requires_*`` / surface-count / ``valid_teeth``
+rules return a 422 naming the field. A PATCH that only re-prices a migrated
+charge never trips them.
+
+**Planned → completed (PROC-INT-1/2).** ``treatment_plan_item_id`` is the item
+this charge fulfils. Setting it on create/PATCH validates the item against the
+charge's patient and plan, lets the charge inherit the item's tooth/surface/
+quadrant/material where the payload left them blank, and — in the **same
+transaction** — flips the item to ``status='completed'``. Voiding the charge
+(``is_void`` or DELETE) or re-pointing it releases the item back to
+``accepted`` unless another live charge still fulfils it. Un-voiding re-binds.
+
+**Push (PROC-INT-3).** Every write announces ``procedures.changed`` after its commit.
 """
 
 from __future__ import annotations
@@ -42,7 +60,11 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationError
 from app.crud.base import CRUDBase
 from app.db.models import PatientProcedure
-from app.services import pricing_service
+from app.services import pricing_service, procedure_events, treatment_service
+from app.services.procedure_rules_service import apply_entry_rules
+
+CHARGE_SOURCE = "patient_procedures"
+_INHERITED_FROM_ITEM = ("tooth", "surface", "quadrant", "material_id")
 
 
 def _truthy(value: Any) -> bool:  # noqa: ANN401
@@ -65,12 +87,47 @@ def _reject_held_claim(held: bool, claim_id: Any) -> None:  # noqa: ANN401
 
 
 class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
-    """Generic CRUD plus the Hold Claim guard (AL-17)."""
+    """Generic CRUD plus the Hold Claim guard (AL-17), server-side pricing (FEE-3),
+    the entry rules (PROC-INT-8) and the plan-item link (PROC-INT-1/2)."""
 
     def create(self, db: Session, data: dict, *, tenant_id=None, created_by=None):  # noqa: ANN001, ANN201
-        _reject_held_claim(_truthy(data.get("hold_claim")), data.get("claim_id"))
-        payload = self._price(db, dict(data), tenant_id)
-        return super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
+        payload = dict(data)
+        _reject_held_claim(_truthy(payload.get("hold_claim")), payload.get("claim_id"))
+
+        item = None
+        if payload.get("treatment_plan_item_id"):
+            item = treatment_service.resolve_item_for_charge(
+                db, payload["treatment_plan_item_id"],
+                patient_id=payload.get("patient_id"),
+                treatment_plan_id=payload.get("treatment_plan_id"),
+            )
+            payload.setdefault("treatment_plan_id", item.plan_id)
+            for field in _INHERITED_FROM_ITEM:
+                if payload.get(field) is None and getattr(item, field) is not None:
+                    payload[field] = getattr(item, field)
+
+        payload = apply_entry_rules(db, payload)
+        payload = self._price(db, payload, tenant_id)
+
+        # Same steps as CRUDBase.create, inlined so the item flip lands in the
+        # same transaction as the charge (a half-applied Post to Ledger is
+        # exactly the failure the FK exists to remove).
+        if created_by is not None and self._is_int_col("created_by"):
+            payload.setdefault("created_by", created_by)
+        obj = self.model(**payload)
+        db.add(obj)
+        if item is not None:
+            db.flush()
+            treatment_service.bind_item_to_charge(db, item, obj)
+        self._commit(db)
+        db.refresh(obj)
+        procedure_events.announce(
+            tenant_id, obj.patient_id, source=CHARGE_SOURCE,
+            action="posted" if item is not None else "created", entity_id=obj.id,
+            treatment_plan_id=obj.treatment_plan_id,
+            treatment_plan_item_id=obj.treatment_plan_item_id, actor_user_id=created_by,
+        )
+        return obj
 
     @staticmethod
     def _price(db: Session, data: dict, tenant_id: int | None) -> dict:
@@ -96,12 +153,81 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
         return data
 
     def update(self, db: Session, obj_id, data: dict, *, tenant_id=None, updated_by=None):  # noqa: ANN001, ANN201
-        if data.get("claim_id"):
+        current = self.get(db, obj_id, tenant_id=tenant_id)
+        payload = dict(data)
+        if payload.get("claim_id"):
             # A PATCH may carry claim_id alone, so the hold to check is the
             # payload's when it says, else the one already on the row.
-            current = self.get(db, obj_id, tenant_id=tenant_id)
-            held = _truthy(
-                data["hold_claim"] if "hold_claim" in data else current.hold_claim
+            held = _truthy(payload["hold_claim"] if "hold_claim" in payload else current.hold_claim)
+            _reject_held_claim(held, payload["claim_id"])
+        payload = apply_entry_rules(db, payload, current)
+
+        # ── plan-item link transitions ─────────────────────────────────────
+        old_item_id = current.treatment_plan_item_id
+        new_item = None
+        item_changed = "treatment_plan_item_id" in payload and payload["treatment_plan_item_id"] != old_item_id
+        if item_changed and payload["treatment_plan_item_id"]:
+            new_item = treatment_service.resolve_item_for_charge(
+                db, payload["treatment_plan_item_id"],
+                patient_id=payload.get("patient_id", current.patient_id),
+                treatment_plan_id=payload.get("treatment_plan_id"),
             )
-            _reject_held_claim(held, data["claim_id"])
-        return super().update(db, obj_id, data, tenant_id=tenant_id, updated_by=updated_by)
+            if "treatment_plan_id" not in payload:
+                payload["treatment_plan_id"] = new_item.plan_id
+        was_void = bool(current.is_void)
+        will_be_void = _truthy(payload["is_void"]) if "is_void" in payload else was_void
+
+        for key, value in payload.items():
+            setattr(current, key, value)
+        if updated_by is not None and self._is_int_col("updated_by"):
+            current.updated_by = updated_by
+
+        if item_changed:
+            treatment_service.release_item(db, old_item_id, exclude_procedure_id=current.id)
+        if will_be_void and not was_void:
+            treatment_service.release_item(
+                db, current.treatment_plan_item_id, exclude_procedure_id=current.id
+            )
+        elif not will_be_void:
+            if new_item is not None:
+                treatment_service.bind_item_to_charge(db, new_item, current)
+            elif was_void and current.treatment_plan_item_id:
+                # un-void: the charge is live again, so the item it fulfils is completed again
+                item = treatment_service.resolve_item_for_charge(
+                    db, current.treatment_plan_item_id,
+                    patient_id=current.patient_id, treatment_plan_id=None,
+                )
+                treatment_service.bind_item_to_charge(db, item, current)
+
+        self._commit(db)
+        db.refresh(current)
+        procedure_events.announce(
+            tenant_id, current.patient_id, source=CHARGE_SOURCE,
+            action="voided" if (will_be_void and not was_void) else "updated",
+            entity_id=current.id, treatment_plan_id=current.treatment_plan_id,
+            treatment_plan_item_id=current.treatment_plan_item_id, actor_user_id=updated_by,
+        )
+        return current
+
+    def delete(self, db: Session, obj_id, *, tenant_id=None) -> None:  # noqa: ANN001
+        """A charge delete is a void (``is_void``), and voiding releases the item."""
+        obj = self.get(db, obj_id, tenant_id=tenant_id)
+        if self.soft_delete_field:
+            setattr(obj, self.soft_delete_field, self.soft_delete_value)
+            treatment_service.release_item(db, obj.treatment_plan_item_id, exclude_procedure_id=obj.id)
+        else:  # pragma: no cover - the registry always configures is_void
+            treatment_service.release_item(db, obj.treatment_plan_item_id, exclude_procedure_id=obj.id)
+            db.delete(obj)
+        self._commit(db)
+        procedure_events.announce(
+            tenant_id, obj.patient_id, source=CHARGE_SOURCE, action="voided",
+            entity_id=obj.id, treatment_plan_id=obj.treatment_plan_id,
+            treatment_plan_item_id=obj.treatment_plan_item_id,
+        )
+
+
+#: Shared instance for service callers (Post to Ledger). The registry builds its
+#: own for the routes; the class holds no per-instance state beyond config.
+patient_procedure_crud = PatientProcedureCRUD(
+    PatientProcedure, soft_delete_field="is_void", soft_delete_value=True, default_sort="created_at"
+)

@@ -121,7 +121,10 @@ def test_patient_items_endpoint(client, db_session, patient, proc):
 
     rows = client.get(f"{PREFIX}/patients/{patient.id}/treatment-plan-items")
     assert rows.status_code == 200, rows.text
-    ids = {r["id"] for r in rows.json()}
+    body = rows.json()
+    # PROC-INT-4: standard paginated envelope (was a bare array that ignored size).
+    assert body["meta"]["total"] == 2
+    ids = {r["id"] for r in body["items"]}
     assert ids == {"PA-1", "PB-1"}  # both plans, no cross-patient row
 
 
