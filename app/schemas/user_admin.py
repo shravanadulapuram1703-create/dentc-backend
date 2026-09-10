@@ -8,6 +8,7 @@ from decimal import Decimal
 from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.common import ORMModel
+from app.schemas.signature import SignatureCaptureFields
 
 
 # ── Gap 3: time-clock config ─────────────────────────────────────────────────
@@ -112,10 +113,15 @@ class UserImageResult(BaseModel):
 
 
 # ── PN-1: per-user signature store ("Load My Signature") ─────────────────────
-class UserSignatureUpdate(BaseModel):
+class UserSignatureUpdate(SignatureCaptureFields):
+    """SIG-6: ``PUT /users/{id}/signature`` (and ``/me/signature``) is the
+    **canonical** user-signature write - the only path that accepts the Topaz
+    block. The user PATCH still takes ``signature_data`` but clears the block."""
+
     signature_data: str = Field(..., description="Base64 / data-URL signature image")
     signature_len: int | None = None
-    device_source: str | None = Field(None, max_length=20)
+    device_source: str | None = Field(None, max_length=20, examples=["topaz", "web-pad"])
+    signed_at: datetime | None = None
 
 
 class UserSignatureRead(BaseModel):
@@ -124,6 +130,20 @@ class UserSignatureRead(BaseModel):
     signature_len: int | None = None
     device_source: str | None = None
     updated_at: datetime | None = Field(None, description="When the signature last changed")
+    signed_at: datetime | None = None
+    # Topaz capture metadata (SIG-1/2/3/8); the SigString only with
+    # ``?include_sig_string=true`` (SIG-4).
+    has_sig_string: bool = False
+    sig_string: str | None = None
+    sig_format: str | None = None
+    sig_compression: int | None = None
+    sig_encryption: int | None = None
+    point_count: int | None = None
+    stroke_count: int | None = None
+    device_vendor: str | None = None
+    device_model: str | None = None
+    device_serial: str | None = None
+    captured_user_agent: str | None = None
 
 
 # ── Gap 7: self-service password change ──────────────────────────────────────

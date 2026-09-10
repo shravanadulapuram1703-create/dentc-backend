@@ -177,6 +177,7 @@ from app.db.models.patients import (
     PatientQuestionnaireResponse,
     PatientRecall,
     PatientSignature,
+    SignatureAuditEvent,
     Referral,
     ResponsibleParty,
 )
@@ -240,7 +241,7 @@ __all__ = [
     "ChartColor", "CodesView",
     # patients
     "Patient", "PatientInsurance", "PatientAlert", "AccountNote",
-    "PatientSignature", "MedicalHistoryRecord", "MedicalHistoryDetail",
+    "PatientSignature", "SignatureAuditEvent", "MedicalHistoryRecord", "MedicalHistoryDetail",
     "Referral", "PatientNote", "PatientRecall", "CariesRiskAssessment",
     "PatientMedicalAlert", "PatientQuestionnaireResponse", "PatientOpeningBalance",
     "PatientMedicalHistory", "PatientMedicalHistoryEvent",

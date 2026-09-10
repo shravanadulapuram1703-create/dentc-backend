@@ -9,6 +9,8 @@ self-service password change.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from typing import Any
 
 from sqlalchemy import select
@@ -29,6 +31,7 @@ from app.db.models import (
     UserPreference,
     UserTimeClockConfig,
 )
+from app.services import signature_service as sig_svc
 
 # Fallback option sets (used when no `definitions` rows are seeded for the group).
 _DEFAULT_ROLES = ["admin", "provider", "front_desk", "staff", "super_admin"]
@@ -192,6 +195,7 @@ def create_complete(db: Session, tenant_id: int, payload: dict, created_by: int 
         created_by=created_by,
     )
     db.add(user)
+    _patch_signature_image(user, payload)  # SIG-6: keep len/updated_at coherent
     _flush(db)  # assign user.id (converts uniqueness violations to 409)
     _apply_related(db, user, tenant_id, payload, is_create=True)
     _commit(db)
@@ -206,8 +210,9 @@ def update_complete(db: Session, tenant_id: int, user_id: int, payload: dict,
     ).scalar_one_or_none()
     if user is None:
         raise NotFoundError(f"User '{user_id}' was not found")
-    for field in _IDENTITY_FIELDS & payload.keys():
+    for field in (_IDENTITY_FIELDS & payload.keys()) - {"signature_data"}:
         setattr(user, field, payload[field])
+    _patch_signature_image(user, payload)  # SIG-6
     if "password" in payload and payload["password"]:
         user.password_hash = hash_password(payload["password"])
     user.updated_by = updated_by  # gap #8: record the editing actor
@@ -339,17 +344,51 @@ def get_user_signature(db: Session, user_id: int, tenant_id: int) -> User:
     return _require_user(db, user_id, tenant_id)
 
 
+def _patch_signature_image(user: User, payload: dict) -> None:
+    """The identity PATCH / ``/complete`` carry ``signature_data`` with no
+    capture metadata (SIG-6). Keep the row coherent: recompute the length,
+    stamp the change time and clear the Topaz block that described the
+    previous image. ``PUT /users/{id}/signature`` is the canonical write."""
+    if "signature_data" not in payload:
+        return
+    image = (payload.get("signature_data") or "").strip() or None
+    user.signature_data = image
+    user.signature_len = len(image) if image else None
+    user.signature_updated_at = datetime.now(timezone.utc)
+    user.signature_device_source = None
+    sig_svc.clear_user_topaz_metadata(user)
+    user.signature_signed_at = user.signature_updated_at if image else None
+
+
 def set_user_signature(
     db: Session, user_id: int, tenant_id: int, *,
-    signature_data: str, signature_len: int | None, device_source: str | None,
+    signature_data: str, signature_len: int | None = None, device_source: str | None = None,
+    capture: dict | None = None, actor_id: int | None = None,
 ) -> User:
-    from datetime import datetime, timezone
-
+    """Canonical user-signature write (SIG-6). ``capture`` is the full request
+    body; it goes through ``signature_service.normalise_capture`` like every
+    other store, and the replace is written to the audit trail (SIG-8)."""
     user = _require_user(db, user_id, tenant_id)
-    user.signature_data = signature_data
-    user.signature_len = signature_len
-    user.signature_device_source = device_source
+    payload = dict(capture or {})
+    payload["signature_data"] = signature_data
+    if signature_len is not None:
+        payload.setdefault("signature_len", signature_len)
+    if device_source is not None:
+        payload.setdefault("device_source", device_source)
+    normalised = sig_svc.normalise_capture(payload)
+    had_signature = bool(user.signature_data)
+    # A fresh capture replaces the whole block: a field the client did not send
+    # must not survive from the previous pad.
+    sig_svc.clear_user_topaz_metadata(user)
+    user.signature_device_source = None
+    sig_svc.apply_user_capture(user, normalised)
     user.signature_updated_at = datetime.now(timezone.utc)
+    sig_svc.record_event(
+        db, tenant_id=tenant_id, entity_type=sig_svc.ENTITY_USER, entity_id=user.id,
+        event=sig_svc.EVENT_REPLACED if had_signature else sig_svc.EVENT_CAPTURED,
+        actor_id=actor_id, source=user, signature_type="user",
+        occurred_at=user.signature_signed_at,
+    )
     db.commit()
     db.refresh(user)
     return user

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -21,6 +21,7 @@ from app.db.models import (
 from app.schemas.common import ORMModel
 from app.schemas.factory import build_schemas
 from app.schemas.patient import PatientRead
+from app.schemas.signature import SignatureCaptureFields
 
 # Distinctly-named sub-shapes so they don't clash with the CRUD components.
 _LetterOfficeRead = build_schemas(Office, "LetterContextOffice")[2]
@@ -202,17 +203,22 @@ class LetterContextResponse(ORMModel):
     )
 
 
-class ConsentSignRequest(BaseModel):
-    """LTR-10: capture a signature against an existing consent row."""
+class ConsentSignRequest(SignatureCaptureFields):
+    """LTR-10: capture a signature against an existing consent row. Carries the
+    Topaz block (SIG-1/2/3/8) via ``SignatureCaptureFields``."""
 
     signature_data: str | None = Field(
-        None, description="Base64 / data-URL image of a drawn signature"
+        None, description="Base64 / data-URL image of the signature (Topaz JPEG or canvas PNG)"
     )
+    signature_len: int | None = None
+    device_source: str | None = Field(None, examples=["topaz", "web-pad"], max_length=20)
+    signed_at: datetime | None = Field(None, description="Workstation timestamp of the capture")
     document_id: int | None = Field(
         None, description="An uploaded patient-document holding the scanned wet-signed copy"
     )
     status: str = Field("signed", examples=["signed", "declined", "voided"])
-    signature_method: str | None = Field(None, examples=["drawn", "scanned", "verbal"])
+    # SIG-5: ``topaz`` is the pad capture; defaults from the capture when omitted.
+    signature_method: str | None = Field(None, examples=["topaz", "drawn", "scanned", "verbal"])
     signer_name: str | None = None
     signer_relationship: str | None = Field(None, examples=["self", "guardian"])
     declined_reason: str | None = None

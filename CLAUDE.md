@@ -1054,6 +1054,50 @@ Restorative Chart · Treatment Plan; PROC-INT-1…9 of
   `scripts/purge_sms_messages.py` blanks bodies, keeps rows. **EMAIL-1** mirrors the whole
   shape over SendGrid ([app/services/email_service.py](app/services/email_service.py)).
 
+**Topaz signature capture** (one shared FE `SignatureCapture` component → Medical
+History, Progress Notes, Letters consents, Security → Users; SIG-1…10 of
+[docs/signature/topaz_signature_backend_devreport.md](docs/signature/topaz_signature_backend_devreport.md)
+/ [response](docs/signature/topaz_signature_backend_response.md); Alembic
+`b6c7d8e9f0a1`). The pad's **SigString** (the vector stroke record — the actual
+biometric record; `signature_data` is only its JPEG) plus point/stroke counts and
+pad model/serial were captured by the FE and dropped by every store.
+- **One home**: [app/services/signature_service.py](app/services/signature_service.py).
+  `normalise_capture` is the single validation/defaulting pass on **every** write
+  path (generic CRUD via `PatientSignatureCRUD`/`PatientConsentCRUD`,
+  `/medical-history/sign`, `/patient-consents/{id}/sign`, `PUT /users/…/signature`):
+  Fernet-encrypts `sig_string` at rest (SIG-4), defaults `sig_format`/`device_*`
+  from what was sent, 422 `signature_empty` on `point_count < 2` (only when the
+  count is sent — the on-screen pad reports none), unrecognised `device_source`
+  **stored as written**. The three stores are `patient_signatures`,
+  `patient_consents` and `users.signature_*` (prefixed — `user_column_for`).
+- **`sig_string` is never on a read model** — `has_sig_string` is. The only exits
+  are admin-only and each read is a `sig_string_exported` audit event:
+  `GET /patient-signatures/{id}/sig-string`, `…/patient-consents/{id}/sig-string`,
+  `GET /users/{id}/signature?include_sig_string=true`
+  ([app/api/v1/signatures.py](app/api/v1/signatures.py)).
+- **SIG-8** `signature_audit_events` (captured/superseded/voided/declined/replaced/
+  sig_string_exported + ip/user-agent/pad identity), written **inside** the
+  write's transaction; `client_ip_ctx`/`user_agent_ctx` in `app/core/logging.py`
+  are set by `RequestContextMiddleware` so the CRUD engine can attribute the
+  workstation. `GET /signature-audit-events`.
+- **SIG-7** document binding: `patient_signatures.progress_note_id`/`consent_id`
+  (same-patient enforced, 422 `signature_document_mismatch`) with a
+  server-computed `content_hash`; `progress_notes.content_hash` (stamped by
+  `/sign`) and `patient_consents.content_hash` (stamped on `status=signed`);
+  `signature_status` = `signed|stale|unverifiable|…` on all three reads, **null**
+  on an unbound signature row (the API does not guess). **SIG-6 decided**:
+  `PUT /users/{id}/signature` is canonical; the user PATCH still takes
+  `signature_data` but clears the Topaz block (it described the previous image).
+- **SIG-9** `GET /patient-signatures?include_image=false` — rows are `expunge`d
+  before `signature_data` is blanked so the strip can never flush as a NULL.
+- **Legacy data, applied on the dev DB**: 3,760 migrated rows held a raw SigString
+  in `signature_data` (`device_source="0"`; `"2"` = 98 real legacy images; 2 rows
+  hold the literal `undefined`). `scripts/migrate_legacy_sigstrings.py` moved them
+  into `sig_string` (encrypted), NULLing the image — **no server-side JPEG render**
+  (needs Topaz SigPlus, a Windows COM component). Rides along: `patient_signatures`
+  has no `tenant_id`, so before `PatientSignatureCRUD._scope_tenant` any tenant
+  could read/void any signature by id.
+
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))
   records authenticated 2xx mutations (POST/PUT/PATCH/DELETE) to `audit_logs` via

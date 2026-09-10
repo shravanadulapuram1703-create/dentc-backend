@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, LegacyIdMixin, TimestampMixin
@@ -66,6 +66,20 @@ class User(Base, IntPKMixin, TimestampMixin):
     signature_len: Mapped[int | None]
     signature_device_source: Mapped[str | None] = mapped_column(String(20))
     signature_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Topaz signature capture (SIG-1/2/3/8) - the user-signature store carries the
+    # same block as patient_signatures, prefixed ``signature_`` like the three
+    # columns above. ``signature_sig_string`` is encrypted at rest (SIG-4).
+    signature_sig_string: Mapped[str | None] = mapped_column(Text)
+    signature_sig_format: Mapped[str | None] = mapped_column(String(24))
+    signature_sig_compression: Mapped[int | None] = mapped_column(SmallInteger)
+    signature_sig_encryption: Mapped[int | None] = mapped_column(SmallInteger)
+    signature_point_count: Mapped[int | None] = mapped_column(Integer)
+    signature_stroke_count: Mapped[int | None] = mapped_column(Integer)
+    signature_device_vendor: Mapped[str | None] = mapped_column(String(20))
+    signature_device_model: Mapped[str | None] = mapped_column(String(40))
+    signature_device_serial: Mapped[str | None] = mapped_column(String(40))
+    signature_captured_user_agent: Mapped[str | None] = mapped_column(String(255))
+    signature_signed_at: Mapped[datetime | None] = mapped_column(DateTime)
     image_url: Mapped[str | None] = mapped_column(String(500))  # gap #5 (avatar)
     # PDP-3: server-side persistent default patient (last opened). ON DELETE SET
     # NULL so a hard-deleted patient can't strand the user on a 404; soft-deleted

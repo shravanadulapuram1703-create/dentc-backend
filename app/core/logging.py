@@ -17,6 +17,11 @@ import sys
 request_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 user_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("user_id", default="-")
 tenant_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("tenant_id", default="-")
+# SIG-8: the signature audit trail records *which workstation* captured a
+# signature. The CRUD engine never sees the Request object, so the middleware
+# parks the client address + User-Agent here and ``signature_service`` reads them.
+client_ip_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("client_ip", default=None)
+user_agent_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("user_agent", default=None)
 
 
 class ContextFilter(logging.Filter):

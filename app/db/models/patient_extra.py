@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
@@ -124,10 +124,26 @@ class PatientConsent(Base, IntPKMixin, CreatedAtMixin):
     # to ``signed_by`` which is the staff user that captured it.
     signer_name: Mapped[str | None] = mapped_column(String(255))
     signer_relationship: Mapped[str | None] = mapped_column(String(50))
-    signature_method: Mapped[str | None] = mapped_column(String(20))  # drawn | scanned | verbal
+    # SIG-5: drawn | scanned | verbal | topaz (published by signature_service.SIGNATURE_METHODS)
+    signature_method: Mapped[str | None] = mapped_column(String(20))
     declined_reason: Mapped[str | None] = mapped_column(String(500))
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # ── Topaz signature capture (SIG-1/2/3/4/7/8) - mirrors patient_signatures ──
+    sig_string: Mapped[str | None] = mapped_column(Text)  # encrypted at rest
+    sig_format: Mapped[str | None] = mapped_column(String(24))
+    sig_compression: Mapped[int | None] = mapped_column(SmallInteger)
+    sig_encryption: Mapped[int | None] = mapped_column(SmallInteger)
+    point_count: Mapped[int | None] = mapped_column(Integer)
+    stroke_count: Mapped[int | None] = mapped_column(Integer)
+    device_source: Mapped[str | None] = mapped_column(String(20))
+    device_vendor: Mapped[str | None] = mapped_column(String(20))
+    device_model: Mapped[str | None] = mapped_column(String(40))
+    device_serial: Mapped[str | None] = mapped_column(String(40))
+    captured_user_agent: Mapped[str | None] = mapped_column(String(255))
+    # SIG-7: SHA-256 over the rendered consent as it stood when signed, so an
+    # edit to ``rendered_html`` afterwards reads as ``signature_status="stale"``.
+    content_hash: Mapped[str | None] = mapped_column(String(64))
 
 
 class ClaimAttachment(Base, IntPKMixin, CreatedAtMixin):

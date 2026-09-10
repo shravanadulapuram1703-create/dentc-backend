@@ -11,6 +11,7 @@ from datetime import date, datetime
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
+from app.schemas.signature import SignatureCaptureFields
 
 AlertResponse = Literal["yes", "no", "unknown"]
 Scope = Literal["all", "alerts", "dental", "medical"]
@@ -85,6 +86,18 @@ class MedicalHistorySignature(BaseModel):
     #: MH-6: SHA-256 of the answers as signed. Null on migrated rows, which is
     #: why ``signature_status`` can be ``unverifiable``.
     content_hash: Optional[str] = None
+    # Topaz capture metadata (SIG-1/2/3/8). ``sig_string`` itself is never on a
+    # read model - ``has_sig_string`` says whether one is on file.
+    has_sig_string: bool = False
+    sig_format: Optional[str] = None
+    sig_compression: Optional[int] = None
+    sig_encryption: Optional[int] = None
+    point_count: Optional[int] = None
+    stroke_count: Optional[int] = None
+    device_vendor: Optional[str] = None
+    device_model: Optional[str] = None
+    device_serial: Optional[str] = None
+    captured_user_agent: Optional[str] = None
     is_active: bool = True
     superseded_by_id: Optional[int] = None
     voided_at: Optional[datetime] = None
@@ -265,9 +278,14 @@ class MedicalHistoryCopyRequest(BaseModel):
     allow_contradictions: bool = False
 
 
-class MedicalHistorySignRequest(BaseModel):
+class MedicalHistorySignRequest(SignatureCaptureFields):
+    """MH-6 sign body + the Topaz block (SIG-10: the same fields as
+    ``POST /patient-signatures`` so switching paths loses no metadata)."""
+
     signature_data: str
+    signature_len: Optional[int] = None
     device_source: Optional[str] = None
+    signed_at: Optional[datetime] = None
     is_user_sig: bool = False
     #: MH-6: who is attesting, if not the authenticated operator of the pad.
     signed_by_user_id: Optional[int] = None

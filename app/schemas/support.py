@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -51,3 +51,11 @@ class SupportTicketRead(ORMModel):
 
 class SupportTicketList(BaseModel):
     tickets: list[SupportTicketRead]
+
+
+class SupportTicketStatusUpdate(BaseModel):
+    """HELP-6: reporter-driven status change from "My Tickets". Only the FE's
+    mapped status set is accepted; ``Failed`` is a create outcome, not a state a
+    user can pick."""
+
+    status: Literal["Open", "In Progress", "Done"]

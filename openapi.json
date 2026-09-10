@@ -1775,6 +1775,18 @@
         ],
         "parameters": [
           {
+            "name": "include_sig_string",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "SIG-4: also return the clear Topaz SigString (audited)",
+              "default": false,
+              "title": "Include Sig String"
+            },
+            "description": "SIG-4: also return the clear Topaz SigString (audited)"
+          },
+          {
             "name": "X-Tenant-ID",
             "in": "header",
             "required": false,
@@ -1948,6 +1960,18 @@
               "type": "integer",
               "title": "User Id"
             }
+          },
+          {
+            "name": "include_sig_string",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "SIG-4: also return the clear Topaz SigString (audited)",
+              "default": false,
+              "title": "Include Sig String"
+            },
+            "description": "SIG-4: also return the clear Topaz SigString (audited)"
           },
           {
             "name": "X-Tenant-ID",
@@ -10638,6 +10662,120 @@
               }
             },
             "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/support/tickets/{ticket_id}": {
+      "patch": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Change the status of one of the caller's tickets (HELP-6)",
+        "description": "Moves the ticket to ``Open`` / ``In Progress`` / ``Done``. When the ticket is\nmirrored in Jira, the matching workflow transition is applied there first so the\ntwo never disagree (409 if Jira offers no transition into that status, 502 if\nJira is unreachable).",
+        "operationId": "update_support_ticket_status",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportTicketStatusUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
           }
         }
       }
@@ -22459,7 +22597,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PatientConsentSignedRead"
+                  "$ref": "#/components/schemas/PatientConsentRead"
                 }
               }
             }
@@ -24935,6 +25073,473 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MedicalHistoryRules"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/patient-signatures/{signature_id}/sig-string": {
+      "get": {
+        "tags": [
+          "Patients"
+        ],
+        "summary": "The clear Topaz SigString for one signature (admin, audited \u2014 SIG-4)",
+        "operationId": "get_patient_signature_sig_string",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "signature_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "signature identifier",
+              "title": "Signature Id"
+            },
+            "description": "signature identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureVectorRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-consents/{consent_id}/sig-string": {
+      "get": {
+        "tags": [
+          "Patients"
+        ],
+        "summary": "The clear Topaz SigString captured on a consent (admin, audited \u2014 SIG-4)",
+        "operationId": "get_patient_consent_sig_string",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "consent identifier",
+              "title": "Consent Id"
+            },
+            "description": "consent identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureVectorRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/signature-audit-events": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Signature lifecycle audit trail \u2014 who signed on which pad from which workstation (SIG-8)",
+        "operationId": "list_signature_audit_events",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "patient_signature | patient_consent | user",
+              "title": "Entity Type"
+            },
+            "description": "patient_signature | patient_consent | user"
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "captured | superseded | voided | declined | replaced | cleared | sig_string_exported",
+              "title": "Event"
+            },
+            "description": "captured | superseded | voided | declined | replaced | cleared | sig_string_exported"
+          },
+          {
+            "name": "actor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Column to sort by",
+              "title": "Sort"
+            },
+            "description": "Column to sort by"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Free-text search",
+              "title": "Search"
+            },
+            "description": "Free-text search"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_SignatureAuditEventRead_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/metadata/signature-capture": {
+      "get": {
+        "tags": [
+          "Patients"
+        ],
+        "summary": "Signature-capture vocabularies and limits the API enforces (SIG-2/5)",
+        "operationId": "get_signature_capture_rules",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureCaptureRules"
                 }
               }
             }
@@ -36615,6 +37220,78 @@
             "description": "Filter by content_hash"
           },
           {
+            "name": "device_source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by device_source",
+              "title": "Device Source"
+            },
+            "description": "Filter by device_source"
+          },
+          {
+            "name": "progress_note_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by progress_note_id",
+              "title": "Progress Note Id"
+            },
+            "description": "Filter by progress_note_id"
+          },
+          {
+            "name": "consent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by consent_id",
+              "title": "Consent Id"
+            },
+            "description": "Filter by consent_id"
+          },
+          {
+            "name": "include_image",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by include_image",
+              "title": "Include Image"
+            },
+            "description": "Filter by include_image"
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -37218,6 +37895,24 @@
               "title": "Status"
             },
             "description": "Filter by status"
+          },
+          {
+            "name": "signature_method",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by signature_method",
+              "title": "Signature Method"
+            },
+            "description": "Filter by signature_method"
           },
           {
             "name": "page",
@@ -100397,6 +101092,17 @@
             ],
             "title": "Signed At"
           },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
           "is_struck_off": {
             "type": "boolean",
             "title": "Is Struck Off"
@@ -106252,6 +106958,135 @@
       },
       "ConsentSignRequest": {
         "properties": {
+          "sig_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig String",
+            "description": "Topaz SigString \u2014 clear text, lossless; encrypted at rest"
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 24
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format",
+            "examples": [
+              "topaz_sigstring_v1"
+            ]
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression",
+            "description": "0 none | 1 lossless | 2 lossy"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption",
+            "description": "0 clear | 1 DES | 2 high"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor",
+            "examples": [
+              "topaz"
+            ]
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model",
+            "examples": [
+              "T-L(BK)462",
+              "T-LBK755SE"
+            ]
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent",
+            "description": "Workstation hint; defaults to the request User-Agent"
+          },
           "signature_data": {
             "anyOf": [
               {
@@ -106262,7 +107097,47 @@
               }
             ],
             "title": "Signature Data",
-            "description": "Base64 / data-URL image of a drawn signature"
+            "description": "Base64 / data-URL image of the signature (Topaz JPEG or canvas PNG)"
+          },
+          "signature_len": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Len"
+          },
+          "device_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Source",
+            "examples": [
+              "topaz",
+              "web-pad"
+            ]
+          },
+          "signed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed At",
+            "description": "Workstation timestamp of the capture"
           },
           "document_id": {
             "anyOf": [
@@ -106297,6 +107172,7 @@
             ],
             "title": "Signature Method",
             "examples": [
+              "topaz",
               "drawn",
               "scanned",
               "verbal"
@@ -106342,7 +107218,7 @@
         },
         "type": "object",
         "title": "ConsentSignRequest",
-        "description": "LTR-10: capture a signature against an existing consent row."
+        "description": "LTR-10: capture a signature against an existing consent row. Carries the\nTopaz block (SIG-1/2/3/8) via ``SignatureCaptureFields``."
       },
       "ContactInput": {
         "properties": {
@@ -124488,12 +125364,7 @@
           "response": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "yes",
-                  "no",
-                  "unknown"
-                ]
+                "type": "string"
               },
               {
                 "type": "null"
@@ -125960,7 +126831,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/MedicalAlertIn"
+                  "$ref": "#/components/schemas/app__schemas__medical_history__MedicalAlertIn"
                 },
                 "type": "array"
               },
@@ -126051,9 +126922,149 @@
       },
       "MedicalHistorySignRequest": {
         "properties": {
+          "sig_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig String",
+            "description": "Topaz SigString \u2014 clear text, lossless; encrypted at rest"
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 24
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format",
+            "examples": [
+              "topaz_sigstring_v1"
+            ]
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression",
+            "description": "0 none | 1 lossless | 2 lossy"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption",
+            "description": "0 clear | 1 DES | 2 high"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor",
+            "examples": [
+              "topaz"
+            ]
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model",
+            "examples": [
+              "T-L(BK)462",
+              "T-LBK755SE"
+            ]
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent",
+            "description": "Workstation hint; defaults to the request User-Agent"
+          },
           "signature_data": {
             "type": "string",
             "title": "Signature Data"
+          },
+          "signature_len": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Len"
           },
           "device_source": {
             "anyOf": [
@@ -126065,6 +127076,18 @@
               }
             ],
             "title": "Device Source"
+          },
+          "signed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed At"
           },
           "is_user_sig": {
             "type": "boolean",
@@ -126103,7 +127126,8 @@
         "required": [
           "signature_data"
         ],
-        "title": "MedicalHistorySignRequest"
+        "title": "MedicalHistorySignRequest",
+        "description": "MH-6 sign body + the Topaz block (SIG-10: the same fields as\n``POST /patient-signatures`` so switching paths loses no metadata)."
       },
       "MedicalHistorySignature": {
         "properties": {
@@ -126208,6 +127232,110 @@
               }
             ],
             "title": "Content Hash"
+          },
+          "has_sig_string": {
+            "type": "boolean",
+            "title": "Has Sig String",
+            "default": false
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format"
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent"
           },
           "is_active": {
             "type": "boolean",
@@ -134820,6 +135948,26 @@
         ],
         "title": "PaginatedResponse[ResponsiblePartyRead]"
       },
+      "PaginatedResponse_SignatureAuditEventRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SignatureAuditEventRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[SignatureAuditEventRead]"
+      },
       "PaginatedResponse_SmsMessageRead_": {
         "properties": {
           "items": {
@@ -136054,6 +137202,138 @@
               }
             ],
             "title": "Is Deleted"
+          },
+          "sig_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig String"
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format"
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Source"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
           }
         },
         "type": "object",
@@ -136224,6 +137504,127 @@
             ],
             "title": "Created By"
           },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format"
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Source"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -136232,6 +137633,22 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "has_sig_string": {
+            "type": "boolean",
+            "title": "Has Sig String",
+            "default": false
+          },
+          "signature_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Status"
           }
         },
         "type": "object",
@@ -136244,189 +137661,6 @@
           "created_at"
         ],
         "title": "PatientConsentRead"
-      },
-      "PatientConsentSignedRead": {
-        "properties": {
-          "tenant_id": {
-            "type": "integer",
-            "title": "Tenant Id"
-          },
-          "patient_id": {
-            "type": "integer",
-            "title": "Patient Id"
-          },
-          "template_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Template Id"
-          },
-          "plan_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Plan Id"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "rendered_html": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rendered Html"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "signature_data": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Signature Data"
-          },
-          "document_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Document Id"
-          },
-          "signed_by": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Signed By"
-          },
-          "signed_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Signed At"
-          },
-          "signer_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Signer Name"
-          },
-          "signer_relationship": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Signer Relationship"
-          },
-          "signature_method": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Signature Method"
-          },
-          "declined_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Declined Reason"
-          },
-          "is_deleted": {
-            "type": "boolean",
-            "title": "Is Deleted"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "tenant_id",
-          "patient_id",
-          "status",
-          "is_deleted",
-          "id",
-          "created_at"
-        ],
-        "title": "PatientConsentSignedRead"
       },
       "PatientConsentUpdate": {
         "properties": {
@@ -136595,6 +137829,138 @@
               }
             ],
             "title": "Is Deleted"
+          },
+          "sig_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig String"
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format"
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Source"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
           }
         },
         "type": "object",
@@ -146080,6 +147446,138 @@
               }
             ],
             "title": "Voided By"
+          },
+          "sig_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig String"
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format"
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent"
+          },
+          "progress_note_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Note Id"
+          },
+          "consent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Id"
           }
         },
         "type": "object",
@@ -146247,6 +147745,127 @@
             ],
             "title": "Updated By"
           },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format"
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent"
+          },
+          "progress_note_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Note Id"
+          },
+          "consent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Id"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -146267,6 +147886,70 @@
               }
             ],
             "title": "Updated At"
+          },
+          "has_image": {
+            "type": "boolean",
+            "title": "Has Image",
+            "default": false
+          },
+          "image_omitted": {
+            "type": "boolean",
+            "title": "Image Omitted",
+            "default": false
+          },
+          "has_sig_string": {
+            "type": "boolean",
+            "title": "Has Sig String",
+            "default": false
+          },
+          "legacy_sig_string_in_image": {
+            "type": "boolean",
+            "title": "Legacy Sig String In Image",
+            "default": false
+          },
+          "signature_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Status"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "signed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed By Name"
+          },
+          "voided_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided By Name"
           }
         },
         "type": "object",
@@ -146425,6 +148108,138 @@
               }
             ],
             "title": "Voided By"
+          },
+          "sig_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig String"
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format"
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent"
+          },
+          "progress_note_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Note Id"
+          },
+          "consent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Id"
           }
         },
         "type": "object",
@@ -155964,6 +157779,17 @@
             ],
             "title": "Signed At"
           },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
           "is_struck_off": {
             "anyOf": [
               {
@@ -156157,6 +157983,28 @@
               }
             ],
             "title": "Signed At"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "signature_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Status"
           },
           "is_struck_off": {
             "type": "boolean",
@@ -156471,6 +158319,17 @@
               }
             ],
             "title": "Signed At"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
           },
           "is_struck_off": {
             "anyOf": [
@@ -160995,7 +162854,7 @@
           },
           "medical_alerts": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__patient_intake__MedicalAlertIn"
+              "$ref": "#/components/schemas/MedicalAlertIn"
             },
             "type": "array",
             "title": "Medical Alerts"
@@ -164083,6 +165942,470 @@
         ],
         "title": "SecuritySettingsRead"
       },
+      "SignatureAuditEventRead": {
+        "properties": {
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "integer",
+            "title": "Entity Id"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "event": {
+            "type": "string",
+            "title": "Event"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          },
+          "device_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Source"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "signature_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Type"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type",
+          "entity_id",
+          "event",
+          "id",
+          "created_at"
+        ],
+        "title": "SignatureAuditEventRead"
+      },
+      "SignatureCaptureRules": {
+        "properties": {
+          "sig_formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sig Formats"
+          },
+          "sig_compression_values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Sig Compression Values"
+          },
+          "sig_encryption_values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Sig Encryption Values"
+          },
+          "device_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Device Sources"
+          },
+          "legacy_device_source": {
+            "type": "string",
+            "title": "Legacy Device Source"
+          },
+          "legacy_device_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Legacy Device Sources"
+          },
+          "signature_methods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Signature Methods"
+          },
+          "signature_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Signature Statuses"
+          },
+          "audit_events": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Audit Events"
+          },
+          "min_point_count": {
+            "type": "integer",
+            "title": "Min Point Count"
+          },
+          "min_stroke_count": {
+            "type": "integer",
+            "title": "Min Stroke Count"
+          },
+          "max_signature_chars": {
+            "type": "integer",
+            "title": "Max Signature Chars"
+          },
+          "max_sig_string_chars": {
+            "type": "integer",
+            "title": "Max Sig String Chars"
+          },
+          "sig_string_encrypted_at_rest": {
+            "type": "boolean",
+            "title": "Sig String Encrypted At Rest"
+          },
+          "sig_string_on_read_models": {
+            "type": "boolean",
+            "title": "Sig String On Read Models"
+          },
+          "sig_string_endpoints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sig String Endpoints"
+          },
+          "canonical_user_signature_write": {
+            "type": "string",
+            "title": "Canonical User Signature Write"
+          },
+          "document_binding": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Document Binding"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sig_formats",
+          "sig_compression_values",
+          "sig_encryption_values",
+          "device_sources",
+          "legacy_device_source",
+          "legacy_device_sources",
+          "signature_methods",
+          "signature_statuses",
+          "audit_events",
+          "min_point_count",
+          "min_stroke_count",
+          "max_signature_chars",
+          "max_sig_string_chars",
+          "sig_string_encrypted_at_rest",
+          "sig_string_on_read_models",
+          "sig_string_endpoints",
+          "canonical_user_signature_write",
+          "document_binding"
+        ],
+        "title": "SignatureCaptureRules",
+        "description": "``GET /metadata/signature-capture`` \u2014 the vocabularies and limits the\nAPI enforces, so the pad diagnostics page reads them from one place."
+      },
+      "SignatureVectorRead": {
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "examples": [
+              "patient_signature",
+              "patient_consent",
+              "user"
+            ]
+          },
+          "entity_id": {
+            "type": "integer",
+            "title": "Entity Id"
+          },
+          "sig_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig String"
+          },
+          "sig_string_readable": {
+            "type": "boolean",
+            "title": "Sig String Readable",
+            "description": "False when the row holds a token the current key cannot open",
+            "default": false
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format"
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Source"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "signed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed At"
+          },
+          "encrypted_at_rest": {
+            "type": "boolean",
+            "title": "Encrypted At Rest",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type",
+          "entity_id"
+        ],
+        "title": "SignatureVectorRead",
+        "description": "SIG-4: the clear Topaz SigString for one signature. Admin-only, audited."
+      },
       "SignatureVoidRequest": {
         "properties": {
           "reason": {
@@ -166930,6 +169253,25 @@
           "issue_key"
         ],
         "title": "SupportTicketResult"
+      },
+      "SupportTicketStatusUpdate": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "Open",
+              "In Progress",
+              "Done"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SupportTicketStatusUpdate",
+        "description": "HELP-6: reporter-driven status change from \"My Tickets\". Only the FE's\nmapped status set is accepted; ``Failed`` is a create outcome, not a state a\nuser can pick."
       },
       "TelecomVerifyResult": {
         "properties": {
@@ -170938,6 +173280,133 @@
             ],
             "title": "Updated At",
             "description": "When the signature last changed"
+          },
+          "signed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed At"
+          },
+          "has_sig_string": {
+            "type": "boolean",
+            "title": "Has Sig String",
+            "default": false
+          },
+          "sig_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig String"
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format"
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent"
           }
         },
         "type": "object",
@@ -170948,6 +173417,135 @@
       },
       "UserSignatureUpdate": {
         "properties": {
+          "sig_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig String",
+            "description": "Topaz SigString \u2014 clear text, lossless; encrypted at rest"
+          },
+          "sig_format": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 24
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Format",
+            "examples": [
+              "topaz_sigstring_v1"
+            ]
+          },
+          "sig_compression": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Compression",
+            "description": "0 none | 1 lossless | 2 lossy"
+          },
+          "sig_encryption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sig Encryption",
+            "description": "0 clear | 1 DES | 2 high"
+          },
+          "point_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Count"
+          },
+          "stroke_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stroke Count"
+          },
+          "device_vendor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Vendor",
+            "examples": [
+              "topaz"
+            ]
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model",
+            "examples": [
+              "T-L(BK)462",
+              "T-LBK755SE"
+            ]
+          },
+          "device_serial": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial"
+          },
+          "captured_user_agent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured User Agent",
+            "description": "Workstation hint; defaults to the request User-Agent"
+          },
           "signature_data": {
             "type": "string",
             "title": "Signature Data",
@@ -170974,14 +173572,31 @@
                 "type": "null"
               }
             ],
-            "title": "Device Source"
+            "title": "Device Source",
+            "examples": [
+              "topaz",
+              "web-pad"
+            ]
+          },
+          "signed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed At"
           }
         },
         "type": "object",
         "required": [
           "signature_data"
         ],
-        "title": "UserSignatureUpdate"
+        "title": "UserSignatureUpdate",
+        "description": "SIG-6: ``PUT /users/{id}/signature`` (and ``/me/signature``) is the\n**canonical** user-signature write - the only path that accepts the Topaz\nblock. The user PATCH still takes ``signature_data`` but clears the block."
       },
       "UserTaskCreate": {
         "properties": {
@@ -171672,7 +174287,7 @@
         ],
         "title": "PaymentAllocationRead"
       },
-      "app__schemas__patient_intake__MedicalAlertIn": {
+      "app__schemas__medical_history__MedicalAlertIn": {
         "properties": {
           "alert_code": {
             "type": "string",
@@ -171692,7 +174307,12 @@
           "response": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no",
+                  "unknown"
+                ]
               },
               {
                 "type": "null"

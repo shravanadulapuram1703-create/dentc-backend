@@ -15,7 +15,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from app.core.logging import get_logger, request_id_ctx, tenant_id_ctx, user_id_ctx
+from app.core.logging import (
+    client_ip_ctx,
+    get_logger,
+    request_id_ctx,
+    tenant_id_ctx,
+    user_agent_ctx,
+    user_id_ctx,
+)
 
 logger = get_logger("app.request")
 
@@ -28,6 +35,15 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         request_id_ctx.set(request_id)
         user_id_ctx.set("-")
         tenant_id_ctx.set("-")
+        # SIG-8: workstation attribution for the signature audit trail. Honour the
+        # first hop of X-Forwarded-For (Cloud Run / a reverse proxy rewrites the
+        # peer address), else the socket peer.
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        client_ip = forwarded.split(",")[0].strip() if forwarded else (
+            request.client.host if request.client else None
+        )
+        client_ip_ctx.set(client_ip or None)
+        user_agent_ctx.set(request.headers.get("User-Agent") or None)
 
         start = time.perf_counter()
         response = await call_next(request)
