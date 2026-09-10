@@ -5,10 +5,15 @@ Why
 The legacy import wrote every migrated ``patient_signatures`` row with
 ``device_source = "0"`` and the raw Topaz **SigString** (``02008C00D5…`` — the
 vector stroke record) in ``signature_data``, the column that is supposed to hold
-a rendered image. Verified on tenant 1 on 2026-09-10: 3,862 rows, 3,860 of them
-legacy SigStrings, 2 real ``web-pad`` data URLs. The frontend cannot render a
-SigString as ``<img>`` and shows "Topaz signature on file (legacy data — image
-not available)" for them.
+a rendered image. Measured on the dev database on 2026-09-10 (3,862 rows):
+3,760 legacy SigStrings (``device_source="0"``), 98 migrated data-URL images
+(``device_source="2"``), 2 ``web-pad`` data URLs, and 2 rows holding the literal
+string ``undefined`` (a legacy client bug; left alone and reported as
+``unrecognised_kept``). The frontend cannot render a SigString as ``<img>`` and
+shows "Topaz signature on file (legacy data — image not available)" for them.
+
+**Applied on the dev database 2026-09-10**: 3,760 moved, 0 raw SigStrings left in
+``signature_data``, every ``sig_string`` encrypted.
 
 What this does
 --------------
@@ -58,41 +63,54 @@ BATCH = 500
 
 def _migrate_patient_signatures(db, *, tenant_id: int | None, apply: bool) -> Counter:  # noqa: ANN001
     stats: Counter = Counter()
-    stmt = select(PatientSignature).where(
+    id_stmt = select(PatientSignature.id).where(
         PatientSignature.signature_data.is_not(None),
         PatientSignature.sig_string.is_(None),
     )
     if tenant_id is not None:
-        stmt = stmt.where(
+        id_stmt = id_stmt.where(
             PatientSignature.patient_id.in_(select(Patient.id).where(Patient.tenant_id == tenant_id))
         )
+    # Ids first, then batches by id: a server-side cursor cannot survive the
+    # per-batch commit, and the whole table is a few thousand rows.
+    ids = list(db.execute(id_stmt.order_by(PatientSignature.id)).scalars())
     pending = 0
-    for row in db.execute(stmt.execution_options(yield_per=BATCH)).scalars():
-        stats["scanned"] += 1
-        data = row.signature_data or ""
-        if data.strip().startswith("data:"):
-            stats["image_kept"] += 1
-            continue
-        if not svc.looks_like_sigstring(data):
-            stats["unrecognised_kept"] += 1
-            continue
-        stats["sigstring_moved"] += 1
-        if row.device_source == svc.DEVICE_SOURCE_LEGACY:
-            stats["legacy_source"] += 1
-        if not apply:
-            continue
-        row.sig_string = svc.encrypt_sig_string(data.strip())
-        row.sig_format = svc.SIG_FORMAT_TOPAZ_V1
-        row.device_vendor = svc.DEVICE_VENDOR_TOPAZ
-        row.signature_data = None
-        row.signature_len = None
-        pending += 1
-        if pending >= BATCH:
+    for start in range(0, len(ids), BATCH):
+        chunk = ids[start:start + BATCH]
+        rows = db.execute(
+            select(PatientSignature).where(PatientSignature.id.in_(chunk))
+        ).scalars().all()
+        for row in rows:
+            _migrate_row(row, stats, apply)
+            if apply:
+                pending += 1
+        if apply and pending >= BATCH:
             db.commit()
             pending = 0
     if apply:
         db.commit()
     return stats
+
+
+def _migrate_row(row: PatientSignature, stats: Counter, apply: bool) -> None:
+    stats["scanned"] += 1
+    data = row.signature_data or ""
+    if data.strip().startswith("data:"):
+        stats["image_kept"] += 1
+        return
+    if not svc.looks_like_sigstring(data):
+        stats["unrecognised_kept"] += 1
+        return
+    stats["sigstring_moved"] += 1
+    if row.device_source == svc.DEVICE_SOURCE_LEGACY:
+        stats["legacy_source"] += 1
+    if not apply:
+        return
+    row.sig_string = svc.encrypt_sig_string(data.strip())
+    row.sig_format = svc.SIG_FORMAT_TOPAZ_V1
+    row.device_vendor = svc.DEVICE_VENDOR_TOPAZ
+    row.signature_data = None
+    row.signature_len = None
 
 
 def _migrate_users(db, *, tenant_id: int | None, apply: bool) -> Counter:  # noqa: ANN001

@@ -26,7 +26,7 @@ SigString (the legacy import put SigStrings where images go) are moved into
 ``sig_string`` by ``scripts/migrate_legacy_sigstrings.py`` — a data step kept out
 of this revision so it can be dry-run and reported.
 
-Revision ID: a3b4c5d6e7f8
+Revision ID: b6c7d8e9f0a1
 Revises: e0f1a2b3c4d5
 Create Date: 2026-09-10
 """
@@ -34,9 +34,10 @@ Create Date: 2026-09-10
 from __future__ import annotations
 
 import sqlalchemy as sa
+
 from alembic import op
 
-revision = "a3b4c5d6e7f8"
+revision = "b6c7d8e9f0a1"
 down_revision = "e0f1a2b3c4d5"
 branch_labels = None
 depends_on = None

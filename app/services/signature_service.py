@@ -64,9 +64,13 @@ SIG_ENCRYPTION_VALUES = (0, 1, 2)
 
 DEVICE_SOURCE_TOPAZ = "topaz"
 DEVICE_SOURCE_WEB_PAD = "web-pad"
-#: The legacy import wrote ``"0"`` on every migrated signature row.
+#: The legacy import wrote ``"0"`` on every migrated SigString row (3,760 on the
+#: dev database) and ``"2"`` on the 98 migrated rows that hold a real data-URL
+#: image. Both are kept as written — they are the only marker of provenance.
 DEVICE_SOURCE_LEGACY = "0"
-DEVICE_SOURCES = (DEVICE_SOURCE_TOPAZ, DEVICE_SOURCE_WEB_PAD, DEVICE_SOURCE_LEGACY)
+DEVICE_SOURCE_LEGACY_IMAGE = "2"
+DEVICE_SOURCES = (DEVICE_SOURCE_TOPAZ, DEVICE_SOURCE_WEB_PAD, DEVICE_SOURCE_LEGACY,
+                  DEVICE_SOURCE_LEGACY_IMAGE)
 
 DEVICE_VENDOR_TOPAZ = "topaz"
 
@@ -695,6 +699,7 @@ def published_rules() -> dict[str, Any]:
         "sig_encryption_values": {"0": "clear", "1": "des", "2": "high"},
         "device_sources": list(DEVICE_SOURCES),
         "legacy_device_source": DEVICE_SOURCE_LEGACY,
+        "legacy_device_sources": [DEVICE_SOURCE_LEGACY, DEVICE_SOURCE_LEGACY_IMAGE],
         "signature_methods": list(SIGNATURE_METHODS),
         "signature_statuses": list(SIGNATURE_STATUSES),
         "audit_events": list(EVENTS),

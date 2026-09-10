@@ -45,6 +45,38 @@ settings.GCS_BUCKET_DOCUMENTS = None
 # configured path.
 settings.JIRA_BASE_URL = None
 
+# Same reasoning for Twilio. A developer's ``.env`` legitimately carries a real
+# ``TWILIO_ACCOUNT_SID`` + credential, and with them set
+# ``twilio_client.is_configured()`` is True, so every ``POST /sms/send`` in
+# ``test_sms_module.py`` went to the **live** Twilio REST API — seven tests
+# failed with ``twilio_error`` 502 ("actor doesn't have any assertions") because
+# the test fixtures' phone numbers and Messaging Service are not real. The SMS
+# module's documented zero-config path (persist ``queued``, log-only, no carrier
+# call) is what the tests are meant to exercise; the ``twilio_live`` fixture in
+# ``test_sms_module.py`` patches the SID/token back on with a fake
+# ``send_message``. All four gate ``is_configured()`` (SID + either an API key
+# pair or the Auth Token), and the token alone gates webhook validation, so
+# clear every one — a leftover API key pair would keep the gateway live.
+settings.TWILIO_ACCOUNT_SID = None
+settings.TWILIO_AUTH_TOKEN = None
+settings.TWILIO_API_KEY_SID = None
+settings.TWILIO_API_KEY_SECRET = None
+
+# And for the email transports. ``sendgrid_client.is_configured()`` gates the
+# patient-email path the same way Twilio gates SMS; ``email.graph_is_configured()``
+# / ``SMTP_HOST`` pick the transport for password-reset mail, and
+# ``test_auth_extras.py`` hits ``/auth/forgot-password`` without stubbing it —
+# with a real ``GRAPH_*`` block in ``.env`` that was a live Microsoft Graph
+# ``sendMail`` to a fixture address on every run (fail-soft, so it never
+# failed, it just quietly sent). ``test_email_graph_transport.py`` patches the
+# Graph/SMTP settings back on per test with a fake ``httpx.post``.
+settings.SENDGRID_API_KEY = None
+settings.SENDGRID_FROM_EMAIL = None
+settings.GRAPH_TENANT_ID = None
+settings.GRAPH_CLIENT_ID = None
+settings.GRAPH_CLIENT_SECRET = None
+settings.SMTP_HOST = None
+
 
 @pytest.fixture
 def db_session():

@@ -278,7 +278,7 @@ def test_signature_capture_rules_published(client):
     r = client.get(f"{V1}/metadata/signature-capture")
     assert r.status_code == 200
     body = r.json()
-    assert body["device_sources"] == ["topaz", "web-pad", "0"]
+    assert body["device_sources"] == ["topaz", "web-pad", "0", "2"]
     assert "topaz" in body["signature_methods"]
     assert body["min_point_count"] == 2
     assert body["sig_string_encrypted_at_rest"] is True

@@ -88,6 +88,7 @@ class SignatureCaptureRules(BaseModel):
     sig_encryption_values: dict[str, str]
     device_sources: list[str]
     legacy_device_source: str
+    legacy_device_sources: list[str]
     signature_methods: list[str]
     signature_statuses: list[str]
     audit_events: list[str]

@@ -19,7 +19,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query
 
-from app.api.deps import CurrentUser, DbSession, PageParams, TenantId, get_current_user, require_roles
+from app.api.deps import (
+    CurrentUser,
+    DbSession,
+    PageParams,
+    TenantId,
+    get_current_user,
+    require_roles,
+)
 from app.crud.base import CRUDBase
 from app.db.models import PatientConsent, SignatureAuditEvent
 from app.schemas.common import ErrorResponse, PaginatedResponse
