@@ -181,3 +181,72 @@ def get_status(issue_key: str) -> str | None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Jira status fetch error for %s: %s", issue_key, exc)
         return None
+
+
+def get_statuses(issue_keys: list[str]) -> dict[str, str]:
+    """Bulk variant of :func:`get_status`: one JQL search per 100 keys
+    (POST /rest/api/3/search/jql — the GET /search endpoint is deprecated on
+    Jira Cloud). Returns ``{issue_key: raw_status_name}`` for every issue Jira
+    returned; keys Jira didn't return are simply absent. Never raises."""
+    out: dict[str, str] = {}
+    keys = [k for k in issue_keys if k]
+    for i in range(0, len(keys), 100):
+        chunk = keys[i:i + 100]
+        jql = "key in (" + ",".join(chunk) + ")"
+        try:
+            with _client() as client:
+                resp = client.post(
+                    "/rest/api/3/search/jql",
+                    json={"jql": jql, "fields": ["status"], "maxResults": len(chunk)},
+                )
+            if resp.status_code >= 300:
+                logger.warning("Jira bulk status failed (%s): %s", resp.status_code, _short_error(resp))
+                continue
+            for issue in (resp.json() or {}).get("issues") or []:
+                key = issue.get("key")
+                name = (((issue.get("fields") or {}).get("status") or {}).get("name"))
+                if key and name:
+                    out[key] = name
+        except Exception as exc:  # noqa: BLE001 — status sync is best-effort
+            logger.warning("Jira bulk status error: %s", exc)
+    return out
+
+
+def list_transitions(issue_key: str) -> list[dict[str, Any]]:
+    """Return the workflow transitions currently available on an issue
+    (GET .../transitions) as ``[{"id", "name", "to": {"name"}}, ...]``.
+
+    Raises :class:`JiraError` on any failure — the caller decides whether a
+    status change can proceed without Jira agreeing to it."""
+    try:
+        with _client() as client:
+            resp = client.get(f"/rest/api/3/issue/{issue_key}/transitions")
+    except httpx.HTTPError as exc:
+        raise JiraError(f"Could not reach Jira: {exc}") from exc
+    if resp.status_code >= 300:
+        raise JiraError(f"Jira transitions lookup failed ({resp.status_code}). {_short_error(resp)}",
+                        status_code=resp.status_code)
+    items = (resp.json() or {}).get("transitions") or []
+    return [
+        {"id": str(t.get("id")), "name": t.get("name"), "to": {"name": (t.get("to") or {}).get("name")}}
+        for t in items
+        if isinstance(t, dict)
+    ]
+
+
+def do_transition(issue_key: str, transition_id: str) -> None:
+    """Apply one workflow transition to an issue (POST .../transitions).
+    Raises :class:`JiraError` on any failure."""
+    try:
+        with _client() as client:
+            resp = client.post(
+                f"/rest/api/3/issue/{issue_key}/transitions",
+                json={"transition": {"id": str(transition_id)}},
+            )
+    except httpx.HTTPError as exc:
+        raise JiraError(f"Could not reach Jira: {exc}") from exc
+    if resp.status_code >= 300:
+        detail = _short_error(resp)
+        logger.warning("Jira transition failed (%s) for %s: %s", resp.status_code, issue_key, detail)
+        raise JiraError(f"Jira transition failed ({resp.status_code}). {detail}",
+                        status_code=resp.status_code)

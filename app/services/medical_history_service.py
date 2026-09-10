@@ -59,6 +59,7 @@ from app.services.medical_history_catalog import (
     QUESTIONNAIRE_GROUP_TYPES,
     input_type_for,
 )
+from app.services import signature_service as sig_svc
 
 #: Mirrors the frontend's ``MIN_TENANT_CATALOG_ITEMS`` guard. A tenant catalog
 #: smaller than this is a stray test group (the three ``*_TEST`` groups that
@@ -372,6 +373,17 @@ def _signature_out(row: PatientSignature, names: dict[int, str]) -> dict[str, An
         "signed_by_user_id": row.signed_by_user_id,
         "signed_by_name": names.get(row.signed_by_user_id) if row.signed_by_user_id else None,
         "content_hash": row.content_hash,
+        # Topaz block (SIG-1/2/3/8); the SigString itself never leaves via a read.
+        "has_sig_string": bool(row.sig_string),
+        "sig_format": row.sig_format,
+        "sig_compression": row.sig_compression,
+        "sig_encryption": row.sig_encryption,
+        "point_count": row.point_count,
+        "stroke_count": row.stroke_count,
+        "device_vendor": row.device_vendor,
+        "device_model": row.device_model,
+        "device_serial": row.device_serial,
+        "captured_user_agent": row.captured_user_agent,
         "is_active": row.is_active,
         "superseded_by_id": row.superseded_by_id,
         "voided_at": row.voided_at,
@@ -1099,8 +1111,19 @@ def sign(
         is_active=True,
         created_by=user_id,
     )
+    # SIG-10: the Topaz block rides this path too (encrypted SigString, device
+    # identity, empty-pad guard), through the same pass as POST /patient-signatures.
+    sig_svc.apply_capture(signature, sig_svc.normalise_capture(
+        {**payload, "signature_data": signature_data}, now=now,
+    ))
     db.add(signature)
     db.flush()
+    sig_svc.record_event(
+        db, tenant_id=tenant_id, entity_type=sig_svc.ENTITY_PATIENT_SIGNATURE,
+        entity_id=signature.id, event=sig_svc.EVENT_CAPTURED, actor_id=user_id,
+        patient_id=patient_id, source=signature, signature_type=signature_type,
+        content_hash=content_hash, occurred_at=signature.signed_at,
+    )
 
     # MH-7: the previous standing signature of this type is superseded, not left
     # to a client-side "newest row wins" guess.
@@ -1112,6 +1135,12 @@ def sign(
         previous.is_active = False
         previous.superseded_by_id = signature.id
         previous.updated_by = user_id
+        sig_svc.record_event(
+            db, tenant_id=tenant_id, entity_type=sig_svc.ENTITY_PATIENT_SIGNATURE,
+            entity_id=previous.id, event=sig_svc.EVENT_SUPERSEDED, actor_id=user_id,
+            patient_id=patient_id, source=previous, signature_type=previous.signature_type,
+            content_hash=previous.content_hash, reason=f"superseded by signature {signature.id}",
+        )
 
     version = _freeze_version(
         db, tenant_id=tenant_id, patient_id=patient_id, scope=scope, comments=head.comments,
@@ -1165,6 +1194,12 @@ def void_signature(
     _event(db, tenant_id=tenant_id, patient_id=patient.id, entity_type="signature",
            action="void", entity_id=signature.id, code=signature.signature_type,
            old_value=signature.content_hash, new_value=_clean(reason), user_id=user_id)
+    sig_svc.record_event(
+        db, tenant_id=tenant_id, entity_type=sig_svc.ENTITY_PATIENT_SIGNATURE,
+        entity_id=signature.id, event=sig_svc.EVENT_VOIDED, actor_id=user_id,
+        patient_id=patient.id, source=signature, signature_type=signature.signature_type,
+        content_hash=signature.content_hash, reason=reason,
+    )
     db.commit()
     names = _actor_names(db, {signature.created_by, signature.signed_by_user_id, user_id})
     return _signature_out(signature, names)

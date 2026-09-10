@@ -120,6 +120,8 @@ def test_list_syncs_live_jira_status(client, monkeypatch):
     )
     client.post("/api/v1/support/tickets", json=_payload())
 
+    # Bulk lookup returns nothing (e.g. search API unavailable) → per-issue fallback.
+    monkeypatch.setattr(jira_client, "get_statuses", lambda keys: {})
     # Agent moved it to "In Progress" in Jira → the list read reflects it.
     monkeypatch.setattr(jira_client, "get_status", lambda key: "In Progress")
     t = client.get("/api/v1/support/tickets").json()["tickets"][0]
@@ -201,3 +203,104 @@ def test_unknown_issue_type_falls_back_to_default(client, monkeypatch):
     res = client.post("/api/v1/support/tickets", json=_payload(issue_type="Improvement"))
     assert res.status_code == 200, res.text
     assert attempts == ["Improvement", "Bug"]  # rejected, then retried with default
+
+
+# ── HELP-6: reporter-driven status change ────────────────────────────────────
+
+def test_update_status_local_mode(client, monkeypatch):
+    monkeypatch.setattr(jira_client, "is_configured", lambda: False)
+    client.post("/api/v1/support/tickets", json=_payload())
+    t = client.get("/api/v1/support/tickets").json()["tickets"][0]
+
+    res = client.patch(f"/api/v1/support/tickets/{t['id']}", json={"status": "In Progress"})
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "In Progress"
+    assert client.get("/api/v1/support/tickets").json()["tickets"][0]["status"] == "In Progress"
+
+    # Only the FE's mapped set is accepted.
+    assert client.patch(f"/api/v1/support/tickets/{t['id']}", json={"status": "Failed"}).status_code == 422
+    # Unknown / someone else's ticket → 404.
+    assert client.patch("/api/v1/support/tickets/999999", json={"status": "Done"}).status_code == 404
+
+
+def test_update_status_transitions_jira_first(client, monkeypatch):
+    monkeypatch.setattr(jira_client, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        jira_client, "issue_browse_url",
+        lambda key: f"https://site.atlassian.net/browse/{key}" if key else None,
+    )
+    monkeypatch.setattr(
+        jira_client, "create_issue",
+        lambda **kw: {"key": "KAN-7", "url": "https://site.atlassian.net/browse/KAN-7"},
+    )
+    monkeypatch.setattr(jira_client, "get_statuses", lambda keys: {"KAN-7": "To Do"})
+    client.post("/api/v1/support/tickets", json=_payload())
+    t = client.get("/api/v1/support/tickets").json()["tickets"][0]
+
+    applied: list = []
+    monkeypatch.setattr(
+        jira_client, "list_transitions",
+        lambda key: [
+            {"id": "11", "name": "To Do", "to": {"name": "To Do"}},
+            {"id": "21", "name": "In Progress", "to": {"name": "In Progress"}},
+            {"id": "31", "name": "Done", "to": {"name": "Done"}},
+        ],
+    )
+    monkeypatch.setattr(jira_client, "do_transition", lambda key, tid: applied.append((key, tid)))
+
+    res = client.patch(f"/api/v1/support/tickets/{t['id']}", json={"status": "Done"})
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "Done"
+    assert applied == [("KAN-7", "31")]
+
+    # Jira has no transition into the requested status → 409, nothing persisted.
+    monkeypatch.setattr(jira_client, "list_transitions", lambda key: [
+        {"id": "11", "name": "Reopen", "to": {"name": "To Do"}},
+    ])
+    monkeypatch.setattr(jira_client, "get_statuses", lambda keys: {"KAN-7": "Done"})
+    res = client.patch(f"/api/v1/support/tickets/{t['id']}", json={"status": "In Progress"})
+    assert res.status_code == 409, res.text
+    assert client.get("/api/v1/support/tickets").json()["tickets"][0]["status"] == "Done"
+
+    # Jira unreachable → 502, nothing persisted.
+    def boom(key):
+        raise jira_client.JiraError("Could not reach Jira: timeout")
+    monkeypatch.setattr(jira_client, "list_transitions", boom)
+    res = client.patch(f"/api/v1/support/tickets/{t['id']}", json={"status": "Open"})
+    assert res.status_code == 502, res.text
+
+
+def test_list_uses_one_bulk_status_lookup(client, monkeypatch):
+    """The list read syncs every open Jira-backed ticket with ONE search call,
+    not one GET per ticket."""
+    monkeypatch.setattr(jira_client, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        jira_client, "issue_browse_url",
+        lambda key: f"https://site.atlassian.net/browse/{key}" if key else None,
+    )
+    seq = iter(["KAN-1", "KAN-2", "KAN-3"])
+    monkeypatch.setattr(
+        jira_client, "create_issue",
+        lambda **kw: (lambda k: {"key": k, "url": f"https://site.atlassian.net/browse/{k}"})(next(seq)),
+    )
+    for _ in range(3):
+        client.post("/api/v1/support/tickets", json=_payload())
+
+    bulk_calls: list = []
+    monkeypatch.setattr(
+        jira_client, "get_statuses",
+        lambda keys: bulk_calls.append(sorted(keys)) or {"KAN-1": "Done", "KAN-2": "Ready to Test"},
+    )
+    def no_single(key):
+        raise AssertionError("per-issue get_status must not be used when bulk returned data")
+    monkeypatch.setattr(jira_client, "get_status", no_single)
+
+    listed = client.get("/api/v1/support/tickets").json()["tickets"]
+    assert bulk_calls == [["KAN-1", "KAN-2", "KAN-3"]]
+    by_key = {t["issue_key"]: t["status"] for t in listed}
+    assert by_key == {"KAN-1": "Done", "KAN-2": "Ready to Test", "KAN-3": "Open"}
+
+    # Done tickets are terminal → excluded from the next sync.
+    bulk_calls.clear()
+    client.get("/api/v1/support/tickets")
+    assert bulk_calls == [["KAN-2", "KAN-3"]]

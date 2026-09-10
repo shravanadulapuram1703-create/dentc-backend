@@ -154,6 +154,10 @@ class ProgressNote(Base, IntPKMixin, CreatedAtMixin):
     region: Mapped[str | None] = mapped_column(String(50))
     signed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     signed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # SIG-7: SHA-256 over the note content as it stood when signed
+    # (signature_service.progress_note_content_hash); the read model derives
+    # ``signature_status`` from it.
+    content_hash: Mapped[str | None] = mapped_column(String(64))
     is_struck_off: Mapped[bool] = mapped_column(Boolean, default=False)
     # PN-4: stamped when is_struck_off goes false→true (cleared on restore) so the
     # client can gate "Restore" to the same calendar day; struck_off_by = actor.

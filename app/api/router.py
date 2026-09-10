@@ -26,6 +26,7 @@ from app.api.v1 import (
     office_setup,
     patient_intake,
     patients_extra,
+    signatures,
     payment_plans,
     perio,
     pick_lists,
@@ -143,6 +144,12 @@ api_router.include_router(patient_intake.router)
 api_router.include_router(medical_history.router)
 api_router.include_router(medical_history.signature_router)
 api_router.include_router(medical_history.metadata_router)
+# Topaz signature capture (SIG-4/8): audited SigString reads, the audit trail
+# and the published rules. Before the generic /patient-signatures + /patient-consents.
+api_router.include_router(signatures.signature_router)
+api_router.include_router(signatures.consent_router)
+api_router.include_router(signatures.audit_router)
+api_router.include_router(signatures.metadata_router)
 # Add/Edit Patient checkbox-integrity rules (/metadata/patient-flag-rules).
 api_router.include_router(patient_intake.metadata_router)
 api_router.include_router(patient_intake.rp_router)

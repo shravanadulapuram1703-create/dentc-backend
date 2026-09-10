@@ -39,6 +39,10 @@ class ProgressNoteRead(ORMModel):
     region: Optional[str] = None
     signed_by: Optional[int] = None
     signed_at: Optional[datetime] = None
+    # SIG-7: hash of the content as signed + the derived status
+    # (signed | stale | unverifiable | unsigned).
+    content_hash: Optional[str] = None
+    signature_status: Optional[str] = None
     is_struck_off: bool
     struck_off_at: Optional[datetime] = None  # PN-4
     struck_off_by: Optional[int] = None  # PN-4

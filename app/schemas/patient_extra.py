@@ -19,9 +19,10 @@ from app.schemas.factory import build_schemas
 
 PatientDocumentRead = build_schemas(PatientDocument, "PatientDocument", read_exclude=("file_path",))[2]
 ClaimAttachmentRead = build_schemas(ClaimAttachment, "ClaimAttachment", read_exclude=("file_path",))[2]
-# LTR-10: the sign response. Named distinctly so it does not collide with the
-# generic CRUD ``PatientConsentRead`` component.
-PatientConsentSignedRead = build_schemas(PatientConsent, "PatientConsentSigned")[2]
+# LTR-10: the sign response. SIG-4: it is the generic ``PatientConsentRead``
+# (``sig_string`` excluded, ``signature_status``/``has_sig_string`` enriched) -
+# one component, so the grid and the sign dialog cannot disagree.
+from app.schemas.signature import PatientConsentRead as PatientConsentSignedRead  # noqa: E402
 
 # Composed claim-detail sub-shapes (distinct names to avoid CRUD component clashes).
 _ClaimDetailClaimRead = build_schemas(InsuranceClaim, "ClaimDetailClaim")[2]

@@ -36,6 +36,7 @@ from app.db.models import (
 )
 from app.services import auth_service
 from app.services.user_admin_service import resolve_user_names
+from app.services import signature_service as sig_svc
 
 # PN-7 lock scope. ``note_date`` is deliberately NOT here (PN-8): doctors write
 # notes days after the visit and often pick the wrong Date of Service, so the
@@ -137,6 +138,7 @@ def enrich_progress_notes(db: Session, items, tenant_id: int | None = None) -> N
 
     today = datetime.now(timezone.utc).date()
     for r in rows:
+        r.signature_status = sig_svc.progress_note_signature_status(r)  # SIG-7
         r.created_by_name = names.get(r.created_by) if r.created_by is not None else None
         r.signed_by_name = names.get(r.signed_by) if r.signed_by is not None else None
         r.struck_off_by_name = names.get(r.struck_off_by) if r.struck_off_by is not None else None
@@ -181,6 +183,9 @@ def sign_progress_note(
 
     note.signed_by = signer_id
     note.signed_at = datetime.now(timezone.utc)
+    # SIG-7: freeze the content the signature attests to, so a later edit
+    # flips ``signature_status`` to ``stale`` instead of silently re-attesting.
+    note.content_hash = sig_svc.progress_note_content_hash(note)
     db.commit()
     db.refresh(note)
     return note

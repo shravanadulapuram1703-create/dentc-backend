@@ -24,6 +24,7 @@ from app.db.models import (
 )
 from app.schemas.patient_extra import DuplicateCandidate
 from app.services import document_store
+from app.services import signature_service as sig_svc
 
 # NOTE-DOC-5: the size cap and the type allow-list live in ``filestore`` so every
 # upload route enforces one rule set and ``GET /patient-documents/limits`` can
@@ -160,11 +161,12 @@ def delete_document(db: Session, tenant_id: int, doc_id: int) -> None:
 # The published ``patient_consents.status`` vocabulary. Also seeded as the
 # ``consent_status`` definitions group so the FE renders labels from the backend.
 CONSENT_STATUSES = ("pending", "printed", "signed", "declined", "voided")
-SIGNATURE_METHODS = ("drawn", "scanned", "verbal")
+# SIG-5: the vocabulary lives once in signature_service (``topaz`` added).
+SIGNATURE_METHODS = sig_svc.SIGNATURE_METHODS
 
 # A drawn signature arrives as a data-URL PNG from a canvas. Cap it: the column is
 # TEXT, and an uncapped base64 blob is an easy way to bloat the row.
-_MAX_SIGNATURE_CHARS = 512 * 1024
+_MAX_SIGNATURE_CHARS = sig_svc.MAX_SIGNATURE_CHARS
 
 
 def _require_consent(db: Session, tenant_id: int, consent_id: int) -> PatientConsent:
@@ -223,6 +225,11 @@ def sign_consent(
         if signature and len(signature) > _MAX_SIGNATURE_CHARS:
             raise ValidationError("Signature payload is too large", code="signature_too_large")
 
+    # SIG-1/2/3/8: validate + default the Topaz block (encrypts the SigString,
+    # refuses an empty pad, stamps the workstation) before anything is written.
+    capture = sig_svc.normalise_capture(payload)
+    is_topaz = bool(capture.get("sig_string")) or capture.get("device_source") == sig_svc.DEVICE_SOURCE_TOPAZ
+
     if document_id is not None:
         doc = get_document(db, tenant_id, int(document_id))
         if doc.patient_id != consent.patient_id:
@@ -232,10 +239,12 @@ def sign_consent(
         consent.document_id = doc.id
         method = method or "scanned"
     elif signature:
-        method = method or "drawn"
+        method = method or ("topaz" if is_topaz else "drawn")
 
     if signature:
         consent.signature_data = signature
+        capture.pop("signature_data", None)
+    sig_svc.apply_capture(consent, capture)
     consent.status = status
     consent.signature_method = method
     consent.signer_name = payload.get("signer_name") or consent.signer_name
@@ -244,8 +253,23 @@ def sign_consent(
     if status in ("signed", "declined"):
         consent.signed_by = user_id
         consent.signed_at = datetime.now(timezone.utc)
+    if status == "signed":
+        # SIG-7: freeze what was signed. An edit to rendered_html afterwards
+        # reads as ``signature_status="stale"`` instead of silently re-attesting.
+        consent.content_hash = sig_svc.consent_content_hash(consent.rendered_html)
+    event = {"signed": sig_svc.EVENT_CAPTURED, "declined": sig_svc.EVENT_DECLINED,
+             "voided": sig_svc.EVENT_VOIDED}.get(status)
+    if event is not None:
+        sig_svc.record_event(
+            db, tenant_id=tenant_id, entity_type=sig_svc.ENTITY_PATIENT_CONSENT,
+            entity_id=consent.id, event=event, actor_id=user_id, patient_id=consent.patient_id,
+            source=consent, signature_type="consent", content_hash=consent.content_hash,
+            reason=consent.declined_reason if status == "declined" else None,
+            occurred_at=consent.signed_at,
+        )
     db.commit()
     db.refresh(consent)
+    sig_svc.enrich_patient_consents(db, [consent], tenant_id)
     return consent
 
 

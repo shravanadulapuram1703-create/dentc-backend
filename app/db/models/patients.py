@@ -17,8 +17,10 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -214,6 +216,71 @@ class PatientSignature(Base, IntPKMixin, TimestampMixin):
     voided_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # ── Topaz signature capture (docs/signature/topaz_signature_backend_devreport.md) ──
+    # SIG-1: the Topaz SigString - the vector stroke record (points + timing),
+    # i.e. the actual biometric record; ``signature_data`` is only its rendering.
+    # Stored **encrypted at rest** (SIG-4, Fernet via app.core.crypto) and never
+    # on the generic read model - ``GET /patient-signatures/{id}/sig-string``
+    # is the audited, admin-only way out.
+    sig_string: Mapped[str | None] = mapped_column(Text)
+    sig_format: Mapped[str | None] = mapped_column(String(24))  # topaz_sigstring_v1
+    sig_compression: Mapped[int | None] = mapped_column(SmallInteger)  # 0 none|1 lossless|2 lossy
+    sig_encryption: Mapped[int | None] = mapped_column(SmallInteger)  # 0 clear|1 DES|2 high
+    # SIG-2: integrity/quality metadata the pad reports.
+    point_count: Mapped[int | None] = mapped_column(Integer)
+    stroke_count: Mapped[int | None] = mapped_column(Integer)
+    # SIG-3: *which pad in which room* captured it. ``device_source`` is only
+    # the method (topaz | web-pad | legacy "0").
+    device_vendor: Mapped[str | None] = mapped_column(String(20))
+    device_model: Mapped[str | None] = mapped_column(String(40))
+    device_serial: Mapped[str | None] = mapped_column(String(40))
+    # SIG-8: the workstation hint the client sent (else the request User-Agent).
+    captured_user_agent: Mapped[str | None] = mapped_column(String(255))
+    # SIG-7: document binding for the non-medical-history signature kinds. A
+    # bound signature gets a server-computed ``content_hash`` over the note body
+    # / rendered consent, so a later edit flips ``signature_status`` to
+    # ``stale`` the way MH-6 does for medical histories.
+    progress_note_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("progress_notes.id"), index=True
+    )
+    consent_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("patient_consents.id"), index=True
+    )
+
+
+class SignatureAuditEvent(Base, IntPKMixin, CreatedAtMixin):
+    """SIG-8: one row per signature lifecycle event - captured, superseded,
+    voided, declined, replaced, exported.
+
+    ``audit_logs`` records one row per *request*, which cannot answer "who
+    signed on which pad from which workstation" for a signature that was
+    created inside a composite write (a medical-history sign, a consent sign).
+    This table is append-only and is written by every sign/void path, including
+    the generic CRUD routes via ``PatientSignatureCRUD``. ``entity_type`` +
+    ``entity_id`` point at the signature store (``patient_signature`` /
+    ``patient_consent`` / ``user``); ``ip``/``user_agent`` come from the request,
+    the ``device_*`` columns from the capture itself.
+    """
+
+    __tablename__ = "signature_audit_events"
+    __table_args__ = (Index("ix_signature_audit_events_entity", "entity_type", "entity_id"),)
+
+    tenant_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    entity_type: Mapped[str] = mapped_column(String(30))
+    entity_id: Mapped[int] = mapped_column(Integer)
+    patient_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    event: Mapped[str] = mapped_column(String(30), index=True)
+    actor_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    occurred_at: Mapped[datetime | None] = mapped_column(DateTime)
+    ip: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
+    device_source: Mapped[str | None] = mapped_column(String(20))
+    device_vendor: Mapped[str | None] = mapped_column(String(20))
+    device_model: Mapped[str | None] = mapped_column(String(40))
+    device_serial: Mapped[str | None] = mapped_column(String(40))
+    signature_type: Mapped[str | None] = mapped_column(String(30))
+    content_hash: Mapped[str | None] = mapped_column(String(64))
+    reason: Mapped[str | None] = mapped_column(String(500))
 
 
 class MedicalHistoryRecord(Base, IntPKMixin, TimestampMixin):

@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import AppError
+from app.core.exceptions import AppError, ConflictError, NotFoundError
 from app.core.logging import get_logger
 from app.db.models import SupportTicket, User
 from app.integrations import jira_client
@@ -167,13 +167,22 @@ def _to_read(t: SupportTicket) -> dict:
 def _sync_status(db: Session, tickets: list[SupportTicket]) -> None:
     """HELP-2: refresh live Jira status for Jira-backed tickets that aren't already
     terminal. Best-effort — a Jira hiccup leaves the stored status untouched."""
+    pending = [
+        t for t in tickets
+        if t.jira_issue_url and t.jira_issue_key and not t.jira_issue_key.startswith("LOCAL-")
+        and _map_status(t.status) != "Done"
+    ]
+    if not pending:
+        return
+    # One JQL search for the whole list instead of one GET per ticket — a
+    # 40-ticket "My Tickets" read used to take minutes. Falls back to the
+    # per-issue lookup for anything the bulk call didn't return.
+    statuses = jira_client.get_statuses([t.jira_issue_key for t in pending])
     changed = False
-    for t in tickets:
-        if not t.jira_issue_url or not t.jira_issue_key or t.jira_issue_key.startswith("LOCAL-"):
-            continue
-        if _map_status(t.status) == "Done":
-            continue
-        raw = jira_client.get_status(t.jira_issue_key)
+    for t in pending:
+        raw = statuses.get(t.jira_issue_key)
+        if raw is None and not statuses:
+            raw = jira_client.get_status(t.jira_issue_key)
         mapped = _map_status(raw) if raw else None
         if mapped and mapped != t.status:
             t.status = mapped
@@ -193,3 +202,53 @@ def list_my_tickets(db: Session, tenant_id: int, user: User) -> list[dict]:
         _sync_status(db, rows)
 
     return [_to_read(t) for t in rows]
+
+
+def _is_jira_backed(t: SupportTicket) -> bool:
+    return bool(t.jira_issue_url and t.jira_issue_key and not t.jira_issue_key.startswith("LOCAL-"))
+
+
+def update_ticket_status(
+    db: Session, tenant_id: int, user: User, ticket_id: int, status: str
+) -> dict:
+    """HELP-6: the reporter changes a ticket's status from "My Tickets".
+
+    Jira stays the source of truth for mirrored tickets: the matching workflow
+    transition is applied in Jira *before* the local row is updated, so the next
+    list read (which syncs from Jira) cannot silently undo the change. A ticket
+    without a Jira mirror (``LOCAL-<id>``, or Jira not configured) is updated
+    locally only."""
+    ticket = db.execute(
+        select(SupportTicket).where(
+            SupportTicket.id == ticket_id,
+            SupportTicket.tenant_id == tenant_id,
+            SupportTicket.reporter_user_id == user.id,
+        )
+    ).scalar_one_or_none()
+    if ticket is None:
+        raise NotFoundError("Ticket not found")
+
+    if _map_status(ticket.status) == status:
+        return _to_read(ticket)
+
+    if _is_jira_backed(ticket) and jira_client.is_configured():
+        try:
+            transitions = jira_client.list_transitions(ticket.jira_issue_key)
+            match = next(
+                (t for t in transitions if _map_status((t.get("to") or {}).get("name")) == status),
+                None,
+            )
+            if match is None:
+                raise ConflictError(
+                    f"Jira offers no transition to '{status}' from the issue's current status",
+                    code="jira_no_transition",
+                )
+            jira_client.do_transition(ticket.jira_issue_key, match["id"])
+        except jira_client.JiraError as exc:
+            logger.warning("Support ticket %s: Jira transition failed: %s", ticket.id, exc.message)
+            raise AppError(exc.message, code="jira_error", status_code=502) from exc
+
+    ticket.status = status
+    db.commit()
+    db.refresh(ticket)
+    return _to_read(ticket)

@@ -40,6 +40,7 @@ from app.schemas.user_admin import (
     UserSignatureUpdate,
 )
 from app.services import user_admin_service as svc
+from app.services import signature_service as sig_svc
 
 _admin = Depends(require_roles("admin"))
 
@@ -179,22 +180,47 @@ def clear_my_last_patient(db: DbSession, tenant_id: TenantId, current: CurrentUs
 
 
 # ── PN-1: per-user signature ("Load My Signature") ───────────────────────────
-def _signature_read(user) -> UserSignatureRead:  # noqa: ANN001
+def _signature_read(user, *, include_sig_string: bool = False) -> UserSignatureRead:  # noqa: ANN001
     return UserSignatureRead(
         user_id=user.id, signature_data=user.signature_data,
         signature_len=user.signature_len, device_source=user.signature_device_source,
         updated_at=user.signature_updated_at,
+        signed_at=user.signature_signed_at,
+        has_sig_string=bool(user.signature_sig_string),
+        # SIG-4: the SigString only on request; decrypted from the at-rest token.
+        sig_string=(sig_svc.decrypt_sig_string(user.signature_sig_string)
+                    if include_sig_string else None),
+        sig_format=user.signature_sig_format,
+        sig_compression=user.signature_sig_compression,
+        sig_encryption=user.signature_sig_encryption,
+        point_count=user.signature_point_count,
+        stroke_count=user.signature_stroke_count,
+        device_vendor=user.signature_device_vendor,
+        device_model=user.signature_device_model,
+        device_serial=user.signature_device_serial,
+        captured_user_agent=user.signature_captured_user_agent,
     )
+
+
+_IncludeSigString = Annotated[bool, Query(
+    description="SIG-4: also return the clear Topaz SigString (audited)"
+)]
 
 
 # /me/signature (literal) MUST precede /{user_id}/signature so "me" isn't parsed as an id.
 @router.get("/me/signature", response_model=UserSignatureRead, operation_id="get_my_signature",
             responses={404: {"model": ErrorResponse}}, summary="Get the logged-in user's signature")
-def get_my_signature(db: DbSession, tenant_id: TenantId, current: CurrentUser):
+def get_my_signature(db: DbSession, tenant_id: TenantId, current: CurrentUser,
+                     include_sig_string: _IncludeSigString = False):
     user = svc.get_user_signature(db, current.id, tenant_id)
-    if not user.signature_data:
+    if not user.signature_data and not user.signature_sig_string:
         raise NotFoundError("No signature on file for this user")
-    return _signature_read(user)
+    if include_sig_string and user.signature_sig_string:
+        sig_svc.record_event(db, tenant_id=tenant_id, entity_type=sig_svc.ENTITY_USER,
+                             entity_id=user.id, event=sig_svc.EVENT_EXPORTED,
+                             actor_id=current.id, source=user, signature_type="user")
+        db.commit()
+    return _signature_read(user, include_sig_string=include_sig_string)
 
 
 @router.put("/me/signature", response_model=UserSignatureRead, operation_id="set_my_signature",
@@ -202,7 +228,7 @@ def get_my_signature(db: DbSession, tenant_id: TenantId, current: CurrentUser):
 def set_my_signature(db: DbSession, tenant_id: TenantId, current: CurrentUser, body: UserSignatureUpdate):
     user = svc.set_user_signature(
         db, current.id, tenant_id, signature_data=body.signature_data,
-        signature_len=body.signature_len, device_source=body.device_source,
+        capture=body.model_dump(exclude_unset=True), actor_id=current.id,
     )
     return _signature_read(user)
 
@@ -210,20 +236,27 @@ def set_my_signature(db: DbSession, tenant_id: TenantId, current: CurrentUser, b
 @router.get("/{user_id}/signature", response_model=UserSignatureRead, dependencies=[_admin],
             operation_id="get_user_signature", responses={404: {"model": ErrorResponse}},
             summary="Get a user's signature")
-def get_user_signature(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()]):
+def get_user_signature(db: DbSession, tenant_id: TenantId, current: CurrentUser,
+                       user_id: Annotated[int, Path()],
+                       include_sig_string: _IncludeSigString = False):
     user = svc.get_user_signature(db, user_id, tenant_id)
-    if not user.signature_data:
+    if not user.signature_data and not user.signature_sig_string:
         raise NotFoundError("No signature on file for this user")
-    return _signature_read(user)
+    if include_sig_string and user.signature_sig_string:
+        sig_svc.record_event(db, tenant_id=tenant_id, entity_type=sig_svc.ENTITY_USER,
+                             entity_id=user.id, event=sig_svc.EVENT_EXPORTED,
+                             actor_id=current.id, source=user, signature_type="user")
+        db.commit()
+    return _signature_read(user, include_sig_string=include_sig_string)
 
 
 @router.put("/{user_id}/signature", response_model=UserSignatureRead, dependencies=[_admin],
             operation_id="set_user_signature", summary="Save a user's signature")
 def set_user_signature(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
-                       body: UserSignatureUpdate):
+                       body: UserSignatureUpdate, current: CurrentUser):
     user = svc.set_user_signature(
         db, user_id, tenant_id, signature_data=body.signature_data,
-        signature_len=body.signature_len, device_source=body.device_source,
+        capture=body.model_dump(exclude_unset=True), actor_id=current.id,
     )
     return _signature_read(user)
 

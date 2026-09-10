@@ -6,6 +6,8 @@ serialised on read. Guarded to admin / super_admin.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, status
@@ -18,6 +20,7 @@ from app.db.models import User
 from app.schemas.auth import UserRead
 from app.schemas.common import ErrorResponse, PaginatedResponse
 from app.services import user_admin_service
+from app.services import signature_service
 
 router = APIRouter(
     prefix="/users",
@@ -118,6 +121,20 @@ def update_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path
     if "password" in data:
         data["password_hash"] = hash_password(data.pop("password"))
     data["updated_by"] = current.id  # gap #8: record the editing actor
+    if "signature_data" in data:
+        # SIG-6: the PATCH is not the canonical signature write (that is
+        # PUT /users/{id}/signature). It still accepts the image, but the
+        # metadata is kept coherent: length + change time recomputed, the Topaz
+        # block cleared (it described the previous image).
+        image = (data.get("signature_data") or "").strip() or None
+        data["signature_data"] = image
+        data["signature_len"] = len(image) if image else None
+        data["signature_updated_at"] = datetime.now(timezone.utc)
+        data["signature_signed_at"] = data["signature_updated_at"] if image else None
+        data["signature_device_source"] = None
+        for field in signature_service.CAPTURE_FIELDS:
+            if field not in ("signature_data", "signature_len"):
+                data[signature_service.user_column_for(field)] = None
     user = _crud.update(db, user_id, data, tenant_id=tenant_id)
     user_admin_service.attach_audit_names(db, user)
     return user

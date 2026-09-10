@@ -155,6 +155,20 @@ from app.schemas.procedure_code import (
     ProcedureCodeRead,
     ProcedureCodeUpdate,
 )
+from app.schemas.signature import (
+    PatientConsentCreate,
+    PatientConsentRead,
+    PatientConsentUpdate,
+    PatientSignatureCreate,
+    PatientSignatureRead,
+    PatientSignatureUpdate,
+)
+from app.services.signature_service import (
+    PatientConsentCRUD,
+    PatientSignatureCRUD,
+    enrich_patient_consents,
+    enrich_patient_signatures,
+)
 
 _DEFAULT_SORT = ("created_at", "id")
 
@@ -289,17 +303,41 @@ _PATIENTS = [
     # consent or financial one, and DELETE is now a soft delete (``is_active``)
     # so a cleared signature is representable instead of destroyed - the void
     # endpoint (/patient-signatures/{id}/void) is the attributable form.
-    _cfg(m.PatientSignature, "PatientSignature", "patient-signatures", "Patients",
-         "patient_signature", "patient_signatures",
-         filters=("patient_id", "signature_type", "is_user_sig", "is_active",
-                  "content_hash"),
-         soft_field="is_active", soft_value=False),
+    # Topaz capture (SIG-1..9): the read excludes ``sig_string`` (SIG-4),
+    # PatientSignatureCRUD encrypts it at rest, binds progress_note_id/consent_id
+    # (SIG-7), scopes tenancy through the patient, writes the audit trail
+    # (SIG-8) and honours ``?include_image=false`` (SIG-9).
+    CrudConfig(
+        model=m.PatientSignature,
+        create_schema=PatientSignatureCreate,
+        update_schema=PatientSignatureUpdate,
+        read_schema=PatientSignatureRead,
+        prefix="patient-signatures", tag="Patients",
+        singular="patient_signature", plural="patient_signatures",
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("patient_id", "signature_type", "is_user_sig", "is_active",
+                       "content_hash", "device_source", "progress_note_id", "consent_id"),
+        extra_filters=(("include_image", bool),),
+        soft_delete_field="is_active", soft_delete_value=False,
+        crud_class=PatientSignatureCRUD,
+        read_enrich=enrich_patient_signatures,
+    ),
     # PLAN-7: per-patient consent capture (template rendered with patient/plan data,
     # optionally signed + stored). Distinct from tenant-level account consents.
-    _cfg(m.PatientConsent, "PatientConsent", "patient-consents", "Patients",
-         "patient_consent", "patient_consents",
-         filters=("patient_id", "plan_id", "template_id", "status"),
-         soft_field="is_deleted", soft_value=True),
+    # SIG-4/7: ``sig_string`` off the read, ``signature_status`` derived on it.
+    CrudConfig(
+        model=m.PatientConsent,
+        create_schema=PatientConsentCreate,
+        update_schema=PatientConsentUpdate,
+        read_schema=PatientConsentRead,
+        prefix="patient-consents", tag="Patients",
+        singular="patient_consent", plural="patient_consents",
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("patient_id", "plan_id", "template_id", "status", "signature_method"),
+        soft_delete_field="is_deleted", soft_delete_value=True,
+        crud_class=PatientConsentCRUD,
+        read_enrich=enrich_patient_consents,
+    ),
     # MH-6: a medical_history_records row is one *version* of a patient's medical
     # history - the thing a signature attests to. ``content_hash`` is the
     # fingerprint shared with patient_signatures.
