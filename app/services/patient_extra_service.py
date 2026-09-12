@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core import filestore
 from app.core.config import settings
@@ -129,10 +130,17 @@ def list_documents(
 def _stamp_url(doc: PatientDocument) -> PatientDocument:
     """LTR-1 ask #2: hand back a URL the browser can actually fetch.
 
-    Set on the in-memory row only — a signed URL is short-lived, so persisting it
-    would serve an expired link on the next read.
+    Meant to be in-memory only — a signed URL is short-lived (and can run far
+    longer than the file_url column's 500-char limit), so it must never be
+    flushed to the DB. A plain attribute assignment doesn't guarantee that: if
+    this same tracked row later picks up an unrelated real change in the same
+    session (e.g. delete_document's is_deleted flag) before commit, SQLAlchemy
+    flushes every dirty column on it, file_url included, and a long signed URL
+    then fails the column's length constraint. set_committed_value sets the
+    value without marking it dirty, so it's visible for this response but never
+    written back.
     """
-    doc.file_url = document_store.public_url(doc)
+    set_committed_value(doc, "file_url", document_store.public_url(doc))
     return doc
 
 
