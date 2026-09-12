@@ -29,6 +29,14 @@ env:
   # MUST live in the Cloud Run REGION (us-central1) and share the VPC with Redis.
   VPC_NETWORK: default
   VPC_SUBNET: default
+  # Patient-document storage bucket (app/services/document_store.py). Without
+  # this set, uploads fall back to the container's local disk, which Cloud Run
+  # wipes on every new revision/instance — this is what caused X-Ray tab
+  # uploads to show blank/broken after a redeploy. Same bucket already used
+  # for DICOM imaging (GCS_BUCKET_ORIGINALS) — already IAM-authorized, and
+  # document_store.py keys documents under a separate documents/ prefix so
+  # there's no collision.
+  GCS_BUCKET_DOCUMENTS: rd-phi-dicom-originals
 
 jobs:
   deploy:
@@ -122,7 +130,7 @@ jobs:
             --network "$VPC_NETWORK" \
             --subnet "$VPC_SUBNET" \
             --vpc-egress private-ranges-only \
-            --update-env-vars "REDIS_ENABLED=true,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT"
+            --update-env-vars "REDIS_ENABLED=true,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,GCS_BUCKET_DOCUMENTS=$GCS_BUCKET_DOCUMENTS"
 
           # Force 100% traffic onto the revision we just built. Without this, a
           # service whose traffic was ever pinned to a specific revision (e.g. a
