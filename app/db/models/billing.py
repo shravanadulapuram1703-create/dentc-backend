@@ -14,6 +14,7 @@ from decimal import Decimal
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     ForeignKey,
     Integer,
     Numeric,
@@ -106,6 +107,55 @@ class InsuranceClaim(Base, CreatedAtMixin):
     write_off_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     write_off_mode: Mapped[str | None] = mapped_column(String(10))  # amount | percent
     write_off_value: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # ── ADA Dental Claim Form (2024) — docs/claims/ada_claim_form_2024_backend_devreport.md
+    # ADA-BE-2: the three data elements the 2024 revision added. ``date_last_srp``
+    # is nullable on purpose — NULL means "derive from the last completed
+    # D4341/D4342" (claim_form_service.derive_date_last_srp); a stored value is
+    # the biller's override for Item 39a.
+    is_epsdt: Mapped[bool] = mapped_column(Boolean, default=False)  # Item 1 EPSDT / Title XIX
+    is_locum_tenens: Mapped[bool] = mapped_column(Boolean, default=False)  # Item 53a
+    date_last_srp: Mapped[date | None] = mapped_column(Date)  # Item 39a
+    # ADA-BE-3 / CLM-FO-3: the four claim-level diagnosis codes (Item 34a) plus
+    # the list qualifier (Item 34: AB = ICD-10-CM, B = ICD-9-CM). Codes are
+    # stored as typed — the ICD library is a lookup aid, not an FK, because a
+    # payer-required code the practice has not seeded must still print.
+    icd_qualifier: Mapped[str | None] = mapped_column(String(2))
+    icd_1: Mapped[str | None] = mapped_column(String(10))
+    icd_2: Mapped[str | None] = mapped_column(String(10))
+    icd_3: Mapped[str | None] = mapped_column(String(10))
+    icd_4: Mapped[str | None] = mapped_column(String(10))
+    # ADA-BE-5: Item 31a "Other Fee(s)" — sales tax / regulatory charges, added
+    # to Item 32. NULL = none (the renderer prints blank, not 0.00).
+    other_fees: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    # ADA-BE-6: Item 33 override. A comma list of Universal tooth ids the biller
+    # marks for *this* claim; when NULL the set is derived from the chart
+    # (claim_form_service.derive_missing_teeth).
+    missing_teeth: Mapped[str | None] = mapped_column(String(120))
+    # ADA-BE-9: the *other* plan Items 4–11 describe, captured when the claim is
+    # created (InsuranceClaimCRUD) so a later slot change cannot re-point a
+    # printed claim; ``has_other_coverage`` is the explicit Item 4 flag —
+    # NULL = derive from whether an other plan resolves.
+    other_ins_plan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_plans.id"))
+    has_other_coverage: Mapped[bool | None] = mapped_column(Boolean)
+    # CLM-FO-1/2/4: the fill-out boxes that lived in per-browser localStorage.
+    predetermination_number: Mapped[str | None] = mapped_column(String(50))  # Item 2
+    remarks: Mapped[str | None] = mapped_column(Text)  # Item 35
+    # Item 36 — the biller's assertion. The print ORs it with an active
+    # ``claim_consent`` patient signature (ADA-BE-7) so a captured consent
+    # asserts "Signature on File" without a checkbox.
+    signature_on_file: Mapped[bool] = mapped_column(Boolean, default=False)
+    place_of_treatment: Mapped[str | None] = mapped_column(String(2))  # Item 38 — CMS POS code
+    # Items 40–42 orthodontics
+    is_ortho: Mapped[bool] = mapped_column(Boolean, default=False)
+    ortho_appliance_date: Mapped[date | None] = mapped_column(Date)
+    ortho_months_remaining: Mapped[int | None] = mapped_column(Integer)
+    # Items 43–44 prosthesis
+    prosthesis_replacement: Mapped[bool] = mapped_column(Boolean, default=False)
+    prosthesis_prior_date: Mapped[date | None] = mapped_column(Date)
+    # Items 45–47 accident (occupational | auto | other)
+    accident_type: Mapped[str | None] = mapped_column(String(15))
+    accident_date: Mapped[date | None] = mapped_column(Date)
+    accident_state: Mapped[str | None] = mapped_column(String(2))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 

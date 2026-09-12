@@ -1,6 +1,10 @@
 """Audit-log writer.
 
 Kept tiny and exception-safe: auditing must never break the request it records.
+
+MH-19: ``details`` (``{patient_id, row_id, before, after}``) and ``patient_id``
+are optional — they are filled when the CRUD engine (or a hand-written handler)
+recorded them in :mod:`app.core.audit_context`, and left null otherwise.
 """
 
 from __future__ import annotations
@@ -26,6 +30,8 @@ def write_audit(
     request_id: str | None,
     resource_type: str | None = None,
     resource_id: str | None = None,
+    patient_id: int | None = None,
+    details: dict | None = None,
 ) -> None:
     db = SessionLocal()
     try:
@@ -36,11 +42,13 @@ def write_audit(
                 action=method,
                 resource_type=resource_type,
                 resource_id=resource_id,
+                patient_id=patient_id,
                 method=method,
                 path=path,
                 status_code=status_code,
                 ip_address=ip_address,
                 request_id=request_id,
+                details=details,
             )
         )
         db.commit()

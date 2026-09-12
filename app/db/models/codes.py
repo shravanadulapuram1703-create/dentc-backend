@@ -36,6 +36,17 @@ class ProcedureCode(Base, CreatedAtMixin):
     requires_surface: Mapped[bool] = mapped_column(Boolean, default=False)
     requires_quadrant: Mapped[bool] = mapped_column(Boolean, default=False)
     requires_lab: Mapped[bool] = mapped_column(Boolean, default=False)
+    # ── PROC-7: supporting-records requirements (Charting tab, "Supporting
+    # Records Required"). Same shape and scope as requires_tooth — a tenant-wide
+    # attribute of the code, default false, independent on/off flags. Unlike the
+    # tooth/surface/quadrant flags these are *advisory* on posting (the record
+    # can be captured after the chair) and enforced at claim submission; the
+    # definition of "satisfied" lives in supporting_records_service.
+    requires_attachment: Mapped[bool] = mapped_column(Boolean, default=False)
+    requires_perio_chart: Mapped[bool] = mapped_column(Boolean, default=False)
+    requires_photo: Mapped[bool] = mapped_column(Boolean, default=False)
+    requires_xray: Mapped[bool] = mapped_column(Boolean, default=False)
+    requires_missing_tooth_info: Mapped[bool] = mapped_column(Boolean, default=False)
     is_ortho: Mapped[bool] = mapped_column(Boolean, default=False)
     billing_order: Mapped[str | None] = mapped_column(String(10))
     recall_interval: Mapped[int | None]
@@ -128,6 +139,12 @@ class ChartMaterial(Base, IntPKMixin, TimestampMixin):
 
 class NoteMacro(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "note_macros"
+    # NM-7: same migration-rerun duplication as prescription_library /
+    # chart_materials (every legacy macro imported 4x). NULL legacy_id
+    # (API-created) is exempt.
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "legacy_id", name="uq_note_macros_tenant_legacy"),
+    )
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20))
@@ -175,6 +192,11 @@ class CodeBundleItem(Base, IntPKMixin, CreatedAtMixin):
 
 class PrescriptionLibrary(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "prescription_library"
+    # RX-4: same migration-rerun duplication as chart_materials / code_bundles
+    # (every legacy drug imported 5x). NULL legacy_id (API-created) is exempt.
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "legacy_id", name="uq_prescription_library_tenant_legacy"),
+    )
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20))
@@ -184,8 +206,17 @@ class PrescriptionLibrary(Base, IntPKMixin, TimestampMixin):
     refills: Mapped[int] = mapped_column(Integer, default=0)
     is_as_written: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # MA-5: allergy keys this drug conflicts with (``["penicillin", "aspirin"]``),
+    # matched against the patient's active YES medical alerts and free-text
+    # patient alerts when a prescription is written. Keys are stored as
+    # ``to_code`` slugs so they compare against ``alert_code`` directly.
+    allergy_keys: Mapped[list | None] = mapped_column(JSON)
     # RX-1: "Modified By". updated_at already comes from TimestampMixin ("Modified
-    # On"); updated_by is auto-set by CRUDBase.update on every PATCH.
+    # On"); updated_by is auto-set by CRUDBase.update on every PATCH, created_by
+    # by CRUDBase.create. Both resolve to ``*_by_name`` on the read model
+    # (attach_actor_names). Migrated rows keep NULL — the Denticon export carries
+    # no author for the library.
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 

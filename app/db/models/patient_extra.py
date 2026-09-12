@@ -34,6 +34,16 @@ class PatientDocument(Base, IntPKMixin, CreatedAtMixin):
     storage_backend: Mapped[str] = mapped_column(String(20), default="local")  # local | gcs
     storage_bucket: Mapped[str | None] = mapped_column(String(255))
     storage_path: Mapped[str | None] = mapped_column(String(500))
+    # PROC-7c: which posted charge / claim this document supports. Before this
+    # a document could only be tied to the *patient*, so "the crown on #30 has a
+    # narrative attached" was not representable and ``requires_attachment``
+    # could never be judged. Both optional; validated same-tenant + same-patient.
+    procedure_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("patient_procedures.id"), index=True
+    )
+    claim_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("insurance_claims.id"), index=True
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
@@ -144,6 +154,54 @@ class PatientConsent(Base, IntPKMixin, CreatedAtMixin):
     # SIG-7: SHA-256 over the rendered consent as it stood when signed, so an
     # edit to ``rendered_html`` afterwards reads as ``signature_status="stale"``.
     content_hash: Mapped[str | None] = mapped_column(String(64))
+    # ── Sign-in-viewer (docs/letters/consent_inline_signing_backend_devreport.md) ──
+    # CS-1: the *signed* PDF rendition (signature stamped on the lines), kept
+    # beside ``document_id`` (the printed / scanned copy) instead of replacing it.
+    signed_document_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("patient_documents.id")
+    )
+    # CS-3: the workstation capture time as sent; ``signed_at`` honours it when
+    # it is within tolerance of the server clock (``signed_at_source``).
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime)
+    signed_at_source: Mapped[str | None] = mapped_column(String(10))  # client | server
+    # CS-4: the immutable "as signed" HTML — ``rendered_html`` stays editable
+    # (and ``content_hash`` flags the edit); this is what was on the sheet.
+    signed_rendered_html: Mapped[str | None] = mapped_column(Text)
+
+
+class ConsentSignature(Base, IntPKMixin, CreatedAtMixin):
+    """CS-2: a countersignature on a consent (Dentist / Hygienist / Assistant /
+    Office Manager line). The consent row keeps the patient/guardian signature;
+    every other line is one of these. Same capture block, SigString encrypted."""
+
+    __tablename__ = "consent_signatures"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    consent_id: Mapped[int] = mapped_column(Integer, ForeignKey("patient_consents.id"), index=True)
+    role: Mapped[str] = mapped_column(String(30))  # dentist | hygienist | assistant | office_manager | other
+    signer_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    signer_provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
+    signer_name: Mapped[str | None] = mapped_column(String(120))
+    signature_data: Mapped[str | None] = mapped_column(Text)
+    signature_len: Mapped[int | None] = mapped_column(Integer)
+    device_source: Mapped[str | None] = mapped_column(String(20))
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime)
+    sig_string: Mapped[str | None] = mapped_column(Text)
+    sig_format: Mapped[str | None] = mapped_column(String(24))
+    sig_compression: Mapped[int | None] = mapped_column(SmallInteger)
+    sig_encryption: Mapped[int | None] = mapped_column(SmallInteger)
+    point_count: Mapped[int | None] = mapped_column(Integer)
+    stroke_count: Mapped[int | None] = mapped_column(Integer)
+    device_vendor: Mapped[str | None] = mapped_column(String(20))
+    device_model: Mapped[str | None] = mapped_column(String(40))
+    device_serial: Mapped[str | None] = mapped_column(String(40))
+    captured_user_agent: Mapped[str | None] = mapped_column(String(255))
+    content_hash: Mapped[str | None] = mapped_column(String(64))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime)
+    voided_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class ClaimAttachment(Base, IntPKMixin, CreatedAtMixin):

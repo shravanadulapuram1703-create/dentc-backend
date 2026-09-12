@@ -13,6 +13,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
+from app.core.datetimes import UtcDatetime
 
 
 class PickListItemWrite(BaseModel):
@@ -38,7 +39,7 @@ class PickListOptionRead(ORMModel):
     answer_code: str
     sort_order: int
     is_active: bool
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class PickListCascadeResult(BaseModel):

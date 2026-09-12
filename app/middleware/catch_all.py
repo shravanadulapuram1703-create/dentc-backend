@@ -20,14 +20,22 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from app.core.logging import get_logger
+from app.core.logging import get_logger, request_id_ctx
 
 logger = get_logger("app.errors")
 
 
-def _error_body() -> dict:
+def _error_body(request_id: str | None) -> dict:
     # Mirror app.core.exceptions._error_body so the contract is identical.
-    return {"error": {"code": "internal_error", "message": "An unexpected error occurred", "details": None}}
+    # GAP-AP-26: the request id (also the X-Request-ID header) is the one
+    # diagnostic a genuine 500 carries — it matches the log line written above.
+    return {
+        "error": {
+            "code": "internal_error",
+            "message": "An unexpected error occurred",
+            "details": {"request_id": request_id},
+        }
+    }
 
 
 class CatchAllMiddleware(BaseHTTPMiddleware):
@@ -35,7 +43,11 @@ class CatchAllMiddleware(BaseHTTPMiddleware):
         try:
             return await call_next(request)
         except Exception as exc:  # noqa: BLE001 — deliberate catch-all boundary
+            # RequestContextMiddleware runs *inside* this one, so its contextvar
+            # is not visible here; it leaves the id on the shared scope state.
+            request_id = getattr(request.state, "request_id", None) or request_id_ctx.get()
             logger.exception(
-                "Unhandled error on %s %s: %s", request.method, request.url.path, exc
+                "Unhandled error on %s %s (req=%s): %s",
+                request.method, request.url.path, request_id, exc,
             )
-            return JSONResponse(status_code=500, content=_error_body())
+            return JSONResponse(status_code=500, content=_error_body(request_id))

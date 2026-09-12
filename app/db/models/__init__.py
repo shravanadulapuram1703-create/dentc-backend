@@ -28,6 +28,7 @@ from app.db.models.account import (
 from app.db.models.audit import AuditLog
 from app.db.models.aux_codes import IcdCode, PlaceOfServiceCode
 from app.db.models.patient_extra import (
+    ConsentSignature,
     ClaimAttachment,
     PatientAdjustment,
     PatientConsent,
@@ -68,6 +69,7 @@ from app.db.models.provider_setup import (
     ProviderReferralOffice,
     ProviderScheduleDay,
     ProviderWatermark,
+    ProviderSignature,
 )
 from app.db.models.billing import (
     ClaimSubmission,
@@ -188,12 +190,13 @@ from app.db.models.reference import (
     QuestionnaireHeader,
     QuestionnaireOption,
 )
-from app.db.models.scheduling import Appointment, AppointmentProcedure
+from app.db.models.scheduling import Appointment, AppointmentProcedure, Lab
 from app.db.models.staff import ProviderInsuranceId, ProviderRouteSlip, TimeClockEntry
 from app.db.models.treatment import (
     TreatmentPlan,
     TreatmentPlanInsuranceDetail,
     TreatmentPlanItem,
+    TreatmentPlanItemIcdCode,
 )
 
 __all__ = [
@@ -209,7 +212,7 @@ __all__ = [
     "AppointNowReason", "BookingRequest",
     # patients module net-new
     "PatientDocument", "PatientEmergencyContact", "PatientAdjustment", "ClaimAttachment",
-    "ProgressNoteAttachment", "PatientConsent",
+    "ProgressNoteAttachment", "PatientConsent", "ConsentSignature",
     "ChartStatusTemplate", "ChartSettings", "ChartToothNote",
     # account information (Setup -> Account Info)
     "AccountSettings", "AccountCommunications", "OfficePhoneAssignment",
@@ -241,15 +244,16 @@ __all__ = [
     "ChartColor", "CodesView",
     # patients
     "Patient", "PatientInsurance", "PatientAlert", "AccountNote",
-    "PatientSignature", "SignatureAuditEvent", "MedicalHistoryRecord", "MedicalHistoryDetail",
+    "PatientSignature", "SignatureAuditEvent", "ProviderSignature", "MedicalHistoryRecord", "MedicalHistoryDetail",
     "Referral", "PatientNote", "PatientRecall", "CariesRiskAssessment",
     "PatientMedicalAlert", "PatientQuestionnaireResponse", "PatientOpeningBalance",
     "PatientMedicalHistory", "PatientMedicalHistoryEvent",
     "ResponsibleParty",
     # scheduling
-    "Appointment", "AppointmentProcedure",
+    "Appointment", "AppointmentProcedure", "Lab",
     # treatment
     "TreatmentPlan", "TreatmentPlanItem", "TreatmentPlanInsuranceDetail",
+    "TreatmentPlanItemIcdCode",
     # clinical
     "PatientProcedure", "ChartCondition", "ProgressNote", "PerioExam",
     "PerioExamDetail", "Prescription", "PerioChartSetting", "PerioChartActivity",

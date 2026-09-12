@@ -22,6 +22,11 @@ tenant_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("tenant_id",
 # parks the client address + User-Agent here and ``signature_service`` reads them.
 client_ip_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("client_ip", default=None)
 user_agent_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("user_agent", default=None)
+# CS-6: the base URL the *caller* reached us on (scheme + host, honouring
+# X-Forwarded-Proto/Host), so a document ``file_url`` built during this request
+# points at the API the frontend is actually talking to — not a fixed
+# ``PUBLIC_API_BASE_URL`` that names another environment.
+request_base_url_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("request_base_url", default=None)
 
 
 class ContextFilter(logging.Filter):

@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
+from app.core.datetimes import UtcDatetime
 
 
 class LoginRequest(BaseModel):
@@ -37,11 +38,11 @@ class UserRead(ORMModel):
     patient_access_level: str | None = None
     is_active: bool
     must_change_password: bool
-    last_login_at: datetime | None = None
+    last_login_at: UtcDatetime | None = None
     # Authentication module (login dev-report §3): legacy onboarding state.
     is_legacy_user: bool = False
     legacy_activation_completed: bool = False
-    password_created_at: datetime | None = None
+    password_created_at: UtcDatetime | None = None
     # Security -> Users (users_missing_fields dev-report): structural gaps 1-5.
     short_id: str | None = None
     report_access_provider_id: str | None = None
@@ -50,9 +51,9 @@ class UserRead(ORMModel):
     signature_data: str | None = None
     image_url: str | None = None
     # Audit Information panel (users dev-report gap #8): created/updated actors.
-    created_at: datetime
+    created_at: UtcDatetime
     created_by: int | None = None
-    updated_at: datetime | None = None
+    updated_at: UtcDatetime | None = None
     updated_by: int | None = None
     # Resolved display names for the *_by actor ids (None when unresolved).
     created_by_name: str | None = None
@@ -100,6 +101,13 @@ class MeFull(BaseModel):
     last_patient_id: int | None = None
     # MP-7: the provider row linked to this user (My Schedule scoping); null if none.
     provider_id: str | None = None
+    # EDIT-PLAN-5: the caller's effective right codes (union over their active
+    # groups). ``permissions_enforced`` is False for a user in no group — the
+    # server treats them as ungated (role-only) and the UI should too; an
+    # admin / super_admin holds every code and lists the full catalog here.
+    permissions: list[str] = Field(default_factory=list)
+    permissions_enforced: bool = False
+    groups: list[str] = Field(default_factory=list)
 
 
 # ── Persistent default patient (PDP-1/2) ─────────────────────────────────────

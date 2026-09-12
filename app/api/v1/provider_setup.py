@@ -13,6 +13,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Path, Query, Response, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
 from app.db.models.provider_setup import ProviderCarrierLogin
@@ -108,7 +109,11 @@ async def upload_provider_watermark_image(
     kind: Annotated[str, Query(description="watermark | signature")] = "watermark",
 ):
     data = await file.read()
-    return svc.save_watermark_image(db, provider_id, tenant_id, kind, file.filename or "image", file.content_type or "", data)
+    # EDIT-PLAN-7: sync DB + storage work must not run on the event loop.
+    return await run_in_threadpool(
+        svc.save_watermark_image, db, provider_id, tenant_id, kind,
+        file.filename or "image", file.content_type or "", data,
+    )
 
 
 @router.delete("/{provider_id}/watermarks/image", response_model=ProviderWatermarkRead, operation_id="delete_provider_watermark_image")

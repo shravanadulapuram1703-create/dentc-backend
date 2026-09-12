@@ -225,7 +225,13 @@ def test_public_api_base_url_absolutises_the_proxy_url(client, patient, gcs, mon
     monkeypatch.setattr(settings, "DOCUMENT_URL_MODE", "proxy")
     monkeypatch.setattr(settings, "PUBLIC_API_BASE_URL", "https://api.example.com/")
     doc = _upload_consent(client, patient).json()
-    assert doc["file_url"].startswith("https://api.example.com/api/v1/patient-documents/")
+    # CS-6: with absolute URLs configured, an in-request URL is built on the
+    # origin the *caller* used (a local backend links to itself, Cloud Run to
+    # Cloud Run); the configured value is the fallback outside a request.
+    assert doc["file_url"].startswith("http://testserver/api/v1/patient-documents/")
+    from app.services.document_store import absolute_url
+
+    assert absolute_url("/api/v1/x") == "https://api.example.com/api/v1/x"
 
 
 def test_signed_urls_are_not_persisted(client, db_session, patient, gcs):

@@ -55,7 +55,8 @@ below was observed against the live backend, not inferred.
 | 17 | Per-user chart prefs | `/perio-chart-settings` | ⚠️ No "me", no seed → **PERIO-BE-11** |
 | 18 | "Charted by / on" attribution | `created_by` int only | ⚠️ No name/updated_* → **PERIO-BE-6** |
 | 19 | Per-tooth modified audit | none on detail | ⚠️ No audit cols → **PERIO-BE-5** |
-| 20 | Print / report | none | ⚠️ Client-only → **PERIO-BE-10** |
+| 20 | Print / report | none | ⚠️ Shipped client-side (jsPDF) → **PERIO-BE-10** |
+| 21 | Provider on the exam | none on `PerioExam` | ⚠️ Printed record infers it → **PERIO-BE-14** |
 
 ---
 
@@ -117,13 +118,20 @@ below was observed against the live backend, not inferred.
 - Saving a full chart is up to ~32 individual POST/PATCH calls and is not atomic.
 - Ask: a bulk/upsert endpoint, e.g. `PUT /perio-exams/{id}/details` taking an array keyed by `tooth_no` (insert-or-update). Naturally enforces one-row-per-tooth (BE-1) and is atomic.
 
-**PERIO-BE-9 — Add date-range filters to `GET /perio-exams`.**
-- Only `patient_id` is filterable; Compare-by-Dates and history fetch all exams and filter client-side.
-- Ask: add `date_from`/`date_to` (and the `is_voided` filter from BE-3).
+**PERIO-BE-9 — Add date-range filters to `GET /perio-exams`.** *(still open — re-probed 2026-09-11)*
+- Only `patient_id` (and now `is_voided`, ✅ works) is filterable. `date_from=2026-09-20` is silently
+  ignored (`total` unchanged) — Compare-by-Dates and history still fetch all exams and filter client-side.
+- Ask: add `date_from`/`date_to`, and reject unknown query params (or document them) so a silently
+  ignored filter cannot masquerade as "no data".
 
-**PERIO-BE-10 — (Optional) Server-side comparison / summary / print.**
-- Compare-by-Dates aggregation and any PDF/print are client-side.
-- Ask (nice-to-have): a comparison/summary endpoint (pocket-depth deltas across exams) and/or a print/report payload.
+**PERIO-BE-10 — Server-side comparison / summary / print.** *(partially delivered — see §6)*
+- `GET /perio-exams/compare?patient_id=&exam_ids=…` now exists and returns a per-exam **summary**
+  (`teeth_charted`, `sites_measured`, `mean_pd`, `max_pd`, `sites_pd_4plus/6plus`, `bleeding_sites`,
+  `bleeding_pct`, `suppuration_sites`, `mean_cal`, `max_cal`) plus a `delta` vs the previous exam.
+  The frontend now shows this as a summary strip above the per-site comparison (2026-09-11).
+- The per-tooth/site comparison itself is still client-side (N × `GET /perio-exam-details?exam_id=`)
+  because the compare payload carries no site values — see **PERIO-BE-15**. The PDF/print stays
+  client-side (`src/features/perio/perioPrint.ts`).
 
 **PERIO-BE-11 — Per-user chart settings convenience + defaults.**
 - `/perio-chart-settings` requires filtering by `user_id` (client must know its own id) and ships no seeded default row, so the frontend currently keeps prefs in `localStorage` instead.
@@ -132,6 +140,21 @@ below was observed against the live backend, not inferred.
 **PERIO-BE-12 — Define the `auto_advance` JSON schema on templates.**
 - `PerioChartTemplate.auto_advance` is a free-form `object` with no documented shape; the frontend can't honor template-driven probing order and uses a fixed order.
 - Ask: define and document the `auto_advance` structure (site visiting order per arch/surface).
+
+**PERIO-BE-14 — `PerioExam` has no provider.**
+- The legacy Denticon report prints a **Provider** block (name, address, Tax ID, License#) beside the
+  patient, but `PerioExam` carries only `patient_id`/`office_id` and `created_by` (a *user*, not a
+  provider).
+- **Frontend workaround (in place):** the Perio Chart toolbar now has a **Provider** picker; the
+  selection is what prints. It is seeded from the patient's `preferred_provider_id`, falling back to
+  the office's `billing_provider_id`, and — because there is nowhere on the exam to put it — is
+  persisted **per exam in `localStorage`** (`perio:exam_provider`, see `perioService.ts`). That means
+  the provider on a reprint is only correct on the machine that charted it; another workstation, a
+  cleared profile, or a different user reprinting the same exam falls back to the inferred default.
+- Impact: the sheet is attached to insurance claims, where the rendering provider must be accurate.
+- Ask: add a nullable `provider_id` (FK → `providers`) to `PerioExam` create/read/update, and ideally a
+  resolved `provider_name` on the read model (same treatment as `created_by_name` from BE-6). Once it
+  lands, the frontend deletes the `localStorage` seam — ping this module's owner.
 
 **PERIO-BE-13 — Clarify or deprecate `PerioChartActivity`.**
 - This denormalized legacy log (`perio_type`/`orientation`/`arch`/`quadrant`/`block_no`/`mxy`/`perio_value`, `created_by` as a **string**) has no documented relationship to exams/details and is unused by the new UI.
@@ -145,28 +168,62 @@ below was observed against the live backend, not inferred.
 
 ---
 
-## 6. Backend response — IMPLEMENTED (2026-06-23)
+## 6. Compare by Dates — re-verification 2026-09-11 (patient 83700, exams 2871 / 2872)
 
-All gaps are addressed. Migration: `alembic/versions/f2c3d4e5a6b7_add_perio_charting_gaps.py`
-(down_revision `f1a2b3c4d5e6`). Models in `app/db/models/clinical.py`; custom schemas
-in `app/schemas/perio.py`; logic in `app/services/perio_service.py`; supplemental
-routes in `app/api/v1/perio.py`; CRUD wiring in `app/api/v1/registry.py`.
+**Reported symptom:** "Compare by Dates shows no data." **Root cause (frontend, fixed):** the legacy
+"Pocket Depth Comparison" only ever tabulated `pd1..6`. Both exams on this patient were charted with
+Bleeding / Suppuration / FGM / Mobility but **no pocket depths** (verified: every `pd*` is `null` on all
+8 detail rows), so the grid was a wall of blanks that read as "missing data". The comparison now offers
+every measure (PD / CAL / FGM / MGJ / Bleeding / Suppuration / Furcation / Mobility), opens on the first
+one that has values, shows a `Change` row (newest − oldest), and states explicitly when the chosen
+measure was never recorded on the selected dates. It also surfaces the new server summary (BE-10).
+While here: the chart now opens on the newest **live** exam instead of a voided one, and a failed
+fetch shows an error instead of an empty screen. Files: `src/features/perio/CompareDatesModal.tsx`,
+`perioCompare.ts`, `PerioChart.tsx`.
 
-| ID | Resolution |
+**Second frontend bug found on the way (fixed, not a backend ask):** the shared axios instance
+serialised list query params with brackets (`exam_ids[]=2872&exam_ids[]=2871`), which FastAPI rejects
+with **422** — so the first call to the new compare endpoint failed silently. `src/services/api.ts` now
+sets `paramsSerializer: { indexes: null }` (repeated keys). `exam_ids` is the only list-typed query param
+in the generated client today; any future list param will work out of the box.
+
+**Live probes (admin, `http://127.0.0.1:8000`):**
+
+| Call | Result |
 |---|---|
-| **BE-1** | UNIQUE `perio_exam_details(exam_id, tooth_no)` (`uq_perio_exam_details_exam_id_tooth_no`). Migration first collapses pre-existing duplicates to the highest-id (most recent) row. Duplicate `POST` → **409**. |
-| **BE-2** | `mobility_buccal`/`mobility_lingual` → `NUMERIC(2,1)`. Half-grades 0.5/1.5/2.5 persist; values outside 0–3 → 422. |
-| **BE-3** | **Decision:** exams = soft-delete (void) — `DELETE` flips `is_voided` (clinical/legal record retained); details = hard-delete. `GET /perio-exams` gains an `is_voided` filter — pass `is_voided=false` to exclude voided from the Date-of-Service list. |
-| **BE-4** | `cal1..6` added to `perio_exam_details` (stored, independent of PD+FGM). |
-| **BE-5** | `perio_exam_details` gains `created_at`/`updated_at`/`created_by`/`updated_by`; read model also exposes `created_by_name`/`updated_by_name`. |
-| **BE-6** | `perio_exams` gains `updated_at`/`updated_by`; read model exposes `created_by_name`/`updated_by_name` (batch-resolved, no N+1). |
-| **BE-7** | Server-side ranges enforced (422): PD/CAL 0–20, FGM −10…+10, MGJ 0–20, furcation 0–4, mobility 0–3. |
-| **BE-8** | `PUT /perio-exams/{exam_id}/details` — atomic bulk upsert keyed by `tooth_no` (insert-or-update, one transaction). Returns the resulting detail rows. |
-| **BE-9** | `GET /perio-exams` gains `exam_date_from`/`exam_date_to` typed range params (+ `is_voided` from BE-3). |
-| **BE-10** | `GET /perio-exams/compare?patient_id=&exam_ids=…` — per-exam clinical summaries (mean/max PD, sites ≥4/≥6 mm, bleeding %, suppuration, CAL) ordered oldest→newest with deltas vs the prior exam. |
-| **BE-11** | `GET /perio-chart-settings/me` (token-resolved, seeds a default row on first access) + `PUT /perio-chart-settings/me`. |
-| **BE-12** | `auto_advance` is now a typed object (`PerioAutoAdvance`) — 8 region keys (`ur_facial`…`ll_lingual`) → direction string (e.g. `"01-08"`). |
-| **BE-13** | `PerioChartActivity` documented as **deprecated / migration-only** (not synced with exams/details). |
+| `GET /perio-exam-details?exam_id=2871&size=200` | 200, 5 rows, all `pd*` null, only `bleed*/supp*` set — filter works |
+| `GET /perio-exam-details?exam_id=2871&exam_id=2872` | 200, **only exam 2872 rows** (last value wins; no multi-id filter) |
+| `GET /perio-exams/compare?patient_id=83700&exam_ids=2871&exam_ids=2872` | 200, summary + delta per exam; **no per-site values** |
+| same, after 3 PD sites were charted (6 bleeding sites on file) | `sites_measured: 3`, **`bleeding_pct: 200.0`** |
+| `…compare?patient_id=83700&exam_ids=2872&exam_ids=1` (exam 1 belongs to another patient) | 200, foreign id **silently dropped** |
+| `…compare?patient_id=83700&exam_ids=2872&exam_ids=99999999` | 200, unknown id **silently dropped** |
+| `GET /perio-exams?patient_id=83700&is_voided=false` | 200, voided exam excluded — BE-3 filter delivered ✅ |
+| `GET /perio-exams?patient_id=83700&date_from=2026-09-20` | 200, filter **ignored** (total unchanged) — BE-9 open |
+| `PUT /perio-exams/{exam_id}/details` | present in OpenAPI (BE-8 delivered per spec; frontend still on per-row create/update) |
 
-Apply with `python -c "from alembic.config import main; main(['upgrade','head'])"`.
-After this ships, the frontend can drop its duplicate guard and decimal-skip workaround.
+### New / updated asks
+
+**PERIO-BE-15 — Compare needs per-site values (or a multi-exam details filter).**
+- `GET /perio-exams/compare` returns only roll-ups, so the UI still issues one `GET /perio-exam-details`
+  per selected date to draw the tooth-by-tooth table, and `/perio-exam-details` does not accept a
+  repeated `exam_id` (last one wins).
+- Ask (either): add `details: PerioExamDetailRead[]` per entry to the compare payload (optional flag
+  `include_details=true`), **or** accept `exam_ids` (list) on `GET /perio-exam-details`.
+
+**PERIO-BE-16 — `bleeding_pct` is computed against PD-measured sites and exceeds 100 %.**
+- Observed `bleeding_sites: 6, sites_measured: 3 → bleeding_pct: 200.0`; when no PD is charted it is
+  `null` even though bleeding was recorded. `sites_measured` counts only sites with a pocket depth.
+- Ask: define `bleeding_pct = bleeding_sites / probeable sites` (6 × teeth present, or 6 × `teeth_charted`)
+  and clamp to 0–100; either count sites with *any* finding in `sites_measured` or document it as
+  "sites with PD" (the UI currently labels it that way and does not display `bleeding_pct`). The same
+  denominator issue would affect any future `suppuration_pct`.
+
+**PERIO-BE-17 — Compare silently drops unknown or other-patient `exam_ids`.**
+- A typo'd or foreign id returns 200 with fewer entries, so the UI cannot tell "no such exam" from
+  "exam has no data". Ask: 404 (unknown id) / 422 (exam not owned by `patient_id`) with the offending id
+  in `detail`.
+
+**PERIO-BE-18 — Voided exams are included in the compare set and in `delta` chains.**
+- `is_voided: true` entries are returned and the next exam's `delta` is computed against the voided
+  one. The UI labels them "(voided)"; server-side, either exclude voided exams unless
+  `include_voided=true`, or skip them when computing `delta`.

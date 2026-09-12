@@ -11,9 +11,11 @@ tenancy is verified through the owning patient.
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -800,16 +802,31 @@ def submit_claim(
     """Submit (send) a claim: stamp sent_date + status, and create the
     ``claim_submissions`` record that returns the ``batch_id`` / send method."""
     claim = _get_claim(db, claim_id, tenant_id)
+    # PROC-7c: the supporting-records gate. 422 ``supporting_records_missing``
+    # unless the caller overrides; nothing is written before this runs.
+    from app.services.supporting_records_service import assert_claim_ready
+
+    overridden = assert_claim_ready(
+        db, tenant_id, claim, allow_missing_records=bool(payload.get("allow_missing_records")),
+    )
     sent_date = payload.get("sent_date") or datetime.now(timezone.utc).date()
     batch_id = payload.get("batch_id") or f"BATCH-{uuid7()}"
-    is_preauth = bool(payload.get("is_preauth"))
+    is_preauth = bool(payload.get("is_preauth", claim.is_preauth))
+    # CLM-FO-5: what was actually sent. The assembled ADA form (every fill-out
+    # box + the resolved providers / NPIs / other coverage) is frozen on the
+    # submission row, so a later edit of the claim cannot rewrite history and
+    # the e-claim builder reads the same snapshot the paper form printed.
+    from app.services import claim_form_service  # noqa: PLC0415
 
+    form = claim_form_service.assemble(db, claim.id, tenant_id)
     submission = ClaimSubmission(
         claim_id=claim_id,
         batch_id=batch_id,
         is_preauth=is_preauth,
         total_charges=claim.total_billed,
+        num_lines=len(form["service_lines"]),
         submission_status="sent",
+        claim_text=json.dumps(jsonable_encoder(form)),
         created_by=actor_id,
     )
     db.add(submission)
@@ -834,6 +851,8 @@ def submit_claim(
         "sent_date": sent_date,
         "send_method": payload.get("send_method", "electronic"),
         "submission_id": submission.id,
+        "missing_records_overridden": overridden,
+        "form_warnings": form["warnings"],
     }
 
 

@@ -110,6 +110,57 @@ def set_provider_codes(
     return get_provider_codes(db, provider_id)
 
 
+def providers_for_code(db: Session, tenant_id: int, code: str) -> list[Provider]:
+    """PLAN-16 reverse lookup: the providers assigned ``code`` in this tenant.
+    Empty means *unrestricted* — nobody has been limited, so everyone may perform it."""
+    sub = select(ProviderProcedureCode.provider_id).where(
+        ProviderProcedureCode.tenant_id == tenant_id,
+        ProviderProcedureCode.procedure_code == code,
+    )
+    return list(db.execute(
+        select(Provider).where(Provider.id.in_(sub)).order_by(Provider.name.asc(), Provider.id.asc())
+    ).scalars().all())
+
+
+def code_eligibility(db: Session, tenant_id: int, codes: list[str]) -> dict:
+    """PLAN-16 batched form: for each requested code, who may perform it, plus
+    the intersection for a multi-row Change Provider. One query, however many
+    codes and providers — the client used to fan out one request per provider.
+
+    Semantics (confirmed): a code with **no** assignment rows is unrestricted
+    (``restricted=False``, empty ``provider_ids``) and does not narrow the
+    intersection; ``eligible_for_all`` is ``None`` when nothing is restricted."""
+    wanted = list(dict.fromkeys(c.strip() for c in codes if c and c.strip()))
+    by_code: dict[str, list[str]] = {c: [] for c in wanted}
+    if wanted:
+        for provider_id, code in db.execute(
+            select(ProviderProcedureCode.provider_id, ProviderProcedureCode.procedure_code)
+            .where(ProviderProcedureCode.tenant_id == tenant_id,
+                   ProviderProcedureCode.procedure_code.in_(wanted))
+            .order_by(ProviderProcedureCode.provider_id.asc())
+        ).all():
+            by_code.setdefault(code, []).append(provider_id)
+    restricted_all = list(db.execute(
+        select(ProviderProcedureCode.provider_id)
+        .where(ProviderProcedureCode.tenant_id == tenant_id)
+        .distinct().order_by(ProviderProcedureCode.provider_id.asc())
+    ).scalars().all())
+    eligible: set[str] | None = None
+    for code in wanted:
+        ids = by_code.get(code) or []
+        if not ids:
+            continue
+        eligible = set(ids) if eligible is None else (eligible & set(ids))
+    return {
+        "codes": [
+            {"procedure_code": c, "restricted": bool(by_code.get(c)), "provider_ids": by_code.get(c) or []}
+            for c in wanted
+        ],
+        "eligible_for_all": sorted(eligible) if eligible is not None else None,
+        "restricted_provider_ids": restricted_all,
+    }
+
+
 # ── PROC-3: per-code insurance rules ─────────────────────────────────────────
 def list_insurance_rules(db: Session, tenant_id: int, code: str) -> list[ProcedureInsuranceRule]:
     return list(db.execute(

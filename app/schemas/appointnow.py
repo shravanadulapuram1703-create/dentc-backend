@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.core.datetimes import UtcDatetime
 
 
 # ── Public office info (AN-1) ────────────────────────────────────────────────
@@ -119,9 +120,9 @@ class BookingRequestRead(BaseModel):
     appointment_id: str | None = None
     patient_id: int | None = None
     decline_reason: str | None = None
-    actioned_at: datetime | None = None
-    created_at: datetime
-    updated_at: datetime | None = None
+    actioned_at: UtcDatetime | None = None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime | None = None
 
 
 # ── Staff inbox listing (AN-4 / AN-13) ───────────────────────────────────────

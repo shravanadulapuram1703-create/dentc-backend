@@ -43,14 +43,16 @@ What lives here and why
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Iterable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core import audit_context, concurrency
+from app.core.exceptions import LockedError, NotFoundError, ValidationError
+from app.core.logging import user_id_ctx
 from app.crud.base import CRUDBase
 from app.db.models import (
     Definition,
@@ -58,6 +60,22 @@ from app.db.models import (
     InsurancePlan,
     InsurancePlanFrequencyGroup,
 )
+from app.services import permission_service
+
+#: EDIT-PLAN-9: what the legacy dialog shows for a blank field — and, since
+#: Alembic ``7f483f6833a7``, what a NULL column was backfilled to and what a
+#: new row defaults to (``InsurancePlan`` column defaults). Published on
+#: ``GET /insurance-plans/metadata → plan_field_defaults``.
+PLAN_FIELD_DEFAULTS: dict[str, Any] = {
+    "fees_to_print": "office_ucr",
+    "claim_option": "submit",
+    "form_to_print": "ADA2024",
+    "network_type": "unknown",
+    "noa_only": False,
+    # The legacy dialog defaults this **on**; the first migration wrote false
+    # and the Denticon export has no column, so migrated rows are not rewritten.
+    "lifetime_ortho_benefits": True,
+}
 
 # ── PLAN-DTL-4: the frequency-limitation ordinals ────────────────────────────
 #: ``(ordinal, label, key1, key2)`` — the legacy FREQUENCYLIMITATIONS list in
@@ -319,10 +337,79 @@ def is_frequency_group_shape(payload: dict[str, Any]) -> bool:
 
 
 # ── tenancy through the plan ─────────────────────────────────────────────────
-def get_plan(db: Session, plan_id: int, tenant_id: int | None) -> InsurancePlan:
-    plan = db.get(InsurancePlan, plan_id)
+def get_plan(
+    db: Session, plan_id: int, tenant_id: int | None, *, for_update: bool = False,
+) -> InsurancePlan:
+    stmt = select(InsurancePlan).where(InsurancePlan.id == plan_id)
+    if for_update:
+        # EDIT-PLAN-1: a versioned write holds the row until commit.
+        stmt = stmt.with_for_update()
+    plan = db.execute(stmt).scalar_one_or_none()
     if plan is None or (tenant_id is not None and plan.tenant_id != tenant_id):
         raise NotFoundError(f"InsurancePlan '{plan_id}' was not found")
+    return plan
+
+
+# ── EDIT-PLAN-1/5/6: the plan row as the document's version + lock + scope ──
+def _actor_id(actor_id: int | None) -> int | None:
+    """The acting user: the explicit id when the caller has one, else the
+    request context (the generic DELETE route carries no actor)."""
+    if actor_id is not None:
+        return actor_id
+    raw = user_id_ctx.get()
+    return int(raw) if raw and raw.isdigit() else None
+
+
+def touch_plan(plan: InsurancePlan, actor_id: int | None) -> None:
+    """Move the plan's version. ``insurance_plans.updated_at`` is the version of
+    the **whole** plan document — a coverage-rule or frequency-group write
+    changes what the plan pays, so it has to move the value a concurrent
+    editor's precondition is judged against, even though the plan's own
+    columns did not change (the mixin's ``onupdate`` would not fire)."""
+    plan.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    actor = _actor_id(actor_id)
+    if actor is not None:
+        plan.updated_by = actor
+
+
+def assert_plan_editable(db: Session, plan: InsurancePlan, actor_id: int | None) -> None:
+    """EDIT-PLAN-5: a locked plan is 423 ``plan_locked`` unless the actor holds
+    ``setup_insurance_plans_screen_edit_locked_plan`` (or a full-access role).
+    An unresolvable actor never unlocks anything."""
+    if not plan.is_locked:
+        return
+    perms = permission_service.permissions_for_user_id(db, _actor_id(actor_id))
+    if perms is None:
+        raise LockedError(
+            "This insurance plan is locked", code="plan_locked",
+            details={"plan_id": plan.id,
+                     "required_any_of": [permission_service.INSURANCE_PLAN_EDIT_LOCKED]},
+        )
+    permission_service.assert_can_edit_locked(perms, plan_id=plan.id)
+
+
+def record_plan_scope(plan_id: int, label: str | None = None) -> None:
+    """EDIT-PLAN-6: tag the request's audit row with the plan a child-row write
+    belongs to, so ``GET /insurance-plans/{id}/history`` can find it without a
+    lookup per rule id. ``label`` names the row (``03A``, code group ``01``) —
+    a PATCH diff carries only the changed fields, so the history summary
+    would otherwise have nothing but the row id to show."""
+    scope: dict[str, Any] = {"ins_plan_id": plan_id}
+    if label:
+        scope["label"] = label
+    audit_context.record(scope=scope)
+
+
+def _plan_for_write(
+    db: Session, plan_id: int, tenant_id: int | None, actor_id: int | None,
+    label: str | None = None,
+) -> InsurancePlan:
+    """The owning plan, checked for the lock, tagged for audit and version-bumped
+    — the three things every child-row write has to do."""
+    plan = get_plan(db, plan_id, tenant_id)
+    assert_plan_editable(db, plan, actor_id)
+    record_plan_scope(plan.id, label)
+    touch_plan(plan, actor_id)
     return plan
 
 
@@ -356,7 +443,8 @@ class InsuranceCoverageRuleCRUD(CRUDBase[InsuranceCoverageRule]):
         payload = normalise_rule_limits(data)
         self._refuse_frequency_group(payload)
         if payload.get("ins_plan_id") is not None:
-            get_plan(db, payload["ins_plan_id"], tenant_id)
+            _plan_for_write(db, payload["ins_plan_id"], tenant_id, created_by,
+                            label=payload.get("start_code"))
         return super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
 
     def update(
@@ -370,16 +458,25 @@ class InsuranceCoverageRuleCRUD(CRUDBase[InsuranceCoverageRule]):
             "start_code": payload.get("start_code", existing.start_code),
         }
         self._refuse_frequency_group(merged)
+        _plan_for_write(db, existing.ins_plan_id, tenant_id, updated_by, label=existing.start_code)
         if "ins_plan_id" in payload and payload["ins_plan_id"] != existing.ins_plan_id:
-            get_plan(db, payload["ins_plan_id"], tenant_id)
+            _plan_for_write(db, payload["ins_plan_id"], tenant_id, updated_by, label=existing.start_code)
         return super().update(db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by)
+
+    def delete(self, db: Session, obj_id: Any, *, tenant_id: int | None = None) -> None:
+        existing = self.get(db, obj_id, tenant_id=tenant_id)
+        _plan_for_write(db, existing.ins_plan_id, tenant_id, None, label=existing.start_code)
+        super().delete(db, obj_id, tenant_id=tenant_id)
 
 
 class InsurancePlanFrequencyGroupCRUD(CRUDBase[InsurancePlanFrequencyGroup]):
     """PLAN-DTL-2: the plan must belong to the tenant; numbers are whole and
     non-negative; a blank description is filled from the code-group catalogue."""
 
-    def _prepare(self, db: Session, payload: dict[str, Any], tenant_id: int | None) -> dict[str, Any]:
+    def _prepare(
+        self, db: Session, payload: dict[str, Any], tenant_id: int | None,
+        actor_id: int | None = None,
+    ) -> dict[str, Any]:
         out = dict(payload)
         if "freq_limit" in out:
             out["freq_limit"] = parse_freq_limit(out["freq_limit"])
@@ -393,22 +490,29 @@ class InsurancePlanFrequencyGroupCRUD(CRUDBase[InsurancePlanFrequencyGroup]):
             if not out.get("description"):
                 out["description"] = dict(CODE_GROUPS).get(code)
         if out.get("ins_plan_id") is not None:
-            get_plan(db, out["ins_plan_id"], tenant_id)
+            _plan_for_write(db, out["ins_plan_id"], tenant_id, actor_id, label=out.get("code_group"))
         return out
 
     def create(
         self, db: Session, data: dict[str, Any], *,
         tenant_id: int | None = None, created_by: int | None = None,
     ) -> InsurancePlanFrequencyGroup:
-        payload = self._prepare(db, data, tenant_id)
+        payload = self._prepare(db, data, tenant_id, created_by)
         return super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
 
     def update(
         self, db: Session, obj_id: Any, data: dict[str, Any], *,
         tenant_id: int | None = None, updated_by: int | None = None,
     ) -> InsurancePlanFrequencyGroup:
-        payload = self._prepare(db, data, tenant_id)
+        existing = self.get(db, obj_id, tenant_id=tenant_id)
+        _plan_for_write(db, existing.ins_plan_id, tenant_id, updated_by, label=existing.code_group)
+        payload = self._prepare(db, data, tenant_id, updated_by)
         return super().update(db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by)
+
+    def delete(self, db: Session, obj_id: Any, *, tenant_id: int | None = None) -> None:
+        existing = self.get(db, obj_id, tenant_id=tenant_id)
+        _plan_for_write(db, existing.ins_plan_id, tenant_id, None, label=existing.code_group)
+        super().delete(db, obj_id, tenant_id=tenant_id)
 
 
 # ── PLAN-DTL-3: anniversary Month/Day ↔ full date ────────────────────────────
@@ -545,6 +649,24 @@ def plan_metadata(db: Session, tenant_id: int | None) -> dict:
             field: [{"code": code, "label": label} for code, label in options]
             for field, options in PLAN_FIELD_OPTIONS.items()
         },
+        # EDIT-PLAN-9: what a blank / omitted field means (and now stores).
+        "plan_field_defaults": dict(PLAN_FIELD_DEFAULTS),
+        # EDIT-PLAN-5: the rights the write paths enforce, so the UI gates
+        # Edit Plan on the same codes the server does.
+        "permissions": {
+            "write_any_of": list(permission_service.INSURANCE_PLAN_WRITE),
+            "edit_locked": permission_service.INSURANCE_PLAN_EDIT_LOCKED,
+            "locked_error_code": "plan_locked",
+            "denied_error_code": "permission_denied",
+        },
+        # EDIT-PLAN-1: how a client asserts "unchanged since I read it".
+        "concurrency": {
+            "version_field": "updated_at",
+            "headers": ["If-Match", "If-Unmodified-Since"],
+            "body_field": "expected_updated_at",
+            "error_code": "precondition_failed",
+            "status_code": 412,
+        },
         "catalog_sources": {
             "frequency_limitations": "tenant" if any(f["definition_id"] for f in freq) else "builtin",
             "default_coverage_rules": defaults[0]["source"] if defaults else "builtin",
@@ -616,6 +738,7 @@ def replace_plan_coverage(
     rules: list[dict[str, Any]] | None,
     frequency_groups: list[dict[str, Any]] | None,
     actor_id: int | None,
+    expected_updated_at: Any = concurrency._SENTINEL,
 ) -> dict:
     """Reconcile a plan's whole coverage table in one transaction.
 
@@ -625,9 +748,30 @@ def replace_plan_coverage(
     any existing row not mentioned is deleted — replace semantics that keep
     identity for the rows the caller kept. An ``id`` that is not on this plan
     is a 422, never a cross-plan move.
+
+    EDIT-PLAN-1: ``expected_updated_at`` (or the request's ``If-Match`` /
+    ``If-Unmodified-Since``) is judged against the **plan** row, which is
+    locked for the transaction; the plan's version moves on success.
+    EDIT-PLAN-5: a locked plan is refused. EDIT-PLAN-6: every row-level
+    change lands in the request's audit row as ``changes[]``.
     """
-    plan = get_plan(db, plan_id, tenant_id)
+    precondition = dict(concurrency.snapshot() or {})
+    if expected_updated_at is not concurrency._SENTINEL:
+        precondition["expected_updated_at"] = expected_updated_at
+    plan = get_plan(db, plan_id, tenant_id, for_update=bool(precondition))
+    concurrency.check(plan, precondition or None, db=db, resource="InsurancePlan")
+    assert_plan_editable(db, plan, actor_id)
     summary = {"rules": None, "frequency_groups": None}
+    changes: list[dict[str, Any]] = []
+
+    def _change(resource_type: str, row_id: Any, action: str, before: dict | None,
+                after: dict | None, label: str | None) -> None:
+        changes.append({
+            "resource_type": resource_type, "row_id": row_id, "action": action,
+            "label": label,
+            "before": {k: audit_context.json_safe(v) for k, v in before.items()} if before else None,
+            "after": {k: audit_context.json_safe(v) for k, v in after.items()} if after else None,
+        })
 
     try:
         if rules is not None:
@@ -655,19 +799,27 @@ def replace_plan_coverage(
                             f"rules[{idx}].id {rid} is not a rule on plan {plan.id}",
                             code="rule_not_on_plan", details={"index": idx, "id": rid},
                         )
+                    before, after = audit_context.diff_fields(row, {k: v for k, v in payload.items() if k in _RULE_FIELDS})
                     _apply_fields(row, payload, _RULE_FIELDS)
-                    row.updated_by = actor_id
+                    if before:
+                        row.updated_by = actor_id
+                        _change("insurance-coverage-rules", rid, "update", before, after,
+                                f"{row.start_code} {row.description or ''}".strip())
                     kept.add(rid)
                     updated += 1
                 else:
-                    db.add(InsuranceCoverageRule(
-                        ins_plan_id=plan.id, created_by=actor_id,
-                        **{k: v for k, v in payload.items() if k in _RULE_FIELDS},
-                    ))
+                    fields = {k: v for k, v in payload.items() if k in _RULE_FIELDS}
+                    new_row = InsuranceCoverageRule(ins_plan_id=plan.id, created_by=actor_id, **fields)
+                    db.add(new_row)
+                    _change("insurance-coverage-rules", None, "create", None, fields,
+                            f"{fields.get('start_code')} {fields.get('description') or ''}".strip())
                     created += 1
             deleted = 0
             for rid, row in existing.items():
                 if rid not in kept:
+                    _change("insurance-coverage-rules", rid, "delete",
+                            {f: getattr(row, f) for f in _RULE_FIELDS}, None,
+                            f"{row.start_code} {row.description or ''}".strip())
                     db.delete(row)
                     deleted += 1
             summary["rules"] = {"created": created, "updated": updated, "deleted": deleted}
@@ -707,8 +859,11 @@ def replace_plan_coverage(
                             f"frequency_groups[{idx}].id {gid} is not on plan {plan.id}",
                             code="frequency_group_not_on_plan", details={"index": idx, "id": gid},
                         )
+                    before, after = audit_context.diff_fields(row, payload)
                     _apply_fields(row, payload, _GROUP_FIELDS)
-                    row.updated_by = actor_id
+                    if before:
+                        row.updated_by = actor_id
+                        _change("insurance-plan-frequency-groups", gid, "update", before, after, code)
                     kept_g.add(gid)
                     updated += 1
                 else:
@@ -716,8 +871,11 @@ def replace_plan_coverage(
                     # unique constraint does not turn a re-PUT into a 409.
                     match = next((g for g in existing_g.values() if g.code_group == code and g.id not in kept_g), None)
                     if match is not None:
+                        before, after = audit_context.diff_fields(match, payload)
                         _apply_fields(match, payload, _GROUP_FIELDS)
-                        match.updated_by = actor_id
+                        if before:
+                            match.updated_by = actor_id
+                            _change("insurance-plan-frequency-groups", match.id, "update", before, after, code)
                         kept_g.add(match.id)
                         updated += 1
                     else:
@@ -725,22 +883,34 @@ def replace_plan_coverage(
                             tenant_id=plan.tenant_id, ins_plan_id=plan.id,
                             created_by=actor_id, **payload,
                         ))
+                        _change("insurance-plan-frequency-groups", None, "create", None, payload, code)
                         created += 1
             deleted = 0
             for gid, row in existing_g.items():
                 if gid not in kept_g:
+                    _change("insurance-plan-frequency-groups", gid, "delete",
+                            {f: getattr(row, f) for f in _GROUP_FIELDS}, None, row.code_group)
                     db.delete(row)
                     deleted += 1
             summary["frequency_groups"] = {"created": created, "updated": updated, "deleted": deleted}
 
-        plan.updated_by = actor_id
+        # EDIT-PLAN-1: the plan row is the document's version — it moves on
+        # every coverage write so a concurrent editor's precondition fails.
+        touch_plan(plan, actor_id)
         db.commit()
     except Exception:
         db.rollback()
         raise
 
+    # EDIT-PLAN-6: one audit row for the request, carrying every row-level change.
+    audit_context.record(
+        resource_id=str(plan.id), row_id=plan.id,
+        scope={"ins_plan_id": plan.id}, changes=changes or None,
+    )
     out = plan_coverage(db, plan.id, tenant_id)
     out["summary"] = summary
+    out["plan_updated_at"] = plan.updated_at
+    out["version"] = concurrency.version_token(concurrency.version_of(plan))
     return out
 
 
@@ -794,16 +964,21 @@ __all__ = [
     "FREQUENCY_LIMITATIONS",
     "InsuranceCoverageRuleCRUD",
     "InsurancePlanFrequencyGroupCRUD",
+    "PLAN_FIELD_DEFAULTS",
     "PLAN_FIELD_OPTIONS",
     "PLAN_SUBTYPES",
     "PLAN_TYPES",
+    "assert_plan_editable",
     "compose_age_limit",
     "copy_plan_coverage",
     "fold_anniversary",
+    "get_plan",
     "normalise_rule_limits",
     "parse_age_limit",
     "parse_wait_months",
     "plan_coverage",
     "plan_metadata",
+    "record_plan_scope",
     "replace_plan_coverage",
+    "touch_plan",
 ]

@@ -119,11 +119,24 @@ ortho, by_category }`. **Wired**: KPI cards now read from this endpoint; the cat
 filter prefers `by_category` keys (falls back to derived). The full-catalog load remains
 only for the client-side searchable list table.
 
-### ◑ PROC-6 — `fee-schedules` list latency — **OPEN (perf)**
-`GET /api/v1/fee-schedules?size=200` is still multi-second; the Fee Schedules tab needs it
-only to resolve `fee_schedule_id → name`. **Suggested**: denormalize
-`fee_schedule_name`/`fee_type` onto `FeeScheduleEntryRead`, or a lightweight `id,name`
-projection. Non-blocking.
+### ✅ PROC-7 — Supporting-records requirement flags — **BACKEND DONE (2026-09-10)**
+Charting tab gained five requirement toggles next to Tooth/Surface/Quadrant Required:
+`requires_attachment`, `requires_perio_chart`, `requires_photo`, `requires_xray`,
+`requires_missing_tooth_info`. **Backend shipped** (Alembic `aee911131850`, applied): the five
+columns exist on `procedure_codes`, round-trip on `ProcedureCodeRead/Create/Update` (list +
+detail), are advertised as *advisory* on `/metadata/procedure-entry-rules` with the rule table,
+and are judged by `GET /patients/{id}/procedure-readiness`, `GET /patient-procedures/{id}/readiness`
+and `GET /insurance-claims/{id}/readiness` (which also derives the ADA Enclosures box). Enforcement
+is at `POST /insurance-claims/{id}/submit` (422 `supporting_records_missing`, override
+`allow_missing_records`), never on posting. `POST /patient-documents` takes `procedure_id` /
+`claim_id` so an attachment can be tied to a charge. **Frontend to-do**: `npm run api:sync`,
+delete the localStorage fallback + amber note, wire the readiness reads. Full response:
+**`docs/procedure_code/procedure_code_supporting_records_backend_response.md`**.
+
+### ✅ PROC-6 — `fee-schedules` list latency — **DONE (backend)**
+`GET /api/v1/fee-schedules/options` is the lightweight active `id, name, fee_type`
+projection (`listFeeScheduleOptions`). The Fee Schedules tab should resolve
+`fee_schedule_id → name` from it instead of paging `/fee-schedules?size=200`.
 
 ---
 
@@ -142,6 +155,7 @@ projection. Non-blocking.
 | KPI cards from `/procedure-codes/stats` (PROC-5) | ✅ wired |
 | Main tab billing/tax/defaults/NHS (PROC-4) | ✅ wired (provider + note-macro selects) |
 | Charting tab full config + valid-teeth grid (PROC-1) | ✅ wired |
+| Charting tab supporting-records toggles (PROC-7) | ◑ UI + browser persistence; backend columns pending |
 | Insurance tab CRUD (PROC-3) | ✅ wired |
 | `npx tsc -b` (whole project) | ✅ clean |
 | `npx eslint` (touched files) | ✅ clean |
@@ -167,7 +181,8 @@ projection. Non-blocking.
 No mock/hardcoded business data; categories from `stats.by_category`; provider / note-macro
 / chart-material selects from their respective endpoints.
 
-**Outstanding** — PROC-6 (fee-schedules list latency, perf, non-blocking) and the
+**Outstanding** — PROC-7 (supporting-records flags need `procedure_codes` columns — see the
+dedicated report), PROC-6 (fee-schedules list latency, perf, non-blocking) and the
 provider-side PROC-2 ("Procedure Codes" tab on **Provider Setup**, follow-up — endpoints
 exist).
 

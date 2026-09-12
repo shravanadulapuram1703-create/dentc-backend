@@ -61,6 +61,7 @@ from app.core.exceptions import ValidationError
 from app.crud.base import CRUDBase
 from app.db.models import PatientProcedure
 from app.services import pricing_service, procedure_events, treatment_service
+from app.services.claim_form_service import attach_procedure_to_claim, normalise_claim_line
 from app.services.procedure_rules_service import apply_entry_rules
 
 CHARGE_SOURCE = "patient_procedures"
@@ -107,6 +108,7 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
                     payload[field] = getattr(item, field)
 
         payload = apply_entry_rules(db, payload)
+        payload = normalise_claim_line(payload)  # ADA-BE-3/4
         payload = self._price(db, payload, tenant_id)
 
         # Same steps as CRUDBase.create, inlined so the item flip lands in the
@@ -119,6 +121,8 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
         if item is not None:
             db.flush()
             treatment_service.bind_item_to_charge(db, item, obj)
+        if obj.claim_id:
+            self._attach_claim(db, obj)
         self._commit(db)
         db.refresh(obj)
         procedure_events.announce(
@@ -128,6 +132,17 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
             treatment_plan_item_id=obj.treatment_plan_item_id, actor_user_id=created_by,
         )
         return obj
+
+    @staticmethod
+    def _attach_claim(db: Session, proc: PatientProcedure) -> None:
+        """ADA-BE-12: the ledger builds a claim as POST + per-line PATCH, so the
+        claim's treating / billing provider and service dates are filled from
+        the first line that lands on it (never overwritten once set)."""
+        from app.db.models import InsuranceClaim  # noqa: PLC0415
+
+        claim = db.get(InsuranceClaim, proc.claim_id)
+        if claim is not None:
+            attach_procedure_to_claim(db, claim, proc)
 
     @staticmethod
     def _price(db: Session, data: dict, tenant_id: int | None) -> dict:
@@ -161,6 +176,8 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
             held = _truthy(payload["hold_claim"] if "hold_claim" in payload else current.hold_claim)
             _reject_held_claim(held, payload["claim_id"])
         payload = apply_entry_rules(db, payload, current)
+        payload = normalise_claim_line(payload, current)  # ADA-BE-3/4
+        claim_changed = bool(payload.get("claim_id")) and payload["claim_id"] != current.claim_id
 
         # ── plan-item link transitions ─────────────────────────────────────
         old_item_id = current.treatment_plan_item_id
@@ -181,6 +198,8 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
             setattr(current, key, value)
         if updated_by is not None and self._is_int_col("updated_by"):
             current.updated_by = updated_by
+        if claim_changed:
+            self._attach_claim(db, current)
 
         if item_changed:
             treatment_service.release_item(db, old_item_id, exclude_procedure_id=current.id)

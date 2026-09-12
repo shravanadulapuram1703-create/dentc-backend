@@ -8,8 +8,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.datetimes import UtcDatetime
 from app.db.models import Patient
 from app.schemas.factory import build_schemas
+from app.schemas.medical_alerts import MedicalAlertSummary
 
 # Reuse the patient field set under a distinct component name for the context aggregate.
 SchedulerPatientRead = build_schemas(Patient, "SchedulerPatient")[2]
@@ -41,12 +43,17 @@ class AppointmentSchedulerRead(BaseModel):
     # appointments by default; the flag is exposed so a caller that opts back in
     # with ``?include_archived=true`` can tell the tombstones apart.
     is_archived: bool = False
-    posted_on: datetime | None = None
-    confirmed_on: datetime | None = None
-    checked_in_on: datetime | None = None
-    checked_out_on: datetime | None = None
+    posted_on: UtcDatetime | None = None
+    confirmed_on: UtcDatetime | None = None
+    checked_in_on: UtcDatetime | None = None
+    checked_out_on: UtcDatetime | None = None
     # SCHED G1/G2/G4/G5 — denormalized per-block enrichment (no per-cell N+1).
+    # MA-1: true when the patient has an active free-text alert OR a Medical
+    # History alert answered YES (was free-text only).
     has_alert: bool = False
+    # MA-2: one line per section for the block tooltip / popover, no fan-out.
+    alert_summary: str | None = None
+    alert_count: int = 0
     patient_age: int | None = None
     patient_gender: str | None = None
     responsible_party_id: str | None = None
@@ -60,6 +67,19 @@ class AppointmentSchedulerRead(BaseModel):
     cancellation_note: str | None = None
     cancellation_reason: str | None = None
     add_to_call_list: bool = False
+    # LAB-3: the lab block, so the calendar can badge a lab case and the Lab
+    # Tracking tab can reuse this denormalised feed. ``lab_status`` is the
+    # same derivation the ``?lab_status=`` filter evaluates (null unless has_lab).
+    has_lab: bool = False
+    lab_vendor_id: int | None = None
+    lab_vendor_name: str | None = None
+    lab_dds: str | None = None
+    lab_cost: Decimal | None = None
+    lab_short_notice: bool = False
+    lab_sent_on: date | None = None
+    lab_due_on: date | None = None
+    lab_received_on: date | None = None
+    lab_status: Literal["not_sent", "sent", "overdue", "received"] | None = None
 
 
 class AppointmentStatusUpdate(BaseModel):
@@ -100,6 +120,8 @@ class PatientContextVisit(BaseModel):
 class PatientContext(BaseModel):
     patient: SchedulerPatientRead  # type: ignore[valid-type]
     balance: dict
+    # MA-2: the same per-patient alert summary as /patients/{id}/medical-alerts/summary.
+    medical_alerts: MedicalAlertSummary | None = None
     insurance: list[PatientContextInsurance]
     # AL-12: header detail the shared patient shell could not previously show.
     primary_insurance: PatientContextInsurance | None = None

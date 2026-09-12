@@ -30,8 +30,10 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, NotFoundError
-from app.services.insurance_plan_service import fold_anniversary
+from app.core import concurrency
+from app.core.exceptions import ConflictError, LockedError, NotFoundError
+from app.services import permission_service
+from app.services.insurance_plan_service import assert_plan_editable, fold_anniversary
 from app.crud.base import CRUDBase
 from app.db.models import (
     Employer,
@@ -404,6 +406,28 @@ class InsurancePlanCRUD(CRUDBase[InsurancePlan]):
             },
         )
 
+    # ── EDIT-PLAN-5: the lock ────────────────────────────────────────────────
+    @staticmethod
+    def _require_lock_right(db: Session, actor_id: int | None, plan_id: int | None) -> None:
+        perms = permission_service.permissions_for_user_id(db, actor_id)
+        if perms is None:
+            raise LockedError(
+                "Locking or editing a locked insurance plan requires the 'Edit Locked Plan' right",
+                code="plan_locked",
+                details={"plan_id": plan_id,
+                         "required_any_of": [permission_service.INSURANCE_PLAN_EDIT_LOCKED]},
+            )
+        permission_service.assert_can_edit_locked(perms, plan_id=plan_id)
+
+    @staticmethod
+    def _stamp_lock(payload: dict[str, Any], actor_id: int | None) -> None:
+        if payload.get("is_locked"):
+            payload["locked_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
+            payload["locked_by"] = actor_id
+        else:
+            payload["locked_at"] = None
+            payload["locked_by"] = None
+
     def create(
         self, db: Session, data: dict[str, Any], *,
         tenant_id: int | None = None, created_by: int | None = None,
@@ -411,6 +435,10 @@ class InsurancePlanCRUD(CRUDBase[InsurancePlan]):
         # PLAN-DTL-3: month/day and the full date are kept consistent server-side.
         payload = fold_anniversary(dict(data))
         allow = bool(payload.pop("allow_duplicate_group", False))
+        payload.pop("expected_updated_at", None)
+        if payload.get("is_locked"):
+            self._require_lock_right(db, created_by, None)
+            self._stamp_lock(payload, created_by)
         self._guard(
             db, tenant_id=tenant_id,
             carrier_id=payload.get("carrier_id"),
@@ -426,6 +454,22 @@ class InsurancePlanCRUD(CRUDBase[InsurancePlan]):
         existing = self.get(db, obj_id, tenant_id=tenant_id)
         payload = fold_anniversary(dict(data), existing)
         allow = bool(payload.pop("allow_duplicate_group", False))
+        # EDIT-PLAN-1: the body-level precondition — the ``updated_at`` the
+        # client read. (The header forms are checked by ``CRUDBase.update``.)
+        if "expected_updated_at" in payload:
+            concurrency.check(
+                existing, {"expected_updated_at": payload.pop("expected_updated_at")},
+                db=db, resource=self.resource_name,
+            )
+        # EDIT-PLAN-5: a locked plan, or flipping the lock either way, needs the
+        # edit-locked right; the stamp columns are never client-written.
+        lock_change = "is_locked" in payload and bool(payload["is_locked"]) != bool(existing.is_locked)
+        if existing.is_locked or lock_change:
+            self._require_lock_right(db, updated_by, existing.id)
+        if lock_change:
+            self._stamp_lock(payload, updated_by)
+        elif "is_locked" in payload:
+            payload.pop("is_locked")  # same value re-sent: nothing to stamp
         # Evaluate against the merge of payload + stored row, so a PATCH carrying
         # only the group number is still checked against the plan's own carrier
         # (and a PATCH that only moves the carrier against its stored group).
@@ -444,7 +488,64 @@ class InsurancePlanCRUD(CRUDBase[InsurancePlan]):
             db, tenant_id=tenant_id, carrier_id=carrier_id, group_number=group_number,
             allow_duplicate=allow or not moved, exclude_id=existing.id,
         )
-        return super().update(db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by)
+        # EDIT-PLAN-4: the plan is the master; subscribers that still carried the
+        # previous value follow it in the same transaction, the rest are kept.
+        cascade = None
+        if "group_number" in payload and _norm(payload["group_number"]) != _norm(existing.group_number):
+            cascade = cascade_subscriber_group_number(
+                db, existing.id, existing.group_number, payload["group_number"],
+            )
+        obj = super().update(db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by)
+        # Handed to ``enrich_insurance_plan`` (which runs on every read and
+        # consumes it), so the cascade shows on *this* response only.
+        obj._pending_cascade = cascade
+        return obj
+
+    def delete(self, db: Session, obj_id: Any, *, tenant_id: int | None = None) -> None:
+        existing = self.get(db, obj_id, tenant_id=tenant_id)
+        assert_plan_editable(db, existing, None)
+        super().delete(db, obj_id, tenant_id=tenant_id)
+
+
+def cascade_subscriber_group_number(
+    db: Session, plan_id: int, previous: str | None, new: str | None,
+) -> dict[str, Any]:
+    """EDIT-PLAN-4: move the subscribers on ``plan_id`` that still carried the
+    plan's *previous* group number (or none) to the new one.
+
+    ``insurance_subscribers.group_number`` is the number on the member's
+    card — an enrolment-time snapshot of the plan master. On the migrated data
+    22,335 of 65,314 subscribers hold a value that genuinely differs from
+    their plan (``000003`` vs ``000003-pa``, a carrier suffix on the card), so
+    the subscriber column is a real per-card override, not a stale copy, and
+    overwriting every row would destroy it. The rule the frontend applied to
+    the one slot it could see now runs server-side for every subscriber:
+    *still equal to the old value (or blank) → follows the plan; different →
+    kept, and reported*. Rows are only queued here; the caller's commit lands
+    them with the plan change.
+    """
+    subs = db.execute(
+        select(InsuranceSubscriber).where(InsuranceSubscriber.ins_plan_id == plan_id)
+    ).scalars().all()
+    prev = _norm(previous)
+    updated = kept = 0
+    kept_ids: list[int] = []
+    for sub in subs:
+        current = _norm(sub.group_number)
+        if current is None or current == prev:
+            if sub.group_number != new:
+                sub.group_number = new
+            updated += 1
+        else:
+            kept += 1
+            kept_ids.append(sub.id)
+    return {
+        "previous_group_number": previous,
+        "new_group_number": new,
+        "subscribers_updated": updated,
+        "subscribers_kept": kept,
+        "kept_subscriber_ids": kept_ids[:200],
+    }
 
 
 class _NameGuardCRUD(CRUDBase):

@@ -11,7 +11,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import create_model
+from pydantic import Field, create_model
 
 from app.db import models as m
 from app.schemas.factory import build_schemas
@@ -32,8 +32,26 @@ class PatientProcedureCreate(_pp_create):  # type: ignore[valid-type, misc]
     """
 
     fee: Decimal | None = None
+    # ADA-BE-3: the column is 4 letters (A–D) but a client may send them with
+    # separators ("A, B"); the CRUD normalises, so the wire cap is looser.
+    diagnosis_pointers: str | None = Field(None, max_length=16)
+
+
+class PatientProcedureUpdate(PatientProcedureUpdate):  # type: ignore[no-redef, valid-type, misc]
+    diagnosis_pointers: str | None = Field(None, max_length=16)
+
+
 PatientPaymentCreate, PatientPaymentUpdate, _ = build_schemas(m.PatientPayment, "PatientPayment")
-InsuranceClaimCreate, InsuranceClaimUpdate, _ = build_schemas(m.InsuranceClaim, "InsuranceClaim")
+_claim_create_base, InsuranceClaimUpdate, _ = build_schemas(m.InsuranceClaim, "InsuranceClaim")
+# ADA-BE-12: ``procedure_ids`` (not a column) links the claimed charges in the
+# same transaction as the claim row, so the treating / billing provider and the
+# service dates can be defaulted from them (claim_form_service.InsuranceClaimCRUD).
+InsuranceClaimCreate = create_model(
+    "InsuranceClaimCreate", __base__=_claim_create_base,
+    procedure_ids=(Optional[list[str]], Field(
+        None, description="patient_procedures ids to attach; the claim's treating/billing provider, "
+                          "service dates and totals default from them (ADA-BE-12)")),
+)
 TreatmentPlanCreate, TreatmentPlanUpdate, _ = build_schemas(m.TreatmentPlan, "TreatmentPlan")
 
 # CHG-5: the applied-money rollup behind the grid's Pat Paid / Pat Adj / Rem Amt
@@ -82,4 +100,24 @@ _provider_base = build_schemas(m.Provider, "ProviderFull")[2]
 ProviderRead = create_model(
     "ProviderRead", __base__=_provider_base,
     provider_kind=(Optional[str], None),
+    # ADA-BE-14: stored taxonomy_code, else keyword-derived from specialty, else
+    # 122300000X (Dentist); ``effective_taxonomy_source`` says which.
+    effective_taxonomy_code=(Optional[str], None),
+    effective_taxonomy_source=(Optional[str], None),
+)
+
+
+# PRINT-2: the office's print branding — logo + the name/address/phone block
+# that heads every server-rendered report — resolved once (Statement-tab custom
+# logo/address → practice logo → the office row) by
+# ``print_service.resolve_letterhead`` and published here so the screens'
+# printed headers and the PDFs cannot disagree. Set by
+# ``enrich_service.enrich_office``.
+from app.schemas.print import OfficeLetterhead  # noqa: E402
+
+_office_base = build_schemas(m.Office, "OfficeFull")[2]
+OfficeRead = create_model(
+    "OfficeRead", __base__=_office_base,
+    logo_url=(Optional[str], None),
+    letterhead=(Optional[OfficeLetterhead], None),
 )

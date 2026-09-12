@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.common import ORMModel
 from app.schemas.signature import SignatureCaptureFields
+from app.core.datetimes import UtcDatetime
 
 
 # ── Gap 3: time-clock config ─────────────────────────────────────────────────
@@ -121,7 +122,7 @@ class UserSignatureUpdate(SignatureCaptureFields):
     signature_data: str = Field(..., description="Base64 / data-URL signature image")
     signature_len: int | None = None
     device_source: str | None = Field(None, max_length=20, examples=["topaz", "web-pad"])
-    signed_at: datetime | None = None
+    signed_at: UtcDatetime | None = None
 
 
 class UserSignatureRead(BaseModel):
@@ -129,8 +130,10 @@ class UserSignatureRead(BaseModel):
     signature_data: str | None = None
     signature_len: int | None = None
     device_source: str | None = None
-    updated_at: datetime | None = Field(None, description="When the signature last changed")
-    signed_at: datetime | None = None
+    updated_at: UtcDatetime | None = Field(None, description="When the signature last changed")
+    signed_at: UtcDatetime | None = None
+    # CS-8: topaz | drawn | legacy | unknown, derived from device_source.
+    capture_method: str | None = None
     # Topaz capture metadata (SIG-1/2/3/8); the SigString only with
     # ``?include_sig_string=true`` (SIG-4).
     has_sig_string: bool = False

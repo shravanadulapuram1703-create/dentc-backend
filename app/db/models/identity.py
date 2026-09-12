@@ -151,6 +151,20 @@ class Office(Base, IntPKMixin, TimestampMixin):
     default_fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
     default_ucr_fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # ADA-BE-8: the Type 2 (organisation) NPI + taxonomy an incorporated practice
+    # bills under (ADA claim form Item 49 / 837D loop 2010AA). The billing
+    # *provider's* Type 1 NPI is the fallback, which is wrong next to a corporate
+    # TIN — some payers reject the pair.
+    npi: Mapped[str | None] = mapped_column(String(10))
+    taxonomy_code: Mapped[str | None] = mapped_column(String(10))
+    # ADA-BE-13: the *physical* treatment location (Item 56 — never a P.O. Box)
+    # when it differs from the billing/mailing address above (Item 48). All
+    # nullable: blank falls back to the main address.
+    treatment_address_line1: Mapped[str | None] = mapped_column(String(255))
+    treatment_address_line2: Mapped[str | None] = mapped_column(String(255))
+    treatment_city: Mapped[str | None] = mapped_column(String(100))
+    treatment_state: Mapped[str | None] = mapped_column(String(50))
+    treatment_zip: Mapped[str | None] = mapped_column(String(20))
 
 
 class Provider(Base, CreatedAtMixin):
@@ -169,6 +183,10 @@ class Provider(Base, CreatedAtMixin):
     tax_id: Mapped[str | None] = mapped_column(String(50))
     dea_id: Mapped[str | None] = mapped_column(String(50))
     specialty: Mapped[str | None] = mapped_column(String(100))
+    # ADA-BE-14: Healthcare Provider Taxonomy code (Item 56a / 837D PRV03).
+    # ``specialty`` stays free text; when this is NULL the read derives
+    # ``effective_taxonomy_code`` from it by keyword (provider_taxonomy_service).
+    taxonomy_code: Mapped[str | None] = mapped_column(String(10))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Office Assignment -> Providers grid (gap #28): legacy split-name + audit columns.
     first_name: Mapped[str | None] = mapped_column(String(100))
@@ -200,6 +218,13 @@ class Provider(Base, CreatedAtMixin):
     ortho_questionnaire_template: Mapped[str | None] = mapped_column(String(100))
     custom_1: Mapped[str | None] = mapped_column(String(255))
     custom_2: Mapped[str | None] = mapped_column(String(255))
+    # PLAN-APPT-4: the chair a booking for this provider defaults to. The
+    # inverse of ``operatories.provider_id`` (one column-header provider per
+    # operatory); validated to sit in an office the provider serves.
+    default_operatory_id: Mapped[str | None] = mapped_column(
+        String(50),
+        ForeignKey("operatories.id", use_alter=True, name="fk_providers_default_operatory"),
+    )
 
 
 class Operatory(Base, CreatedAtMixin):

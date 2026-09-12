@@ -8,16 +8,28 @@ service.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Generic, TypeVar
 
 from sqlalchemy import func, inspect as sa_inspect, or_, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core import audit_context, concurrency
+from app.core.exceptions import NotFoundError, app_error_from_db
 from app.db.base import Base
 
 ModelT = TypeVar("ModelT", bound=Base)
+
+
+class _Blank:
+    """Stand-in "before" object for a create: every payload key counts as changed."""
+
+    def __getattr__(self, name: str) -> object:
+        return _MISSING
+
+
+_MISSING = object()
 
 
 class CRUDBase(Generic[ModelT]):
@@ -82,8 +94,17 @@ class CRUDBase(Generic[ModelT]):
         return stmt
 
     # ── reads ──────────────────────────────────────────────────────────────
-    def get(self, db: Session, obj_id: Any, *, tenant_id: int | None = None) -> ModelT:
+    def get(
+        self, db: Session, obj_id: Any, *, tenant_id: int | None = None,
+        for_update: bool = False,
+    ) -> ModelT:
         stmt = self._scope_tenant(select(self.model).where(self._pk == obj_id), tenant_id)
+        # EDIT-PLAN-1: a write carrying a precondition locks the row for the
+        # rest of the transaction so the version check and the UPDATE cannot
+        # interleave with another writer (Postgres; SQLite has no row locks and
+        # the dialect drops the clause).
+        if for_update:
+            stmt = stmt.with_for_update()
         obj = db.execute(stmt).scalar_one_or_none()
         if obj is None:
             raise NotFoundError(f"{self.resource_name} '{obj_id}' was not found")
@@ -214,6 +235,7 @@ class CRUDBase(Generic[ModelT]):
         db.add(obj)
         self._commit(db)
         db.refresh(obj)
+        self._audit(obj, after=audit_context.diff_fields(_Blank(), payload)[1])
         return obj
 
     def update(
@@ -225,30 +247,91 @@ class CRUDBase(Generic[ModelT]):
         tenant_id: int | None = None,
         updated_by: int | None = None,
     ) -> ModelT:
-        obj = self.get(db, obj_id, tenant_id=tenant_id)
-        for key, value in data.items():
-            setattr(obj, key, value)
+        precondition = concurrency.snapshot()
+        obj = self.get(db, obj_id, tenant_id=tenant_id, for_update=precondition is not None)
+        # EDIT-PLAN-1: the caller said "only if unchanged since X" — judged
+        # before anything is assigned, against the row as it is *now*.
+        concurrency.check(obj, precondition, db=db, resource=self.resource_name)
+        # MH-20: compare before assigning. A PATCH that re-sends the stored value
+        # used to re-stamp ``updated_at`` / ``updated_by`` ("modified by Admin
+        # User on 09/10" with nothing changed) — and the screen's old
+        # PATCH-everything save did that to all 88 alerts on every Save. With no
+        # difference there is no assignment, no actor stamp, no UPDATE and no
+        # audit row worth writing.
+        before, after = audit_context.diff_fields(obj, data)
+        # A subclass may have mutated the row (or queued rows) before delegating
+        # here; those still have to land even when the payload itself is a no-op.
+        subclass_changed = db.is_modified(obj) or bool(db.new) or bool(db.deleted)
+        if not before and not subclass_changed:
+            return obj
+        for key in before:
+            setattr(obj, key, data[key])
+        changed = bool(before) or db.is_modified(obj)
         # INS-6: server-maintained modified actor (integer updated_by columns only).
-        if updated_by is not None and self._is_int_col("updated_by"):
+        if changed and updated_by is not None and self._is_int_col("updated_by"):
             obj.updated_by = updated_by
+        # EDIT-PLAN-1: ``updated_at`` is the row's *version*. Stamp it here with
+        # microsecond precision instead of leaving it to the column's
+        # ``onupdate=now()`` — SQLite's CURRENT_TIMESTAMP is whole seconds, so
+        # two saves inside one second read as the same version and a stale
+        # precondition passes.
+        if changed and hasattr(obj, concurrency.VERSION_FIELD):
+            setattr(obj, concurrency.VERSION_FIELD,
+                    datetime.now(timezone.utc).replace(tzinfo=None))
         self._commit(db)
         db.refresh(obj)
+        # MH-19: the audit row carries what changed, so a second edit no longer
+        # erases the first value.
+        self._audit(obj, before=before, after=after)
         return obj
 
     def delete(self, db: Session, obj_id: Any, *, tenant_id: int | None = None) -> None:
-        obj = self.get(db, obj_id, tenant_id=tenant_id)
+        precondition = concurrency.snapshot()
+        obj = self.get(db, obj_id, tenant_id=tenant_id, for_update=precondition is not None)
+        concurrency.check(obj, precondition, db=db, resource=self.resource_name)
+        self._audit(obj, before={"is_active": getattr(obj, "is_active", None)}
+                    if self.soft_delete_field else {"deleted": True})
         if self.soft_delete_field:
             setattr(obj, self.soft_delete_field, self.soft_delete_value)
         else:
             db.delete(obj)
         self._commit(db)
 
+    def _audit(self, obj: Any, *, before: dict | None = None, after: dict | None = None) -> None:
+        """MH-19: hand the row identity + diff to the request's audit context."""
+        try:
+            pk = getattr(obj, self.pk_attr, None)
+            patient_id = getattr(obj, "patient_id", None)
+            if patient_id is None and self.model.__tablename__ == "patients":
+                patient_id = pk
+            audit_context.record(
+                resource_id=str(pk) if pk is not None else None,
+                row_id=pk,
+                patient_id=patient_id if isinstance(patient_id, int) else None,
+                before=before or None,
+                after=after or None,
+            )
+        except Exception:  # noqa: BLE001 - auditing never breaks a write
+            pass
+
+    def _flush(self, db: Session) -> None:
+        """A flush that can fail the same way ``_commit`` can (a subclass that
+        needs the SERIAL id mid-transaction hits the unique/FK/length checks
+        here, not at commit). Rolls back so the session is reusable, then maps
+        the driver error the same way (GAP-AP-26)."""
+        try:
+            db.flush()
+        except (IntegrityError, DataError) as exc:
+            db.rollback()
+            raise app_error_from_db(exc, resource=self.resource_name) from exc
+
     def _commit(self, db: Session) -> None:
         try:
             db.commit()
-        except IntegrityError as exc:
+        except (IntegrityError, DataError) as exc:
             db.rollback()
-            raise ConflictError(
-                f"{self.resource_name} violates a uniqueness or reference constraint",
-                details=str(getattr(exc, "orig", exc)),
-            ) from exc
+            # GAP-AP-26: 409 ``constraint`` for a unique collision, 422 for a
+            # dangling reference / missing column / over-long value — with the
+            # table, column(s) and constraint named (was a bare 409 carrying the
+            # raw driver string for every one of them).
+            raise app_error_from_db(exc, resource=self.resource_name) from exc

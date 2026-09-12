@@ -37,7 +37,11 @@ def test_duplicate_tooth_rejected(client, exam):
     assert first.status_code == 201, first.text
     dup = client.post(base, json={"exam_id": exam.id, "tooth_no": "4", "pd1": 5})
     assert dup.status_code == 409
-    assert dup.json()["error"]["code"] == "conflict"
+    # GAP-AP-26: a unique violation is ``constraint`` with the columns named
+    # (was the generic ``conflict`` carrying the raw driver string).
+    err = dup.json()["error"]
+    assert err["code"] == "constraint" and err["details"]["kind"] == "unique"
+    assert "tooth_no" in err["details"]["columns"]
 
 
 # ── PERIO-BE-2: mobility decimals ────────────────────────────────────────────

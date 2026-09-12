@@ -122,15 +122,29 @@ class InsurancePlan(Base, IntPKMixin, TimestampMixin):
     # stored as written (``insurance_plan_service.PLAN_FIELD_OPTIONS`` publishes
     # the vocabularies) — the PROV-3 call: an unfamiliar string beats a 422 on a
     # form the user cannot otherwise submit.
-    fees_to_print: Mapped[str | None] = mapped_column(String(20))
-    claim_option: Mapped[str | None] = mapped_column(String(20))
-    form_to_print: Mapped[str | None] = mapped_column(String(20))
+    # EDIT-PLAN-9: the four coded fields default to the legacy dialog's values
+    # (``insurance_plan_service.PLAN_FIELD_DEFAULTS``) so a new row never
+    # holds NULL and the first edit of a plan no longer audits four "changes"
+    # the user did not make; Alembic ``7f483f6833a7`` backfilled the migrated
+    # rows the same way. ``lifetime_ortho_benefits`` defaults **true** — the
+    # legacy dialog's default (an ortho maximum is a lifetime figure on almost
+    # every plan); migrated rows keep the false the first migration wrote.
+    fees_to_print: Mapped[str | None] = mapped_column(String(20), default="office_ucr")
+    claim_option: Mapped[str | None] = mapped_column(String(20), default="submit")
+    form_to_print: Mapped[str | None] = mapped_column(String(20), default="ADA2024")
     reporting_subtype: Mapped[str | None] = mapped_column(String(50))
-    network_type: Mapped[str | None] = mapped_column(String(20))
+    network_type: Mapped[str | None] = mapped_column(String(20), default="unknown")
     noa_only: Mapped[bool] = mapped_column(Boolean, default=False)
     per_visit_copay: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
-    lifetime_ortho_benefits: Mapped[bool] = mapped_column(Boolean, default=False)
+    lifetime_ortho_benefits: Mapped[bool] = mapped_column(Boolean, default=True)
     plan_notes: Mapped[str | None] = mapped_column(Text)
+    # EDIT-PLAN-5: a locked plan can only be edited (or unlocked) by a caller
+    # holding ``setup_insurance_plans_screen_edit_locked_plan`` — the right
+    # existed in the catalog with nothing to honour it. ``locked_at``/
+    # ``locked_by`` are stamped server-side when the flag flips on.
+    is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
+    locked_at: Mapped[datetime | None]
+    locked_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     # INS-PT-8: legacy free-text audit (migrated source), same shape as the carrier.
     created_on: Mapped[datetime | None]
     created_by: Mapped[str | None] = mapped_column(String(100))
@@ -152,6 +166,9 @@ class InsuranceSubscriber(Base, IntPKMixin, TimestampMixin):
     sub_first_name: Mapped[str | None] = mapped_column(String(100))
     sub_last_name: Mapped[str | None] = mapped_column(String(100))
     sub_mi: Mapped[str | None] = mapped_column(String(10))
+    # ADA-BE-10: subscriber name suffix (Items 5 / 12, 837D NM107). ``sub_``
+    # prefixed like every other subscriber demographic column on this table.
+    sub_suffix: Mapped[str | None] = mapped_column(String(10))
     sub_address: Mapped[str | None] = mapped_column(String(255))
     # INS-PT-4: legacy screen has two subscriber address lines.
     sub_address2: Mapped[str | None] = mapped_column(String(255))

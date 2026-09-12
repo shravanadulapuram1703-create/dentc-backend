@@ -13,13 +13,15 @@ verifying the provider belongs to the authenticated tenant.
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, datetime, time
 
 from sqlalchemy import (
     Boolean,
     Date,
+    DateTime,
     ForeignKey,
     Integer,
+    SmallInteger,
     String,
     Text,
     Time,
@@ -76,6 +78,42 @@ class ProviderWatermark(Base, IntPKMixin, TimestampMixin):
     signature_image_url: Mapped[str | None] = mapped_column(String(500))
     opacity: Mapped[int | None] = mapped_column(Integer)  # 0–100
     position: Mapped[str | None] = mapped_column(String(30))  # center | top_left | …
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+
+class ProviderSignature(Base, IntPKMixin, TimestampMixin):
+    """SIG-14: the provider-level signature store (1:1 with provider).
+
+    The treating-dentist certification (ADA Item 53) used to fall back to the
+    *user* signature store through ``providers.user_id`` — and most migrated
+    providers have no linked user at all, so they had no signature on file and
+    had to sign every claim at the pad. This carries the same block as
+    ``users.signature_*`` (image + Topaz capture, SigString encrypted at rest)
+    keyed on the provider. ``GET /providers/{id}/signature`` resolves provider
+    store → linked user store, so one call answers "what prints on Item 53".
+    ``provider_watermarks.signature_image_url`` (an uploaded *file*) is the
+    document-watermark feature and stays separate.
+    """
+
+    __tablename__ = "provider_signatures"
+    __table_args__ = (UniqueConstraint("provider_id", name="uq_provider_signatures_provider"),)
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    provider_id: Mapped[str] = mapped_column(String(50), ForeignKey("providers.id"), index=True)
+    signature_data: Mapped[str | None] = mapped_column(Text)
+    signature_len: Mapped[int | None] = mapped_column(Integer)
+    device_source: Mapped[str | None] = mapped_column(String(20))
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    sig_string: Mapped[str | None] = mapped_column(Text)  # encrypted at rest (SIG-4)
+    sig_format: Mapped[str | None] = mapped_column(String(24))
+    sig_compression: Mapped[int | None] = mapped_column(SmallInteger)
+    sig_encryption: Mapped[int | None] = mapped_column(SmallInteger)
+    point_count: Mapped[int | None] = mapped_column(Integer)
+    stroke_count: Mapped[int | None] = mapped_column(Integer)
+    device_vendor: Mapped[str | None] = mapped_column(String(20))
+    device_model: Mapped[str | None] = mapped_column(String(40))
+    device_serial: Mapped[str | None] = mapped_column(String(40))
+    captured_user_agent: Mapped[str | None] = mapped_column(String(255))
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 

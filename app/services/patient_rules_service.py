@@ -70,6 +70,61 @@ INSURANCE_RANKS: tuple[str, ...] = ("primary", "secondary", "tertiary", "quatern
 
 _PLAN_TYPE_LABELS = {"D": "Dental", "M": "Medical"}
 
+# ── Responsible-party relationship (patients.responsible_party_relationship) ──
+# GAP-AP-25: the ``resp_party_rel`` definitions group was seeded twice — a
+# lowercase key set (``self/spouse/…``) and the legacy single-letter codes
+# (``S/SP/P/G/C/D/O``) — so the dropdown listed every option twice and the
+# column held three spellings of the same fact (``spouse`` / ``SP`` / ``Spouse``).
+# The **code** is canonical: it is the legacy vocabulary, it is what
+# ``patient_insurance.relationship`` already holds, and it is the only set with
+# *Dependent*. Every write path folds a key or a label to the code; a value that
+# is none of the three is stored as written (the PROV-3 call — a 422 on save is a
+# worse failure than an unfamiliar string, and a migrated value may be one).
+RESP_PARTY_RELATIONSHIPS: tuple[tuple[str, str], ...] = (
+    ("S", "Self"), ("SP", "Spouse"), ("P", "Parent"), ("G", "Guardian"),
+    ("C", "Child"), ("D", "Dependent"), ("O", "Other"),
+)
+_REL_ALIASES: dict[str, str] = {}
+for _code, _label in RESP_PARTY_RELATIONSHIPS:
+    _REL_ALIASES[_code.lower()] = _code
+    _REL_ALIASES[_label.lower()] = _code
+RESP_PARTY_REL_SELF = "S"
+
+
+def normalize_resp_party_relationship(value: Any) -> Any:
+    """Fold a ``resp_party_rel`` key, code or label to the canonical code."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return _REL_ALIASES.get(text.lower(), text)
+
+
+# ── Middle name / initial (GAP-AP-19) ────────────────────────────────────────
+def fold_middle_name(payload: dict[str, Any], *, existing: Any = None) -> None:
+    """Keep ``middle_initial`` in step with ``middle_name`` in place.
+
+    Legacy screens, letters (``#PAT_MID_INITIAL#``) and the migrated data all
+    read the initial, so it must not go blank the moment a practice starts
+    entering full names: a write that carries ``middle_name`` and no explicit
+    ``middle_initial`` derives the initial from it. An explicit initial always
+    wins — it may legitimately differ (``"Jr."`` conventions, two middle names).
+    Clearing the name clears a derived initial only when the stored initial
+    was the name's own first letter, so a hand-typed initial survives.
+    """
+    if "middle_name" not in payload or "middle_initial" in payload:
+        return
+    name = payload.get("middle_name")
+    name = str(name).strip() if name is not None else ""
+    if name:
+        payload["middle_initial"] = name[0].upper()
+        return
+    stored_name = str(getattr(existing, "middle_name", None) or "").strip()
+    stored_initial = str(getattr(existing, "middle_initial", None) or "").strip()
+    if stored_name and stored_initial and stored_initial.upper() == stored_name[0].upper():
+        payload["middle_initial"] = None
+
 
 def _label(code: str) -> str:
     """Human label for a patient-type code, for error messages."""
@@ -178,6 +233,11 @@ def normalize_patient_payload(
     if "patient_types" in out:
         out["patient_types"] = normalize_patient_types(out["patient_types"])
         validate_patient_types(out["patient_types"])
+    if "responsible_party_relationship" in out:
+        out["responsible_party_relationship"] = normalize_resp_party_relationship(
+            out["responsible_party_relationship"]
+        )
+    fold_middle_name(out, existing=existing)
     apply_status_implications(out, existing=existing)
     return out
 
@@ -283,5 +343,15 @@ def published_rules() -> dict[str, Any]:
             ],
             "ranks": list(INSURANCE_RANKS),
             "requires_lower_rank": True,
+        },
+        # GAP-AP-25: the canonical value the column holds is the *code*; keys
+        # and labels are accepted on write and folded. Published so the form
+        # binds the dropdown's value to ``key1`` rather than the description.
+        "responsible_party_relationship": {
+            "field": "responsible_party_relationship",
+            "canonical": "key1",
+            "definition_group": "resp_party_rel",
+            "self_code": RESP_PARTY_REL_SELF,
+            "codes": [{"code": c, "label": lbl} for c, lbl in RESP_PARTY_RELATIONSHIPS],
         },
     }

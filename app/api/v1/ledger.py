@@ -13,6 +13,13 @@ from app.services import ledger_service
 
 router = APIRouter(prefix="/patients", tags=["Billing"], dependencies=[Depends(get_current_user)])
 
+# PRINT-3: the feeds compute the whole window in memory and only *slice* it per
+# page, so a larger page costs serialisation, not another query. 500 forced a
+# client that does not page to print a truncated statement; 5,000 covers every
+# migrated account in one call (the 99th percentile is far below it), and
+# ``page`` still walks anything longer.
+MAX_FEED_SIZE = 5000
+
 
 @router.get(
     "/{patient_id}/ledger",
@@ -37,7 +44,7 @@ def get_ledger(
     ] = "date",
     sort_order: Annotated[Literal["asc", "desc"], Query()] = "asc",
     page: Annotated[int, Query(ge=1)] = 1,
-    size: Annotated[int, Query(ge=1, le=500)] = 50,
+    size: Annotated[int, Query(ge=1, le=MAX_FEED_SIZE)] = 50,
 ):
     return ledger_service.get_patient_ledger(
         db, patient_id, tenant_id, date_from=date_from, date_to=date_to,
@@ -88,7 +95,7 @@ def get_account_ledger(
     ] = "date",
     order: Annotated[Literal["asc", "desc"], Query()] = "asc",
     page: Annotated[int, Query(ge=1)] = 1,
-    size: Annotated[int, Query(ge=1, le=500)] = 50,
+    size: Annotated[int, Query(ge=1, le=MAX_FEED_SIZE)] = 50,
 ):
     return ledger_service.get_account_ledger(
         db, patient_id, tenant_id, scope=scope, date_from=date_from, date_to=date_to,

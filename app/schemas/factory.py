@@ -18,8 +18,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, create_model
-from sqlalchemy import JSON
+from pydantic import BaseModel, Field, create_model
+from sqlalchemy import JSON, String, Text
 from sqlalchemy import inspect as sa_inspect
 
 from app.core.datetimes import UtcDatetime
@@ -27,6 +27,22 @@ from app.schemas.common import ORMModel
 
 # Columns the API manages itself; never part of a client write payload.
 _WRITE_EXCLUDE = {"created_at", "updated_at", "created_by", "updated_by", "tenant_id", "legacy_id"}
+
+
+def _write_constraints(col) -> dict:  # noqa: ANN001
+    """Validation the write schemas inherit from the column definition.
+
+    LAB-6 (and RX-2 before it): a ``String(100)`` column used to accept any
+    length at the schema layer and fail in the DB driver, which surfaced as a
+    **500** ``internal_error`` with no field name. The length is on the mapped
+    column already — carrying it onto Create/Update turns that into a 422 that
+    names the field. ``Text`` (and an unbounded ``String``) stays unconstrained.
+    Reads are deliberately untouched: a read never rejects stored data.
+    """
+    ctype = col.type
+    if isinstance(ctype, String) and not isinstance(ctype, Text) and ctype.length:
+        return {"max_length": int(ctype.length)}
+    return {}
 
 
 def _py_type(col) -> type:  # noqa: ANN001
@@ -72,13 +88,18 @@ def build_schemas(
         if key in _WRITE_EXCLUDE:
             continue
 
+        constraints = _write_constraints(col)
+
         if key not in create_exclude and not is_auto_pk:
             has_default = col.default is not None or col.server_default is not None
             required = (not nullable) and not has_default
-            create_fields[key] = (pytype, ...) if required else (Optional[pytype], None)
+            if required:
+                create_fields[key] = (pytype, Field(..., **constraints))
+            else:
+                create_fields[key] = (Optional[pytype], Field(None, **constraints))
 
         if not col.primary_key and key not in update_exclude:
-            update_fields[key] = (Optional[pytype], None)
+            update_fields[key] = (Optional[pytype], Field(None, **constraints))
 
     read_model = create_model(f"{name}Read", __base__=ORMModel, **read_fields)
     create_model_cls = create_model(f"{name}Create", **create_fields)

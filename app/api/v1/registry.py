@@ -27,10 +27,12 @@ from app.services.enrich_service import (
     enrich_patient_procedure,
     enrich_patient_provider,
     enrich_payment_plan,
+    enrich_office,
     enrich_provider,
     enrich_treatment_plan,
 )
 from app.services.billing_service import LedgerInsuranceDetailCRUD
+from app.services.claim_form_service import InsuranceClaimCRUD
 from app.services.insurance_plan_service import (
     InsuranceCoverageRuleCRUD,
     InsurancePlanFrequencyGroupCRUD,
@@ -40,11 +42,24 @@ from app.services.insurance_service import (
     InsuranceCarrierCRUD,
     InsurancePlanCRUD,
 )
+# EDIT-PLAN-3/4/5: the affected-treatment-plans filter, the subscriber read
+# that names the plan's group number, and the plan write permissions.
+from app.services import permission_service
+from app.services.enrich_service import enrich_insurance_subscriber
+from app.services.treatment_service import TreatmentPlanCRUD
+from app.schemas.insurance import (
+    InsuranceSubscriberCreate,
+    InsuranceSubscriberRead,
+    InsuranceSubscriberUpdate,
+)
+from app.schemas.prescription import PrescriptionCreate, PrescriptionRead, PrescriptionUpdate
+from app.services.prescription_service import PrescriptionCRUD
 from app.services.medical_history_service import (
     PatientMedicalAlertCRUD,
     PatientQuestionnaireResponseCRUD,
     enrich_medical_alerts,
     enrich_questionnaire_responses,
+    PatientAlertCRUD,
 )
 from app.services.patient_procedure_service import PatientProcedureCRUD
 from app.services.payment_plan_service import PaymentPlanCRUD
@@ -63,10 +78,32 @@ from app.schemas.sms import (
     SmsTemplateUpdate,
 )
 from app.services.patient_service import PatientCRUD, PatientInsuranceCRUD
-from app.services.perio_service import attach_actor_names
+from app.services.perio_service import PerioExamCRUD, PerioExamDetailCRUD, attach_actor_names
+from app.services.prescription_library_service import PrescriptionLibraryCRUD
+from app.services.note_macro_service import NoteMacroCRUD, enrich_note_macros
+from app.schemas.progress_notes import NoteMacroCreate, NoteMacroRead, NoteMacroUpdate
+from app.schemas.procedure_setup import (
+    PrescriptionLibraryCreate,
+    PrescriptionLibraryRead,
+    PrescriptionLibraryUpdate,
+)
 from app.services.progress_notes_service import ProgressNoteCRUD, enrich_progress_notes
 from app.services.procedure_rules_service import ProcedureTemplateCRUD
-from app.services.treatment_service import TreatmentPlanItemCRUD, enrich_treatment_plan_item
+from app.services.treatment_service import (
+    TreatmentPlanInsuranceDetailCRUD,
+    TreatmentPlanItemCRUD,
+    enrich_treatment_plan_item,
+)
+from app.services.appointment_service import AppointmentCRUD, AppointmentProcedureCRUD
+from app.schemas.appointment import (
+    AppointmentCreate,
+    AppointmentRead,
+    AppointmentUpdate,
+    LabCreate,
+    LabRead,
+    LabUpdate,
+)
+from app.services.lab_tracking_service import LabCRUD, enrich_appointments
 from app.schemas.fee_schedule import (
     FeeScheduleCreate,
     FeeScheduleRead,
@@ -104,6 +141,7 @@ from app.schemas.perio import (
     PerioExamUpdate,
 )
 from app.schemas.enriched import (
+    OfficeRead,
     InsuranceClaimCreate,
     InsuranceClaimRead,
     InsuranceClaimUpdate,
@@ -223,13 +261,26 @@ def _cfg(
 # PROV-3: built once so the OpenAPI components ``ProviderCreate``/``ProviderUpdate``
 # are defined exactly once (the read is the enriched one from schemas.enriched).
 _PROVIDER_CREATE, _PROVIDER_UPDATE, _ = build_schemas(m.Provider, "Provider")
+_OFFICE_CREATE, _OFFICE_UPDATE, _ = build_schemas(m.Office, "Office")
 
 # ── Organisation ───────────────────────────────────────────────────────────
 _ORG = [
     _cfg(m.Tenant, "Tenant", "tenants", "Organization", "tenant", "tenants",
          search=("name", "code"), filters=("is_active",)),
-    _cfg(m.Office, "Office", "offices", "Organization", "office", "offices",
-         search=("name", "office_code", "city"), filters=("is_active",)),
+    # PRINT-2: ``OfficeRead`` carries the resolved print branding (logo_url +
+    # letterhead) so a printed header needs no second lookup.
+    CrudConfig(
+        model=m.Office,
+        create_schema=_OFFICE_CREATE,
+        update_schema=_OFFICE_UPDATE,
+        read_schema=OfficeRead,
+        prefix="offices", tag="Organization",
+        singular="office", plural="offices",
+        search_fields=("name", "office_code", "city"),
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("is_active",),
+        read_enrich=enrich_office,
+    ),
     # PROV-1: ProviderCRUD widens ``?office_id=`` to the provider_offices join ∪ the
     # legacy home-office scalar — a provider serves many offices, so the scalar
     # alone returned an empty list for most offices.
@@ -277,12 +328,17 @@ _PATIENTS = [
         search_fields=("first_name", "last_name", "chart_no", "email", "phone",
                        "cell_phone", "work_phone"),
         sortable_fields=("created_at", "id", "last_name", "first_name", "dob"),
+        # PT-SEARCH-1/2: ``legacy_id`` (exact, trimmed — resolved by PatientCRUD)
+        # and ``id`` are list filters so a Patient-ID / Legacy-ID search shares
+        # the paged + office/active-filtered code path of every other mode;
+        # ``?ids=`` is the batch form.
         filter_fields=("home_office_id", "is_active", "preferred_provider_id", "chart_no",
                        "dob", "ssn", "medicaid_id", "email", "phone", "gender",
                        "patient_type", "responsible_party_id", "preferred_hygienist_id",
-                       "fee_schedule_id"),
+                       "fee_schedule_id", "legacy_id", "id"),
         range_fields=("created_at", "dob"),
         default_sort="created_at",
+        id_in_param=True,
         crud_class=PatientCRUD,
         read_enrich=enrich_patient_office,  # LEG-16: home_office_name/code
     ),
@@ -295,8 +351,20 @@ _PATIENTS = [
          filters=("patient_id", "insurance_type", "ins_plan_id",
                   "legacy_plan_type", "is_active"),
          crud_class=PatientInsuranceCRUD),
-    _cfg(m.PatientAlert, "PatientAlert", "patient-alerts", "Patients",
-         "patient_alert", "patient_alerts", filters=("patient_id", "is_active")),
+    # MA-2: ``?patient_ids=`` bulk read; PatientAlertCRUD scopes tenancy through
+    # the owning patient (the table has no tenant_id column).
+    CrudConfig(
+        model=m.PatientAlert,
+        create_schema=build_schemas(m.PatientAlert, "PatientAlert")[0],
+        update_schema=build_schemas(m.PatientAlert, "PatientAlert")[1],
+        read_schema=build_schemas(m.PatientAlert, "PatientAlert")[2],
+        prefix="patient-alerts", tag="Patients",
+        singular="patient_alert", plural="patient_alerts",
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("patient_id", "is_active"),
+        extra_filters=(("patient_ids", str),),
+        crud_class=PatientAlertCRUD,
+    ),
     _cfg(m.AccountNote, "AccountNote", "account-notes", "Patients",
          "account_note", "account_notes", filters=("patient_id",), soft_field=None),
     # MH-6/MH-7: ``signature_type`` separates a medical-history signature from a
@@ -316,8 +384,11 @@ _PATIENTS = [
         singular="patient_signature", plural="patient_signatures",
         sortable_fields=_DEFAULT_SORT,
         filter_fields=("patient_id", "signature_type", "is_user_sig", "is_active",
-                       "content_hash", "device_source", "progress_note_id", "consent_id"),
-        extra_filters=(("include_image", bool),),
+                       "content_hash", "device_source", "progress_note_id", "consent_id",
+                       "claim_id", "signer_provider_id"),
+        # SIG-9 follow-up: ``signature_types=a,b`` + ``latest_per_type=true`` let the
+        # claim pre-flight fetch the three on-file rows in one small call.
+        extra_filters=(("include_image", bool), ("signature_types", str), ("latest_per_type", bool)),
         soft_delete_field="is_active", soft_delete_value=False,
         crud_class=PatientSignatureCRUD,
         read_enrich=enrich_patient_signatures,
@@ -334,6 +405,8 @@ _PATIENTS = [
         singular="patient_consent", plural="patient_consents",
         sortable_fields=_DEFAULT_SORT,
         filter_fields=("patient_id", "plan_id", "template_id", "status", "signature_method"),
+        # CS-5: ``?include_signature=false`` keeps the history grid light.
+        extra_filters=(("include_signature", bool),),
         soft_delete_field="is_deleted", soft_delete_value=True,
         crud_class=PatientConsentCRUD,
         read_enrich=enrich_patient_consents,
@@ -385,6 +458,7 @@ _PATIENTS = [
         prefix="patient-medical-alerts", tag="Patients",
         singular="patient_medical_alert", plural="patient_medical_alerts",
         filter_fields=("patient_id", "alert_code", "response", "is_active"),
+        extra_filters=(("patient_ids", str),),
         default_sort="created_at",
         crud_class=PatientMedicalAlertCRUD,
         read_enrich=enrich_medical_alerts,
@@ -498,12 +572,25 @@ _INSURANCE = [
         default_sort="created_at",
         crud_class=InsurancePlanCRUD,
         read_enrich=enrich_insurance_plan,
+        # EDIT-PLAN-5: POST / PATCH / DELETE need a plan full-control right.
+        write_permissions=permission_service.INSURANCE_PLAN_WRITE,
     ),
-    _cfg(m.InsuranceSubscriber, "InsuranceSubscriber", "insurance-subscribers", "Insurance",
-         "insurance_subscriber", "insurance_subscribers",
-         search=("sub_first_name", "sub_last_name", "sub_member_id"),
-         # INS-11: elig_status (+ office_id) filter so verification queues are countable.
-         filters=("ins_plan_id", "subscriber_patient_id", "office_id", "elig_status", "is_active")),
+    # EDIT-PLAN-4: the read carries the plan's group number + whether the
+    # subscriber's (card) value agrees with it.
+    CrudConfig(
+        model=m.InsuranceSubscriber,
+        create_schema=InsuranceSubscriberCreate,
+        update_schema=InsuranceSubscriberUpdate,
+        read_schema=InsuranceSubscriberRead,
+        prefix="insurance-subscribers", tag="Insurance",
+        singular="insurance_subscriber", plural="insurance_subscribers",
+        search_fields=("sub_first_name", "sub_last_name", "sub_member_id"),
+        sortable_fields=_DEFAULT_SORT,
+        # INS-11: elig_status (+ office_id) filter so verification queues are countable.
+        filter_fields=("ins_plan_id", "subscriber_patient_id", "office_id", "elig_status", "is_active"),
+        default_sort="created_at",
+        read_enrich=enrich_insurance_subscriber,
+    ),
     # PLAN-DTL-2/5/9: typed limits, tenant scoping through the plan (the table
     # has no tenant_id), Modified On/By, and the FREQGRP-shape refusal.
     CrudConfig(
@@ -517,6 +604,7 @@ _INSURANCE = [
         filter_fields=("ins_plan_id", "category", "start_code"),
         soft_delete_field=None,
         crud_class=InsuranceCoverageRuleCRUD,
+        write_permissions=permission_service.INSURANCE_PLAN_WRITE,
     ),
     # PLAN-DTL-2: the FREQ LIMITATION CODE GRP tab as a real resource.
     CrudConfig(
@@ -530,6 +618,7 @@ _INSURANCE = [
         filter_fields=("ins_plan_id", "code_group", "whole_mouth"),
         soft_delete_field=None,
         crud_class=InsurancePlanFrequencyGroupCRUD,
+        write_permissions=permission_service.INSURANCE_PLAN_WRITE,
     ),
 ]
 
@@ -578,13 +667,46 @@ _CODES = [
          soft_field=None, crud_class=ProcedureTemplateCRUD),
     _cfg(m.ChartMaterial, "ChartMaterial", "chart-materials", "Procedures",
          "chart_material", "chart_materials", search=("name",), soft_field=None),
-    _cfg(m.NoteMacro, "NoteMacro", "note-macros", "Procedures",
-         "note_macro", "note_macros", search=("name", "category"),
-         # NM-1: server-side "Select Macro Category" filter (was client-side only).
-         filters=("category",), soft_field=None),
-    _cfg(m.PrescriptionLibrary, "PrescriptionLibrary", "prescription-library", "Procedures",
-         "prescription_library_item", "prescription_library", search=("drug_name",),
-         filters=("is_active",)),
+    # NM-1: server-side "Select Macro Category" filter. NM-6: name/category
+    # sortable (the documented ?sort=name was silently falling back to id order).
+    # NM-3: created_by_name / updated_by_name on the read. NM-5: NoteMacroCRUD is
+    # the duplicate authority (409 duplicate_note_macro + override). Supplements
+    # (/categories, /limits, /availability) live on progress_notes.macro_router.
+    CrudConfig(
+        model=m.NoteMacro,
+        create_schema=NoteMacroCreate,
+        update_schema=NoteMacroUpdate,
+        read_schema=NoteMacroRead,
+        prefix="note-macros", tag="Procedures",
+        singular="note_macro", plural="note_macros",
+        search_fields=("name", "category"),
+        sortable_fields=_DEFAULT_SORT + ("name", "category"),
+        filter_fields=("category",),
+        default_sort="created_at",
+        soft_delete_field=None,
+        crud_class=NoteMacroCRUD,
+        # PN-6: actor names + category_label (NOTESMACROS code -> description).
+        read_enrich=enrich_note_macros,
+    ),
+    # RX-1/2/4 (Prescriptions Setup): the read carries created_by_name /
+    # updated_by_name ("Modified By: DRLI"); PrescriptionLibraryCRUD is the
+    # server-side duplicate authority (409 duplicate_prescription + override)
+    # and the 240-char sig cap. Supplements (/limits, /availability) live in
+    # api/v1/prescription_library.py.
+    CrudConfig(
+        model=m.PrescriptionLibrary,
+        create_schema=PrescriptionLibraryCreate,
+        update_schema=PrescriptionLibraryUpdate,
+        read_schema=PrescriptionLibraryRead,
+        prefix="prescription-library", tag="Procedures",
+        singular="prescription_library_item", plural="prescription_library",
+        search_fields=("drug_name",),
+        sortable_fields=_DEFAULT_SORT + ("drug_name",),
+        filter_fields=("is_active",),
+        default_sort="created_at",
+        crud_class=PrescriptionLibraryCRUD,
+        read_enrich=attach_actor_names,
+    ),
     # Auxiliary code tables (Setup -> Procedure Codes). AUX-3 POS is tenant-scoped;
     # AUX-4 ICD is a global catalog (like procedure_codes) — paginated + searchable.
     _cfg(m.PlaceOfServiceCode, "PlaceOfServiceCode", "place-of-service-codes", "Procedures",
@@ -608,13 +730,52 @@ _CODES = [
 
 # ── Scheduling ─────────────────────────────────────────────────────────────
 _SCHEDULING = [
-    _cfg(m.Appointment, "Appointment", "appointments", "Appointments",
-         "appointment", "appointments", pk_type=str,
-         search=("procedure_label", "notes"), sortable=("date", "start_time", "created_at"),
-         # PO-5: is_archived filter so archived + active appts aren't returned interleaved.
-         filters=("patient_id", "provider_id", "operatory_id", "office_id", "date",
-                  "status", "is_archived"),
-         ranges=("date",), soft_field="is_archived", soft_value=True),
+    # Lab Tracking (LAB-1..11): hand-written Create/Update carry the lab-field
+    # constraints (lab_dds length, lab_cost range/precision) + extra="forbid";
+    # the read adds lab_vendor_name / lab_status; the list gains the lab filters
+    # and hides soft-deleted rows by default (LAB-11 — the same shape as
+    # appointment-procedures, so a deleted lab case stops reappearing).
+    CrudConfig(
+        model=m.Appointment,
+        create_schema=AppointmentCreate,
+        update_schema=AppointmentUpdate,
+        read_schema=AppointmentRead,
+        prefix="appointments", tag="Appointments",
+        singular="appointment", plural="appointments", pk_type=str,
+        search_fields=("procedure_label", "notes"),
+        sortable_fields=("date", "start_time", "created_at", "updated_at",
+                         "lab_sent_on", "lab_due_on", "lab_received_on", "lab_cost"),
+        # PO-5: is_archived filter so archived + active appts aren't returned interleaved.
+        # LAB-2: has_lab / lab_vendor_id / lab_short_notice (+ the three lab date
+        # ranges below and the derived lab_status).
+        filter_fields=("patient_id", "provider_id", "operatory_id", "office_id", "date",
+                       "status", "is_archived", "treatment_plan_id", "has_lab",
+                       "lab_vendor_id", "lab_short_notice"),
+        range_fields=("date", "lab_sent_on", "lab_due_on", "lab_received_on"),
+        extra_filters=(("lab_status", str),),
+        default_sort="created_at",
+        soft_delete_field="is_archived", soft_delete_value=True,
+        hide_soft_deleted=True,
+        # PLAN-APPT-1: cancel / archive / restore releases or re-books the plan
+        # items the appointment's lines point at. LAB-1/8/9: lab write rules.
+        crud_class=AppointmentCRUD,
+        read_enrich=enrich_appointments,
+    ),
+    # LAB-1: the dental-lab vendor catalog behind appointments.lab_vendor_id.
+    CrudConfig(
+        model=m.Lab,
+        create_schema=LabCreate,
+        update_schema=LabUpdate,
+        read_schema=LabRead,
+        prefix="labs", tag="Appointments", singular="lab", plural="labs",
+        search_fields=("name", "code", "contact_name", "phone", "email", "city"),
+        sortable_fields=("name", "code", "city", "created_at", "updated_at"),
+        filter_fields=("office_id", "is_active"),
+        default_sort="created_at",
+        id_in_param=True,
+        crud_class=LabCRUD,
+        read_enrich=attach_actor_names,
+    ),
     # APPT-PROC-4: DELETE soft-archives the line, so the default listing must hide
     # archived rows (hide_soft_deleted) — otherwise a removed procedure comes back
     # on the next load and every client has to filter. ``?is_archived=true`` still
@@ -622,8 +783,11 @@ _SCHEDULING = [
     _cfg(m.AppointmentProcedure, "AppointmentProcedure", "appointment-procedures", "Appointments",
          "appointment_procedure", "appointment_procedures",
          filters=("appointment_id", "procedure_code", "provider_id", "treatment_plan_id",
-                  "status", "is_archived"),
-         soft_field="is_archived", soft_value=True, hide_soft_deleted=True),
+                  "treatment_plan_item_id", "status", "is_archived"),
+         soft_field="is_archived", soft_value=True, hide_soft_deleted=True,
+         # PLAN-APPT-2: a line carrying treatment_plan_item_id books that item
+         # (status -> scheduled) and inherits what the item knows.
+         crud_class=AppointmentProcedureCRUD),
     # AppointNow reason catalog (Setup surface for the online-booking reasons that
     # drive chair-time duration). The public AN-1/AN-3 endpoints read it directly;
     # this generic CRUD lets staff customise it per office.
@@ -645,8 +809,11 @@ _TREATMENT = [
         singular="treatment_plan", plural="treatment_plans", pk_type=str,
         search_fields=("name",),
         filter_fields=("patient_id", "office_id", "status"),
+        # EDIT-PLAN-3: ``?ins_plan_id=`` — the plans a coverage edit re-prices.
+        extra_filters=(("ins_plan_id", int),),
         soft_delete_field=None, default_sort="created_at",
         read_enrich=enrich_treatment_plan,
+        crud_class=TreatmentPlanCRUD,
     ),
     # Items: custom schemas add phase_id/dates/provider_id/discount + status enum
     # (PLAN-1/2/5/10); is_archived soft-delete (PLAN-14) via TreatmentPlanItemCRUD,
@@ -660,10 +827,14 @@ _TREATMENT = [
         prefix="treatment-plan-items", tag="Treatment Plans",
         singular="treatment_plan_item", plural="treatment_plan_items",
         pk_type=str,
-        sortable_fields=("priority", "created_at"),
+        sortable_fields=("priority", "created_at", "diagnosed_date", "scheduled_date"),
         filter_fields=("plan_id", "procedure_code", "status", "phase_id",
-                       "provider_id", "is_archived", "tooth", "material_id"),
+                       "provider_id", "is_archived", "tooth", "material_id",
+                       "counselor_user_id", "referral_id", "fee_schedule_id"),
         soft_delete_field="is_archived", soft_delete_value=True,
+        # PLAN-24: a deleted procedure must not come back on the next load.
+        # ``?is_archived=true`` still surfaces the tombstones on purpose.
+        hide_soft_deleted=True,
         default_sort="created_at",
         # PROC-INT-1: `procedure_id` = the live charge fulfilling the item.
         read_enrich=enrich_treatment_plan_item,
@@ -722,9 +893,12 @@ _CLINICAL = [
         read_enrich=enrich_progress_notes,
         crud_class=ProgressNoteCRUD,
     ),
-    # Perio exam header. Custom Read embeds resolved actor names (PERIO-BE-6);
-    # is_voided soft-delete (PERIO-BE-3) + is_voided filter so the Date-of-Service
-    # list can exclude voided; exam_date range filter (PERIO-BE-9).
+    # Perio exam header. Custom Read embeds resolved actor + provider names
+    # (PERIO-BE-6/14); is_voided soft-delete (PERIO-BE-3) + is_voided filter so
+    # the Date-of-Service list can exclude voided; exam_date range filter
+    # (PERIO-BE-9) — ``date_from``/``date_to`` are aliases the FE probed for,
+    # resolved by PerioExamCRUD, which also scopes tenancy through the patient
+    # (the table has no tenant_id) and validates ``provider_id``.
     CrudConfig(
         model=m.PerioExam,
         create_schema=PerioExamCreate,
@@ -733,15 +907,20 @@ _CLINICAL = [
         prefix="perio-exams", tag="Clinical",
         singular="perio_exam", plural="perio_exams",
         sortable_fields=("exam_date", "created_at"),
-        filter_fields=("patient_id", "office_id", "is_voided"),
+        filter_fields=("patient_id", "office_id", "provider_id", "is_voided"),
         range_fields=("exam_date",),
+        extra_filters=(("date_from", _date), ("date_to", _date)),
         soft_delete_field="is_voided", soft_delete_value=True,
         default_sort="exam_date",
         read_enrich=attach_actor_names,
+        crud_class=PerioExamCRUD,
     ),
     # Per-tooth detail. Custom Create/Update enforce clinical value ranges
     # (PERIO-BE-7); Read carries audit cols + names (PERIO-BE-5). One row per
     # tooth is enforced by the (exam_id, tooth_no) unique constraint (PERIO-BE-1).
+    # ``?exam_ids=1,2,3`` (PERIO-BE-15) fetches several exams' rows in one call
+    # — a repeated ``exam_id`` key was last-wins. PerioExamDetailCRUD scopes
+    # tenancy through exam -> patient.
     CrudConfig(
         model=m.PerioExamDetail,
         create_schema=PerioExamDetailCreate,
@@ -752,12 +931,26 @@ _CLINICAL = [
         sortable_fields=("id", "tooth_no", "created_at"),
         default_sort="id",
         filter_fields=("exam_id", "tooth_no"),
+        extra_filters=(("exam_ids", str),),
         soft_delete_field=None,
         read_enrich=attach_actor_names,
+        crud_class=PerioExamDetailCRUD,
     ),
-    _cfg(m.Prescription, "Prescription", "prescriptions", "Clinical",
-         "prescription", "prescriptions", search=("drug_name",),
-         filters=("patient_id", "provider_id", "is_active")),
+    # MA-5: PrescriptionCRUD runs the drug<->medical-alert check on create (409
+    # ``prescription_alert_conflict`` unless ``alerts_acknowledged``) and persists
+    # which alerts were on file; the read carries the acknowledgement block.
+    CrudConfig(
+        model=m.Prescription,
+        create_schema=PrescriptionCreate,
+        update_schema=PrescriptionUpdate,
+        read_schema=PrescriptionRead,
+        prefix="prescriptions", tag="Clinical",
+        singular="prescription", plural="prescriptions",
+        search_fields=("drug_name",),
+        sortable_fields=_DEFAULT_SORT,
+        filter_fields=("patient_id", "provider_id", "is_active"),
+        crud_class=PrescriptionCRUD,
+    ),
     # Per-user perio prefs. See /perio-chart-settings/me (PERIO-BE-11) for the
     # token-resolved, self-seeding convenience accessor.
     CrudConfig(
@@ -825,6 +1018,10 @@ _BILLING = [
                        "office_id", "is_active"),
         range_fields=("submitted_date", "paid_date", "created_at"),
         default_sort="created_at", read_enrich=enrich_patient_carrier,
+        # ADA-BE-9/12: defaults treating/billing provider, office, plan, carrier
+        # and the "other" plan at creation (``procedure_ids`` links the lines in
+        # the same transaction) and validates the fill-out vocabulary on PATCH.
+        crud_class=InsuranceClaimCRUD,
     ),
     _cfg(m.ClaimSubmission, "ClaimSubmission", "claim-submissions", "Billing",
          "claim_submission", "claim_submissions", filters=("claim_id", "batch_id"), soft_field=None),
@@ -931,12 +1128,16 @@ _REFERENCE = [
     _cfg(m.CariesRiskAssessment, "CariesRiskAssessment", "caries-risk-assessments", "Clinical",
          "caries_risk_assessment", "caries_risk_assessments",
          filters=("patient_id", "risk_level"), soft_field=None),
-    # is_archived filterable so the list can exclude archived rows (PLAN-13).
+    # is_archived filterable so the list can exclude archived rows (PLAN-13);
+    # PLAN-24: archived rows are hidden from the default listing. PLAN-9:
+    # preauth_status normalised + stamped, and tenancy scoped through the item
+    # (the table has no tenant_id) by TreatmentPlanInsuranceDetailCRUD.
     _cfg(m.TreatmentPlanInsuranceDetail, "TreatmentPlanInsuranceDetail",
          "treatment-plan-insurance-details", "Treatment Plans",
          "treatment_plan_insurance_detail", "treatment_plan_insurance_details",
-         filters=("plan_item_id", "ins_plan_id", "is_archived"),
-         soft_field="is_archived", soft_value=True),
+         filters=("plan_item_id", "ins_plan_id", "is_archived", "preauth_status"),
+         soft_field="is_archived", soft_value=True, hide_soft_deleted=True,
+         crud_class=TreatmentPlanInsuranceDetailCRUD),
 ]
 
 # ── Communications ─────────────────────────────────────────────────────────

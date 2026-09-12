@@ -8,6 +8,7 @@ from typing import Any, Optional
 from pydantic import BaseModel
 
 from app.schemas.common import ORMModel
+from app.core.datetimes import UtcDatetime
 
 
 class UtilityRunRequest(BaseModel):
@@ -26,8 +27,8 @@ class UtilityRunRead(ORMModel):
     succeeded: int
     failed: int
     logs: Optional[list[str]] = None
-    created_at: datetime
-    finished_at: Optional[datetime] = None
+    created_at: UtcDatetime
+    finished_at: Optional[UtcDatetime] = None
 
 
 class UtilityAuditList(BaseModel):

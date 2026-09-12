@@ -8,6 +8,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
+from app.core.datetimes import UtcDatetime
 
 
 class AllocationLine(BaseModel):
@@ -208,9 +209,9 @@ class AccountLedgerRow(BaseModel):
     user_label: str | None = Field(
         None, description="AL-10: the poster — live user short_id/username, else the legacy login"
     )
-    created_at: datetime | None = None
+    created_at: UtcDatetime | None = None
     # AL-13: the Modified By/On pair the Edit Treatment / Edit Payment windows need.
-    updated_at: datetime | None = None
+    updated_at: UtcDatetime | None = None
     updated_by: int | None = None
     updated_by_label: str | None = None
     charge: Decimal = Field(Decimal("0"), description="Debit magnitude, always >= 0")

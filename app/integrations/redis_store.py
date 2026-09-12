@@ -24,13 +24,27 @@ logger = get_logger(__name__)
 # this, an outage makes every balance/ledger/reports request re-pay the full
 # connect timeout. ``_reset_client`` (runtime op failures) bypasses the cooldown
 # so a transient blip recovers immediately on the next call.
-_UNAVAILABLE_COOLDOWN = 30.0
+_UNAVAILABLE_COOLDOWN = 60.0
+
+
+def _no_retry():
+    """MA-8: redis-py >= 6 retries a failed *connect* three times with
+    exponential back-off by default (``Retry(ExponentialWithJitterBackoff(base=1,
+    cap=10), 3)``), so the 2 s ``socket_connect_timeout`` below became a measured
+    **19-22 s** stall whenever Redis is enabled but not running — paid by whichever
+    request came first after each cooldown (a 56 s login, a 25 s scheduler feed).
+    One attempt, no back-off: a dead Redis costs at most one connect timeout per
+    cooldown window."""
+    return Retry(NoBackoff(), 0) if Retry is not None else None
 
 try:  # pragma: no cover - import guard
     import redis as _redis
+    from redis.backoff import NoBackoff
     from redis.exceptions import RedisError
+    from redis.retry import Retry
 except ImportError:  # pragma: no cover
     _redis = None  # type: ignore[assignment]
+    NoBackoff = Retry = None  # type: ignore[assignment]
 
     class RedisError(Exception):  # type: ignore[no-redef]
         """Fallback when redis isn't installed."""
@@ -59,6 +73,7 @@ def _get_client():
                 socket_connect_timeout=2,
                 socket_timeout=2,
                 retry_on_timeout=False,
+                retry=_no_retry(),
                 health_check_interval=30,
             )
             _client.ping()
@@ -298,6 +313,7 @@ def health() -> dict[str, object]:
             decode_responses=True,
             socket_connect_timeout=2,
             socket_timeout=2,
+            retry=_no_retry(),
         )
         client.set("dentc:health:probe", "ok", ex=10)
         value = client.get("dentc:health:probe")

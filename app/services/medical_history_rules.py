@@ -34,6 +34,8 @@ from __future__ import annotations
 from typing import Any
 
 from app.core.exceptions import ValidationError
+from app.schemas.patient_catalog import CATALOG_CODE_MAX_LENGTH as _STORAGE_MAX_LENGTH
+from app.services import medical_history_catalog as _catalog
 from app.services.medical_history_catalog import to_code
 
 #: The "I have no allergies at all" row. Yes here excludes any *specific*
@@ -157,6 +159,11 @@ def published_rules() -> dict[str, Any]:
         "code_convention": {
             "derivation": "lowercase, non-alphanumeric runs -> '_', trimmed",
             "example": {"label": "Latex Rubber", "code": "latex_rubber"},
+            # GAP-AP-20: the derivation cap the frontend's ``toCode`` must use
+            # (answers are keyed by the derived code, so both sides must agree)
+            # and the wider storage bound the write schemas enforce as a 422.
+            "max_length": _catalog.CODE_MAX_LENGTH,
+            "storage_max_length": _STORAGE_MAX_LENGTH,
         },
         "emergency_contact_authority": "patient_emergency_contacts",
     }

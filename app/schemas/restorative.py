@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from app.db import models as m
 from app.schemas.common import ORMModel
 from app.schemas.factory import build_schemas
+from app.core.datetimes import UtcDatetime
 
 # Distinct-name read schemas (avoid clashing with the generic CRUD components).
 _ConditionRead = build_schemas(m.ChartCondition, "ChartConditionRow")[2]
@@ -36,7 +37,7 @@ class ChartSettingsRead(ORMModel):
     edentulous: bool = False
     arch_mode: str = "both"
     updated_by: Optional[int] = None
-    updated_at: Optional[datetime] = None
+    updated_at: Optional[UtcDatetime] = None
 
 
 class ChartSettingsUpsert(BaseModel):

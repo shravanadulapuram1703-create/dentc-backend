@@ -120,9 +120,23 @@ def object_key(
 
 
 def absolute_url(path: str) -> str:
-    """Fully-qualify an API path against ``PUBLIC_API_BASE_URL`` when configured."""
-    base = (settings.PUBLIC_API_BASE_URL or "").rstrip("/")
-    return f"{base}{path}" if base else path
+    """Fully-qualify an API path.
+
+    CS-6: the base is the origin the *current request* arrived on (set by
+    ``RequestContextMiddleware``), so a document saved through a local backend
+    links to that backend and one saved through Cloud Run links to Cloud Run.
+    ``PUBLIC_API_BASE_URL`` is only the fallback outside a request (scripts,
+    the SMS reminder job) — it names one environment, and it used to be the
+    only answer, which is how dev viewers ended up pointing at production.
+    """
+    from app.core.logging import request_base_url_ctx  # noqa: PLC0415
+
+    configured = (settings.PUBLIC_API_BASE_URL or "").rstrip("/")
+    if not configured:
+        # Unconfigured deployments keep relative URLs (the client resolves them).
+        return path
+    base = (request_base_url_ctx.get() or configured).rstrip("/")
+    return f"{base}{path}"
 
 
 def content_path(document_id: int) -> str:

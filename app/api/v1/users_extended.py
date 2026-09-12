@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Path, Query, Response, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user, require_roles
 from app.core.exceptions import NotFoundError
@@ -81,8 +82,12 @@ def update_my_profile(db: DbSession, current: CurrentUser, body: UserSelfUpdate)
              responses={422: {"model": ErrorResponse}}, summary="Upload your own avatar (MP-2)")
 async def upload_my_photo(db: DbSession, tenant_id: TenantId, current: CurrentUser,
                           file: Annotated[UploadFile, File()]):
-    user = svc.save_user_image(db, current.id, tenant_id, file.filename or "avatar",
-                               file.content_type or "", await file.read(), updated_by=current.id)
+    data = await file.read()
+    # EDIT-PLAN-7: sync DB + storage work must not run on the event loop.
+    user = await run_in_threadpool(
+        svc.save_user_image, db, current.id, tenant_id, file.filename or "avatar",
+        file.content_type or "", data, updated_by=current.id,
+    )
     return UserImageResult(image_url=user.image_url)
 
 
@@ -186,6 +191,9 @@ def _signature_read(user, *, include_sig_string: bool = False) -> UserSignatureR
         signature_len=user.signature_len, device_source=user.signature_device_source,
         updated_at=user.signature_updated_at,
         signed_at=user.signature_signed_at,
+        capture_method=sig_svc.capture_method_for(
+            user.signature_device_source, has_sig_string=bool(user.signature_sig_string),
+            has_image=bool(user.signature_data) and not sig_svc.looks_like_sigstring(user.signature_data)),
         has_sig_string=bool(user.signature_sig_string),
         # SIG-4: the SigString only on request; decrypted from the at-rest token.
         sig_string=(sig_svc.decrypt_sig_string(user.signature_sig_string)
@@ -318,8 +326,11 @@ def set_security_settings(db: DbSession, tenant_id: TenantId, user_id: Annotated
 async def upload_user_image(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
                             file: Annotated[UploadFile, File()], current: CurrentUser):
     data = await file.read()
-    user = svc.save_user_image(db, user_id, tenant_id, file.filename or "avatar",
-                               file.content_type or "", data, updated_by=current.id)
+    # EDIT-PLAN-7: sync DB + storage work must not run on the event loop.
+    user = await run_in_threadpool(
+        svc.save_user_image, db, user_id, tenant_id, file.filename or "avatar",
+        file.content_type or "", data, updated_by=current.id,
+    )
     return UserImageResult(image_url=user.image_url)
 
 

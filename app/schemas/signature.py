@@ -14,6 +14,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, create_model
 
+from app.core.datetimes import UtcDatetime
 from app.db.models import PatientConsent, PatientSignature, SignatureAuditEvent
 from app.schemas.factory import build_schemas
 
@@ -35,6 +36,8 @@ PatientSignatureRead = create_model(
     legacy_sig_string_in_image=(bool, False),
     # SIG-7: signed | stale | unverifiable | voided | superseded | null (unbound).
     signature_status=(Optional[str], None),
+    # CS-8: topaz | drawn | legacy | unknown, derived from device_source.
+    capture_method=(Optional[str], None),
     created_by_name=(Optional[str], None),
     signed_by_name=(Optional[str], None),
     voided_by_name=(Optional[str], None),
@@ -46,11 +49,49 @@ PatientConsentCreate, PatientConsentUpdate, _ = build_schemas(PatientConsent, "P
 _consent_read_base = build_schemas(
     PatientConsent, "PatientConsentFull", read_exclude=("sig_string",)
 )[2]
+class ConsentSignatureRead(BaseModel):
+    """CS-2: a countersignature line (images only with ``include_image=true``)."""
+
+    id: int
+    consent_id: int
+    role: str
+    signer_user_id: Optional[int] = None
+    signer_provider_id: Optional[str] = None
+    signer_name: Optional[str] = None
+    signed_at: Optional[datetime] = None
+    captured_at: Optional[datetime] = None
+    device_source: Optional[str] = None
+    capture_method: Optional[str] = None
+    has_image: bool = False
+    signature_data: Optional[str] = None
+    signature_len: Optional[int] = None
+    has_sig_string: bool = False
+    sig_format: Optional[str] = None
+    point_count: Optional[int] = None
+    stroke_count: Optional[int] = None
+    device_vendor: Optional[str] = None
+    device_model: Optional[str] = None
+    device_serial: Optional[str] = None
+    captured_user_agent: Optional[str] = None
+    content_hash: Optional[str] = None
+    is_active: bool = True
+    voided_at: Optional[datetime] = None
+    created_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+
+
 PatientConsentRead = create_model(
     "PatientConsentRead", __base__=_consent_read_base,
     has_sig_string=(bool, False),
     # SIG-7: signed | stale | unverifiable | unsigned | declined | voided.
     signature_status=(Optional[str], None),
+    # CS-5: ``?include_signature=false`` strips the image and says so.
+    has_image=(bool, False),
+    image_omitted=(bool, False),
+    # CS-8: the shared capture vocabulary, derived.
+    capture_method=(Optional[str], None),
+    # CS-2: countersign lines (never with images inline).
+    countersigns=(list[ConsentSignatureRead], []),
 )
 
 # ── audit trail (SIG-8) ──────────────────────────────────────────────────────
@@ -75,7 +116,7 @@ class SignatureVectorRead(BaseModel):
     device_vendor: Optional[str] = None
     device_model: Optional[str] = None
     device_serial: Optional[str] = None
-    signed_at: Optional[datetime] = None
+    signed_at: Optional[UtcDatetime] = None
     encrypted_at_rest: bool = False
 
 
@@ -101,6 +142,47 @@ class SignatureCaptureRules(BaseModel):
     sig_string_endpoints: list[str]
     canonical_user_signature_write: str
     document_binding: dict[str, str]
+    capture_methods: list[str]
+    capture_method_rule: str
+    consent_countersign_roles: list[str]
+    consent_signed_at_tolerance_minutes: int
+    consent_content_hash: str
+    consent_signed_rendition: str
+    # Round 2 (SIG-12/13/14/15/16).
+    provider_signature_write: str
+    signature_types: list[str]
+    claim_signature_items: dict[str, list[str]]
+    claim_signature_resolution: list[str]
+    signer_relationships: list[str]
+    item_53_attester: str
+
+
+class ClaimSignatureSlot(BaseModel):
+    """One of the ADA form's three signature lines as resolved for a claim (SIG-16)."""
+
+    signature_id: Optional[int] = None
+    source: Optional[str] = Field(None, description="claim | patient | provider | user | null")
+    signature_type: Optional[str] = None
+    signed_at: Optional[datetime] = None
+    signer_name: Optional[str] = None
+    signer_relationship: Optional[str] = None
+    signer_provider_id: Optional[str] = None
+    signed_by_user_id: Optional[int] = None
+    has_image: bool = False
+    legacy_sig_string_only: bool = Field(
+        False, description="A legacy SigString-only row: on file but not printable"
+    )
+    signature_data: Optional[str] = Field(None, description="Only with include_image=true")
+    printed_name: Optional[str] = None
+
+
+class ClaimSignaturesRead(BaseModel):
+    claim_id: str
+    patient_id: int
+    treating_provider_id: Optional[str] = None
+    item_36: ClaimSignatureSlot
+    item_37: ClaimSignatureSlot
+    item_53: ClaimSignatureSlot
 
 
 class SignatureCaptureFields(BaseModel):
@@ -121,3 +203,37 @@ class SignatureCaptureFields(BaseModel):
     captured_user_agent: Optional[str] = Field(
         None, max_length=255, description="Workstation hint; defaults to the request User-Agent"
     )
+
+
+class ProviderSignatureUpdate(SignatureCaptureFields):
+    """SIG-14: ``PUT /providers/{id}/signature`` — same block as the user store."""
+
+    signature_data: str = Field(..., description="Base64 / data-URL signature image")
+    signature_len: Optional[int] = None
+    device_source: Optional[str] = Field(None, max_length=20, examples=["topaz", "web-pad"])
+    signed_at: Optional[datetime] = None
+
+
+class ProviderSignatureRead(BaseModel):
+    provider_id: str
+    #: provider | user — which store answered (``GET …?resolve=true`` falls back
+    #: to the provider's linked user account).
+    source: Optional[str] = None
+    user_id: Optional[int] = None
+    signature_data: Optional[str] = None
+    signature_len: Optional[int] = None
+    device_source: Optional[str] = None
+    capture_method: Optional[str] = None
+    updated_at: Optional[datetime] = None
+    signed_at: Optional[datetime] = None
+    has_sig_string: bool = False
+    sig_string: Optional[str] = None
+    sig_format: Optional[str] = None
+    sig_compression: Optional[int] = None
+    sig_encryption: Optional[int] = None
+    point_count: Optional[int] = None
+    stroke_count: Optional[int] = None
+    device_vendor: Optional[str] = None
+    device_model: Optional[str] = None
+    device_serial: Optional[str] = None
+    captured_user_agent: Optional[str] = None

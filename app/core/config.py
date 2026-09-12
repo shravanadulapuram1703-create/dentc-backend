@@ -328,6 +328,17 @@ class Settings(BaseSettings):
     # SMS-9: a reminder whose send-by moment is older than this is skipped
     # rather than blasted late after an outage.
     SMS_REMINDER_CATCHUP_HOURS: int = 6
+
+    # ── PROC-7c: supporting-records readiness ───────────────────────────────
+    # A perio chart older than this (months, counted back from the date of
+    # service) no longer satisfies ``requires_perio_chart``. None = any dated
+    # exam on/before the DOS counts. Overridable per call (?perio_max_age_months=).
+    SUPPORTING_RECORDS_PERIO_MAX_AGE_MONTHS: int | None = None
+    # When true, ``POST /insurance-claims/{id}/submit`` is a 422
+    # ``supporting_records_missing`` while any procedure on the claim still
+    # lacks a required record (``allow_missing_records`` overrides per call).
+    # False turns the check into report-only (the readiness endpoints still work).
+    SUPPORTING_RECORDS_ENFORCE_ON_SUBMIT: bool = True
     # SMS-10: retention for message bodies (None = keep). Enforced by
     # ``scripts/purge_sms_messages.py``, never by a request path.
     SMS_RETENTION_DAYS: int | None = None

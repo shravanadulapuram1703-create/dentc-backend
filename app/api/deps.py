@@ -88,6 +88,22 @@ def require_roles(*roles: str):
     return _guard
 
 
+def require_permission(*codes: str, action: str | None = None):
+    """EDIT-PLAN-5: dependency factory guarding an endpoint to callers holding
+    **any** of the permission ``codes`` (``permission_service`` — admins hold
+    everything, a user in no group is ungated). 403 ``permission_denied``
+    names the codes that would have satisfied it."""
+
+    def _guard(db: DbSession, current_user: CurrentUser) -> User:
+        from app.services import permission_service
+
+        perms = permission_service.effective_permissions(db, current_user)
+        permission_service.assert_permission(perms, *codes, action=action)
+        return current_user
+
+    return _guard
+
+
 class Pagination(BaseModel):
     page: int
     size: int

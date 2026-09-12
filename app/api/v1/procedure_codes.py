@@ -20,6 +20,7 @@ from app.schemas.procedure_setup import (
     ProcedureInsuranceRuleRead,
     ProcedureInsuranceRuleUpdate,
 )
+from app.schemas.treatment import EligibleProviderRead, ProcedureEligibilityResult
 from app.services import procedure_setup_service as svc
 
 router = APIRouter(
@@ -40,6 +41,23 @@ def get_procedure_code_stats(db: DbSession, tenant_id: TenantId):
     return svc.stats(db)
 
 
+@router.get(
+    "/eligibility",
+    response_model=ProcedureEligibilityResult,
+    operation_id="get_procedure_code_eligibility",
+    summary="Which providers may perform these codes, in one call (PLAN-16)",
+)
+def get_procedure_code_eligibility(
+    db: DbSession,
+    tenant_id: TenantId,
+    codes: Annotated[str, Query(description="Comma-separated procedure codes, e.g. D1110,D2740")],
+):
+    """Replaces the per-provider fan-out the Change Provider dropdown was doing.
+    A code with no assignment rows is **unrestricted** (`restricted=false`) — every
+    provider may perform it and it does not narrow `eligible_for_all`."""
+    return svc.code_eligibility(db, tenant_id, [c for c in codes.split(",")])
+
+
 CodeScope = Annotated[str, Path(description="Procedure code")]
 
 
@@ -49,6 +67,16 @@ def _require_code(code: CodeScope, db: DbSession) -> str:
 
 
 CodePath = Annotated[str, Depends(_require_code)]
+
+
+@router.get(
+    "/{code}/providers",
+    response_model=list[EligibleProviderRead],
+    operation_id="list_procedure_code_providers",
+    summary="Providers assigned this code (PLAN-16 reverse lookup); empty = unrestricted",
+)
+def list_procedure_code_providers(db: DbSession, tenant_id: TenantId, code: CodePath):
+    return svc.providers_for_code(db, tenant_id, code)
 
 
 @router.get(
