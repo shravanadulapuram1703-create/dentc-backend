@@ -13,9 +13,11 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core import concurrency
 from app.db.models import (
     Employer,
     InsuranceCarrier,
+    InsurancePlan,
     Office,
     Patient,
     Provider,
@@ -60,12 +62,17 @@ def enrich_patient_office(db: Session, items, tenant_id=None) -> None:  # noqa: 
     actor_ids = {r.created_by for r in rows if getattr(r, "created_by", None) is not None}
     actor_ids |= {r.updated_by for r in rows if getattr(r, "updated_by", None) is not None}
     names = resolve_user_names(db, actor_ids)
+    # ADA-BE-7: one statement for the whole page.
+    from app.services.claim_form_service import claim_consent_patient_ids
+
+    consented = claim_consent_patient_ids(db, {r.id for r in rows if getattr(r, "id", None) is not None})
     for r in rows:
         office = offices.get(r.home_office_id)
         r.home_office_name = office.name if office else None
         r.home_office_code = (office.short_id or office.office_code) if office else None
         r.created_by_name = names.get(r.created_by) if r.created_by is not None else None
         r.updated_by_name = names.get(r.updated_by) if r.updated_by is not None else None
+        r.has_claim_consent = r.id in consented
 
 
 def enrich_patient_provider(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
@@ -139,9 +146,9 @@ def enrich_insurance_plan(db: Session, items, tenant_id=None) -> None:  # noqa: 
         e.id: e.name
         for e in db.execute(select(Employer).where(Employer.id.in_(employer_ids))).scalars()
     } if employer_ids else {}
-    actor_names = resolve_user_names(
-        db, {r.updated_by for r in rows if getattr(r, "updated_by", None) is not None}
-    )
+    actor_ids = {r.updated_by for r in rows if getattr(r, "updated_by", None) is not None}
+    actor_ids |= {r.locked_by for r in rows if getattr(r, "locked_by", None) is not None}
+    actor_names = resolve_user_names(db, actor_ids)
 
     for r in rows:
         carrier = carriers.get(getattr(r, "carrier_id", None))
@@ -154,6 +161,34 @@ def enrich_insurance_plan(db: Session, items, tenant_id=None) -> None:  # noqa: 
         r.updated_by_name = (
             actor_names.get(r.updated_by) if getattr(r, "updated_by", None) is not None else None
         ) or getattr(r, "modified_by", None)
+        # EDIT-PLAN-5 / EDIT-PLAN-1
+        r.locked_by_name = (
+            actor_names.get(r.locked_by) if getattr(r, "locked_by", None) is not None else None
+        )
+        r.version = concurrency.version_token(concurrency.version_of(r))
+        # EDIT-PLAN-4: the cascade the PATCH just ran rides on that response
+        # only — consumed here so a later read of the same row shows none.
+        r.group_number_cascade = getattr(r, "_pending_cascade", None)
+        r._pending_cascade = None
+
+
+def enrich_insurance_subscriber(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
+    """EDIT-PLAN-4: the plan's group number beside the subscriber's own, and
+    whether they agree — so a screen can show a divergent card value for what
+    it is instead of silently preferring one column."""
+    rows = list(items)
+    plan_ids = {r.ins_plan_id for r in rows if getattr(r, "ins_plan_id", None)}
+    plan_groups = {
+        pid: group for pid, group in db.execute(
+            select(InsurancePlan.id, InsurancePlan.group_number).where(InsurancePlan.id.in_(plan_ids))
+        )
+    } if plan_ids else {}
+    for r in rows:
+        plan_group = plan_groups.get(getattr(r, "ins_plan_id", None))
+        r.plan_group_number = plan_group
+        own = (r.group_number or "").strip().lower()
+        theirs = (plan_group or "").strip().lower()
+        r.group_number_matches_plan = (own == theirs) if (own or theirs) else None
 
 
 def _actor_names(db: Session, rows, attrs: tuple[str, ...]) -> dict[int, str]:  # noqa: ANN001
@@ -238,5 +273,24 @@ def enrich_provider(db, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
     fallback). Pure per-row computation — no extra queries."""
     from app.services.provider_directory_service import provider_kind
 
+    from app.services.provider_taxonomy_service import effective_code
+
     for row in items:
         row.provider_kind = provider_kind(row.role, row.title)
+        # ADA-BE-14
+        row.effective_taxonomy_code, row.effective_taxonomy_source = effective_code(
+            getattr(row, "taxonomy_code", None), getattr(row, "specialty", None))
+
+
+def enrich_office(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001
+    """PRINT-2: ``logo_url`` + the ``letterhead`` block on ``OfficeRead``.
+
+    Resolved by ``print_service.resolve_letterhead`` — the same function the
+    server-rendered reports head their pages with — so what the screen shows as
+    the office's print branding is what actually prints."""
+    from app.services.print_service import resolve_letterhead  # noqa: PLC0415 (import cycle)
+
+    for office in items:
+        lh = resolve_letterhead(db, office, tenant_id if tenant_id is not None else office.tenant_id)
+        office.logo_url = lh["logo_url"]
+        office.letterhead = {k: v for k, v in lh.items() if k != "logo_path"}

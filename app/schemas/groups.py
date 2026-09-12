@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
+from app.core.datetimes import UtcDatetime
 
 
 class PermissionRead(ORMModel):
@@ -34,4 +35,4 @@ class GroupRead(ORMModel):
     name: str
     description: str | None = None
     is_active: bool
-    created_at: datetime
+    created_at: UtcDatetime

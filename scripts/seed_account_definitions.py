@@ -240,11 +240,13 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
     "contact_pref": [
         ("phone", "Phone"), ("email", "Email"), ("sms", "Text/SMS"), ("mail", "Mail"),
     ],
+    # GAP-AP-25: ONE key scheme — the legacy single-letter codes (PO-9), which
+    # patient_insurance.relationship already holds and patients.
+    # responsible_party_relationship now holds too (patient_rules_service folds
+    # a key/label to the code on every write). The lowercase ``self/spouse/…``
+    # set that used to sit beside it made every dropdown list each option
+    # twice; RETIRED_KEYS below deactivates it on tenants that already have it.
     "resp_party_rel": [
-        ("self", "Self"), ("spouse", "Spouse"), ("parent", "Parent"),
-        ("guardian", "Guardian"), ("child", "Child"), ("other", "Other"),
-        # PO-9: legacy single-letter subscriber-relationship codes on
-        # patient_insurance.relationship (e.g. "S" -> "Self") so they expand.
         ("S", "Self"), ("SP", "Spouse"), ("P", "Parent"), ("G", "Guardian"),
         ("C", "Child"), ("D", "Dependent"), ("O", "Other"),
     ],
@@ -309,6 +311,35 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
 }
 
 
+# Seed rows this add-only seeder used to emit and no longer should. They are
+# deactivated (never deleted — Setup can reactivate a row a practice wants
+# back), which is enough because every dropdown consumer asks for
+# ``is_active=true``. Alembic ``b317b3c05b47`` does the same for the live DB;
+# this keeps a tenant seeded by an older copy of the script consistent.
+RETIRED_KEYS: dict[str, tuple[str, ...]] = {
+    "resp_party_rel": ("self", "spouse", "parent", "guardian", "child", "other"),
+}
+
+
+def retire_for_tenant(db, tenant_id: int) -> int:  # noqa: ANN001
+    retired = 0
+    for group_code, keys in RETIRED_KEYS.items():
+        rows = db.execute(
+            select(Definition).where(
+                Definition.tenant_id == tenant_id,
+                Definition.group_code == group_code,
+                Definition.key1.in_(keys),
+                Definition.is_active.is_(True),
+            )
+        ).scalars().all()
+        for row in rows:
+            row.is_active = False
+            retired += 1
+    if retired:
+        db.commit()
+    return retired
+
+
 def seed_for_tenant(db, tenant_id: int) -> int:  # noqa: ANN001
     existing = {
         (g, k)
@@ -329,6 +360,7 @@ def seed_for_tenant(db, tenant_id: int) -> int:  # noqa: ANN001
             ))
             added += 1
     db.commit()
+    retire_for_tenant(db, tenant_id)
     return added
 
 

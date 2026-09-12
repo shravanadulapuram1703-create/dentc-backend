@@ -90,6 +90,13 @@ class PatientProcedure(Base, CreatedAtMixin):
     pat_adjust: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     # AL-13: which fee schedule produced `fee`.
     fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
+    # ADA-BE-3: Item 29a — which of the claim's four diagnosis codes (A–D,
+    # priority order) this line points at; 837D loop 2400 SV3 pointer positions.
+    # Normalised by claim_form_service.normalise_claim_line (upper, deduped, ≤4).
+    diagnosis_pointers: Mapped[str | None] = mapped_column(String(4))
+    # ADA-BE-4: Item 29b / 837D SV304 units. One line may report the same
+    # procedure on several teeth (teeth in Item 27, count here).
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
 
 
 class ChartCondition(Base, IntPKMixin, TimestampMixin):
@@ -139,7 +146,16 @@ class ChartCondition(Base, IntPKMixin, TimestampMixin):
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
-class ProgressNote(Base, IntPKMixin, CreatedAtMixin):
+class ProgressNote(Base, IntPKMixin, TimestampMixin):
+    """A clinical progress note. Tenancy is scoped through ``patient_id`` (the
+    table carries no ``tenant_id``) by ``ProgressNoteCRUD``.
+
+    PN-11: ``TimestampMixin`` supplies ``updated_at`` and ``updated_by`` is the
+    editing actor (stamped by ``CRUDBase.update``), so the legacy Created /
+    Modified column has both halves and a Date-of-Service correction (PN-8)
+    leaves a trace on the row as well as in ``audit_logs``.
+    """
+
     __tablename__ = "progress_notes"
 
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
@@ -170,6 +186,8 @@ class ProgressNote(Base, IntPKMixin, CreatedAtMixin):
     drawing_doc_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("patient_documents.id"))
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # PN-11: "Modified By" — set by CRUDBase.update on every real change.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class PerioExam(Base, IntPKMixin, TimestampMixin):
@@ -188,6 +206,14 @@ class PerioExam(Base, IntPKMixin, TimestampMixin):
     exam_date: Mapped[date] = mapped_column()
     notes: Mapped[str | None] = mapped_column(Text)
     is_voided: Mapped[bool] = mapped_column(Boolean, default=False)
+    # PERIO-BE-14: the *rendering* provider the printed chart credits (the sheet
+    # is attached to claims). ``created_by`` is the charting *user*, which is a
+    # different person as often as not (a hygienist charts, the dentist signs).
+    # Nullable — the FE seeds it from the patient's preferred provider and a
+    # migrated exam has no source column.
+    provider_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("providers.id"), index=True
+    )
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
@@ -248,6 +274,19 @@ class Prescription(Base, IntPKMixin, CreatedAtMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     dosespot_rx_id: Mapped[str | None] = mapped_column(String(50))
     dosespot_status: Mapped[str | None] = mapped_column(String(50))
+    # MA-5: the prescriber saw the patient's active medical alerts when this Rx
+    # was written. ``acknowledged_alert_ids`` is the snapshot of *which* alerts
+    # were on file (medical-history answer ids + patient-alert ids, as
+    # ``{"source": ..., "id": ...}``), ``alert_warnings`` the drug<->alert
+    # matches the server found at write time. A conflict that was not
+    # acknowledged is a 409 — it is never stored silently.
+    alerts_acknowledged: Mapped[bool] = mapped_column(Boolean, default=False)
+    acknowledged_alert_ids: Mapped[list | None] = mapped_column(JSON)
+    # The full snapshot (both sources, with label/section) of what was on file.
+    acknowledged_alerts: Mapped[list | None] = mapped_column(JSON)
+    alert_warnings: Mapped[list | None] = mapped_column(JSON)
+    alerts_acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime)
+    alerts_acknowledged_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 

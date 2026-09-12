@@ -34,11 +34,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ValidationError
 from app.crud.base import CRUDBase
-from app.db.models import Provider, ProviderOffice
+from app.db.models import Operatory, Provider, ProviderOffice
 
 #: Canonical ``providers.role`` values (mirrors the ``provider_role`` definition
 #: group seeded by ``scripts/seed_account_definitions.py``).
@@ -124,10 +125,50 @@ class ProviderCRUD(CRUDBase[Provider]):
         return [] if office_id is None else [office_scope_clause(office_id)]
 
     def create(self, db: Session, data: dict, *, tenant_id=None, created_by=None):  # noqa: ANN001, ANN201
-        return super().create(db, _canonicalise(data), tenant_id=tenant_id, created_by=created_by)
+        payload = _canonicalise(data)
+        _validate_default_operatory(db, payload, home_office_id=payload.get("office_id"), provider_id=None)
+        return super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
 
     def update(self, db: Session, obj_id, data: dict, *, tenant_id=None, updated_by=None):  # noqa: ANN001, ANN201
-        return super().update(db, obj_id, _canonicalise(data), tenant_id=tenant_id, updated_by=updated_by)
+        payload = _canonicalise(data)
+        if payload.get("default_operatory_id") is not None:
+            current = self.get(db, obj_id, tenant_id=tenant_id)
+            _validate_default_operatory(
+                db, payload,
+                home_office_id=payload.get("office_id", current.office_id), provider_id=current.id,
+            )
+        return super().update(db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by)
+
+
+def _validate_default_operatory(
+    db: Session, payload: dict, *, home_office_id: int | None, provider_id: str | None
+) -> None:
+    """PLAN-APPT-4: the default chair must exist and sit in an office the
+    provider serves (home office or a provider_offices assignment)."""
+    op_id = payload.get("default_operatory_id")
+    if op_id is None:
+        return
+    op = db.get(Operatory, op_id)
+    if op is None:
+        raise ValidationError(
+            f"Operatory '{op_id}' was not found",
+            details={"code": "operatory_not_found", "field": "default_operatory_id"},
+        )
+    if op.office_id == home_office_id:
+        return
+    if provider_id is not None:
+        assigned = db.execute(
+            select(func.count()).select_from(ProviderOffice).where(
+                ProviderOffice.provider_id == provider_id, ProviderOffice.office_id == op.office_id,
+            )
+        ).scalar_one()
+        if assigned:
+            return
+    raise ValidationError(
+        "The default operatory is not in an office this provider serves",
+        details={"code": "operatory_not_in_provider_office", "field": "default_operatory_id",
+                 "operatory_office_id": op.office_id},
+    )
 
 
 def _canonicalise(data: dict) -> dict:

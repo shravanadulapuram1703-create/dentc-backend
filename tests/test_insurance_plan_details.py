@@ -90,11 +90,18 @@ def test_plan_extras_persist_and_read_back(client, carrier):
     assert patched["fees_to_print"] == "plan_fees"  # untouched
 
 
-def test_plan_extras_default_to_falsey_not_null(client, carrier):
+def test_plan_extras_default_to_legacy_dialog_values(client, carrier):
+    """EDIT-PLAN-9: an omitted coded field stores the legacy default (never
+    NULL), and ``lifetime_ortho_benefits`` defaults **on** like the legacy
+    dialog — so the first edit of a new plan audits no phantom changes."""
     plan = client.post(f"{PREFIX}/insurance-plans", json={"carrier_id": carrier.id}).json()
     assert plan["noa_only"] is False
-    assert plan["lifetime_ortho_benefits"] is False
+    assert plan["lifetime_ortho_benefits"] is True
     assert plan["plan_notes"] is None
+    assert plan["fees_to_print"] == "office_ucr"
+    assert plan["claim_option"] == "submit"
+    assert plan["form_to_print"] == "ADA2024"
+    assert plan["network_type"] == "unknown"
 
 
 # ── PLAN-DTL-3: anniversary Month/Day ────────────────────────────────────────

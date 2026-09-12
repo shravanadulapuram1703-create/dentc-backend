@@ -480,7 +480,15 @@ def resolve_merge_fields(ctx: dict[str, Any]) -> dict[str, str]:
     # A self-guarantor has no responsible_parties row; the patient IS the account.
     rp_first = _rp("first_name") or _p("first_name")
     rp_last = _rp("last_name") or _p("last_name")
-    rp_mid = _rp("middle_initial") or _p("middle_initial")
+    # GAP-AP-19: the token is an *initial*; derive it from the full middle name
+    # when a record carries only that (legacy rows carry only the initial).
+    def _initial(obj: Any) -> str:  # noqa: ANN401
+        if obj is None:
+            return ""
+        value = getattr(obj, "middle_initial", None) or (getattr(obj, "middle_name", None) or "")[:1]
+        return str(value or "")
+
+    rp_mid = (_initial(rp) if rp else "") or _initial(patient)
     rp_address = _street(getattr(rp, "address_line1", None), getattr(rp, "address_line2", None)) if rp \
         else _street(getattr(patient, "address_line1", None), getattr(patient, "address_line2", None))
     rp_city = _rp("city") or _p("city")
@@ -497,7 +505,7 @@ def resolve_merge_fields(ctx: dict[str, Any]) -> dict[str, str]:
         "PAT_FIRST_NAME": _p("first_name"),
         "PAT_NAME_FIRST": _p("first_name"),
         "PAT_LAST_NAME": _p("last_name"),
-        "PAT_MID_INITIAL": _p("middle_initial"),
+        "PAT_MID_INITIAL": _initial(patient),
         "PAT_BIRTHDATE": _date(getattr(patient, "dob", None)),
         "PAT_ADDRESS": _street(getattr(patient, "address_line1", None), getattr(patient, "address_line2", None)),
         "PAT_CITY": _p("city"),

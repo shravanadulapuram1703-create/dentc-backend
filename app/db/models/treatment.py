@@ -1,14 +1,15 @@
 """Treatment-planning domain models.
 
-treatment_plans · treatment_plan_items
+treatment_plans · treatment_plan_items · treatment_plan_item_icd_codes ·
+treatment_plan_insurance_details
 """
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
@@ -61,6 +62,55 @@ class TreatmentPlanItem(Base, TimestampMixin):
     # resolves PLAN-13 (a soft-deleted item keeps its FK so insurance-details never
     # block the delete).
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    # ── Edit Treatment window (PLAN-17/18/19/25/27/28/29, PLAN-11) ────────────
+    # PLAN-17: the legacy NOTES box. Lives on the item, not on the insurance
+    # detail row — an uninsured patient's note had been forcing an empty
+    # insurance row into existence just to hold text.
+    notes: Mapped[str | None] = mapped_column(Text)
+    # PLAN-18: when the procedure was accepted / scheduled. ``accepted_date`` is
+    # stamped the first time the status becomes ``accepted`` unless supplied;
+    # ``scheduled_date`` follows the appointment the item is booked on.
+    accepted_date: Mapped[date | None]
+    scheduled_date: Mapped[date | None]
+    # PLAN-19 / PLAN-APPT-7: per-item chair time, overriding the code's
+    # ``default_duration_minutes``. Nullable so "unset" stays distinct from 0.
+    duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    # PLAN-25: Created By / Modified By as users (stamped by the CRUD engine).
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # PLAN-27: "Referral Type" / "Referring Dentist" on the procedure.
+    referral_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("referrals.id"))
+    referral_type: Mapped[str | None] = mapped_column(String(20))
+    # PLAN-28: posting flags honoured by POST /treatment-plan-items/{id}/post.
+    update_end_date_at_posting: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    re_estimate_at_posting: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    # PLAN-29: which fee schedule priced ``fee`` (stamped at create / re-estimate
+    # when the server resolved it; a client may also state it).
+    fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
+    # PLAN-11: the Treatment Counselor who presented / owns the case for this line.
+    counselor_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # PLAN-APPT-1: the status the item held before it was booked, so cancelling /
+    # deleting the appointment can put it back exactly where it was.
+    status_before_scheduled: Mapped[str | None] = mapped_column(String(20))
+
+
+class TreatmentPlanItemIcdCode(Base, IntPKMixin, CreatedAtMixin):
+    """PLAN-26: item <-> ICD-10 diagnosis link ("Dental Cross Coding Information")."""
+
+    __tablename__ = "treatment_plan_item_icd_codes"
+    __table_args__ = (
+        UniqueConstraint("plan_item_id", "icd_code_id", name="uq_treatment_plan_item_icd_code"),
+    )
+
+    plan_item_id: Mapped[str] = mapped_column(
+        String(50), ForeignKey("treatment_plan_items.id", ondelete="CASCADE"), index=True
+    )
+    icd_code_id: Mapped[int] = mapped_column(Integer, ForeignKey("icd_codes.id"), index=True)
+    ordinal: Mapped[int] = mapped_column(Integer, default=1)
 
 
 class TreatmentPlanInsuranceDetail(Base, IntPKMixin, CreatedAtMixin):
@@ -80,4 +130,8 @@ class TreatmentPlanInsuranceDetail(Base, IntPKMixin, CreatedAtMixin):
     preauth_date: Mapped[date | None]
     preauth_expires: Mapped[date | None]
     preauth_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # PLAN-9: the Pre Auth Status radios (Sent / Closed). ``preauth_status_at`` is
+    # server-stamped whenever the status moves.
+    preauth_status: Mapped[str | None] = mapped_column(String(20))
+    preauth_status_at: Mapped[datetime | None] = mapped_column(DateTime)
     notes: Mapped[str | None] = mapped_column(Text)

@@ -1,6 +1,6 @@
 """Scheduling domain models.
 
-appointments · appointment_procedures
+appointments · appointment_procedures · labs
 """
 
 from __future__ import annotations
@@ -12,6 +12,42 @@ from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
+
+
+class Lab(Base, IntPKMixin, TimestampMixin):
+    """LAB-1: the dental-lab vendor catalog behind Lab Tracking's "Lab" column.
+
+    A lab case is an appointment with lab fields (there is no lab-case row), and
+    until now the appointment could not say *which* lab the case went to — the
+    only free-text lab identity column is ``lab_dds``, the dentist. This is the
+    picker's source and what the cost report groups by. Tenant-scoped, with an
+    optional home office (NULL = every office); the appointment references it
+    by FK (``appointments.lab_vendor_id``), never by name, so a renamed vendor
+    keeps its history.
+    """
+
+    __tablename__ = "labs"
+
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
+    name: Mapped[str] = mapped_column(String(200), index=True)
+    # Optional short code (legacy lab slips carry one); free text.
+    code: Mapped[str | None] = mapped_column(String(50))
+    contact_name: Mapped[str | None] = mapped_column(String(200))
+    phone: Mapped[str | None] = mapped_column(String(50))
+    fax: Mapped[str | None] = mapped_column(String(50))
+    email: Mapped[str | None] = mapped_column(String(255))
+    address_line1: Mapped[str | None] = mapped_column(String(255))
+    address_line2: Mapped[str | None] = mapped_column(String(255))
+    city: Mapped[str | None] = mapped_column(String(100))
+    state: Mapped[str | None] = mapped_column(String(50))
+    zip: Mapped[str | None] = mapped_column(String(20))
+    # Default turnaround the FE can use to pre-fill "Due On" from "Sent On".
+    default_turnaround_days: Mapped[int | None] = mapped_column(Integer)
+    notes: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
 
 class Appointment(Base, TimestampMixin):
@@ -41,6 +77,11 @@ class Appointment(Base, TimestampMixin):
     # Free text rather than a providers FK: legacy lab slips carry initials or an
     # outside dentist's name, neither of which resolves to a provider row.
     lab_dds: Mapped[str | None] = mapped_column(String(100))
+    # LAB-1: which lab the case went to (FK into the ``labs`` catalog). Distinct
+    # from ``lab_dds`` on purpose — that column is the *dentist*, this the vendor.
+    lab_vendor_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("labs.id"), index=True)
+    # LAB-1: legacy "Short Notice" flag — the case is a rush job.
+    lab_short_notice: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     lab_sent_on: Mapped[date | None]
     lab_due_on: Mapped[date | None]
     lab_received_on: Mapped[date | None]
@@ -68,6 +109,12 @@ class AppointmentProcedure(Base, IntPKMixin, CreatedAtMixin):
     procedure_code: Mapped[str] = mapped_column(String(20), ForeignKey("procedure_codes.code"))
     provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
     treatment_plan_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("treatment_plans.id"))
+    # PLAN-APPT-2: the *item* this line books (the plan id alone cannot tell two
+    # identical open items apart). Setting it is what flips the item to
+    # ``scheduled``; archiving the line / cancelling the appointment releases it.
+    treatment_plan_item_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("treatment_plan_items.id"), index=True
+    )
     tooth: Mapped[str | None] = mapped_column(String(10))
     surface: Mapped[str | None] = mapped_column(String(20))
     description: Mapped[str | None] = mapped_column(String(500))

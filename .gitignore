@@ -11,3 +11,6 @@ uploads/
 # local detached uvicorn output (Start-Process redirect)
 uvicorn.out.log
 uvicorn.err.log
+
+# One-off data-repair backups (PHI — never commit)
+backups/

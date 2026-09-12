@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Path, Query, Request, Response, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -83,16 +84,21 @@ async def create_capture(
     description: Annotated[str | None, Form()] = None,
 ):
     data = await file.read()
-    instance = capture_svc.ingest_capture(
-        db,
-        tenant_id=tenant_id,
-        patient_id=patient_id,
-        data=data,
-        content_type=file.content_type or "application/octet-stream",
-        modality_hint=modality,
-        description=description,
-    )
-    return svc.get_instance_detail(db, instance.sop_instance_uid, tenant_id)
+
+    # EDIT-PLAN-7: sync DB + storage work must not run on the event loop.
+    def _ingest():
+        instance = capture_svc.ingest_capture(
+            db,
+            tenant_id=tenant_id,
+            patient_id=patient_id,
+            data=data,
+            content_type=file.content_type or "application/octet-stream",
+            modality_hint=modality,
+            description=description,
+        )
+        return svc.get_instance_detail(db, instance.sop_instance_uid, tenant_id)
+
+    return await run_in_threadpool(_ingest)
 
 
 @router.get(

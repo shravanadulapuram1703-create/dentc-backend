@@ -12,6 +12,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Path, Query, Response, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
 from app.core.exceptions import ForbiddenError
@@ -77,7 +78,10 @@ def update_account_settings(
 @router.post("/logo", response_model=LogoResult, operation_id="upload_account_logo")
 async def upload_account_logo(db: DbSession, tenant_id: AccountTenant, file: Annotated[UploadFile, File()]):
     data = await file.read()
-    url = account_service.save_logo(db, tenant_id, file.filename or "logo", file.content_type or "", data)
+    # EDIT-PLAN-7: sync DB + storage work must not run on the event loop.
+    url = await run_in_threadpool(
+        account_service.save_logo, db, tenant_id, file.filename or "logo", file.content_type or "", data,
+    )
     return LogoResult(logo_url=url)
 
 

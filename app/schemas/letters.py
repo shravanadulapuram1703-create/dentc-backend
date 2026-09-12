@@ -203,6 +203,23 @@ class LetterContextResponse(ORMModel):
     )
 
 
+class ConsentCountersignRequest(SignatureCaptureFields):
+    """CS-2: one countersignature line on a consent."""
+
+    role: str = Field(..., examples=["dentist", "hygienist", "assistant", "office_manager"])
+    signature_data: str = Field(..., description="Base64 / data-URL image of the countersignature")
+    signature_len: int | None = None
+    device_source: str | None = Field(None, examples=["topaz", "web-pad"], max_length=20)
+    signed_at: datetime | None = None
+    signer_user_id: int | None = None
+    signer_provider_id: str | None = None
+    signer_name: str | None = Field(None, max_length=120)
+
+
+class ConsentCountersignVoidRequest(BaseModel):
+    reason: str | None = None
+
+
 class ConsentSignRequest(SignatureCaptureFields):
     """LTR-10: capture a signature against an existing consent row. Carries the
     Topaz block (SIG-1/2/3/8) via ``SignatureCaptureFields``."""
@@ -212,10 +229,17 @@ class ConsentSignRequest(SignatureCaptureFields):
     )
     signature_len: int | None = None
     device_source: str | None = Field(None, examples=["topaz", "web-pad"], max_length=20)
-    signed_at: datetime | None = Field(None, description="Workstation timestamp of the capture")
+    signed_at: UtcDatetime | None = Field(None, description="Workstation timestamp of the capture")
     document_id: int | None = Field(
         None, description="An uploaded patient-document holding the scanned wet-signed copy"
     )
+    # CS-1: the PDF rebuilt with the signature(s) stamped on the lines. Kept
+    # beside document_id; may accompany signature_data.
+    signed_document_id: int | None = Field(
+        None, description="The signed PDF rendition (patient-document id), kept beside document_id"
+    )
+    # CS-2: the Dentist / Hygienist / Assistant / Office Manager line(s).
+    countersigns: list[ConsentCountersignRequest] | None = None
     status: str = Field("signed", examples=["signed", "declined", "voided"])
     # SIG-5: ``topaz`` is the pad capture; defaults from the capture when omitted.
     signature_method: str | None = Field(None, examples=["topaz", "drawn", "scanned", "verbal"])

@@ -42,6 +42,13 @@ class Patient(Base, IntPKMixin, TimestampMixin):
     preferred_name: Mapped[str | None] = mapped_column(String(100))
     title: Mapped[str | None] = mapped_column(String(20))
     middle_initial: Mapped[str | None] = mapped_column(String(10))
+    # GAP-AP-19: the full middle name. Legacy stored an initial only; the
+    # wizard's Middle Name box had to be hard-capped at 10 chars to avoid a
+    # 500. ``middle_initial`` stays for parity and is derived (``[:1]``) when a
+    # write carries only ``middle_name`` (patient_rules_service.fold_middle_name).
+    middle_name: Mapped[str | None] = mapped_column(String(50))
+    # ADA-BE-10: name suffix (Jr / Sr / III) — ADA claim Item 20 / 837D NM107.
+    suffix: Mapped[str | None] = mapped_column(String(10))
     dob: Mapped[date | None]
     gender: Mapped[str | None] = mapped_column(String(20))
     ssn: Mapped[str | None] = mapped_column(String(20))
@@ -246,6 +253,21 @@ class PatientSignature(Base, IntPKMixin, TimestampMixin):
     consent_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("patient_consents.id"), index=True
     )
+    # SIG-11: the claim this signature was captured for (ADA Items 36 / 37 / 53).
+    # A row pinned to a claim beats the patient's latest "signature on file".
+    claim_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("insurance_claims.id"), index=True
+    )
+    # SIG-13: who physically signed when it was not the patient (a parent /
+    # guardian / POA for a minor). The printed form and the audit trail name them.
+    signer_name: Mapped[str | None] = mapped_column(String(120))
+    signer_relationship: Mapped[str | None] = mapped_column(String(40))
+    # SIG-15: the *provider* attesting (Item 53). Distinct from ``created_by``
+    # (whoever operated the pad) and ``signed_by_user_id`` (an attesting *user*)
+    # because most migrated providers have no linked user account at all.
+    signer_provider_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("providers.id"), index=True
+    )
 
 
 class SignatureAuditEvent(Base, IntPKMixin, CreatedAtMixin):
@@ -281,6 +303,9 @@ class SignatureAuditEvent(Base, IntPKMixin, CreatedAtMixin):
     signature_type: Mapped[str | None] = mapped_column(String(30))
     content_hash: Mapped[str | None] = mapped_column(String(64))
     reason: Mapped[str | None] = mapped_column(String(500))
+    # SIG-13: who signed for the patient, so the trail names the guardian.
+    signer_name: Mapped[str | None] = mapped_column(String(120))
+    signer_relationship: Mapped[str | None] = mapped_column(String(40))
 
 
 class MedicalHistoryRecord(Base, IntPKMixin, TimestampMixin):
@@ -400,7 +425,8 @@ class MedicalHistoryDetail(Base, IntPKMixin, CreatedAtMixin):
 
     history_id: Mapped[int] = mapped_column(Integer, ForeignKey("medical_history_records.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20))
-    question_code: Mapped[str] = mapped_column(String(50))
+    # GAP-AP-20: 100, matching the two answer tables this snapshot freezes.
+    question_code: Mapped[str] = mapped_column(String(100))
     question_text: Mapped[str | None] = mapped_column(Text)
     answer_code: Mapped[str | None] = mapped_column(String(20))
     answer_text: Mapped[str | None] = mapped_column(Text)
@@ -468,7 +494,11 @@ class PatientMedicalAlert(Base, IntPKMixin, TimestampMixin):
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
-    alert_code: Mapped[str] = mapped_column(String(50))  # code from definitions 'MEDALERT'
+    # GAP-AP-20: codes are derived from the legacy *labels* by the frontend's
+    # ``to_code`` and 12 of the legacy questions slug past 50 chars, which was a
+    # 500 that rolled back the whole registration. 100 here, and the Create/
+    # Update schemas carry ``max_length`` so an overflow is a 422 naming the field.
+    alert_code: Mapped[str] = mapped_column(String(100))  # code from definitions 'MEDALERT'
     alert_label: Mapped[str | None] = mapped_column(String(255))
     # MH-5: yes|no|unknown. A *missing row* is "Not Answered"; ``unknown`` is the
     # explicit third answer ("patient does not know"). The two are different
@@ -479,6 +509,16 @@ class PatientMedicalAlert(Base, IntPKMixin, TimestampMixin):
     # distinct from ``updated_at``, which also moves on an incidental edit.
     answered_at: Mapped[datetime | None] = mapped_column(DateTime)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # MA-3: the catalog group the answer belongs to ("Allergic To", "Check, if
+    # applicable"). Filled from the MEDALERT definition at write time when the
+    # client sends none, so the row is self-describing; a client-sent value is
+    # an override. On read the catalog is still the fallback for older rows.
+    section: Mapped[str | None] = mapped_column(String(100))
+    # MA-4: per-answer overrides of the Setup catalog's flags. NULL means "derive
+    # from the MEDALERT definition" (the read reports the *effective* value);
+    # a stored True/False is what the client asserted for this patient.
+    is_flash_alert: Mapped[bool | None] = mapped_column(Boolean)
+    blocks_charges: Mapped[bool | None] = mapped_column(Boolean)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     # MH-8: legacy prints "Modified By" on this screen; CRUDBase.update stamps it.
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
@@ -493,7 +533,7 @@ class PatientQuestionnaireResponse(Base, IntPKMixin, TimestampMixin):
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
     questionnaire_type: Mapped[str] = mapped_column(String(20))  # dental|medical
-    question_code: Mapped[str] = mapped_column(String(50))
+    question_code: Mapped[str] = mapped_column(String(100))  # GAP-AP-20: was 50
     question_text: Mapped[str | None] = mapped_column(Text)
     answer: Mapped[str | None] = mapped_column(Text)
     # MH-16: see PatientMedicalAlert.answered_at.
@@ -551,6 +591,8 @@ class ResponsibleParty(Base, IntPKMixin, TimestampMixin):
     last_name: Mapped[str | None] = mapped_column(String(100))
     first_name: Mapped[str | None] = mapped_column(String(100))
     middle_initial: Mapped[str | None] = mapped_column(String(10))
+    middle_name: Mapped[str | None] = mapped_column(String(50))  # GAP-AP-19
+    suffix: Mapped[str | None] = mapped_column(String(10))  # ADA-BE-10
     address_line1: Mapped[str | None] = mapped_column(String(255))
     address_line2: Mapped[str | None] = mapped_column(String(255))
     city: Mapped[str | None] = mapped_column(String(100))

@@ -240,3 +240,95 @@ a foreign id is a 404, and a signature cannot be moved to another patient
   `/patient-consents?signature_method=`.
 
 `openapi.json` is regenerated.
+
+
+---
+
+## 11. ADA Dental Claim Form signatures — §5 of the 2026-09-12 report (SIG-11…16)
+
+> **Alembic:** `6f5fd1cb5b52` (applied on the dev database 2026-09-12). Tests:
+> [tests/test_claim_form_signatures.py](../../tests/test_claim_form_signatures.py).
+
+| Gap | Status | Where |
+|-----|--------|-------|
+| **SIG-11** claim binding | ✅ | `patient_signatures.claim_id` + `?claim_id=` filter; server `content_hash` over the claimed lines |
+| **SIG-12** `signature_type` vocabulary | ✅ | published; `claim_patient_consent` **and** `claim_consent` are both Item 36 |
+| **SIG-13** guardian identity | ✅ | `signer_name` / `signer_relationship` on the row **and** on the audit trail |
+| **SIG-14** provider-level signature | ✅ | new `provider_signatures` + `GET/PUT/DELETE /providers/{id}/signature` |
+| **SIG-15** Item 53 attester | ✅ Decided | new **`signer_provider_id`** (the dentist); `signed_by_user_id` stays the attesting *user*, `created_by` the pad operator |
+| **SIG-16** server PDF embeds the images | ✅ | `authorizations.signatures` on the assembled form; images drawn on Items 36/37/53 |
+| SIG-9 follow-up | ✅ | `?signature_types=a,b&latest_per_type=true&include_image=false` + `GET /insurance-claims/{id}/signatures` |
+
+### SIG-11 — `claim_id`
+
+`insurance_claims.id` is a `VARCHAR(50)` (not a UUID column), so `claim_id` is the
+same type with a real FK. On create/PATCH the claim must be on the **same
+patient** (422 `signature_document_mismatch`) and the server computes
+`content_hash` over the claimed service lines (procedure id / code / tooth /
+surface / quadrant / fee / date) + patient + plan — re-pricing or adding a line
+after signing reads as `signature_status="stale"`. The fill-out record no longer
+needs to keep the three ids in `localStorage`: `GET /insurance-claims/{id}/signatures`
+answers from any workstation.
+
+### SIG-12 / SIG-13 / SIG-15 — the row
+
+- `signature_type` is trimmed + lower-cased and **stored as written** (an unknown
+  type is not refused, it is just not one the print resolves). The vocabulary is
+  published at `GET /metadata/signature-capture → signature_types` and
+  `claim_signature_items`.
+- `signer_name` (120) / `signer_relationship` (40; `self | parent | guardian |
+  poa | spouse | other`, lower-cased, unknown kept) print beside the Item 36 image
+  and land on every `signature_audit_events` row.
+- **SIG-15 decision:** pass **`signer_provider_id`** = the treating dentist. It is
+  a real FK to `providers` (422 `signature_provider_not_found` otherwise) and it
+  is what Item 53 resolution keys on — most migrated providers have no user
+  account, so a user id could never have identified them. `signed_by_user_id`
+  keeps the MH-6 meaning (the attesting *user*, defaulting to the caller) and
+  `created_by` is whoever operated the pad. Send both when you have both.
+
+### SIG-14 — `provider_signatures`
+
+1:1 with the provider, the same block as `users.signature_*` (image, Topaz
+capture, SigString encrypted at rest).
+
+| Route | Behaviour |
+|-------|-----------|
+| `GET /providers/{id}/signature` | provider store → (`resolve=true`, default) the linked user's store; `source` = `provider` or `user`; 404 when neither |
+| `GET …?include_sig_string=true` | admin only, audited `sig_string_exported` |
+| `PUT /providers/{id}/signature` | same body as `PUT /users/{id}/signature`; replaces the whole block; audited `captured` / `replaced` |
+| `DELETE /providers/{id}/signature` | clears the store (audited `cleared`); the user fallback still answers afterwards |
+
+`provider_watermarks.signature_image_url` (an uploaded *file* for document
+watermarks) is untouched and unrelated.
+
+### SIG-16 — what prints
+
+`claim_form_service.assemble` now carries `authorizations.signatures`
+(`item_36` / `item_37` / `item_53`), each resolved in this order:
+
+1. the active row **pinned to the claim** (`claim_id`) of that item's type;
+2. the patient's **latest active** row of that type ("signature on file");
+3. Item 53 only: the treating provider's store, then the provider's linked user.
+
+Each slot reports `signature_id`, `source` (`claim | patient | provider | user |
+null`), `signed_at`, `signer_name`/`signer_relationship`, `signer_provider_id`,
+`has_image`, `printed_name` (Item 53) and — on the PDF path or with
+`?include_signature_images=true` on the JSON read — the `signature_data` image.
+The PDF draws Item 36 at 208 × 14 pt with the date and guardian name, Item 37 at
+208 × 17 pt with the date, and Item 53 at 78 × 16 pt followed by the printed name
+and date; "Signature on File" prints only when there is no image. A **legacy
+SigString-only row** resolves (it *is* on file) but cannot print: the slot says
+`legacy_sig_string_only=true`, the form carries a `signature_not_printable`
+warning for that item, and the paper line stays blank. `signature_on_file`
+(Item 36's checkbox) is true for either Item-36 type or the claim flag;
+`assignment_of_benefits` is true for the patient flag or an Item-37 row. The
+submit snapshot (`claim_submissions.claim_text`) is taken without images.
+
+### SIG-9 follow-up
+
+`GET /patient-signatures?patient_id=&signature_types=claim_patient_consent,claim_assign_benefits,claim_treating_dentist&latest_per_type=true&include_image=false`
+returns the newest **active** row per type with no images — the pre-flight in
+one small page instead of 100 rows with JPEGs. `latest_per_type` is a window
+function over `(patient_id, signature_type)`; combined with `is_active=false`
+it returns nothing, on purpose. `GET /insurance-claims/{id}/signatures` is the
+higher-level answer (the three resolved slots, `include_image` opt-in).

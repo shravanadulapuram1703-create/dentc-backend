@@ -20,7 +20,6 @@ from app.db.models import (
     Office,
     Operatory,
     Patient,
-    PatientAlert,
     PatientInsurance,
     PatientPayment,
     PatientProcedure,
@@ -171,13 +170,18 @@ def list_scheduler_appointments(
     today = datetime.now(timezone.utc).date()
     patient_ids = {a.patient_id for a, *_ in records if a.patient_id is not None}
     appt_ids = [a.id for a, *_ in records]
-    alert_pids = {
-        pid for (pid,) in db.execute(
-            select(PatientAlert.patient_id).where(
-                PatientAlert.patient_id.in_(patient_ids), PatientAlert.is_active.is_(True)
-            ).distinct()
-        ).all()
-    } if patient_ids else set()
+    # MA-1: ``has_alert`` used to be derived from ``patient_alerts`` alone, so a
+    # patient with three Medical History YES answers and no free-text alert was
+    # reported as having none — and every consumer fanned out two list calls per
+    # patient to find out otherwise. The shared summary reads both tables in
+    # four statements for the whole feed, and MA-2 hands the block its tooltip.
+    from app.services import medical_alert_summary_service as alert_summary_svc  # noqa: PLC0415
+
+    alert_summaries = alert_summary_svc.summarize(db, tenant_id, patient_ids) if patient_ids else {}
+    # LAB-3: lab block on the feed — vendor names in one batched query.
+    from app.services import lab_tracking_service as lab_svc  # noqa: PLC0415
+
+    lab_names = lab_svc.vendor_names(db, {a.lab_vendor_id for a, *_ in records if a.lab_vendor_id})
     balances = _batch_balances(db, patient_ids)
     services = _batch_service_summary(db, appt_ids)
     eligibility = _batch_eligibility(db, patient_ids)
@@ -213,7 +217,13 @@ def list_scheduler_appointments(
             "checked_in_on": appt.checked_in_on,
             "checked_out_on": appt.checked_out_on,
             # G1/G2/G4/G5 enrichment.
-            "has_alert": appt.patient_id in alert_pids if appt.patient_id else False,
+            "has_alert": bool(alert_summaries.get(appt.patient_id, {}).get("alert_count"))
+            if appt.patient_id else False,
+            # MA-2: "Allergic To: Aspirin; Check, if applicable: Cardiac Pacemaker".
+            "alert_summary": alert_summaries.get(appt.patient_id, {}).get("summary_text")
+            if appt.patient_id else None,
+            "alert_count": alert_summaries.get(appt.patient_id, {}).get("alert_count", 0)
+            if appt.patient_id else 0,
             "patient_age": _age(patient.dob, today) if patient else None,
             "patient_gender": patient.gender if patient else None,
             "responsible_party_id": patient.responsible_party_id if patient else None,
@@ -227,6 +237,19 @@ def list_scheduler_appointments(
             "cancellation_note": appt.cancellation_note,
             "cancellation_reason": appt.cancellation_reason,
             "add_to_call_list": appt.add_to_call_list,
+            # LAB-3
+            "has_lab": bool(appt.has_lab),
+            "lab_vendor_id": appt.lab_vendor_id,
+            "lab_vendor_name": lab_names.get(appt.lab_vendor_id) if appt.lab_vendor_id else None,
+            "lab_dds": appt.lab_dds,
+            "lab_cost": appt.lab_cost,
+            "lab_short_notice": bool(appt.lab_short_notice),
+            "lab_sent_on": appt.lab_sent_on,
+            "lab_due_on": appt.lab_due_on,
+            "lab_received_on": appt.lab_received_on,
+            "lab_status": lab_svc.derive_lab_status(
+                appt.lab_sent_on, appt.lab_due_on, appt.lab_received_on, today,
+            ) if appt.has_lab else None,
         })
     return out
 
@@ -247,6 +270,7 @@ def update_status(
     add_to_call_list: bool | None = None, actor_id: int | None = None,
 ) -> Appointment:
     appt = _appointment_in_tenant(db, appt_id, tenant_id)
+    was_live = not appt.is_archived and not appt.is_cancelled
     normalized = status.strip().lower().replace(" ", "_").replace("-", "_")
     appt.status = status
     stamp_field = _STATUS_STAMP.get(normalized)
@@ -263,6 +287,11 @@ def update_status(
         appt.add_to_call_list = add_to_call_list
     if actor_id is not None:
         appt.updated_by = actor_id
+    # PLAN-APPT-1: cancelling releases the plan items it booked (they go back to
+    # the status they held before); un-cancelling books them again.
+    from app.services.appointment_service import sync_appointment_items
+
+    sync_appointment_items(db, appt, was_live=was_live)
     db.commit()
     db.refresh(appt)
     return appt
@@ -281,6 +310,9 @@ def restore_appointment(
         appt.is_archived = False
         if actor_id is not None:
             appt.updated_by = actor_id
+        from app.services.appointment_service import sync_appointment_items
+
+        sync_appointment_items(db, appt, was_live=False)
         db.commit()
         db.refresh(appt)
     return appt
@@ -336,9 +368,13 @@ def get_patient_context(db: Session, patient_id: int, tenant_id: int) -> dict:
             "home_phone": getattr(rp, "home_phone", None),
         }
 
+    from app.services import medical_alert_summary_service as alert_summary_svc  # noqa: PLC0415
+
     return {
         "patient": patient,
         "balance": balance_service.get_patient_balance(db, patient_id, tenant_id),
+        # MA-2: the appointment Details pop-out reads the alerts from here.
+        "medical_alerts": alert_summary_svc.summarize_one(db, tenant_id, patient_id),
         "insurance": insurance,
         # AL-12: the primary plan the title row links to (first active D-tier slot).
         "primary_insurance": next(

@@ -18,9 +18,10 @@ from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator
+from app.core.datetimes import UtcDatetime
 
 
-def iso_utc(value: datetime | None) -> str | None:
+def iso_utc(value: UtcDatetime | None) -> str | None:
     """Serialize a timestamp as ISO-8601 with an explicit ``Z``.
 
     The messaging tables store naive UTC (matching the rest of this schema).

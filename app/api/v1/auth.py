@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_token_payload
-from app.db.models import Office, Tenant, UserOffice
+from app.db.models import Office, Permission, Tenant, UserOffice
 from app.schemas.auth import (
     ForgotPasswordRequest,
     LegacyCreatePasswordRequest,
@@ -28,7 +28,13 @@ from app.schemas.auth import (
     UserRead,
 )
 from app.schemas.common import ErrorResponse
-from app.services import auth_extras_service, auth_service, my_page_service, patient_context_service
+from app.services import (
+    auth_extras_service,
+    auth_service,
+    my_page_service,
+    patient_context_service,
+    permission_service,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"], responses={401: {"model": ErrorResponse}})
 
@@ -117,8 +123,20 @@ def me_full(db: DbSession, current_user: CurrentUser, tenant_id: TenantId) -> Me
     ]
     last_patient_id = patient_context_service.resolve_last_patient(db, current_user, tenant_id)
     provider_id = my_page_service.linked_provider_id(db, current_user.id)
+    # EDIT-PLAN-5: effective rights. A full-access role lists the whole active
+    # catalog so a client can key on codes without special-casing the role.
+    perms = permission_service.effective_permissions(db, current_user)
+    if perms.full_access:
+        codes = sorted(db.execute(
+            select(Permission.code).where(Permission.is_active.is_(True))
+        ).scalars().all())
+    else:
+        codes = sorted(perms.codes)
     return MeFull(user=current_user, tenant=tenant, offices=offices,
-                  last_patient_id=last_patient_id, provider_id=provider_id)
+                  last_patient_id=last_patient_id, provider_id=provider_id,
+                  permissions=codes,
+                  permissions_enforced=perms.enforced or perms.full_access,
+                  groups=perms.groups)
 
 
 # ── Forgot / reset password (login dev-report §2.1–2.3) ──────────────────────

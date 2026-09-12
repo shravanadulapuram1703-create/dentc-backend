@@ -436,6 +436,10 @@ _ACCT_SORT_KEYS = {
     "amount": lambda r: r["amount"],
     "patient": lambda r: (r["patient_name"] or "", r["entry_date"] or date.min),
 }
+#: Public name for the display-sort extractors — the server-rendered ledger
+#: report (print_service) sorts the same rows with the same keys, so the printed
+#: order can never differ from the grid's.
+ACCOUNT_SORT_KEYS = _ACCT_SORT_KEYS
 
 
 def get_account_ledger(

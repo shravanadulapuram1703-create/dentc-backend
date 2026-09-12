@@ -12,7 +12,15 @@ from fastapi import APIRouter, Depends, Path, Query, Response, status
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
 from app.schemas.common import ErrorResponse
+from app.schemas.medical_alerts import MedicalAlertSummary, MedicalAlertSummaryBatch
+from app.schemas.patient_catalog import (
+    MedicalAlertBulkRequest,
+    MedicalAlertBulkResponse,
+    QuestionnaireResponseBulkRequest,
+    QuestionnaireResponseBulkResponse,
+)
 from app.schemas.medical_history import (
+    MedicalHistoryAudit,
     MedicalHistoryChange,
     MedicalHistoryCopyRequest,
     MedicalHistoryDocument,
@@ -24,6 +32,7 @@ from app.schemas.medical_history import (
     MedicalHistoryVersionDetail,
     SignatureVoidRequest,
 )
+from app.services import medical_alert_summary_service as summary_svc
 from app.services import medical_history_rules as rules_svc
 from app.services import medical_history_service as svc
 
@@ -46,8 +55,60 @@ metadata_router = APIRouter(
     tags=["Patients"], dependencies=[Depends(get_current_user)],
     responses={401: {"model": ErrorResponse}},
 )
+# GAP-AP-22: bulk upserts on the two answer resources. Mounted before the
+# generic CRUD routers so ``/bulk`` is never read as an ``{item_id}``.
+alerts_bulk_router = APIRouter(
+    prefix="/patient-medical-alerts", tags=["Patients"],
+    dependencies=[Depends(get_current_user)], responses=_errs,
+)
+responses_bulk_router = APIRouter(
+    prefix="/patient-questionnaire-responses", tags=["Patients"],
+    dependencies=[Depends(get_current_user)], responses=_errs,
+)
 
 PatientPath = Annotated[int, Path(description="patient identifier")]
+
+
+@alerts_bulk_router.post(
+    "/bulk",
+    response_model=MedicalAlertBulkResponse,
+    operation_id="bulk_upsert_patient_medical_alerts",
+    summary="Create/update many medical-alert answers for one patient in one transaction (GAP-AP-22)",
+)
+def bulk_upsert_medical_alerts(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser, body: MedicalAlertBulkRequest,
+):
+    """Replaces one ``POST /patient-medical-alerts`` per row (~1.2 s each on a
+    remote database; ~105 s for a full legacy catalog). Keyed by ``alert_code``:
+    an active row for the code is updated in place, otherwise inserted; a null
+    ``response`` **and** ``comments`` resets the code to Not Answered. Runs the
+    same MH-12 contradiction rules, MA-3 catalog fill, MH-8 change log and MH-14
+    flash-alert propagation as the single-row resource. All-or-nothing.
+    """
+    return svc.bulk_upsert_alerts(
+        db, tenant_id, body.patient_id, [i.model_dump(exclude_unset=True) for i in body.items],
+        user_id=current.id, allow_contradictions=body.allow_contradictions, replace=body.replace,
+    )
+
+
+@responses_bulk_router.post(
+    "/bulk",
+    response_model=QuestionnaireResponseBulkResponse,
+    operation_id="bulk_upsert_patient_questionnaire_responses",
+    summary="Create/update many questionnaire answers for one patient in one transaction (GAP-AP-22)",
+)
+def bulk_upsert_questionnaire_responses(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser,
+    body: QuestionnaireResponseBulkRequest,
+):
+    """Keyed by ``(questionnaire_type, question_code)``; a null ``answer`` resets
+    the code to Not Answered. ``replace`` clears the stored codes of every
+    questionnaire type *present in the payload* that the payload omits.
+    All-or-nothing."""
+    return svc.bulk_upsert_responses(
+        db, tenant_id, body.patient_id, [i.model_dump(exclude_unset=True) for i in body.items],
+        user_id=current.id, replace=body.replace,
+    )
 
 
 @router.get(
@@ -192,6 +253,64 @@ def list_changes(
     is a single entry for a whole document. A medical record has to be able to
     answer "who changed *this answer* and when"."""
     return svc.list_changes(db, tenant_id, patient_id, entity_type=entity_type, limit=limit)
+
+
+@router.get(
+    "/{patient_id}/medical-history/audit",
+    response_model=MedicalHistoryAudit,
+    operation_id="get_patient_medical_history_audit",
+    summary="Created / Modified stamps (overall + per section) and last-reviewed, server-computed (MH-18)",
+)
+def medical_history_audit(db: DbSession, tenant_id: TenantId, patient_id: PatientPath):
+    """Replaces the five list calls (two of them over soft-deleted rows, capped
+    at one page) the header strip was issuing to derive ``min(created_at)`` /
+    ``max(updated_at)``. Cleared answers and the field-level change log both
+    count, so a removal reads as a modification."""
+    svc._patient(db, tenant_id, patient_id)
+    return svc.get_audit(db, tenant_id, patient_id)
+
+
+@router.get(
+    "/{patient_id}/medical-alerts/summary",
+    response_model=MedicalAlertSummary,
+    operation_id="get_patient_medical_alert_summary",
+    summary="Active medical alerts (Medical History YES answers + free-text patient alerts) in one call (MA-2)",
+)
+def medical_alert_summary(db: DbSession, tenant_id: TenantId, patient_id: PatientPath):
+    """The shape the Prescriptions banner, the scheduler popover and the
+    appointment Details pop-out all read. ``history_on_file`` separates *no
+    history* from *no active alerts*; ``comments`` is the Additional Comments
+    text (MA-7), so no consumer has to special-case a magic alert row."""
+    svc._patient(db, tenant_id, patient_id)
+    return summary_svc.summarize_one(db, tenant_id, patient_id)
+
+
+@metadata_router.get(
+    "/medical-alerts/summary",
+    response_model=MedicalAlertSummaryBatch,
+    operation_id="list_medical_alert_summaries",
+    summary="Bulk per-patient alert summaries, ``?patient_ids=1,2,3`` (<= 200) (MA-2)",
+)
+def medical_alert_summaries(
+    db: DbSession,
+    tenant_id: TenantId,
+    patient_ids: Annotated[str, Query(description="Comma-separated patient ids, at most 200")],
+):
+    """One request for a whole scheduler day/week instead of two per patient.
+    Patients outside the tenant are silently absent from ``items``."""
+    ids = svc.parse_patient_ids(patient_ids) or []
+    if not ids:
+        return {"items": []}
+    from sqlalchemy import select  # noqa: PLC0415
+    from app.db.models import Patient  # noqa: PLC0415
+
+    valid = [
+        pid for (pid,) in db.execute(
+            select(Patient.id).where(Patient.id.in_(ids), Patient.tenant_id == tenant_id)
+        ).all()
+    ]
+    summaries = summary_svc.summarize(db, tenant_id, valid)
+    return {"items": [summaries[pid] for pid in ids if pid in summaries]}
 
 
 @router.get(

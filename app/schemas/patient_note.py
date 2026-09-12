@@ -20,6 +20,7 @@ from pydantic import BaseModel, create_model
 
 from app.db.models import PatientNote
 from app.schemas.factory import build_schemas
+from app.core.datetimes import UtcDatetime
 
 
 class PatientNoteDocumentRef(BaseModel):
@@ -39,7 +40,7 @@ class PatientNoteDocumentRef(BaseModel):
     # and never the public /uploads path (NOTE-DOC-3).
     file_url: Optional[str] = None
     storage_backend: Optional[str] = None
-    created_at: Optional[datetime] = None
+    created_at: Optional[UtcDatetime] = None
 
     model_config = {"from_attributes": True}
 

@@ -8,6 +8,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel
 
 from app.schemas.common import ORMModel
+from app.core.datetimes import UtcDatetime
 
 
 class SupportAttachment(BaseModel):
@@ -46,7 +47,7 @@ class SupportTicketRead(ORMModel):
     status: str
     mode: str = "proxy"
     reporter_id: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class SupportTicketList(BaseModel):

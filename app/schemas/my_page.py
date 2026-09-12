@@ -8,6 +8,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
+from app.core.datetimes import UtcDatetime
 
 
 # ── MP-1: self-service profile update ────────────────────────────────────────
@@ -46,8 +47,8 @@ class UserTaskRead(ORMModel):
     is_done: bool
     due_date: Optional[date] = None
     notes: Optional[str] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    created_at: UtcDatetime
+    updated_at: Optional[UtcDatetime] = None
 
 
 # ── MP-4: opaque per-user preferences blob ───────────────────────────────────
@@ -64,8 +65,8 @@ class NotificationRead(ORMModel):
     ref_type: Optional[str] = None
     ref_id: Optional[str] = None
     is_read: bool
-    read_at: Optional[datetime] = None
-    created_at: datetime
+    read_at: Optional[UtcDatetime] = None
+    created_at: UtcDatetime
 
 
 class NotificationList(BaseModel):

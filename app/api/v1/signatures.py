@@ -27,10 +27,14 @@ from app.api.deps import (
     get_current_user,
     require_roles,
 )
+from app.core.exceptions import NotFoundError
 from app.crud.base import CRUDBase
 from app.db.models import PatientConsent, SignatureAuditEvent
 from app.schemas.common import ErrorResponse, PaginatedResponse
 from app.schemas.signature import (
+    ClaimSignaturesRead,
+    ProviderSignatureRead,
+    ProviderSignatureUpdate,
     SignatureAuditEventRead,
     SignatureCaptureRules,
     SignatureVectorRead,
@@ -60,6 +64,16 @@ audit_router = APIRouter(
 metadata_router = APIRouter(
     tags=["Patients"], dependencies=[Depends(get_current_user)],
     responses={401: {"model": ErrorResponse}},
+)
+# SIG-14: the provider-level signature store.
+provider_router = APIRouter(
+    prefix="/providers", tags=["Organization"],
+    dependencies=[Depends(get_current_user)], responses=_errs,
+)
+# SIG-16 pre-flight: what prints on a claim's three signature lines.
+claims_router = APIRouter(
+    prefix="/insurance-claims", tags=["Billing"],
+    dependencies=[Depends(get_current_user)], responses=_errs,
 )
 
 _signature_crud = svc.PatientSignatureCRUD(svc.PatientSignature, soft_delete_field="is_active")
@@ -106,8 +120,6 @@ def get_consent_sig_string(
 ):
     row = db.get(PatientConsent, consent_id)
     if row is None or row.tenant_id != tenant_id or row.is_deleted:
-        from app.core.exceptions import NotFoundError
-
         raise NotFoundError(f"Consent '{consent_id}' was not found")
     out = svc.signature_vector(row, entity_type=svc.ENTITY_PATIENT_CONSENT)
     svc.record_event(
@@ -151,3 +163,115 @@ def list_signature_audit_events(
 )
 def signature_capture_rules():
     return svc.published_rules()
+
+
+# ── SIG-14: provider signature store ─────────────────────────────────────────
+_ProviderPath = Annotated[str, Path(description="provider identifier")]
+
+
+def _provider_signature_read(row, *, provider_id: str, source: str | None,  # noqa: ANN001
+                             include_sig_string: bool) -> ProviderSignatureRead:
+    if row is None:
+        return ProviderSignatureRead(provider_id=provider_id, source=None)
+    from app.db.models import User
+
+    out = svc.signature_store_out(row, include_sig_string=include_sig_string)
+    return ProviderSignatureRead(
+        provider_id=provider_id, source=source,
+        user_id=row.id if isinstance(row, User) else None, **out,
+    )
+
+
+@provider_router.get(
+    "/{provider_id}/signature",
+    response_model=ProviderSignatureRead,
+    operation_id="get_provider_signature",
+    summary="A provider's signature on file — the provider store, else the linked user's (SIG-14)",
+)
+def get_provider_signature(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser, provider_id: _ProviderPath,
+    resolve: Annotated[bool, Query(description="Fall back to the provider's linked user account")] = True,
+    include_sig_string: Annotated[bool, Query(description="SIG-4: also return the clear SigString (admin, audited)")] = False,
+):
+    provider = svc._require_provider(db, tenant_id, provider_id)
+    if resolve:
+        row, source = svc.resolve_provider_signature(db, tenant_id, provider)
+    else:
+        row = svc.get_provider_signature(db, tenant_id, provider_id)
+        source = "provider" if row is not None and (row.signature_data or row.sig_string) else None
+        row = row if source else None
+    if row is None:
+        raise NotFoundError("No signature on file for this provider")
+    if include_sig_string:
+        if current.role not in ("admin", "super_admin"):
+            from app.core.exceptions import ForbiddenError
+
+            raise ForbiddenError("Reading a SigString requires an admin role")
+        svc.record_event(
+            db, tenant_id=tenant_id, entity_type=svc.ENTITY_PROVIDER if source == "provider" else svc.ENTITY_USER,
+            entity_id=row.id, event=svc.EVENT_EXPORTED, actor_id=current.id, source=row,
+            signature_type="provider" if source == "provider" else "user", reason=f"provider {provider_id}",
+        )
+        db.commit()
+    return _provider_signature_read(row, provider_id=provider_id, source=source,
+                                    include_sig_string=include_sig_string)
+
+
+@provider_router.put(
+    "/{provider_id}/signature",
+    response_model=ProviderSignatureRead,
+    operation_id="set_provider_signature",
+    summary="Save a provider's signature (Topaz block accepted; replaces the whole block)",
+)
+def set_provider_signature(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser, provider_id: _ProviderPath,
+    body: ProviderSignatureUpdate,
+):
+    row = svc.set_provider_signature(db, tenant_id, provider_id, body.model_dump(exclude_unset=True),
+                                     actor_id=current.id)
+    return _provider_signature_read(row, provider_id=provider_id, source="provider",
+                                    include_sig_string=False)
+
+
+@provider_router.delete(
+    "/{provider_id}/signature",
+    status_code=204,
+    operation_id="clear_provider_signature",
+    summary="Clear a provider's stored signature (audited as `cleared`)",
+)
+def clear_provider_signature(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser, provider_id: _ProviderPath,
+):
+    if not svc.clear_provider_signature(db, tenant_id, provider_id, actor_id=current.id):
+        raise NotFoundError("No signature on file for this provider")
+    return None
+
+
+# ── SIG-16: claim signature pre-flight ───────────────────────────────────────
+@claims_router.get(
+    "/{claim_id}/signatures",
+    response_model=ClaimSignaturesRead,
+    operation_id="get_claim_signatures",
+    summary="What prints on ADA Items 36 / 37 / 53 for this claim — pinned, on-file, or provider (SIG-16)",
+)
+def get_claim_signatures(
+    db: DbSession, tenant_id: TenantId,
+    claim_id: Annotated[str, Path(description="claim identifier")],
+    include_image: Annotated[bool, Query(description="Embed the signature image data URLs")] = False,
+):
+    from app.services import claim_form_service
+
+    claim, patient = claim_form_service._get_claim(db, claim_id, tenant_id)
+    treating_id = claim.treating_provider_id
+    if not treating_id:
+        from sqlalchemy import select
+
+        from app.db.models import PatientProcedure
+
+        procs = db.execute(
+            select(PatientProcedure).where(PatientProcedure.claim_id == claim.id)
+        ).scalars().all()
+        treating_id = claim_form_service.pick_treating_provider(db, procs) or patient.preferred_provider_id
+    slots = svc.resolve_claim_signatures(db, tenant_id, claim, treating_provider_id=treating_id,
+                                         include_images=include_image)
+    return {"claim_id": claim.id, "patient_id": patient.id, "treating_provider_id": treating_id, **slots}

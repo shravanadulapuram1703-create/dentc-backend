@@ -12,6 +12,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 from app.schemas.signature import SignatureCaptureFields
+from app.core.datetimes import UtcDatetime
 
 AlertResponse = Literal["yes", "no", "unknown"]
 Scope = Literal["all", "alerts", "dental", "medical"]
@@ -43,7 +44,7 @@ class MedicalAlertAnswer(BaseModel):
     section: Optional[str] = None
     response: Optional[str] = None
     comments: Optional[str] = None
-    answered_at: Optional[datetime] = None
+    answered_at: Optional[UtcDatetime] = None
     is_active: bool = True
     is_flash_alert: bool = False
     blocks_charges: bool = False
@@ -51,8 +52,8 @@ class MedicalAlertAnswer(BaseModel):
     created_by_name: Optional[str] = None
     updated_by: Optional[int] = None
     updated_by_name: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: Optional[UtcDatetime] = None
+    updated_at: Optional[UtcDatetime] = None
 
 
 class QuestionnaireAnswer(BaseModel):
@@ -62,14 +63,14 @@ class QuestionnaireAnswer(BaseModel):
     question_code: str
     question_text: Optional[str] = None
     answer: Optional[str] = None
-    answered_at: Optional[datetime] = None
+    answered_at: Optional[UtcDatetime] = None
     is_active: bool = True
     created_by: Optional[int] = None
     created_by_name: Optional[str] = None
     updated_by: Optional[int] = None
     updated_by_name: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: Optional[UtcDatetime] = None
+    updated_at: Optional[UtcDatetime] = None
 
 
 class MedicalHistorySignature(BaseModel):
@@ -80,7 +81,7 @@ class MedicalHistorySignature(BaseModel):
     signature_len: Optional[int] = None
     device_source: Optional[str] = None
     is_user_sig: bool = False
-    signed_at: Optional[datetime] = None
+    signed_at: Optional[UtcDatetime] = None
     signed_by_user_id: Optional[int] = None
     signed_by_name: Optional[str] = None
     #: MH-6: SHA-256 of the answers as signed. Null on migrated rows, which is
@@ -100,12 +101,12 @@ class MedicalHistorySignature(BaseModel):
     captured_user_agent: Optional[str] = None
     is_active: bool = True
     superseded_by_id: Optional[int] = None
-    voided_at: Optional[datetime] = None
+    voided_at: Optional[UtcDatetime] = None
     voided_by: Optional[int] = None
     created_by: Optional[int] = None
     created_by_name: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: Optional[UtcDatetime] = None
+    updated_at: Optional[UtcDatetime] = None
 
 
 class MedicalHistoryVersion(BaseModel):
@@ -116,13 +117,13 @@ class MedicalHistoryVersion(BaseModel):
     item_count: Optional[int] = None
     comments: Optional[str] = None
     signature_id: Optional[int] = None
-    completed_at: Optional[datetime] = None
+    completed_at: Optional[UtcDatetime] = None
     completed_by: Optional[int] = None
     completed_by_name: Optional[str] = None
     source_patient_id: Optional[int] = None
-    copied_at: Optional[datetime] = None
+    copied_at: Optional[UtcDatetime] = None
     is_archived: bool = False
-    created_at: Optional[datetime] = None
+    created_at: Optional[UtcDatetime] = None
 
 
 class MedicalHistoryVersionAnswer(BaseModel):
@@ -162,9 +163,40 @@ class MedicalHistoryPatient(BaseModel):
 
 
 class MedicalHistoryCompletion(BaseModel):
-    last_completed_at: Optional[datetime] = None
+    last_completed_at: Optional[UtcDatetime] = None
     last_completed_by: Optional[int] = None
     last_completed_by_name: Optional[str] = None
+
+
+class MedicalHistoryStamp(BaseModel):
+    """MH-18: one Created / Modified pair, server-computed."""
+
+    created_at: Optional[UtcDatetime] = None
+    created_by: Optional[int] = None
+    created_by_name: Optional[str] = None
+    updated_at: Optional[UtcDatetime] = None
+    updated_by: Optional[int] = None
+    updated_by_name: Optional[str] = None
+
+
+class MedicalHistoryReviewed(BaseModel):
+    """MH-16/18: the asserted "patient reviewed and confirmed this" stamp."""
+
+    last_reviewed_at: Optional[UtcDatetime] = None
+    last_reviewed_by: Optional[int] = None
+    last_reviewed_by_name: Optional[str] = None
+
+
+class MedicalHistoryAudit(BaseModel):
+    """MH-18: ``GET /patients/{id}/medical-history/audit`` (also embedded on the
+    document as ``audit``). ``sections`` keys: ``alerts`` / ``dental`` /
+    ``medical`` / ``signature`` / ``comments``; ``last_reviewed`` keys:
+    ``alerts`` / ``dental`` / ``medical``. Inactive (cleared) rows and the
+    field-level change log both count, so a removal is a modification."""
+
+    overall: MedicalHistoryStamp
+    sections: dict[str, MedicalHistoryStamp] = Field(default_factory=dict)
+    last_reviewed: dict[str, MedicalHistoryReviewed] = Field(default_factory=dict)
 
 
 class MedicalHistoryDocument(BaseModel):
@@ -195,8 +227,10 @@ class MedicalHistoryDocument(BaseModel):
     catalogs: dict[str, list[MedicalHistoryCatalogItem]] = Field(default_factory=dict)
     catalog_sources: dict[str, str] = Field(default_factory=dict)
     completion: dict[str, MedicalHistoryCompletion] = Field(default_factory=dict)
+    #: MH-18: Created / Modified stamps, overall and per section.
+    audit: Optional[MedicalHistoryAudit] = None
     copied_from_patient_id: Optional[int] = None
-    copied_at: Optional[datetime] = None
+    copied_at: Optional[UtcDatetime] = None
     copied_by_name: Optional[str] = None
     #: Set on writes: the codes this request actually changed, per section.
     changed: Optional[dict[str, list[str]]] = None
@@ -221,16 +255,21 @@ class MedicalHistoryChange(BaseModel):
     source_patient_id: Optional[int] = None
     changed_by: Optional[int] = None
     changed_by_name: Optional[str] = None
-    changed_at: Optional[datetime] = None
+    changed_at: Optional[UtcDatetime] = None
 
 
 # ── writes ───────────────────────────────────────────────────────────────────
 class MedicalAlertIn(BaseModel):
     alert_code: str
+    #: MA-3: optional override; filled from the MEDALERT catalog when omitted.
     alert_label: Optional[str] = None
+    section: Optional[str] = None
     #: Null/omitted with no comment resets the row to **Not Answered** (deleted).
     response: Optional[AlertResponse] = None
     comments: Optional[str] = None
+    #: MA-4: per-answer overrides of the catalog's flags; omit to derive.
+    is_flash_alert: Optional[bool] = None
+    blocks_charges: Optional[bool] = None
 
 
 class QuestionnaireAnswerIn(BaseModel):
@@ -285,7 +324,7 @@ class MedicalHistorySignRequest(SignatureCaptureFields):
     signature_data: str
     signature_len: Optional[int] = None
     device_source: Optional[str] = None
-    signed_at: Optional[datetime] = None
+    signed_at: Optional[UtcDatetime] = None
     is_user_sig: bool = False
     #: MH-6: who is attesting, if not the authenticated operator of the pad.
     signed_by_user_id: Optional[int] = None

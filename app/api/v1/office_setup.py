@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Path, Query, Response, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
 from app.db.models.office_setup import (
@@ -78,7 +79,10 @@ def update_statement_settings(db: DbSession, office_id: OfficeScope, tenant_id: 
 @router.post("/{office_id}/statement-logo", response_model=LogoResult, operation_id="upload_office_statement_logo")
 async def upload_statement_logo(db: DbSession, office_id: OfficeScope, tenant_id: TenantId, file: Annotated[UploadFile, File()]):
     data = await file.read()
-    url = svc.save_statement_logo(db, office_id, tenant_id, file.filename or "logo", file.content_type or "", data)
+    # EDIT-PLAN-7: sync DB + storage work must not run on the event loop.
+    url = await run_in_threadpool(
+        svc.save_statement_logo, db, office_id, tenant_id, file.filename or "logo", file.content_type or "", data,
+    )
     return LogoResult(logo_url=url)
 
 

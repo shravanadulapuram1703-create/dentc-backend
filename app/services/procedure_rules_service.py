@@ -85,6 +85,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.exceptions import ValidationError
 from app.crud.base import CRUDBase
 from app.db.models import ProcedureCode
@@ -111,6 +112,15 @@ QUADRANT_LABELS: dict[str, str] = {
     "UA": "Upper Arch", "LA": "Lower Arch", "FM": "Full Mouth",
 }
 TRUE_QUADRANTS: tuple[str, ...] = ("UR", "UL", "LL", "LR")
+#: ADA-BE-11: the ADA claim form's Item 25 "Area of Oral Cavity" two-digit code
+#: for every quadrant token the API stores (plus the legacy numeric quadrant
+#: ids the migration left in a handful of rows). Published on
+#: /metadata/procedure-entry-rules and /metadata/ada-claim-form-rules so the
+#: print and the validator can never disagree on the token set.
+AREA_OF_ORAL_CAVITY: dict[str, str] = {
+    "FM": "00", "UA": "01", "LA": "02", "UR": "10", "UL": "20", "LL": "30", "LR": "40",
+    "1": "10", "2": "20", "3": "30", "4": "40",
+}
 
 PERMANENT_ANTERIOR: frozenset[int] = frozenset(range(6, 12)) | frozenset(range(22, 28))
 PRIMARY_LETTERS = "ABCDEFGHIJKLMNOPQRST"
@@ -328,6 +338,9 @@ def rules_for(code_row: ProcedureCode) -> dict:
         "valid_teeth": list(code_row.valid_teeth) if code_row.valid_teeth else None,
         "allowed_quadrants": allowed_quadrants(code_row),
         "default_material_id": code_row.default_material_id,
+        # PROC-7: supporting-records flags, advisory on posting (see
+        # supporting_records_service for what satisfies each).
+        **{flag: bool(getattr(code_row, flag, False)) for flag in SUPPORTING_RECORD_FLAGS},
     }
 
 
@@ -336,6 +349,18 @@ def _fail(code: str, field: str, message: str, **extra: Any) -> ValidationError:
 
 
 CLINICAL_FIELDS: tuple[str, ...] = ("procedure_code", "tooth", "surface", "quadrant")
+
+#: PROC-7: the five supporting-records flags on ``procedure_codes``. Kept here
+#: (next to the tooth/surface/quadrant flags) so ``rules_for`` and the
+#: published metadata read them from one list; the *meaning* of each — what
+#: counts as "on file" — is ``supporting_records_service.RULES``.
+SUPPORTING_RECORD_FLAGS: tuple[str, ...] = (
+    "requires_attachment",
+    "requires_perio_chart",
+    "requires_photo",
+    "requires_xray",
+    "requires_missing_tooth_info",
+)
 
 
 def touches_clinical_fields(data: dict) -> bool:
@@ -489,6 +514,17 @@ class ProcedureTemplateCRUD(CRUDBase):
 
 
 # ── published contract ───────────────────────────────────────────────────────
+def _supporting_rules_catalog() -> list[dict]:
+    # Lazy: supporting_records_service imports the flag list from this module.
+    from app.services.supporting_records_service import rules_catalog
+    return rules_catalog()
+
+
+def _supporting_error_code(flag: str) -> str:
+    """``requires_xray`` -> ``xray_required`` (the per-procedure error code)."""
+    return f"{flag.removeprefix('requires_')}_required"
+
+
 ERROR_CODES: dict[str, str] = {
     "invalid_tooth": "tooth is not a Universal tooth id, supernumerary id or quadrant code",
     "invalid_surface": "surface contains a character outside the vocabulary or a misplaced Class V",
@@ -500,6 +536,19 @@ ERROR_CODES: dict[str, str] = {
     "surface_not_allowed": "a surface letter is outside the code's allowed set",
     "quadrant_required": "the code requires a quadrant and none was given",
     "quadrant_not_allowed": "the quadrant is outside the code's allowed_quadrants",
+    # PROC-7b/c: raised only by claim submission (never by posting a charge);
+    # ``details.missing`` lists each procedure with the records it still lacks.
+    "supporting_records_missing": "a procedure on the claim requires a supporting record "
+                                  "(attachment / perio chart / photo / x-ray / missing-tooth "
+                                  "info) that is not on file; allow_missing_records overrides",
+    "attachment_required": "requires_attachment and no document is linked to the procedure "
+                           "or its claim",
+    "perio_chart_required": "requires_perio_chart and no perio exam is on file on/before the "
+                            "date of service (within the configured age)",
+    "photo_required": "requires_photo and no patient photo is on file",
+    "xray_required": "requires_xray and no radiograph is on file on/before the date of service",
+    "missing_tooth_info_required": "requires_missing_tooth_info and no charted missing tooth "
+                                   "with a date, or posted extraction, is on file",
 }
 
 
@@ -530,6 +579,8 @@ def rules_metadata() -> dict:
         "posterior_surfaces": list(POSTERIOR_SURFACES),
         "quadrants": [{"code": q, "label": QUADRANT_LABELS[q]} for q in QUADRANTS],
         "true_quadrants": list(TRUE_QUADRANTS),
+        # ADA-BE-11: quadrant token -> ADA claim form Item 25 code.
+        "area_of_oral_cavity": [{"token": k, "code": v} for k, v in AREA_OF_ORAL_CAVITY.items()],
         "teeth": {
             "system": "universal",
             "permanent": [str(n) for n in range(1, 33)],
@@ -554,6 +605,31 @@ def rules_metadata() -> dict:
         "advisory": {
             "requires_lab": "material_id is recommended, never a 422 — chart_materials is "
                             "tenant-scoped and several posting paths have no material picker",
+            # PROC-7b: advisory on posting, enforced at claim submission. The
+            # record is usually captured after the chair (the x-ray is taken,
+            # the narrative written, the photo uploaded), so a 422 on POST
+            # patient_procedures would block the charge that the record is
+            # about. GET /patients/{id}/procedure-readiness is the checklist.
+            **{
+                flag: f"checked by GET /patients/{{id}}/procedure-readiness and enforced at "
+                      f"POST /insurance-claims/{{id}}/submit (422 supporting_records_missing, "
+                      f"per-procedure code {_supporting_error_code(flag)}); never a 422 on "
+                      f"posting a charge or a treatment-plan item"
+                for flag in SUPPORTING_RECORD_FLAGS
+            },
+        },
+        "supporting_records": {
+            "flags": list(SUPPORTING_RECORD_FLAGS),
+            "enforced_at": "claim_submit",
+            "enforce_on_submit": bool(settings.SUPPORTING_RECORDS_ENFORCE_ON_SUBMIT),
+            "override": "allow_missing_records on ClaimSubmitRequest",
+            "readiness": [
+                "GET /patients/{patient_id}/procedure-readiness?procedure_code=&tooth=&date_of_service=",
+                "GET /patient-procedures/{procedure_id}/readiness",
+                "GET /insurance-claims/{claim_id}/readiness",
+            ],
+            "perio_max_age_months": settings.SUPPORTING_RECORDS_PERIO_MAX_AGE_MONTHS,
+            "rules": _supporting_rules_catalog(),
         },
         "update_semantics": "rules run on PATCH only when the payload touches "
                             "procedure_code/tooth/surface/quadrant, against the merge of payload "

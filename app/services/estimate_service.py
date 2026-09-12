@@ -126,6 +126,12 @@ def _match_rule(
     return best
 
 
+#: Public name for the ranked band matcher — ``treatment_service.re_estimate``
+#: prices a plan through the same function so the estimate and the plan can
+#: never disagree on which band a code falls in (FEE-1).
+match_coverage_rule = _match_rule
+
+
 def estimate(
     db: Session,
     patient_id: int,

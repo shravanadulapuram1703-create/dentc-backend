@@ -14,6 +14,10 @@ What's customised over the plain factory output:
 - **PERIO-BE-8** a bulk-upsert item/envelope keyed by ``tooth_no``.
 - **PERIO-BE-10** comparison/summary response shapes.
 - **PERIO-BE-12** a typed ``auto_advance`` template structure.
+- **PERIO-BE-14** ``provider_id`` / resolved ``provider_name`` on the exam read.
+- **PERIO-BE-15/16/18** compare entries can carry the per-site ``details``,
+  the summary percentages are over probeable sites, and a delta names the
+  exam it was measured against.
 """
 
 from __future__ import annotations
@@ -27,6 +31,7 @@ from pydantic import BaseModel, Field, create_model
 from app.db import models as m
 from app.schemas.common import ORMModel
 from app.schemas.factory import build_schemas
+from app.core.datetimes import UtcDatetime
 
 # ── PERIO-BE-7: clinical value ranges (constrained field types) ──────────────
 PdValue = Annotated[int, Field(ge=0, le=20, description="Probing depth in mm (0–20)")]
@@ -86,10 +91,15 @@ class PerioExamRead(ORMModel):
     exam_date: date
     notes: Optional[str] = None
     is_voided: bool
+    # PERIO-BE-14: the rendering provider the printed chart credits (distinct
+    # from ``created_by``, the charting user). Resolved name rides along so the
+    # toolbar/print need no provider lookup.
+    provider_id: Optional[str] = None
+    provider_name: Optional[str] = None
     created_by: Optional[int] = None
     updated_by: Optional[int] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    created_at: UtcDatetime
+    updated_at: Optional[UtcDatetime] = None
     created_by_name: Optional[str] = None
     updated_by_name: Optional[str] = None
 
@@ -114,8 +124,8 @@ PerioExamDetailRead = create_model(
     id=(int, ...),
     exam_id=(int, ...),
     tooth_no=(str, ...),
-    created_at=(datetime, ...),
-    updated_at=(Optional[datetime], None),
+    created_at=(UtcDatetime, ...),
+    updated_at=(Optional[UtcDatetime], None),
     created_by=(Optional[int], None),
     updated_by=(Optional[int], None),
     created_by_name=(Optional[str], None),
@@ -194,8 +204,8 @@ class PerioChartTemplateRead(ORMModel):
     auto_advance: Optional[PerioAutoAdvance] = None
     created_by: Optional[int] = None
     updated_by: Optional[int] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    created_at: UtcDatetime
+    updated_at: Optional[UtcDatetime] = None
 
 
 # ── Perio Chart Setting (per-user prefs) ─────────────────────────────────────
@@ -218,38 +228,69 @@ class PerioChartSettingUpdateMe(BaseModel):
 
 # ── PERIO-BE-10: comparison / summary across exams ───────────────────────────
 class PerioExamSummary(BaseModel):
-    """Aggregate clinical metrics for a single exam (computed from its details)."""
+    """Aggregate clinical metrics for a single exam (computed from its details).
+
+    Denominators (PERIO-BE-16): ``probeable_sites`` = 6 × ``teeth_charted`` and
+    is what every percentage divides by, so a chart with bleeding but no pocket
+    depths still reports a percentage and nothing can exceed 100.
+    ``sites_measured`` is the count of sites carrying a **pocket depth** (the
+    label the UI already uses); ``sites_with_findings`` counts sites with *any*
+    recorded value (PD / CAL / FGM / MGJ / furcation / bleeding / suppuration).
+    """
 
     teeth_charted: int
-    sites_measured: int
+    probeable_sites: int = Field(description="6 × teeth_charted — the percentage denominator")
+    sites_measured: int = Field(description="Sites with a pocket depth recorded")
+    sites_with_findings: int = Field(description="Sites with any recorded value")
     mean_pd: Optional[float] = None
     max_pd: Optional[int] = None
     sites_pd_4plus: int
     sites_pd_6plus: int
     bleeding_sites: int
-    bleeding_pct: Optional[float] = None
+    bleeding_pct: Optional[float] = Field(
+        None, description="bleeding_sites / probeable_sites × 100, clamped 0–100; null when no teeth"
+    )
     suppuration_sites: int
+    suppuration_pct: Optional[float] = Field(
+        None, description="suppuration_sites / probeable_sites × 100, clamped 0–100; null when no teeth"
+    )
     mean_cal: Optional[float] = None
     max_cal: Optional[int] = None
 
 
 class PerioExamComparisonDelta(BaseModel):
-    """Change vs the chronologically previous exam in the comparison set."""
+    """Change vs the previous **live** exam in the comparison set (a voided exam
+    is never the baseline — PERIO-BE-18). ``PerioExamComparisonEntry.delta_vs_exam_id``
+    names that baseline."""
 
     mean_pd: Optional[float] = None
     sites_pd_4plus: Optional[int] = None
     sites_pd_6plus: Optional[int] = None
+    bleeding_sites: Optional[int] = None
     bleeding_pct: Optional[float] = None
+    suppuration_sites: Optional[int] = None
+    suppuration_pct: Optional[float] = None
+    mean_cal: Optional[float] = None
 
 
 class PerioExamComparisonEntry(BaseModel):
     exam_id: int
     exam_date: date
     is_voided: bool
+    provider_id: Optional[str] = None
+    provider_name: Optional[str] = None
     summary: PerioExamSummary
     delta: Optional[PerioExamComparisonDelta] = None
+    # The exam ``delta`` was measured against (None on the first live exam and
+    # on a voided entry). Explicit because voided exams are skipped in the chain.
+    delta_vs_exam_id: Optional[int] = None
+    # PERIO-BE-15: the per-tooth rows, only when ``include_details=true`` —
+    # sorted by tooth number so the tooth-by-tooth table needs no client sort.
+    details: Optional[list[PerioExamDetailRead]] = None
 
 
 class PerioComparisonResult(BaseModel):
     patient_id: int
+    include_details: bool = False
+    include_voided: bool = False
     exams: list[PerioExamComparisonEntry]

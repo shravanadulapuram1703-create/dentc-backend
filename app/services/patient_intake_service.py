@@ -15,21 +15,21 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core.exceptions import NotFoundError, ValidationError
 from app.db.models import (
     Appointment,
     InsuranceCarrier,
     InsurancePlan,
+    InsuranceSubscriber,
     Patient,
     PatientInsurance,
-    PatientMedicalAlert,
     PatientOpeningBalance,
-    PatientQuestionnaireResponse,
     PatientRecall,
     ResponsibleParty,
 )
 from app.integrations import redis_store
 from app.services import balance_service, patient_extra_service, patient_rules_service
+from app.services import medical_history_service as mh
 from app.services.patient_service import assign_chart_no
 
 _BUCKETS = ("current", "over_30", "over_60", "over_90", "over_120")
@@ -101,41 +101,51 @@ def register_patient(db: Session, tenant_id: int, req, *, user_id: int | None = 
 
     A failure anywhere rolls the whole thing back, so registration never leaves a
     patient with only some of its related records (the client-chained flow could).
+    The rollback is explicit rather than left to the session's close: a later
+    slot's 422 (GAP-AP-24) or a flush-time constraint error (GAP-AP-26) must
+    leave the session clean for whoever holds it next — the error handler that
+    turns the exception into a 4xx cannot reach the session to do it.
     """
-    # Add/Edit Patient checkbox integrity: contradictory Patient Type tags are
-    # rejected and the implied Patient Status flags forced, before the duplicate
-    # check — registration must not be able to route around the rules that
-    # PATCH /patients/{id} enforces.
-    payload = patient_rules_service.normalize_patient_payload(
-        req.patient.model_dump(exclude_unset=True)
-    )
+    try:
+        return _register_patient(db, tenant_id, req, user_id=user_id)
+    except Exception:
+        db.rollback()
+        raise
 
-    # KAN-108: Quick Save posts straight here, so the duplicate guard has to live
-    # server-side — a client that forgets to call /patients/check-duplicate must
-    # not be able to create a duplicate silently.
-    if not getattr(req, "force_create", False):
-        dupes = patient_extra_service.find_strong_duplicates(db, tenant_id, payload)
-        if dupes:
-            raise ConflictError(
-                "A patient matching these details already exists.",
-                code="duplicate_patient",
-                details={"candidates": dupes},
-            )
 
-    payload["tenant_id"] = tenant_id
-    if user_id is not None:
-        payload.setdefault("created_by", user_id)
+def _register_patient(db: Session, tenant_id: int, req, *, user_id: int | None) -> dict:
+    raw = req.patient.model_dump(exclude_unset=True)
+    # GAP-AP-21: the override is accepted at either level — the FE's retry
+    # sets the top-level flag; a client reusing PatientCreate may set the inner one.
+    force_create = bool(getattr(req, "force_create", False) or raw.pop("force_create", False))
 
     rp = req.responsible_party
     if rp is not None:
         if rp.relationship:
-            payload["responsible_party_relationship"] = rp.relationship
+            raw["responsible_party_relationship"] = rp.relationship
         elif rp.is_self:
-            payload["responsible_party_relationship"] = "self"
+            raw["responsible_party_relationship"] = patient_rules_service.RESP_PARTY_REL_SELF
         # Link an already-existing guarantor now; is_self / inline person resolved
         # after the patient has an id.
         if not rp.is_self and rp.person is None and rp.responsible_party_id:
-            payload["responsible_party_id"] = rp.responsible_party_id
+            raw["responsible_party_id"] = rp.responsible_party_id
+
+    # Add/Edit Patient checkbox integrity: contradictory Patient Type tags are
+    # rejected and the implied Patient Status flags forced, before the duplicate
+    # check — registration must not be able to route around the rules that
+    # PATCH /patients/{id} enforces. (Also folds the GAP-AP-25 relationship code
+    # and the GAP-AP-19 middle initial.)
+    payload = patient_rules_service.normalize_patient_payload(raw)
+
+    # KAN-108: Quick Save posts straight here, so the duplicate guard has to live
+    # server-side — a client that forgets to call /patients/check-duplicate must
+    # not be able to create a duplicate silently. GAP-AP-21: the same function
+    # guards the plain POST /patients.
+    patient_extra_service.raise_if_duplicate(db, tenant_id, payload, force_create=force_create)
+
+    payload["tenant_id"] = tenant_id
+    if user_id is not None:
+        payload.setdefault("created_by", user_id)
 
     patient = Patient(**payload)
     db.add(patient)
@@ -147,41 +157,44 @@ def register_patient(db: Session, tenant_id: int, req, *, user_id: int | None = 
             patient.responsible_party_id = str(patient.id)
         elif rp.person is not None:
             # LEG-10: create the non-self guarantor and link it in the same txn.
-            guarantor = ResponsibleParty(
-                tenant_id=tenant_id, created_by=user_id,
-                **rp.person.model_dump(exclude_unset=True),
-            )
+            person = rp.person.model_dump(exclude_unset=True)
+            patient_rules_service.fold_middle_name(person)
+            guarantor = ResponsibleParty(tenant_id=tenant_id, created_by=user_id, **person)
             db.add(guarantor)
             db.flush()
             patient.responsible_party_id = str(guarantor.id)
 
-    alert_rows = [
-        PatientMedicalAlert(
-            tenant_id=tenant_id, patient_id=patient.id, created_by=user_id,
-            alert_code=a.alert_code, alert_label=a.alert_label,
-            response=a.response, comments=a.comments,
-        )
-        for a in req.medical_alerts
-    ]
-    quest_rows = [
-        PatientQuestionnaireResponse(
-            tenant_id=tenant_id, patient_id=patient.id, created_by=user_id,
-            questionnaire_type=q.questionnaire_type, question_code=q.question_code,
-            question_text=q.question_text, answer=q.answer,
-        )
-        for q in req.questionnaire_responses
-    ]
+    # GAP-AP-22: alerts and questionnaire answers go through the same reconcile
+    # the composite Medical History write and the bulk endpoints use, so the
+    # MH-12 contradiction rules, the MA-3 catalog fill, the MH-8 change log and
+    # the MH-14 flash-alert propagation all hold on a registration too (the
+    # bare inserts here used to bypass every one of them).
+    alerts = mh.apply_alert_answers(
+        db, tenant_id, patient.id, [a.model_dump(exclude_unset=True) for a in req.medical_alerts],
+        user_id=user_id, allow_contradictions=bool(getattr(req, "allow_contradictions", False)),
+    ) if req.medical_alerts else {"rows": [], "contradictions": []}
+    answers = mh.apply_questionnaire_answers(
+        db, tenant_id, patient.id,
+        [q.model_dump(exclude_unset=True) for q in req.questionnaire_responses],
+        user_id=user_id,
+    ) if req.questionnaire_responses else {"rows": []}
+
     recall_rows = [
         PatientRecall(
             patient_id=patient.id, created_by=user_id, office_id=r.office_id,
             recall_type=r.recall_type, procedure_code=r.procedure_code,
-            due_date=r.due_date, interval_months=r.interval_months, notes=r.notes,
+            due_date=r.due_date, interval_months=r.interval_months,
+            # GAP-AP-23 / LEG-17
+            interval_unit=r.interval_unit, scheduled_date=r.scheduled_date,
+            scheduled_time=r.scheduled_time,
+            notes=r.notes,
         )
         for r in req.recalls
     ]
-    for rows in (alert_rows, quest_rows, recall_rows):
-        db.add_all(rows)
+    db.add_all(recall_rows)
     db.flush()
+
+    insurance_out = _register_insurance(db, tenant_id, patient.id, list(req.insurance or []))
 
     opening_seeded = False
     if req.opening_balance is not None:
@@ -193,17 +206,100 @@ def register_patient(db: Session, tenant_id: int, req, *, user_id: int | None = 
         ))
         opening_seeded = True
 
+    if req.medical_alerts:
+        mh.sync_flash_alerts(db, tenant_id, patient.id, user_id=user_id)
     db.commit()
     db.refresh(patient)
     return {
         "patient_id": patient.id,
         "chart_no": patient.chart_no,
         "responsible_party_id": patient.responsible_party_id,
-        "medical_alert_ids": [a.id for a in alert_rows],
-        "questionnaire_response_ids": [q.id for q in quest_rows],
+        "medical_alert_ids": [a.id for a in alerts["rows"]],
+        "questionnaire_response_ids": [q.id for q in answers["rows"]],
         "recall_ids": [r.id for r in recall_rows],
+        "insurance": insurance_out,
         "opening_balance_seeded": opening_seeded,
+        "contradictions": alerts.get("contradictions") or [],
     }
+
+
+def _rank_index(insurance_type: str | None) -> int:
+    rank = str(insurance_type or "").strip().lower()
+    ranks = patient_rules_service.INSURANCE_RANKS
+    return ranks.index(rank) if rank in ranks else len(ranks)
+
+
+def _register_insurance(db: Session, tenant_id: int, patient_id: int, slots: list) -> list[dict]:
+    """GAP-AP-24: subscriber + ``patient_insurance`` link per slot, inside the
+    registration transaction.
+
+    Slots are applied primary-first regardless of payload order so the Coverage
+    Type rank rule (``validate_coverage_slot``, secondary needs primary) judges
+    the set the user built rather than the order the form serialised it in.
+    Every failure is a 422 that names the slot (``details.index``) — the
+    orphaned-subscriber case (BUG-3's side effect) cannot happen because the
+    whole transaction rolls back.
+    """
+    out: list[tuple[int, dict]] = []
+    ordered = sorted(enumerate(slots), key=lambda pair: _rank_index(pair[1].link.insurance_type))
+    for index, slot in ordered:
+        link = slot.link.model_dump(exclude_unset=True)
+        if slot.subscriber is not None:
+            sub = slot.subscriber.model_dump(exclude_unset=True)
+            plan_id = sub.get("ins_plan_id")
+            if db.execute(
+                select(InsurancePlan.id).where(
+                    InsurancePlan.id == plan_id, InsurancePlan.tenant_id == tenant_id
+                )
+            ).scalar_one_or_none() is None:
+                raise ValidationError(
+                    f"Insurance plan '{plan_id}' was not found.",
+                    code="insurance_plan_not_found",
+                    details={"field": "insurance.subscriber.ins_plan_id", "index": index,
+                             "ins_plan_id": plan_id},
+                )
+            subscriber = InsuranceSubscriber(
+                tenant_id=tenant_id,
+                subscriber_patient_id=patient_id if slot.subscriber_is_patient else None,
+                **sub,
+            )
+            db.add(subscriber)
+            db.flush()
+        else:
+            subscriber = db.execute(
+                select(InsuranceSubscriber).where(
+                    InsuranceSubscriber.id == slot.subscriber_id,
+                    InsuranceSubscriber.tenant_id == tenant_id,
+                )
+            ).scalar_one_or_none()
+            if subscriber is None:
+                raise ValidationError(
+                    f"Insurance subscriber '{slot.subscriber_id}' was not found.",
+                    code="insurance_subscriber_not_found",
+                    details={"field": "insurance.subscriber_id", "index": index,
+                             "subscriber_id": slot.subscriber_id},
+                )
+        link.setdefault("ins_plan_id", subscriber.ins_plan_id)
+        try:
+            patient_rules_service.validate_coverage_slot(
+                db, patient_id=patient_id,
+                legacy_plan_type=link.get("legacy_plan_type"),
+                insurance_type=link.get("insurance_type"),
+                is_active=bool(link.get("is_active", True)),
+            )
+        except ValidationError as exc:
+            exc.details = {**(exc.details or {}), "index": index}
+            raise
+        row = PatientInsurance(patient_id=patient_id, subscriber_id=subscriber.id, **link)
+        db.add(row)
+        db.flush()
+        out.append((index, {
+            "subscriber_id": subscriber.id, "patient_insurance_id": row.id,
+            "ins_plan_id": row.ins_plan_id, "legacy_plan_type": row.legacy_plan_type,
+            "insurance_type": row.insurance_type,
+        }))
+    # Report in payload order so the caller can pair results with its slots.
+    return [result for _, result in sorted(out, key=lambda pair: pair[0])]
 
 
 # ── Account plans (LEG-5) ─────────────────────────────────────────────────────

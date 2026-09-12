@@ -17,17 +17,21 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Body, Depends, File, Form, Path, Response, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Form, Path, Query, Response, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
 from app.schemas.common import ErrorResponse
 from app.schemas.progress_notes import (
+    NoteMacroAvailabilityResult,
     NoteMacroCategory,
+    NoteMacroLimits,
     ProgressNoteAttachmentRead,
     ProgressNoteSignRequest,
     ProgressNoteSignResult,
 )
+from app.services import note_macro_service as macro_svc
 from app.services import progress_notes_service as svc
 from app.services.user_admin_service import resolve_user_names
 
@@ -79,7 +83,9 @@ async def upload_attachment(
     description: Annotated[str | None, Form()] = None,
 ):
     data = await file.read()
-    return svc.create_attachment(
+    # EDIT-PLAN-7: sync DB + storage work must not run on the event loop.
+    return await run_in_threadpool(
+        svc.create_attachment,
         db, tenant_id, note_id, attachment_type=attachment_type, description=description,
         file_name=file.filename or "attachment", content_type=file.content_type,
         data=data, user_id=current.id,
@@ -125,3 +131,26 @@ macro_router = APIRouter(prefix="/note-macros", tags=["Procedures"], dependencie
                   summary="Distinct macro categories for the Category dropdown (PN-6)")
 def list_note_macro_categories(db: DbSession, tenant_id: TenantId):
     return svc.note_macro_categories(db, tenant_id)
+
+
+@macro_router.get("/limits", response_model=NoteMacroLimits,
+                  operation_id="get_note_macro_limits",
+                  summary="Field caps + duplicate rule the API enforces on note macros (NM-5)")
+def get_note_macro_limits():
+    return macro_svc.limits()
+
+
+@macro_router.get("/availability", response_model=NoteMacroAvailabilityResult,
+                  operation_id="check_note_macro_availability",
+                  summary="Check whether a macro name is already taken in a category (NM-5)")
+def check_note_macro_availability(
+    db: DbSession,
+    tenant_id: TenantId,
+    name: Annotated[str, Query(description="Macro name to test (trimmed, case-insensitive)")],
+    category: Annotated[str | None, Query(description="Category (blank == none)")] = None,
+    exclude_id: Annotated[int | None, Query(description="Ignore this macro (the one being edited)")] = None,
+):
+    """``taken`` means a macro with the identical name exists in this category, so
+    a save will 409 unless ``allow_duplicate`` is sent. ``other_category_matches``
+    (same name, another category) are reported and never block."""
+    return macro_svc.availability(db, tenant_id, name=name, category=category, exclude_id=exclude_id)

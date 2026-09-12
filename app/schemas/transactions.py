@@ -19,6 +19,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
+from app.core.datetimes import UtcDatetime
 
 Period = Literal["today", "week", "month", "year", "custom"]
 
@@ -366,7 +367,7 @@ class InsurancePaymentReverseResult(BaseModel):
     claim_id: str | None = None
     reversed_amount: Decimal
     reason: str
-    voided_at: datetime | None = None
+    voided_at: UtcDatetime | None = None
     claim: ClaimMoneyTotals | None = None
 
 
@@ -401,6 +402,14 @@ class ClaimSubmitRequest(BaseModel):
     sent_date: date | None = None
     batch_id: str | None = None
     is_preauth: bool = False
+    # PROC-7c: a procedure whose code requires a supporting record (x-ray, perio
+    # chart, photo, attachment, missing-tooth info) that is not on file makes the
+    # submit a 422 ``supporting_records_missing``. This is the override — the
+    # practice may knowingly send a thin claim; the result reports it was used.
+    allow_missing_records: bool = Field(
+        False, description="Submit even though GET /insurance-claims/{id}/readiness reports "
+                           "missing supporting records (PROC-7c override)",
+    )
 
 
 class ClaimSubmitResult(BaseModel):
@@ -411,6 +420,11 @@ class ClaimSubmitResult(BaseModel):
     sent_date: date
     send_method: str
     submission_id: int
+    # PROC-7c: true when the submit went through on allow_missing_records.
+    missing_records_overridden: bool = False
+    # ADA-BE-1/CLM-FO-5: the assembled form's warnings (unresolved NPI, dangling
+    # diagnosis pointer, …) — the snapshot is on claim_submissions.claim_text.
+    form_warnings: list[dict] = Field(default_factory=list)
 
 
 # ── AUD-3: claim status history ──────────────────────────────────────────────

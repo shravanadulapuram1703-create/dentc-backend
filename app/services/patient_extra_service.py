@@ -11,6 +11,8 @@ from app.core import filestore
 from app.core.config import settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.db.models import (
+    User,
+    ConsentSignature,
     ClaimAttachment,
     InsuranceClaim,
     LedgerInsuranceDetail,
@@ -36,6 +38,37 @@ _SCAN_LIMIT = 200
 _MAX_CANDIDATES = 25
 
 
+def _validate_document_links(
+    db: Session, patient_id: int, procedure_id: str | None, claim_id: str | None,
+) -> tuple[str | None, str | None]:
+    """PROC-7c: a document tied to a procedure/claim renders inside *that*
+    patient's chart and counts toward *that* charge's ``requires_attachment``,
+    so a mis-pointed id is both a PHI disclosure and a false "attached" — 422,
+    never a silent write. Blank strings (a multipart form's way of saying
+    "none") are treated as absent."""
+    procedure_id = (procedure_id or "").strip() or None
+    claim_id = (claim_id or "").strip() or None
+    if procedure_id is not None:
+        proc = db.get(PatientProcedure, procedure_id)
+        if proc is None or proc.patient_id != patient_id:
+            raise ValidationError(
+                "procedure_id does not belong to this patient",
+                details={"code": "document_procedure_mismatch", "field": "procedure_id",
+                         "procedure_id": procedure_id, "patient_id": patient_id},
+            )
+        if claim_id is None and proc.claim_id:
+            claim_id = proc.claim_id  # a document on a claimed charge is on its claim too
+    if claim_id is not None:
+        claim = db.get(InsuranceClaim, claim_id)
+        if claim is None or claim.patient_id != patient_id:
+            raise ValidationError(
+                "claim_id does not belong to this patient",
+                details={"code": "document_claim_mismatch", "field": "claim_id",
+                         "claim_id": claim_id, "patient_id": patient_id},
+            )
+    return procedure_id, claim_id
+
+
 def _require_patient(db: Session, patient_id: int, tenant_id: int) -> Patient:
     p = db.execute(
         select(Patient).where(Patient.id == patient_id, Patient.tenant_id == tenant_id)
@@ -49,6 +82,7 @@ def _require_patient(db: Session, patient_id: int, tenant_id: int) -> Patient:
 def list_documents(
     db: Session, tenant_id: int, patient_id: int | None = None, *,
     document_type: str | None = None, office_id: int | None = None,
+    procedure_id: str | None = None, claim_id: str | None = None,
     search: str | None = None, page: int = 1, size: int = 20,
 ) -> tuple[list[PatientDocument], int]:
     """LTR-12: filtered + paged, matching the rest of the API.
@@ -68,6 +102,10 @@ def list_documents(
         clauses.append(PatientDocument.document_type == document_type)
     if office_id is not None:
         clauses.append(PatientDocument.office_id == office_id)
+    if procedure_id:
+        clauses.append(PatientDocument.procedure_id == procedure_id)
+    if claim_id:
+        clauses.append(PatientDocument.claim_id == claim_id)
     if search:
         term = f"%{search.strip()}%"
         clauses.append(or_(
@@ -113,9 +151,10 @@ def create_document(
     db: Session, tenant_id: int, patient_id: int, *, office_id: int | None,
     document_type: str | None, description: str | None,
     file_name: str, content_type: str | None, data: bytes, user_id: int | None,
-    context: str | None = None,
+    context: str | None = None, procedure_id: str | None = None, claim_id: str | None = None,
 ) -> PatientDocument:
     _require_patient(db, patient_id, tenant_id)
+    procedure_id, claim_id = _validate_document_links(db, patient_id, procedure_id, claim_id)
     filestore.validate_upload(file_name, content_type, data)
     # LTR-1 / NOTE-DOC-2: everything lands under the bucket's ``documents/`` root
     # — ``documents/notes/`` when the caller declares ``context=note``, else
@@ -132,6 +171,7 @@ def create_document(
         file_path=stored.path, file_url=stored.url,
         storage_backend=stored.backend, storage_bucket=stored.bucket,
         storage_path=stored.path,
+        procedure_id=procedure_id, claim_id=claim_id,
         created_by=user_id,
     )
     db.add(doc)
@@ -180,20 +220,123 @@ def _require_consent(db: Session, tenant_id: int, consent_id: int) -> PatientCon
     return row
 
 
+def _resolve_countersigner(db: Session, tenant_id: int, item: dict) -> tuple[int | None, str | None]:
+    user_id = item.get("signer_user_id")
+    provider_id = item.get("signer_provider_id")
+    if user_id is not None:
+        user = db.get(User, int(user_id))
+        if user is None or user.tenant_id != tenant_id:
+            raise ValidationError("signer_user_id does not name a user in this practice",
+                                  code="countersigner_not_found", details={"field": "signer_user_id"})
+    if provider_id is not None:
+        provider = db.get(Provider, str(provider_id))
+        if provider is None or provider.tenant_id != tenant_id:
+            raise ValidationError("signer_provider_id does not name a provider in this practice",
+                                  code="countersigner_not_found", details={"field": "signer_provider_id"})
+    return (int(user_id) if user_id is not None else None,
+            str(provider_id) if provider_id is not None else None)
+
+
+def _add_countersign(db: Session, tenant_id: int, consent: PatientConsent, item: dict,
+                     user_id: int | None) -> ConsentSignature:
+    """CS-2: one countersignature line (dentist / hygienist / …) on a consent."""
+    role = (item.get("role") or "").strip().lower().replace(" ", "_")
+    if role not in sig_svc.CONSENT_COUNTERSIGN_ROLES:
+        raise ValidationError(
+            f"role must be one of {', '.join(sig_svc.CONSENT_COUNTERSIGN_ROLES)}",
+            code="invalid_countersign_role", details={"field": "role", "value": role},
+        )
+    if not (item.get("signature_data") or "").strip():
+        raise ValidationError("A countersignature needs signature_data", code="signature_required",
+                              details={"field": "signature_data", "role": role})
+    signer_user_id, signer_provider_id = _resolve_countersigner(db, tenant_id, item)
+    capture = sig_svc.normalise_capture(item)
+    signed_at, _source = sig_svc.resolve_signed_at(item.get("signed_at"))
+    row = ConsentSignature(
+        tenant_id=tenant_id, consent_id=consent.id, role=role,
+        signer_user_id=signer_user_id, signer_provider_id=signer_provider_id,
+        signer_name=(item.get("signer_name") or "").strip()[:120] or None,
+        captured_at=capture.get("signed_at") if item.get("signed_at") is not None else None,
+        content_hash=sig_svc.consent_content_hash(consent.rendered_html),
+        is_active=True, created_by=user_id,
+    )
+    sig_svc.apply_capture(row, capture)
+    row.signed_at = signed_at
+    db.add(row)
+    db.flush()
+    sig_svc.record_event(
+        db, tenant_id=tenant_id, entity_type=sig_svc.ENTITY_CONSENT_SIGNATURE, entity_id=row.id,
+        event=sig_svc.EVENT_CAPTURED, actor_id=user_id, patient_id=consent.patient_id, source=row,
+        signature_type=f"consent_{role}", content_hash=row.content_hash,
+        occurred_at=row.signed_at, reason=f"consent {consent.id}",
+    )
+    return row
+
+
+def add_countersign(db: Session, tenant_id: int, consent_id: int, payload: dict,
+                    user_id: int | None) -> ConsentSignature:
+    """``POST /patient-consents/{id}/countersign`` — a line signed after the
+    patient's (the stored flow), on any consent that is not declined / voided."""
+    consent = _require_consent(db, tenant_id, consent_id)
+    if consent.status in ("declined", "voided"):
+        raise ConflictError(f"Consent '{consent_id}' is {consent.status}; it cannot be countersigned",
+                            code="consent_not_signable")
+    row = _add_countersign(db, tenant_id, consent, payload, user_id)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def list_consent_signatures(db: Session, tenant_id: int, consent_id: int) -> list[ConsentSignature]:
+    _require_consent(db, tenant_id, consent_id)
+    return list(db.execute(
+        select(ConsentSignature).where(ConsentSignature.consent_id == consent_id)
+        .order_by(ConsentSignature.id)
+    ).scalars().all())
+
+
+def void_countersign(db: Session, tenant_id: int, consent_id: int, signature_id: int,
+                     user_id: int | None, reason: str | None) -> ConsentSignature:
+    _require_consent(db, tenant_id, consent_id)
+    row = db.get(ConsentSignature, signature_id)
+    if row is None or row.consent_id != consent_id or row.tenant_id != tenant_id:
+        raise NotFoundError(f"Consent signature '{signature_id}' was not found")
+    if not row.is_active:
+        raise ValidationError("This countersignature has already been voided",
+                              code="signature_already_inactive")
+    row.is_active = False
+    row.voided_at = datetime.now(timezone.utc)
+    row.voided_by = user_id
+    sig_svc.record_event(
+        db, tenant_id=tenant_id, entity_type=sig_svc.ENTITY_CONSENT_SIGNATURE, entity_id=row.id,
+        event=sig_svc.EVENT_VOIDED, actor_id=user_id, patient_id=None, source=row,
+        signature_type=f"consent_{row.role}", content_hash=row.content_hash, reason=reason,
+    )
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 def sign_consent(
     db: Session, tenant_id: int, consent_id: int, payload: dict, user_id: int | None,
 ) -> PatientConsent:
     """Capture a signature against an existing consent row.
 
-    Two routes into the same record, mirroring how a practice actually works:
+    Routes into the same record, mirroring how a practice actually works:
 
-    * ``signature_data`` — a base64 canvas capture signed on-screen.
-    * ``document_id``    — an already-uploaded scan of the wet-signed paper copy,
-      which must belong to the same tenant *and* the same patient as the consent.
+    * ``signature_data`` — the pad / canvas capture (+ the Topaz block).
+    * ``document_id``    — an already-uploaded scan of the wet-signed paper copy.
+    * ``signed_document_id`` (CS-1) — the PDF rebuilt with the signature stamped
+      on the lines, kept *beside* ``document_id``; sent together with
+      ``signature_data`` in both viewer flows.
+    * ``countersigns[]`` (CS-2) — the dentist / hygienist / … lines.
 
-    One of the two is required unless the caller is recording a ``declined``
-    outcome. Signing is idempotent-ish but not silent: re-signing an already
-    signed consent is a conflict, because the earlier signature is the record.
+    Every document must belong to the same tenant *and* patient as the consent.
+    One of signature / document is required unless the caller records a
+    ``declined`` outcome. Re-signing an already signed consent is a conflict,
+    because the earlier signature is the record. **CS-7**: the signer is any user
+    of the practice — never required to be the consent's ``created_by``; a
+    hygienist signs what the front desk printed.
     """
     consent = _require_consent(db, tenant_id, consent_id)
 
@@ -205,6 +348,7 @@ def sign_consent(
 
     signature = payload.get("signature_data")
     document_id = payload.get("document_id")
+    signed_document_id = payload.get("signed_document_id")
     method = (payload.get("signature_method") or "").strip().lower() or None
     if method and method not in SIGNATURE_METHODS:
         raise ValidationError(
@@ -217,9 +361,9 @@ def sign_consent(
             raise ConflictError(
                 f"Consent '{consent_id}' is already signed", code="already_signed"
             )
-        if not signature and document_id is None:
+        if not signature and document_id is None and signed_document_id is None:
             raise ValidationError(
-                "Signing requires either signature_data or document_id",
+                "Signing requires signature_data, document_id or signed_document_id",
                 code="signature_required",
             )
         if signature and len(signature) > _MAX_SIGNATURE_CHARS:
@@ -230,20 +374,34 @@ def sign_consent(
     capture = sig_svc.normalise_capture(payload)
     is_topaz = bool(capture.get("sig_string")) or capture.get("device_source") == sig_svc.DEVICE_SOURCE_TOPAZ
 
-    if document_id is not None:
-        doc = get_document(db, tenant_id, int(document_id))
+    def _same_patient_document(doc_id, field: str):  # noqa: ANN001, ANN202
+        doc = get_document(db, tenant_id, int(doc_id))
         if doc.patient_id != consent.patient_id:
             raise ValidationError(
-                "document_id belongs to a different patient", code="document_patient_mismatch"
+                f"{field} belongs to a different patient", code="document_patient_mismatch",
+                details={"field": field},
             )
-        consent.document_id = doc.id
-        method = method or "scanned"
-    elif signature:
+        return doc
+
+    if document_id is not None:
+        consent.document_id = _same_patient_document(document_id, "document_id").id
+    if signed_document_id is not None:
+        consent.signed_document_id = _same_patient_document(signed_document_id, "signed_document_id").id
+    # The method follows the capture, not the presence of a scan: a pad
+    # signature that also hands over its signed PDF is still ``topaz``.
+    if signature:
         method = method or ("topaz" if is_topaz else "drawn")
+    elif document_id is not None:
+        method = method or "scanned"
 
     if signature:
         consent.signature_data = signature
         capture.pop("signature_data", None)
+    # CS-3: the client's capture time is honoured within tolerance; the raw
+    # value is kept either way.
+    client_signed_at = payload.get("signed_at")
+    signed_at, signed_at_source = sig_svc.resolve_signed_at(client_signed_at)
+    capture.pop("signed_at", None)
     sig_svc.apply_capture(consent, capture)
     consent.status = status
     consent.signature_method = method
@@ -252,11 +410,18 @@ def sign_consent(
     consent.declined_reason = payload.get("declined_reason") or consent.declined_reason
     if status in ("signed", "declined"):
         consent.signed_by = user_id
-        consent.signed_at = datetime.now(timezone.utc)
+        consent.signed_at = signed_at
+        consent.signed_at_source = signed_at_source
+        consent.captured_at = (
+            sig_svc.resolve_signed_at(client_signed_at, tolerance_minutes=10 ** 9)[0]
+            if client_signed_at is not None else None
+        )
     if status == "signed":
         # SIG-7: freeze what was signed. An edit to rendered_html afterwards
         # reads as ``signature_status="stale"`` instead of silently re-attesting.
+        # CS-4: and keep the as-signed HTML itself, immutable.
         consent.content_hash = sig_svc.consent_content_hash(consent.rendered_html)
+        consent.signed_rendered_html = consent.rendered_html
     event = {"signed": sig_svc.EVENT_CAPTURED, "declined": sig_svc.EVENT_DECLINED,
              "voided": sig_svc.EVENT_VOIDED}.get(status)
     if event is not None:
@@ -267,6 +432,9 @@ def sign_consent(
             reason=consent.declined_reason if status == "declined" else None,
             occurred_at=consent.signed_at,
         )
+    # CS-2: the countersign lines captured in the same sitting.
+    for item in payload.get("countersigns") or []:
+        _add_countersign(db, tenant_id, consent, dict(item), user_id)
     db.commit()
     db.refresh(consent)
     sig_svc.enrich_patient_consents(db, [consent], tenant_id)
@@ -453,6 +621,48 @@ def _digits(value: str | None) -> str:
     return "".join(ch for ch in (value or "") if ch.isdigit())
 
 
+# GAP-AP-21: identifiers that are placeholders, not identities. The dev/UAT
+# data holds SSN ``123456789`` on nine patients and chart ``123456`` on more;
+# any single one of them used to block *every* later registration with a 409,
+# because a lone SSN/chart match counted as a certain duplicate. A value that
+# cannot identify anyone is never matched on at all — not in the SQL, not in
+# the score — so ``check_duplicate`` never reports it and the 409 never fires.
+_SYNTHETIC_DIGIT_RUNS = frozenset({
+    "123456789", "987654321", "12345678", "1234567", "123456", "12345", "1234",
+    "0123456789", "1234567890",
+    "078051120",  # the 1938 Woolworth wallet-card SSN, the most-used SSN ever
+    "219099999",  # the SSA's advertised never-issued number
+})
+
+
+def is_synthetic_identifier(value: str | None) -> bool:
+    """True when ``value`` is an obvious placeholder (all one digit, a keyboard
+    run, the famous never-issued SSNs) or too short to identify anyone."""
+    text = (value or "").strip()
+    if not text:
+        return True
+    if any(ch.isalpha() for ch in text):
+        # ``CH-DUP1``, ``A1``: an alphanumeric chart number is a real identifier
+        # however few digits it carries; the digit heuristics below are for
+        # purely numeric values, where "1234" really is a placeholder.
+        return False
+    digits = _digits(text)
+    if not digits:
+        return True  # punctuation only
+    if len(digits) < 4:
+        return True
+    if len(set(digits)) == 1:  # 000000000, 111111111, 999999999 …
+        return True
+    if digits in _SYNTHETIC_DIGIT_RUNS:
+        return True
+    # SSA rules: area 000/666/9xx and a 00 group or 0000 serial are never issued.
+    if len(digits) == 9:
+        area, group, serial = digits[:3], digits[3:5], digits[5:]
+        if area in ("000", "666") or area.startswith("9") or group == "00" or serial == "0000":
+            return True
+    return False
+
+
 # Normalised phone comparison. Patient.phone is free-form ("(555) 123-4567",
 # "555-123-4567", …) so a literal compare misses; strip the separators in SQL the
 # same way appointnow_service does.
@@ -472,6 +682,11 @@ def check_duplicate(db: Session, tenant_id: int, req: dict) -> list[dict]:
     """
     first, last = (req.get("first_name") or "").strip(), (req.get("last_name") or "").strip()
     dob, ssn, chart_no = req.get("dob"), req.get("ssn"), req.get("chart_no")
+    # GAP-AP-21: a placeholder identifier matches nothing.
+    if is_synthetic_identifier(ssn):
+        ssn = None
+    if is_synthetic_identifier(chart_no):
+        chart_no = None
     phone, email = (req.get("phone") or "").strip(), (req.get("email") or "").strip()
     phone_digits = _digits(phone)
     if not any([first, last, ssn, chart_no, phone_digits, email]):
@@ -556,12 +771,41 @@ def _is_strong(match_on: list[str]) -> bool:
     registration, so a false positive blocks legitimate work. A shared surname,
     or a household phone shared by a parent and child, must not qualify on its
     own — the full name has to line up as well.
+
+    GAP-AP-21: an SSN or chart-number match needs *one* corroborating field
+    (last name or DOB). Placeholders are already filtered out before matching,
+    so what reaches here is a real-looking value — but ``chart_no`` is not
+    unique in the migrated data (10,045 duplicated groups) and a mistyped SSN
+    is far more common than two records for one person under different names
+    and birthdays. Such a hit is still *reported* (``match_on``/score), so the
+    user sees it; it just does not refuse the registration on its own.
     """
     got = set(match_on)
-    if "ssn" in got or "chart_no" in got:
+    corroborated = bool(got & {"last_name", "dob"})
+    if ("ssn" in got or "chart_no" in got) and corroborated:
         return True
     full_name = {"first_name", "last_name"} <= got
     return full_name and bool(got & {"dob", "phone", "email"})
+
+
+def raise_if_duplicate(db: Session, tenant_id: int, payload: dict, *, force_create: bool) -> None:
+    """The one 409 both create paths raise (GAP-AP-21).
+
+    ``POST /patients`` and ``POST /patients/register`` used to disagree: the
+    composite refused a strong match and the plain create accepted the identical
+    body, so the guard was bypassed by the very endpoint the frontend fell back
+    to. The body shape (``error.details.candidates[]``) is what the UI's
+    "Identical Patients Found" modal consumes — keep it stable.
+    """
+    if force_create:
+        return
+    dupes = find_strong_duplicates(db, tenant_id, payload)
+    if dupes:
+        raise ConflictError(
+            "A patient matching these details already exists.",
+            code="duplicate_patient",
+            details={"candidates": dupes, "override_field": "force_create"},
+        )
 
 
 def find_strong_duplicates(db: Session, tenant_id: int, req: dict) -> list[dict]:

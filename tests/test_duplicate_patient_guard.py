@@ -97,7 +97,21 @@ def test_genuinely_new_patient_still_registers(client, existing):
     assert r.status_code == 201, r.text
 
 
-def test_ssn_match_alone_blocks(client, existing):
-    """SSN is unique per person — it needs no corroboration."""
-    r = _register(client, {"first_name": "M", "last_name": "D", "ssn": "222-33-4444"})
+def test_ssn_plus_last_name_blocks(client, existing):
+    """GAP-AP-21: a real SSN needs one corroborating field (last name or DOB)."""
+    r = _register(client, {"first_name": "M", "last_name": "Delgado", "ssn": "222-33-4444"})
     assert r.status_code == 409, r.text
+    cand = r.json()["error"]["details"]["candidates"][0]
+    assert cand["id"] == existing.id and "ssn" in cand["match_on"]
+
+
+def test_ssn_match_with_different_name_and_dob_is_reported_not_strong(client, existing):
+    """A mistyped SSN under another name and birthday is far more common than two
+    records for one person — surface it, do not refuse on it alone."""
+    r = client.post("/api/v1/patients/check-duplicate",
+                    json={"first_name": "M", "last_name": "D", "dob": "1999-01-01",
+                          "ssn": "222-33-4444"})
+    cand = next(c for c in r.json()["candidates"] if c["id"] == existing.id)
+    assert cand["match_on"] == ["ssn"] and cand["is_strong"] is False
+    r = _register(client, {"first_name": "M", "last_name": "D", "ssn": "222-33-4444"})
+    assert r.status_code == 201, r.text

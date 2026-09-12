@@ -22,12 +22,21 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Request
 
-from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
+from app.api.deps import (
+    CurrentUser,
+    DbSession,
+    PageParams,
+    TenantId,
+    get_current_user,
+    require_permission,
+)
+from app.core import concurrency
 from app.db.models import Employer, InsuranceCarrier
 from app.schemas.common import ErrorResponse
 from app.schemas.insurance import (
+    AffectedTreatmentPlansResponse,
     EligibilityVerifyRequest,
     EligibilityVerifyResult,
     GroupAvailabilityResult,
@@ -36,10 +45,27 @@ from app.schemas.insurance import (
     PlanCopyRequest,
     PlanCoverageReplaceRequest,
     PlanCoverageResponse,
+    PlanHistoryResponse,
+    PlanReEstimateRequest,
+    PlanReEstimateResult,
+    PlanUsage,
 )
-from app.services import insurance_plan_service, insurance_service
+from app.services import (
+    insurance_plan_edit_service,
+    insurance_plan_service,
+    insurance_service,
+    permission_service,
+)
 
 _ERRORS = {401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}}
+# EDIT-PLAN-5: the plan write paths share one permission dependency.
+_plan_write = Depends(require_permission(
+    *permission_service.INSURANCE_PLAN_WRITE, action="edit insurance plans",
+))
+_WRITE_ERRORS = {
+    403: {"model": ErrorResponse}, 412: {"model": ErrorResponse},
+    422: {"model": ErrorResponse}, 423: {"model": ErrorResponse},
+}
 
 router = APIRouter(
     prefix="/insurance-subscribers",
@@ -155,7 +181,8 @@ def get_insurance_plan_coverage(
     response_model=PlanCoverageResponse,
     operation_id="replace_insurance_plan_coverage",
     summary="Replace a plan's coverage rules and/or frequency code groups atomically (PLAN-DTL-8)",
-    responses={422: {"model": ErrorResponse}},
+    dependencies=[_plan_write],
+    responses=_WRITE_ERRORS,
 )
 def replace_insurance_plan_coverage(
     db: DbSession,
@@ -163,6 +190,7 @@ def replace_insurance_plan_coverage(
     current: CurrentUser,
     plan_id: Annotated[int, Path()],
     body: PlanCoverageReplaceRequest,
+    request: Request,
 ):
     """One transaction for what used to be ~30 sequential POSTs.
 
@@ -171,14 +199,24 @@ def replace_insurance_plan_coverage(
     ``legacy_id`` survive), an item without one is inserted, and existing rows
     not mentioned are deleted. Any failure rolls the whole call back — no
     partial table.
+
+    EDIT-PLAN-1: send ``expected_updated_at`` (the plan's ``updated_at`` you
+    read) or ``If-Match`` / ``If-Unmodified-Since`` and the write is **412**
+    if the plan changed since — the plan row is the version of the whole
+    coverage document. EDIT-PLAN-5: **423 plan_locked** on a locked plan.
     """
+    concurrency.from_headers(request.headers)
     rules = [r.model_dump(exclude_unset=True) for r in body.rules] if body.rules is not None else None
     groups = (
         [g.model_dump(exclude_unset=True) for g in body.frequency_groups]
         if body.frequency_groups is not None else None
     )
+    kwargs = {}
+    if "expected_updated_at" in body.model_fields_set:
+        kwargs["expected_updated_at"] = body.expected_updated_at
     return insurance_plan_service.replace_plan_coverage(
         db, plan_id, tenant_id, rules=rules, frequency_groups=groups, actor_id=current.id,
+        **kwargs,
     )
 
 
@@ -187,7 +225,8 @@ def replace_insurance_plan_coverage(
     response_model=PlanCoverageResponse,
     operation_id="copy_insurance_plan_from",
     summary="COPY FROM EXISTING — copy another plan's coverage table (and optionally its plan fields)",
-    responses={422: {"model": ErrorResponse}},
+    dependencies=[_plan_write],
+    responses=_WRITE_ERRORS,
 )
 def copy_insurance_plan_from(
     db: DbSession,
@@ -195,8 +234,10 @@ def copy_insurance_plan_from(
     current: CurrentUser,
     plan_id: Annotated[int, Path()],
     source_plan_id: Annotated[int, Path()],
+    request: Request,
     body: PlanCopyRequest | None = None,
 ):
+    concurrency.from_headers(request.headers)
     req = body or PlanCopyRequest()
     return insurance_plan_service.copy_plan_coverage(
         db, plan_id, source_plan_id, tenant_id,
@@ -204,6 +245,95 @@ def copy_insurance_plan_from(
         include_frequency_groups=req.include_frequency_groups,
         include_plan_fields=req.include_plan_fields,
         actor_id=current.id,
+    )
+
+
+# ── EDIT-PLAN-2: usage / impact ──────────────────────────────────────────────
+@plans_router.get(
+    "/{plan_id}/usage",
+    response_model=PlanUsage,
+    operation_id="get_insurance_plan_usage",
+    summary="Who is on this plan — distinct patients, subscribers, open claims, pending treatment plans (EDIT-PLAN-2)",
+)
+def get_insurance_plan_usage(db: DbSession, tenant_id: TenantId, plan_id: Annotated[int, Path()]):
+    """The shared-plan banner in one call. ``patients`` is **distinct** (a
+    patient holding the plan in two slots counts once; ``patient_links`` is
+    the raw slot count), ``claims_open`` excludes closed / paid / denied /
+    voided claims, ``treatment_plans`` / ``treatment_plan_items_pending`` are
+    what ``POST …/re-estimate`` would touch. Every count is index-backed."""
+    return insurance_plan_edit_service.plan_usage(db, plan_id, tenant_id)
+
+
+# ── EDIT-PLAN-6: per-plan change history ─────────────────────────────────────
+@plans_router.get(
+    "/{plan_id}/history",
+    response_model=PlanHistoryResponse,
+    operation_id="get_insurance_plan_history",
+    summary="Change log for one plan — plan fields, coverage rules and frequency groups, with user names (EDIT-PLAN-6)",
+)
+def get_insurance_plan_history(
+    db: DbSession, tenant_id: TenantId, page: PageParams, plan_id: Annotated[int, Path()],
+):
+    """Aggregates ``audit_logs`` rows for the plan itself, for every coverage
+    rule / frequency group written under it (``details.scope.ins_plan_id``,
+    plus older rows matched on the plan's current rule ids), and the bulk
+    coverage PUT / copy (``changes[]`` lists each row-level change). Newest
+    first; the response also carries the "Modified by / on" strip."""
+    return insurance_plan_edit_service.plan_history(
+        db, plan_id, tenant_id, page=page.page, size=page.size,
+    )
+
+
+# ── EDIT-PLAN-3: the re-estimate cascade ─────────────────────────────────────
+@plans_router.get(
+    "/{plan_id}/affected-treatment-plans",
+    response_model=AffectedTreatmentPlansResponse,
+    operation_id="list_insurance_plan_affected_treatment_plans",
+    summary="Treatment plans with open items a change to this plan's coverage re-prices (EDIT-PLAN-3)",
+)
+def list_affected_treatment_plans(
+    db: DbSession, tenant_id: TenantId, page: PageParams, plan_id: Annotated[int, Path()],
+):
+    """Same set as ``GET /treatment-plans?ins_plan_id=`` restricted to plans
+    that still have an open (not completed, not archived) item, with the
+    patient name, the open-item count and whether the patient's *active* slot
+    is still this plan (``coverage_source``)."""
+    items, total = insurance_plan_edit_service.affected_treatment_plans(
+        db, plan_id, tenant_id, page=page.page, size=page.size,
+    )
+    pages = (total + page.size - 1) // page.size if page.size else 0
+    return {
+        "plan_id": plan_id, "items": items,
+        "meta": {"page": page.page, "size": page.size, "total": total, "pages": pages},
+    }
+
+
+@plans_router.post(
+    "/{plan_id}/re-estimate",
+    response_model=PlanReEstimateResult,
+    operation_id="re_estimate_insurance_plan",
+    summary="Re-estimate every affected treatment plan (and re-sum open claims) after a coverage change (EDIT-PLAN-3)",
+    dependencies=[_plan_write],
+    responses=_WRITE_ERRORS,
+)
+def re_estimate_insurance_plan(
+    db: DbSession,
+    tenant_id: TenantId,
+    current: CurrentUser,
+    plan_id: Annotated[int, Path()],
+    body: PlanReEstimateRequest | None = None,
+):
+    """Runs ``POST /treatment-plans/{id}/re-estimate`` for each affected plan
+    inline, under ``max_plans``; one plan's failure is recorded on its line
+    and the sweep continues. ``dry_run`` returns the same shape without
+    writing — the "re-estimate N pending treatment plans?" prompt. Open claims
+    on the plan are re-summed from their lines (``recalculate_claims``)."""
+    req = body or PlanReEstimateRequest()
+    return insurance_plan_edit_service.re_estimate_cascade(
+        db, plan_id, tenant_id, actor_id=current.id,
+        dry_run=req.dry_run, use_new_fees=req.use_new_fees,
+        treatment_plan_ids=req.treatment_plan_ids, max_plans=req.max_plans,
+        recalculate_claims=req.recalculate_claims,
     )
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    claim_forms,
     account,
     appointnow,
     audit,
@@ -17,6 +18,7 @@ from app.api.v1 import (
     icd_codes,
     imaging,
     insurance,
+    lab_tracking,
     ledger,
     letters,
     medical_history,
@@ -25,11 +27,14 @@ from app.api.v1 import (
     office_assignment,
     office_setup,
     patient_intake,
+    patient_reports,
     patients_extra,
     signatures,
     payment_plans,
     perio,
     pick_lists,
+    prescription_library,
+    prescriptions,
     progress_notes,
     refunds,
     restorative,
@@ -40,6 +45,7 @@ from app.api.v1 import (
     sms,
     statements,
     support,
+    supporting_records,
     transactions,
     treatment,
     users,
@@ -63,11 +69,19 @@ api_router.include_router(groups.groups_router)
 api_router.include_router(billing.router)
 api_router.include_router(treatment.router)
 api_router.include_router(treatment.metadata_router)  # PROC-INT-6/8 vocabulary
+# PROC-7c: readiness reads before generic CRUD so /{id}/readiness beats /{item_id}.
+api_router.include_router(supporting_records.router)
 # Fee Schedule supplements (restore / new-version). Before generic CRUD so
 # /fee-schedules/{id}/restore & /new-version win over /fee-schedules/{item_id}.
 api_router.include_router(fee_schedules.router)
 api_router.include_router(balances.router)
 api_router.include_router(ledger.router)
+api_router.include_router(patient_reports.router)  # PRINT-1: server-rendered PDFs
+# ADA-BE-1: the ADA Dental Claim Form (JSON + PDF) — before the generic
+# /insurance-claims/{id} router so the literal sub-paths win.
+api_router.include_router(claim_forms.router)
+api_router.include_router(claim_forms.patient_router)
+api_router.include_router(claim_forms.metadata_router)
 # Transactions module: office financial dashboards (DASH-1..5) + unified
 # cross-patient feed/search (SRCH-1/3), refunds & reversals (REF-1..4), and
 # patient statement generation/delivery (STMT-1..3). Before generic CRUD so the
@@ -81,6 +95,9 @@ api_router.include_router(statements.router)
 # /patient-ins-payment-plans/{id}/post & /payment-plans/... win over /{item_id}.
 api_router.include_router(payment_plans.router)
 api_router.include_router(audit.router)
+# MH-19: patient-scoped audit read (any authenticated user). Before generic CRUD
+# so /patients/{id}/audit-logs wins over /patients/{item_id}.
+api_router.include_router(audit.patient_router)
 # Reports module: practice-wide aggregation (summary/trends/AR/aging).
 api_router.include_router(reports.router)
 # Help Center support tickets (Jira proxy) + Utilities execution/audit.
@@ -88,6 +105,10 @@ api_router.include_router(support.router)
 api_router.include_router(utilities.router)
 # Scheduler module: denormalized feed + status transition + patient context.
 # Before generic CRUD so /appointments/scheduler & /patients/{id}/context win.
+# Lab Tracking (LAB-2/4/5): literal /appointments/lab-cases must win over
+# /appointments/{appointment_id}, so it mounts ahead of the scheduler + CRUD routers.
+api_router.include_router(lab_tracking.router)
+api_router.include_router(lab_tracking.metadata_router)
 api_router.include_router(scheduler.appt_router)
 api_router.include_router(scheduler.patient_ctx_router)
 # Account Information module (Setup -> Account Info), nested under /tenants/{id}.
@@ -144,12 +165,18 @@ api_router.include_router(patient_intake.router)
 api_router.include_router(medical_history.router)
 api_router.include_router(medical_history.signature_router)
 api_router.include_router(medical_history.metadata_router)
+# GAP-AP-22: /patient-medical-alerts/bulk + /patient-questionnaire-responses/bulk
+# before the generic CRUD routers so "bulk" is never read as an {item_id}.
+api_router.include_router(medical_history.alerts_bulk_router)
+api_router.include_router(medical_history.responses_bulk_router)
 # Topaz signature capture (SIG-4/8): audited SigString reads, the audit trail
 # and the published rules. Before the generic /patient-signatures + /patient-consents.
 api_router.include_router(signatures.signature_router)
 api_router.include_router(signatures.consent_router)
 api_router.include_router(signatures.audit_router)
 api_router.include_router(signatures.metadata_router)
+api_router.include_router(signatures.provider_router)  # SIG-14
+api_router.include_router(signatures.claims_router)  # SIG-16 pre-flight
 # Add/Edit Patient checkbox-integrity rules (/metadata/patient-flag-rules).
 api_router.include_router(patient_intake.metadata_router)
 api_router.include_router(patient_intake.rp_router)
@@ -158,6 +185,11 @@ api_router.include_router(patient_intake.appt_router)
 # categories (PN-6). Before generic CRUD so literal sub-paths win over /{item_id}.
 api_router.include_router(progress_notes.router)
 api_router.include_router(progress_notes.macro_router)
+# Prescriptions Setup supplements (RX-2 /limits, RX-4 /availability). Before
+# generic CRUD so the literal paths win over /prescription-library/{item_id}.
+api_router.include_router(prescription_library.router)
+# MA-5: /prescriptions/alert-check before generic CRUD so it wins over /{item_id}.
+api_router.include_router(prescriptions.router)
 # Perio charting supplements (bulk upsert / compare / settings-me). Before generic
 # CRUD so /perio-exams/compare, /perio-exams/{id}/details and
 # /perio-chart-settings/me win over the generic /{item_id} routes.

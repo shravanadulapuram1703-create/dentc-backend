@@ -7,12 +7,13 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Path, Query, Response, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, DbSession, PageParams, TenantId, get_current_user
 from app.core import filestore
 from app.schemas.common import ErrorResponse, PaginatedResponse
-from app.schemas.letters import ConsentSignRequest
+from app.schemas.letters import ConsentSignRequest, ConsentCountersignRequest, ConsentCountersignVoidRequest
 from app.schemas.patient_extra import (
     ClaimAttachmentRead,
     ClaimDetailResponse,
@@ -24,7 +25,9 @@ from app.schemas.patient_extra import (
     UploadLimits,
 )
 from app.services import document_store
+from app.schemas.signature import ConsentSignatureRead
 from app.services import patient_extra_service as svc
+from app.services import signature_service as sig_svc
 
 _auth = [Depends(get_current_user)]
 _errs = {401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}}
@@ -46,10 +49,15 @@ def list_documents(
     patient_id: Annotated[int | None, Query(description="Scope to one patient")] = None,
     document_type: Annotated[str | None, Query(description="e.g. consent-form")] = None,
     office_id: Annotated[int | None, Query()] = None,
+    procedure_id: Annotated[str | None, Query(
+        description="PROC-7c: documents linked to one posted procedure")] = None,
+    claim_id: Annotated[str | None, Query(
+        description="PROC-7c: documents linked to one insurance claim")] = None,
 ):
     items, total = svc.list_documents(
         db, tenant_id, patient_id,
         document_type=document_type, office_id=office_id,
+        procedure_id=procedure_id, claim_id=claim_id,
         search=page.search, page=page.page, size=page.size,
     )
     return PaginatedResponse.build(items, total, page.page, page.size)
@@ -68,19 +76,32 @@ async def upload_document(
         description="Which screen the file is attached to, e.g. 'note'. Decides the "
                     "storage folder; see GET /patient-documents/limits for the list.",
     )] = None,
+    procedure_id: Annotated[str | None, Form(
+        description="PROC-7c: the posted procedure this document supports (must belong to "
+                    "patient_id; 422 document_procedure_mismatch otherwise)",
+    )] = None,
+    claim_id: Annotated[str | None, Form(
+        description="PROC-7c: the insurance claim this document supports (must belong to "
+                    "patient_id; 422 document_claim_mismatch otherwise)",
+    )] = None,
 ):
     """Upload a patient document.
 
     ``context`` is what puts a Notes upload in the notes folder. It has to come
     from the caller: the file is uploaded *before* the note row exists, so there
-    is nothing on the server to infer it from.
+    is nothing on the server to infer it from. ``procedure_id`` / ``claim_id``
+    are what let ``requires_attachment`` be judged per charge (PROC-7c).
     """
     data = await file.read()
-    return svc.create_document(
+    # EDIT-PLAN-7: the DB write + object-storage upload are synchronous; run
+    # inline in an ``async def`` they blocked the event loop for the whole
+    # upload, stalling every other request on the worker.
+    return await run_in_threadpool(
+        svc.create_document,
         db, tenant_id, patient_id, office_id=office_id, document_type=document_type,
         description=description, file_name=file.filename or "document",
         content_type=file.content_type, data=data, user_id=current.id,
-        context=context,
+        context=context, procedure_id=procedure_id, claim_id=claim_id,
     )
 
 
@@ -164,7 +185,8 @@ async def upload_claim_attachment(
     attachment_type: Annotated[str | None, Form()] = None,
 ):
     data = await file.read()
-    return svc.create_claim_attachment(
+    return await run_in_threadpool(
+        svc.create_claim_attachment,
         db, tenant_id, claim_id, attachment_type=attachment_type,
         file_name=file.filename or "attachment", content_type=file.content_type,
         data=data, user_id=current.id,
@@ -235,6 +257,54 @@ def sign_consent(
     consent_id: Annotated[int, Path()], body: ConsentSignRequest,
 ):
     return svc.sign_consent(db, tenant_id, consent_id, body.model_dump(exclude_unset=True), current.id)
+
+
+# CS-2: countersignature lines (dentist / hygienist / assistant / office manager).
+@consents_router.get(
+    "/{consent_id}/signatures",
+    response_model=list[ConsentSignatureRead],
+    operation_id="list_patient_consent_signatures",
+    summary="The countersignature lines on a consent (images with include_image=true)",
+)
+def list_consent_signatures(
+    db: DbSession, tenant_id: TenantId, consent_id: Annotated[int, Path()],
+    include_image: Annotated[bool, Query(description="Embed the signature images")] = False,
+    include_voided: Annotated[bool, Query()] = False,
+):
+    rows = svc.list_consent_signatures(db, tenant_id, consent_id)
+    return [sig_svc.countersign_out(r, include_image=include_image)
+            for r in rows if include_voided or r.is_active]
+
+
+@consents_router.post(
+    "/{consent_id}/countersign",
+    response_model=ConsentSignatureRead,
+    status_code=status.HTTP_201_CREATED,
+    operation_id="countersign_patient_consent",
+    summary="Add a countersignature line to a consent (after the patient signed — the stored flow)",
+)
+def countersign_consent(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser,
+    consent_id: Annotated[int, Path()], body: ConsentCountersignRequest,
+):
+    row = svc.add_countersign(db, tenant_id, consent_id, body.model_dump(exclude_unset=True), current.id)
+    return sig_svc.countersign_out(row, include_image=True)
+
+
+@consents_router.post(
+    "/{consent_id}/signatures/{signature_id}/void",
+    response_model=ConsentSignatureRead,
+    operation_id="void_patient_consent_signature",
+    summary="Void a countersignature line",
+)
+def void_consent_signature(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser,
+    consent_id: Annotated[int, Path()], signature_id: Annotated[int, Path()],
+    body: ConsentCountersignVoidRequest | None = None,
+):
+    row = svc.void_countersign(db, tenant_id, consent_id, signature_id, current.id,
+                               body.reason if body else None)
+    return sig_svc.countersign_out(row)
 
 
 # ── Duplicate check ──────────────────────────────────────────────────────────

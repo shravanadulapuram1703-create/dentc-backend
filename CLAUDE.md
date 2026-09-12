@@ -183,6 +183,69 @@ composes patient + responsible-party + alerts + questionnaire + recalls + openin
 balance in one transaction. Shared `PatientCreate` schema lives in
 [app/schemas/patient.py](app/schemas/patient.py).
 
+**Full-wizard registration pass** (GAP-AP-19…26 of
+[docs/patients/add_patient_full_wizard_backend_issues.md](docs/patients/add_patient_full_wizard_backend_issues.md)
+/ [response](docs/patients/add_patient_full_wizard_backend_response.md); Alembic
+`b317b3c05b47`, **applied to the dev DB**).
+- **GAP-AP-20 had three halves, not one**: `alert_code`/`question_code` were
+  `VARCHAR(50)` with no `max_length`, so the 12 legacy questions whose derived
+  slug runs 51–60 chars were a 500 that rolled back the whole registration.
+  Columns widened to **100** — *including* `medical_history_details.question_code`,
+  because the MH-6 signed snapshot copies both codes into it and a widened source
+  with an unwidened sink only moves the 500 to `/sign`. The FE clamped its
+  `toCode` to 50, and the backend's own `to_code` (which keys the built-in
+  catalogs the Medical History document resolves answers against) still sliced
+  at 60 — left alone, the 12 answers would have read as Not Answered.
+  `medical_history_catalog.CODE_MAX_LENGTH = 50` is the derivation cap;
+  `patient_catalog.CATALOG_CODE_MAX_LENGTH = 100` is the storage bound; both
+  published on `/metadata/medical-history-rules → code_convention`.
+- **GAP-AP-21** `POST /patients` had no duplicate guard at all, so the FE's
+  fallback path created the duplicate the composite had just refused.
+  `PatientCRUD.create` now runs `patient_extra_service.raise_if_duplicate`
+  (same 409, same `candidates[]`, + `override_field`) and `PatientCreate` gains
+  `force_create` (not a column). **Placeholder identifiers never match**
+  (`is_synthetic_identifier`: all-one-digit, keyboard runs, the never-issued
+  SSNs, SSA-impossible area/group/serial) — the dev DB's shared `123456789` /
+  `123456` had been blocking every registration. A real SSN/chart-no needs one
+  corroborating field (last name or DOB) to be *strong*; a lone hit is still
+  reported.
+- **GAP-AP-22** `POST /patient-medical-alerts/bulk` + `/patient-questionnaire-responses/bulk`
+  (one transaction, upsert by code, `replace`, ≤500). Built on
+  `medical_history_service.apply_alert_answers` / `apply_questionnaire_answers`
+  — the **non-committing** reconcile now shared by the composite `PUT
+  …/medical-history`, the bulk endpoints **and `POST /patients/register`**,
+  which had been writing bare rows past MH-12/MA-3/MH-8/MH-14. `alert_flags`
+  is cached per session (`Session.info`, invalidated by any flush touching
+  `definitions`/`definition_groups`); it was read three times per single-row
+  write against a remote DB.
+- **GAP-AP-23/24** `RecallIn` carries the LEG-8 trio (LEG-17 closed) and
+  `RegisterRequest.insurance[]` = `{subscriber | subscriber_id,
+  subscriber_is_patient, link}` per slot, applied **primary-first regardless of
+  payload order** so `validate_coverage_slot` judges the set; results in
+  payload order; every failure a 422 with `details.index`. The two register
+  components are factory-derived from `InsuranceSubscriber`/`PatientInsurance`
+  with the transaction-supplied ids excluded.
+- **GAP-AP-25** `resp_party_rel` was seeded twice (lowercase keys + the PO-9
+  single-letter codes). **The code is canonical** and the column now holds it:
+  `patient_rules_service.normalize_resp_party_relationship` folds key/label/code
+  on every write (unknown stored as written — the PROV-3 call), the migration
+  normalised stored rows and **deactivated** (not deleted — Setup-editable, and
+  the FE hooks pass `is_active=true`) the lowercase set; the seeder gained a
+  `RETIRED_KEYS` step. Published on `/metadata/patient-flag-rules`.
+- **GAP-AP-26** `app.core.exceptions.app_error_from_db` maps `DataError` →
+  422 (`value_too_long` w/ `max_length`, `value_out_of_range`, `invalid_value`)
+  and `IntegrityError` → 409 `constraint` (unique) / 422
+  (`foreign_key_violation`, `not_null_violation`, `check_violation`), naming
+  table/column/constraint from the Postgres `diag` block or the SQLite message;
+  used by global handlers **and** `CRUDBase._commit`/`_flush` (which had 409'd
+  every kind as the generic `conflict` with the raw driver string — **breaking**:
+  a DB unique collision is now code `constraint`). Genuine 500s carry
+  `details.request_id`; `CatchAllMiddleware` reads it off `request.state`
+  because it sits outside `RequestContextMiddleware`'s contextvar scope.
+- **GAP-AP-19** `patients.middle_name` + `responsible_parties.middle_name`;
+  `middle_initial` is derived (`fold_middle_name`) unless sent explicitly, and
+  a derived initial is cleared with the name while a typed one survives.
+
 **Legacy-parity extension** (LEG-1…14,
 [docs/patients/add_patient_legacy_parity_devreport.md](docs/patients/add_patient_legacy_parity_devreport.md)
 / [response](docs/patients/add_patient_legacy_parity_response.md); Alembic
@@ -540,6 +603,47 @@ appointment; APPT-PROC-1…4, SCHED-DEL-1/2, APPT-5…12 of
   `(tenant_id, chart_no)` groups across 83,898 migrated patients — so the numeric
   `patients.id` is the only safe key.
 
+**Lab Tracking module** (Add/Edit Appointment → LAB section · Patient → Lab Tracking
+tab; LAB-1…11 of
+[docs/lab-tracking/lab_tracking_backend_devreport.md](docs/lab-tracking/lab_tracking_backend_devreport.md)
+/ [response](docs/lab-tracking/lab_tracking_backend_response.md); Alembic
+`587baa6a0ba7`, **applied to the dev DB**). A lab case **is an appointment** with
+`has_lab` — there is deliberately no lab-case row (legacy M12 + the FE model).
+- **LAB-1** new `labs` vendor catalog ([app/db/models/scheduling.py](app/db/models/scheduling.py),
+  `/labs` CRUD, 409 `duplicate_lab_name` + `allow_duplicate_name` on *create only*,
+  `/labs/name-availability`) + `appointments.lab_vendor_id` (FK, tenant-checked, an
+  inactive lab only blocks a *move*) + `lab_short_notice`. **`lab_dds` is the
+  dentist, not the vendor** — settled. The catalog is empty on the migrated tenant:
+  the Denticon export has no vendor/short-notice column, so no seed.
+- **LAB-8 contract lives once** in [app/services/lab_tracking_service.py](app/services/lab_tracking_service.py)
+  (`apply_lab_rules`, run by `AppointmentCRUD` on every write): `has_lab=false`
+  **clears** the lab block *including values in the same payload* — the Add/Edit form
+  sends the stale DDS/cost along with the un-tick, so "reject" would 422 every
+  un-tick; lab data on a non-lab row **derives** `has_lab=true` (a `lab_cost` of `0`
+  is empty — the migration wrote `0.00` everywhere). **LAB-9** `lab_date_order` 422
+  on the merge of payload + stored row, only when a date is touched (one migrated
+  row holds received-before-sent).
+- **LAB-6 was the schema factory**, not one field: `build_schemas` never carried
+  `String(n)` onto Create/Update, so every over-long string API-wide was a 500. It
+  now emits `max_length` for every generated write schema (reads untouched, `Text`
+  unbounded). **LAB-7** `lab_cost` `ge=0, max_digits=10, decimal_places=2` (the old
+  round-to-2dp is gone). **LAB-10** `AppointmentCreate/Update` are `extra="forbid"`
+  (checked the FE's payload keys first — all real columns).
+- **LAB-2** `has_lab`/`lab_vendor_id`/`lab_short_notice`/`lab_status`
+  (`not_received` = sent|overdue) + three lab date ranges on `GET /appointments`;
+  `lab_status` + `lab_vendor_name` are **on `AppointmentRead`** (via
+  `enrich_appointments`) and on the scheduler feed (**LAB-3**), one derivation
+  (`derive_lab_status`, mirrors the FE's) for read/filter/report. Generic-list
+  "today" is UTC; `/lab-cases` uses the office's date. **LAB-11** `GET /appointments`
+  now `hide_soft_deleted` (18 lab cases live, 14 of them archived tombstones).
+- **LAB-4/5** [app/api/v1/lab_tracking.py](app/api/v1/lab_tracking.py):
+  `GET /appointments/lab-cases` (denormalised, paged, `counts` over every filter
+  *except* `lab_status` so the tabs keep badges, `total_cost`, `as_of`), `…/cost-report`
+  (`date_basis` × `group_by`), `…/report.pdf`, `…/cost-report.pdf`, `…/export.csv`
+  (all audited as `PRINT`/`lab_report`; `ReportHeader.show_patient=False` for
+  office-wide PDFs); `GET /metadata/lab-tracking-rules`. Index
+  `appointments(office_id, has_lab)` — planner verified.
+
 **Add/Edit Patient checkbox integrity** (Patient Status / Coverage Type / Patient
 Type panels; [docs/patients/patient_flag_rules_backend_response.md](docs/patients/patient_flag_rules_backend_response.md)).
 Every box in the three panels was independently selectable, so a patient could be
@@ -685,6 +789,57 @@ INS-PT-7…21 of
 - **INS-PT-5 stays manual** (no clearinghouse contracted — the endpoint stamps
   and reports `method="manual"`); **INS-PT-17** is a frontend route
   (`GET /insurance-plans/{id}` always existed).
+
+**Edit Insurance Plan from the patient screen** (Patient -> Insurance -> slot -> Edit
+Plan, over the shared 4-tab wizard; EDIT-PLAN-1..9 of
+[docs/patient-insurance/edit_insurance_plan_backend_devreport.md](docs/patient-insurance/edit_insurance_plan_backend_devreport.md)
+/ [response](docs/patient-insurance/edit_insurance_plan_backend_response.md); Alembic
+`7f483f6833a7`, **applied to the dev DB**). One plan row is shared by every patient on
+it, so the safeguards a shared master-data edit needs are server-side:
+- **EDIT-PLAN-1 is engine-wide**: [app/core/concurrency.py](app/core/concurrency.py) —
+  `updated_at` is the row's *version* (`created_at` when never updated);
+  `If-Match` (the `ETag` every generated GET now returns) / `If-Unmodified-Since` /
+  body `expected_updated_at` (explicit `null` = "never updated", absent = no check)
+  → **412 `precondition_failed`** carrying `current.{updated_at,version,updated_by_name}`.
+  `CRUDBase.update/delete` check it after a `SELECT … FOR UPDATE`, and **stamp
+  `updated_at` app-side with µs** (SQLite's `now()` is whole seconds, so two saves in
+  one second read as one version). **The plan row is the version of the whole
+  document**: every coverage-rule / frequency-group write (per-row CRUD, bulk PUT,
+  copy) calls `touch_plan`, so one `updated_at` guards all four wizard tabs.
+- **EDIT-PLAN-5**: [app/services/permission_service.py](app/services/permission_service.py)
+  — effective codes = union of the user's active groups' rights; `admin`/`super_admin`
+  hold everything; a non-admin in **no group is ungated** (`permissions_enforced=false`
+  on `me-full` — refusing them would lock a migrated tenant out on deploy day).
+  `CrudConfig.write_permissions` + `require_permission()` gate POST/PATCH/DELETE (403
+  `permission_denied` naming `required_any_of`); reads never gated.
+  `insurance_plans.is_locked` (+ stamped `locked_at/by`) needs
+  `setup_insurance_plans_screen_edit_locked_plan` for *any* edit incl. toggling → 423
+  `plan_locked`; an ungated user does **not** get the lock right for free.
+- **EDIT-PLAN-4 decided by the data**: 22,335 of 65,314 migrated subscribers hold a
+  group number that genuinely differs from their plan's (card suffixes) — so the plan
+  is master and `cascade_subscriber_group_number` moves only subscribers still equal
+  to the old value (or blank), keeps the rest, and reports both on the PATCH response
+  (`group_number_cascade`, consumed by `enrich_insurance_plan` so it shows once).
+  `InsuranceSubscriberRead.plan_group_number` / `group_number_matches_plan`.
+- **EDIT-PLAN-2/3/6** in [app/services/insurance_plan_edit_service.py](app/services/insurance_plan_edit_service.py):
+  `GET /insurance-plans/{id}/usage` (distinct patients vs raw `patient_links`, open
+  claims — only **4** migrated claims carry an `ins_plan_id` at all), `…/affected-
+  treatment-plans` + `GET /treatment-plans?ins_plan_id=` (one clause,
+  `treatment_service.affected_by_insurance_plan_clause`: active slot **or** open item
+  estimated against the plan), `POST …/re-estimate` (inline under `max_plans`,
+  `dry_run`, per-plan failure isolation, open claims re-summed), `…/history`
+  (plan + rule + group + bulk changes with names). Child-row writes stamp
+  `audit_logs.details.scope.ins_plan_id`; the bulk PUT records `details.changes[]`;
+  `AuditMiddleware._details_payload` copies both.
+- **EDIT-PLAN-7 root cause**: nine `async def` upload handlers (documents, claim /
+  note attachments, imaging capture, logos, watermark, avatars) ran sync DB + GCS work
+  **on the event loop**, stalling every other request for the upload's duration —
+  now `run_in_threadpool`. Plus 3 missing `ins_plan_id` indexes (claims count was a
+  96k-row seq scan) + `audit_logs(resource_type, resource_id)`.
+- **EDIT-PLAN-8** plan Create/Update `extra="forbid"`. **EDIT-PLAN-9** 31,334 NULL
+  rows backfilled to the legacy defaults (model defaults match, published as
+  `plan_field_defaults`); `lifetime_ortho_benefits` defaults **true** for new plans
+  only — migrated rows untouched (no source column).
 
 **Insurance Payment window** (Patient -> Ledger -> claim -> INSURANCE PAYMENT;
 INS-PAY-1..8 of
@@ -959,6 +1114,59 @@ generic answer resources one HTTP request per row.
   `signature_status` — a printed history that doesn't say the signature is stale
   is a misleading clinical document.
 
+**Medical Alerts surfacing + Medical History round 2** (Prescriptions banner · Scheduler
+block badge · Details pop-out; MA-1…8 of
+[docs/medical-history/medical_alerts_surfacing_backend_devreport.md](docs/medical-history/medical_alerts_surfacing_backend_devreport.md)
+and MH-17…22 of the Medical History report /
+[response](docs/medical-history/medical_alerts_surfacing_backend_response.md); Alembic
+`b08a4634a3e3`, **applied to the dev DB**).
+- **MA-3 was the built-in catalog, not the rows**: every stored `alert_code` is derived by the
+  frontend from *its* legacy list (`legacyCatalogs.ts` — "Cardiac Pacemaker" under "Check, if
+  applicable"), while the backend's built-in list had been authored independently ("Heart
+  Pacemaker" under "Medical Conditions"), so the codes the screen writes resolved to no
+  section/label and the few overlaps (`aspirin`) worked. `medical_history_catalog.py` is now a
+  **verbatim transcription** of the FE file (88/29/19 items, `to_code` capped at 60 chars like
+  the FE). `alert_label` + new `patient_medical_alerts.section` are filled from the catalog at
+  write time on every path (client value = override); read falls back stored → catalog →
+  humanised code. `scripts/backfill_medical_alert_sections.py` stamped 374/384 rows.
+- **MA-4**: `alert_flags()` = built-in catalog overlaid with **every** tenant MEDALERT
+  definition, deliberately not gated by `MIN_TENANT_CATALOG_ITEMS` (the guard picks the *list*
+  to render; it was also hiding the one flagged definition, so every row read `false/false`).
+  `is_flash_alert`/`blocks_charges` are nullable per-answer overrides too; reads report the
+  effective value via `effective_alert_meta`, set on the ORM row with `set_committed_value` so
+  enrich never dirties a real column.
+- **MA-1/2**: [app/services/medical_alert_summary_service.py](app/services/medical_alert_summary_service.py)
+  answers "active alerts for these patients" in four statements (both tables, de-duplicated by
+  `source_medical_alert_id`, allergies-first order, `summary_text`). Read by the scheduler feed
+  (`has_alert` now = free-text OR Medical-History YES; + `alert_summary`/`alert_count`),
+  `GET /patients/{id}/medical-alerts/summary`, bulk `GET /medical-alerts/summary?patient_ids=`,
+  `PatientContext.medical_alerts`, and the prescription check. `?patient_ids=` (≤200) on
+  `/patient-medical-alerts` + `/patient-alerts` (new `PatientAlertCRUD` scopes tenancy through
+  the patient — the table has no `tenant_id`).
+- **MA-5**: `PrescriptionCRUD` ([app/services/prescription_service.py](app/services/prescription_service.py))
+  matches the drug against the summary two ways (`prescription_library.allergy_keys` slugs vs
+  code/label; the alert label inside the drug name for **allergy sections only**) → 409
+  `prescription_alert_conflict` unless `alerts_acknowledged`; persists
+  `acknowledged_alert_ids` + `acknowledged_alerts` snapshot + `alert_warnings` + `_at/_by`;
+  `POST /prescriptions/alert-check` is the same check as a read. Warning-and-override on
+  purpose: the matcher is lexical.
+- **MA-8 / MH-22 root cause**: redis-py ≥ 6 retries a failed *connect* 3× with exponential
+  back-off by default, so with `REDIS_ENABLED=true` and no local Redis the 2 s connect timeout
+  was a measured **19–22 s stall** paid by the first request after each cooldown (56 s login,
+  25 s feed, 15 s PATCH). Both clients now pass `retry=Retry(NoBackoff(), 0)`; cooldown 60 s;
+  cold cost 4 s (localhost → `::1` + `127.0.0.1`).
+- **MH-17**: every hand-written schema in `app/schemas` uses `UtcDatetime` (22 files).
+  **MH-18**: `GET …/medical-history/audit` (+ `audit` on the document) — overall/per-section
+  Created/Modified from active **and** inactive rows plus the change log (the composite write
+  hard-deletes a cleared answer, so the log is the only complete record). **MH-19**:
+  [app/core/audit_context.py](app/core/audit_context.py) — `CRUDBase` records
+  `{row_id, patient_id, before, after}` per request, `AuditMiddleware` writes it as
+  `audit_logs.details`, reads a POST's id from the 201 body, fills new indexed
+  `audit_logs.patient_id`; `GET /patients/{id}/audit-logs` is open to any tenant user.
+  **MH-20**: `CRUDBase.update` diffs first — no change → no stamp, no UPDATE (a subclass that
+  mutated the row before delegating still commits). Alembic revision ids are random hex now
+  (`a7b8c9d0e1f2` collided with an existing revision and produced a cycle).
+
 **Procedure entry — one path for four screens** (Transactions Entry · Account Ledger Add Proc ·
 Restorative Chart · Treatment Plan; PROC-INT-1…9 of
 [docs/procedures/procedure_entry_integration.md](docs/procedures/procedure_entry_integration.md)
@@ -1097,6 +1305,314 @@ pad model/serial were captured by the FE and dropped by every store.
   (needs Topaz SigPlus, a Windows COM component). Rides along: `patient_signatures`
   has no `tenant_id`, so before `PatientSignatureCRUD._scope_tenant` any tenant
   could read/void any signature by id.
+- **Round 2 — ADA claim-form signatures** (SIG-11…16, §5 of the 2026-09-12 report;
+  Alembic `6f5fd1cb5b52`, **applied**). `patient_signatures.claim_id` (FK to the
+  `VARCHAR(50)` claim id; server `content_hash` over the claimed lines),
+  `signer_name`/`signer_relationship` (also on the audit row) and
+  **`signer_provider_id`** — the SIG-15 answer: Item 53 keys on the *provider*,
+  because most migrated providers have no user account; `signed_by_user_id` stays
+  the attesting user, `created_by` the pad operator. New `provider_signatures`
+  (1:1, same block as the user store) behind `GET/PUT/DELETE /providers/{id}/signature`
+  (GET resolves provider → linked user). `resolve_claim_signatures` is the one
+  resolver (pinned-to-claim → latest-of-type on the patient → Item 53: provider
+  store → user) used by `assemble` (`authorizations.signatures`), the PDF (images
+  drawn on Items 36/37/53, "Signature on File" only when no image; a legacy
+  SigString-only row warns `signature_not_printable`) and
+  `GET /insurance-claims/{id}/signatures`. `claim_consent` (ADA-BE-7) and the FE's
+  `claim_patient_consent` are **both** Item 36. List gains
+  `signature_types=a,b` + `latest_per_type=true` (window function).
+
+**Prescriptions Setup round 2** (Setup -> Prescriptions; RX-1/2/4 of
+[docs/pick-list/pick_list_setup_backend_devreport.md](docs/pick-list/pick_list_setup_backend_devreport.md)
+/ [response](docs/pick-list/pick_list_setup_backend_response.md); Alembic
+`239077e738d5`, **applied to the dev DB**). Round 1 (`f1a2b3c4d5e6`) shipped the
+Pick List / Macro / Medical / Toolbar pieces and `updated_by`.
+- **RX-4 is the same importer defect as `chart_materials` / `code_bundles`**:
+  `prescription_library` had no unique key, so `s16`'s `ON CONFLICT DO NOTHING`
+  had nothing to conflict on and every migration re-run appended the whole
+  Denticon library again — 85 drugs x 5 runs = 425 rows, all byte-identical per
+  `legacy_id`, so the Rx Drug Name picker listed each drug five times. The
+  migration collapses each `(tenant_id, legacy_id)` group to its lowest id,
+  repoints `prescriptions.library_rx_id` + `office_prescription_library` (the only
+  two inbound FKs) and adds `uq_prescription_library_tenant_legacy`. Applied
+  after a rolled-back dry run: 427 -> 87 rows, 0 dangling refs. **`note_macros`
+  has the identical defect (120 groups, 360 extra rows — NM-7) and is not yet
+  fixed.**
+- **The API-side guard is content-based and deliberately not a constraint**
+  ([app/services/prescription_library_service.py](app/services/prescription_library_service.py),
+  `PrescriptionLibraryCRUD`): an identical **active** `drug_name + dispense + sig`
+  (trimmed, whitespace-collapsed, case-insensitive) is 409 `duplicate_prescription`
+  with `allow_duplicate` as the override — the seed legitimately lists
+  *Chlorhexidine* twice with different dispense/sig, so same-name/different-config
+  (`same_name_matches`) and inactive twins (`inactive_matches`) are reported, never
+  blocking. On PATCH it fires on a **move** (or a re-activation), never on stored
+  state. `GET /prescription-library/availability` is the same function as a probe.
+  The name prefilter is a `LIKE` with whitespace runs as `%` (escaped `%`/`_`) so it
+  can over-match but never miss; the exact compare finishes in Python.
+- **RX-2**: the schema factory does not propagate column lengths, so the 240-char
+  sig rule was FE-only and a 501-char sig was a 500. `SIG_MAX_LENGTH` is enforced
+  as 422 `sig_too_long` only when the payload carries `sig`, and published at
+  `GET /prescription-library/limits`; the column stays `String(500)` (max live value
+  177). **RX-1**: `created_by` + `created_by_name`/`updated_by_name` on the read via
+  the shared `attach_actor_names` hook; `drug_name` joined the sortable set.
+
+**Notes Macros Setup round 2** (NM-3/5/6/7 of the same report; Alembic
+`3a8f2c41b7d9`, **applied to the dev DB**, re-parented onto `b08a4634a3e3` because
+the medical-alert surfacing migration landed alongside). `note_macros` had the
+**identical importer defect** (120 legacy macros x 4 runs = 480 identical rows,
+every macro list in the app showed each entry four times): same dedupe shape,
+inbound FKs `procedure_codes.default_notes_macro_id` (3 repointed) +
+`office_note_macros`. Applied: 481 -> 121 rows, 0 dangling refs.
+[app/services/note_macro_service.py](app/services/note_macro_service.py)
+(`NoteMacroCRUD`) is the Rx guard's twin keyed on **name + category** — 409
+`duplicate_note_macro` + `allow_duplicate`, same-name-other-category
+(`other_category_matches`) reported never blocking, fires on a move only (the
+migrated *Fixed/Detach Try-in* pair is two distinct legacy rows and must stay
+editable); a blank category is stored NULL so `/note-macros/categories` never
+grows an `""` bucket. `/note-macros/limits` + `/availability` sit on
+`progress_notes.macro_router`. NM-6 was simply `name`/`category` missing from the
+sortable set. **NM-2 is the remaining blocker**: `category` is still the numeric
+Denticon group code and the label lookup was never exported — needs the
+practice's code->label list, not code.
+
+**Patient ID / Legacy ID search** (PT-SEARCH-1/2,
+[docs/patients/patient_search_backend_response.md](docs/patients/patient_search_backend_response.md);
+no migration). `GET /patients` gains `?legacy_id=` (exact, trimmed, resolved in
+`PatientCRUD` so a blank matches *nothing* rather than un-filtering), `?id=`
+(typed int) and `?ids=` (`id_in_param`), all composing with `home_office_id`/
+`is_active`; free-text `search` resolves a legacy id **exact-only** in the top
+relevance tier. The requested `(tenant_id, legacy_id)` index was **not** added:
+`patients_legacy_id_key` (unique on `legacy_id`, baseline) already makes the
+lookup a single-row index probe, and `idx_patients_legacy` is a redundant twin.
+
+**Procedure Codes — supporting-records requirements** (Setup -> Procedure Codes ->
+Charting tab, "Supporting Records Required"; PROC-7a…7d of
+[docs/procedure_code/procedure_code_supporting_records_backend_devreport.md](docs/procedure_code/procedure_code_supporting_records_backend_devreport.md)
+/ [response](docs/procedure_code/procedure_code_supporting_records_backend_response.md);
+Alembic `aee911131850`, **applied to the dev DB**). Five per-code flags shaped exactly like
+`requires_tooth` — `requires_attachment` / `requires_perio_chart` / `requires_photo` /
+`requires_xray` / `requires_missing_tooth_info` (NOT NULL default false; the FE had been
+parking them in localStorage because the PATCH silently dropped them). No legacy backfill:
+`Codes.txt` has no such columns.
+- **What "on file" means lives once** in
+  [app/services/supporting_records_service.py](app/services/supporting_records_service.py)
+  (`RULES`, published on `/metadata/procedure-entry-rules → supporting_records.rules`):
+  attachment = a `patient_documents` row linked by the new `procedure_id`/`claim_id`
+  (form fields + list filters on `/patient-documents`, same-patient-validated) or a
+  `claim_attachments` row; perio = non-voided exam `≤ DOS` (optionally within
+  `SUPPORTING_RECORDS_PERIO_MAX_AGE_MONTHS`); photo = `PH` document or `XC`/`ES` DICOM;
+  x-ray = `XR` document or radiographic-modality DICOM study `≤ DOS` (`strict_tooth` →
+  tagged instances); missing-tooth = a **dated** missing/extracted `chart_conditions` row
+  or a posted extraction charge. Upload time is never treated as capture date, and the
+  untyped legacy `image_details` are reported but never satisfy a rule.
+- **Enforced at claim submit, advisory on posting** — the record is captured after the
+  chair, so a 422 on `POST patient_procedures` would refuse the charge the record is
+  about. `POST /insurance-claims/{id}/submit` → 422 `supporting_records_missing`
+  (`details.missing[]`) unless `allow_missing_records` (result reports
+  `missing_records_overridden`); claim *creation* is not gated because the FE builds a
+  claim as POST + per-line PATCH. Readiness reads:
+  `GET /patients/{id}/procedure-readiness` (attachment is **`deferred`** before the charge
+  exists, never `missing`), `GET /patient-procedures/{id}/readiness`,
+  `GET /insurance-claims/{id}/readiness` (+ the derived ADA **Enclosures** block, PROC-7d —
+  not persisted, the fill-out has no columns yet). PROC-6 was already answered by
+  `GET /fee-schedules/options`.
+
+**Edit Treatment window + Tx Plan → New Appt** (Treatment Plan grid → double-click /
+Diag Date → Edit Treatment; "New Appt"; PLAN-9/11/16/17…20/24…29 + PLAN-APPT-1…7 of
+[docs/treatment plans/treatment_plan_backend_devreport.md](docs/treatment plans/treatment_plan_backend_devreport.md)
++ [tx_plan_new_appointment_backend_devreport.md](docs/treatment plans/tx_plan_new_appointment_backend_devreport.md)
+/ [response](docs/treatment plans/treatment_plan_edit_backend_response.md); Alembic
+`9de6ac649cba`, **applied to the dev DB**).
+- **PLAN-3 was silently broken on migrated data**: `re_estimate` matched coverage bands
+  lexically (`start_code <= code <= end_code`) while migrated plans band on Denticon
+  coverage-category codes (`03A`), so every migrated plan estimated 0 %. It now uses
+  `estimate_service.match_coverage_rule` (the FEE-1 ranked matcher) — plan and charge
+  can never disagree on a band. `?use_new_fees=true` is "Use New Fees" server-side.
+- **Item ↔ appointment link** (PLAN-APPT-1/2): `appointment_procedures.treatment_plan_item_id`
+  is the FK; `schedule_item` / `release_scheduled_item` in
+  [app/services/treatment_service.py](app/services/treatment_service.py) are the only
+  two places that move an item into / out of `scheduled`, remembering
+  `status_before_scheduled` so cancel / delete puts it back where it was. Every
+  appointment write path calls them — `AppointmentCRUD` / `AppointmentProcedureCRUD` in
+  [app/services/appointment_service.py](app/services/appointment_service.py) (generic PATCH
+  / DELETE / restore) and `scheduler_service.update_status`. `TreatmentPlanItemRead.
+  appointment_id`/`appointment_ids` are **derived** from the line FK (one source of truth,
+  same shape as `procedure_id`). `POST /treatment-plans/{id}/book` (PLAN-APPT-5) is the
+  atomic New Appt: appointment + linked lines + items scheduled, or nothing.
+- **Edit Treatment columns** on `treatment_plan_items`: `notes` (PLAN-17 — moved off the
+  insurance-detail row, which forced an empty insurance row on uninsured patients),
+  `accepted_date` (stamped on first acceptance) / `scheduled_date` (follows the soonest
+  live booking), `duration_minutes` (nullable: unset ≠ 0), `created_by`/`updated_by`
+  (+ names), `referral_id`/`referral_type`, posting flags `update_end_date_at_posting` /
+  `re_estimate_at_posting` (honoured by `/post`), `fee_schedule_id` (PLAN-29: `fee` is
+  optional on create → priced via `pricing_service`; an explicit fee only records the
+  schedule when it is the one that yields that exact amount), `counselor_user_id`.
+  `treatment_plan_item_icd_codes` (PLAN-26) is written through `icd_code_ids` on the item
+  (`[]` = clear). Statuses gain `internal_referral`/`external_referral`; vocabularies at
+  `GET /metadata/treatment-plan-rules`.
+- **PLAN-APPT-3**: `s27b` wrote the Denticon PROVIDERID into `diagnosed_by` (=
+  `providers.legacy_id`) and never filled `provider_id`. New items default it (label →
+  plan majority → preferred provider; stays nullable — a 422 would break the add panel);
+  `scripts/backfill_treatment_plan_item_providers.py` **applied** 693/728. **PLAN-APPT-4**:
+  `providers.default_operatory_id` (validated to an office the provider serves) +
+  `scripts/backfill_operatory_providers.py` (share ≥ 60 % **and** ≥ 10 appointments;
+  dry run only — a wrong default mis-columns every booking). **PLAN-16**:
+  `GET /procedure-codes/eligibility?codes=` + `/{code}/providers`; empty = unrestricted;
+  no legacy eligibility file exists, so seeding is a Setup task.
+- **PLAN-24** `hide_soft_deleted` on items + insurance details. **PLAN-9**
+  `preauth_status` (`sent|closed`, 422 otherwise) + stamped `preauth_status_at`. Rides
+  along: both tables carry no `tenant_id` and were **unscoped** in the generic engine —
+  `TreatmentPlanItemCRUD` / `TreatmentPlanInsuranceDetailCRUD` now scope through
+  item → plan → patient. The migrated item ↔ line link is not reconstructable
+  (`appointment_procedures` kept no legacy id).
+
+**Patient print module** (Print buttons on Patient Overview · Transactions Entry ·
+Account/Patient Ledger · Insurance Details; PRINT-1…10 of
+`dentc-frontend/docs/print/patient_print_backend_devreport.md` /
+[response](docs/print/patient_print_backend_response.md); **no migration**). The
+Print buttons rebuilt each report in the browser with jsPDF from whatever the
+screen had loaded, so a print could only contain what the browser held.
+- **PRINT-1** `GET /patients/{id}/reports/{overview|ledger|transactions|insurance}`
+  → `application/pdf` ([app/api/v1/patient_reports.py](app/api/v1/patient_reports.py)),
+  taking the same query params the screens send (ledger: the full `/account-ledger`
+  filter/sort set; insurance: `category=D|M` + `order=`, resolved with the FE's own
+  slot rule, 404 `insurance_slot_not_found`). Composition in
+  [app/services/print_service.py](app/services/print_service.py) through the same
+  services the screens read; layout in [app/services/pdf_report.py](app/services/pdf_report.py),
+  the reportlab (platypus) twin of the FE's `patientPdf.ts` — header, navy section
+  bar, key/value table, blue-headed grid, paragraph, cards, `Page x of y` via a
+  two-pass numbered canvas. **`_Section`** replaces `KeepTogether` for a heading +
+  grid: stock `KeepTogether` pushes a page-long table to a fresh page and leaves
+  the previous one blank. Every print writes an `audit_logs` row (`action='PRINT'`,
+  `resource_type='patient_report'`, `details.params`) — `AuditMiddleware` only
+  records mutations. `audit_logs.id` is `BigInteger().with_variant(Integer, "sqlite")`
+  because a BIGINT PK never auto-increments on SQLite, so every exception-safe
+  audit write in the test suite had been silently failing.
+- **PRINT-2** `OfficeRead.logo_url` + `.letterhead` (`enrich_office`), resolved once
+  in `print_service.resolve_letterhead` from the Statement tab's existing
+  `logo_option` (office|custom|none) / `address_source` / `correspondence_name` +
+  `account_settings.logo_url`, and used to head every PDF — no new columns.
+- **PRINT-3** ledger feed `size` cap 500 → 5,000 (the feeds slice an in-memory
+  window, so a larger page costs serialisation only); the PDF has no cap.
+- **PRINT-6** `GET /patients/{id}/day-totals?date=` — the deductible is not stored
+  on a charge; `day_totals` runs the estimate engine over the day's charges at their
+  stored fees against the slot's remaining deductible. Office-local `date` default.
+- **PRINT-4/5/7/8/9/10 were already closed** (AL-9 sign rule; PO-1 + the PDF walks
+  the account uncapped; `marital_status`/`sub_phone`/`sec_sub_rel_to_prim_sub` —
+  the FE binds `sec_rel_to_prim`, a name the API never had; subscriber
+  `plan_effective_date`/`plan_term_date` per INS-PT-6, never on `insurance_plans`;
+  `ortho_plans.pat_*`; `patients.photo_document_id`, embedded when local).
+
+**Perio charting round 2** (Patient -> Perio Chart; PERIO-BE-9/14/15/16/17/18 of
+[docs/Perio Chart/perio_charting_backend_devreport.md](docs/Perio%20Chart/perio_charting_backend_devreport.md)
+/ [response](docs/Perio%20Chart/perio_charting_backend_response.md); Alembic
+`47371579152e`, **applied to the dev DB**). Round 1 (PERIO-BE-1..13, `f2c3d4e5a6b7`)
+shipped the unique tooth row, decimal mobility, CAL, audit columns, bulk upsert,
+`/compare` and `/perio-chart-settings/me`.
+- **BE-9 was a naming mismatch, not a gap**: the range filter existed as the engine's
+  `exam_date_from`/`exam_date_to`; the FE probed `date_from` and read the ignored param
+  as "no data". Both names work now (`extra_filters` resolved by `PerioExamCRUD`).
+  Unknown query params are **not** rejected — that would be API-wide; the contract is
+  "a filter exists iff it is in the route's OpenAPI parameter list".
+- **BE-14** `perio_exams.provider_id` (FK `providers`, nullable — no legacy source;
+  `created_by` is a *user*) + `provider_name` batched onto the read. 422
+  `provider_not_found` (foreign tenant reads the same), `provider_inactive` only on a
+  **move** — a retired provider's exam stays editable. Kills the FE's
+  `perio:exam_provider` localStorage seam.
+- **BE-15 both ways**: `/compare?include_details=true` embeds each exam's rows sorted
+  by tooth (`tooth_sort_key`: numeric, then letters; one statement for all exams), and
+  `/perio-exam-details?exam_ids=1,2,3` (comma list; empty/garbage matches nothing).
+- **BE-16** every percentage divides by `probeable_sites` = 6 x `teeth_charted`,
+  clamped 0-100 (was over PD-measured sites -> `200.0`); `sites_measured` keeps meaning
+  "sites with a PD"; `sites_with_findings` + `suppuration_pct` added.
+- **BE-17/18** `/compare` never drops an id: 404 `perio_exam_not_found` (also for
+  another tenant's exam), 422 `exam_not_owned_by_patient`, 422 `perio_exam_voided`
+  unless `include_voided=true` — then the voided entry is returned flagged, has no
+  delta and is **never a delta baseline**; `delta_vs_exam_id` names the baseline.
+- **Ride-along**: the perio tables have no `tenant_id` and the generic routes were
+  unscoped (any tenant could read/void any exam by id). `PerioExamCRUD` /
+  `PerioExamDetailCRUD` scope through patient -> tenant; creates 404 a foreign
+  patient/exam.
+
+**Progress Notes round 2** (PN-6/8/9/11/12 of
+[docs/progress notes/progress_notes_backend_devreport.md](docs/progress%20notes/progress_notes_backend_devreport.md)
+/ [response](docs/progress%20notes/progress_notes_backend_response.md); Alembic
+`17559b3b70d4`, **applied to the dev DB**). PN-1…5/7/8/10 had already landed.
+- **PN-12 is the load-bearing fix, and it is a migration bug**: `s35` stored
+  `NOTESHTML` verbatim, and the export holds the markup entity-escaped once with
+  every `&` replaced by `~^^~` — so 30,322 of 35,286 migrated notes rendered as
+  `~^^~lt;p~^^~gt;…`; the plain `notes` export is lossy on its own (`?` for
+  `&nbsp;`, collapsed line breaks). The decode is **one** entity level
+  (`&amp;lt;` is a typed `<`; a double pass would corrupt it) and lives once in
+  [app/services/progress_note_content.py](app/services/progress_note_content.py),
+  shared by the importer (`s35` now decodes at source), the write path
+  (`ProgressNoteCRUD` derives `notes` from `notes_html` when only the rich body
+  is sent, so `search=` cannot drift) and `scripts/repair_progress_note_content.py`
+  (dry-run default, JSONL backup + `--restore`, `updated_at` deliberately not
+  stamped, signed rows re-hashed, the 4 rx-draw JSON rows moved into
+  `drawing_strokes`). **Applied**: 30,322 bodies decoded, 23,305 `notes` regenerated.
+- **PN-6 was not blocked** — `DEFINITIONS.txt` group `NOTESMACROS` names every
+  `Macrocat` code (`179 → DIAGNOSTIC`) and was already in `definitions` under
+  `legacy_id`; `s13` just never joined it. `s13` now resolves the label,
+  `scripts/normalize_note_macro_categories.py` relabelled 121/121 macros on the
+  dev DB (and filled the blank `key1`), and reads resolve a leftover code
+  defensively (`NoteMacroRead.category_label`, `label` on `/note-macros/categories`).
+  This also closes **NM-2**.
+- **PN-9** the lock day is the *note's office's* day (`note_timezones`: note
+  office → patient home office → default), never the UTC date; `ProgressNoteRead`
+  reports `timezone` + `locks_at` (office-local midnight as a UTC instant). Storage
+  stays UTC (PN-10 is the `UtcDatetime` serialiser). **PN-11** `updated_at`/
+  `updated_by`(+`_name`) — `ProgressNoteCRUD.update` now delegates to
+  `CRUDBase.update`, so a real change stamps the actor, a no-op PATCH stamps
+  nothing (MH-20) and the before/after diff lands in `audit_logs` — which answers
+  the **PN-8 open question**: a Date-of-Service correction is audited field-level
+  (`GET /patients/{id}/audit-logs?resource_type=progress-notes`). Rides along:
+  `progress_notes` has no `tenant_id` and the CRUD was **unscoped** — any tenant
+  could read/patch/delete a note by id; now scoped through the patient, and a
+  create on another tenant's patient is 404.
+
+**ADA Dental Claim Form (2024)** (claim → DIRECT PRINT; ADA-BE-1…14 + CLM-FO-1…5 of
+[docs/claims/ada_claim_form_2024_backend_devreport.md](docs/claims/ada_claim_form_2024_backend_devreport.md)
+/ [response](docs/claims/ada_claim_form_2024_backend_response.md); Alembic `3cf1360c0100`,
+**applied to the dev DB**). The browser had been assembling all 58 items from ~18 requests
+and rendering with jsPDF; every item without a column printed from `localStorage`.
+- **One assembler**, [app/services/claim_form_service.py](app/services/claim_form_service.py):
+  `assemble` → the whole form as a dict (every derived value tagged `*_source`, plus
+  `warnings[]` — a print that silently fell back to the wrong NPI is a rejected claim).
+  `GET /insurance-claims/{id}/ada-claim-form` (JSON), `…/reports/ada-claim-form?mode=form|overlay
+  &offset_x&offset_y` (PDF, [app/services/ada_claim_pdf.py](app/services/ada_claim_pdf.py) —
+  reportlab canvas, **ten lines per form** (rule E) with per-form Item 32, other fees on the
+  last), `POST /insurance-claims/reports/ada-claim-form` (batch, one PDF), all audited
+  `PRINT`/`claim_report`. Routes in [app/api/v1/claim_forms.py](app/api/v1/claim_forms.py).
+- **Columns**: `insurance_claims` gains the three 2024 boxes (`is_epsdt`, `is_locum_tenens`,
+  `date_last_srp` — **NULL = derive** from the last D4341/D4342), `icd_qualifier`+`icd_1..4`
+  (stored as typed, deliberately no FK), `other_fees`, `missing_teeth` (override of the
+  chart-derived set), `other_ins_plan_id`/`has_other_coverage` (captured at creation so a slot
+  change cannot re-point a printed claim), and the CLM-FO fill-out boxes (predetermination
+  number, remarks, signature_on_file, place_of_treatment, ortho/prosthesis/accident);
+  `patient_procedures.diagnosis_pointers`/`quantity`; `offices.npi`/`taxonomy_code` (the
+  **Type 2 NPI** — Item 49 uses it when set, else the billing provider's Type 1 with warning
+  `billing_entity_npi_missing` when the office has a corporate name) + `treatment_*` address
+  (Item 56 physical location); `providers.taxonomy_code` (+ derived
+  `effective_taxonomy_code` via [provider_taxonomy_service.py](app/services/provider_taxonomy_service.py));
+  `suffix` on patients/responsible_parties, **`sub_suffix`** on subscribers.
+- **`InsuranceClaimCRUD`** (ADA-BE-12): `POST /insurance-claims` takes `procedure_ids`
+  (not a column) and defaults office / treating (majority of the lines → preferred
+  provider) / billing (office's → treating) / plan / carrier / other plan / dates /
+  totals in one transaction; the per-line `PATCH claim_id` path fills the same fields
+  from the first attached charge. A provider mix is a 422 `claim_provider_mismatch`
+  **only** when one provider has `print_separate_claim_form`. Fill-out vocabulary is
+  validated on every write; `parse_tooth` errors are re-raised as `invalid_missing_tooth`.
+- Item 36 = claim flag **OR** an active `claim_consent` signature (the signature wins;
+  `PatientRead.has_claim_consent`). `GET /patients/{id}/tooth-status` is the uncapped
+  Item 33 source. `AREA_OF_ORAL_CAVITY` (UR→10 … FM→00, legacy 1–4) lives in
+  `procedure_rules_service` and is published on both metadata routes. Submit now freezes
+  the assembled form on `claim_submissions.claim_text` and returns `form_warnings`.
+- Gotchas met: a pydantic field named `date` shadows the `date` type under
+  `from __future__ import annotations` (use `dt.date`); the schema factory's
+  `max_length` fires **before** a CRUD normaliser, so a normalised column needs a looser
+  wire cap on the write schema (`diagnosis_pointers` 4 → 16); `rules_metadata` is
+  duck-typed, no schema.
 
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))

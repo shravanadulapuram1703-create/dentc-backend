@@ -1,25 +1,38 @@
 """Progress-notes business logic (addresses the frontend progress-notes report).
 
-- **PN-7/PN-4** ``ProgressNoteCRUD`` — a CRUDBase subclass wired into the generic
-  engine that enforces server-side lock (signed or prior-day notes reject text
-  edits) and maintains the strike-off audit (``struck_off_at``/``struck_off_by``)
-  on the false→true / true→false transition.
-- **PN-5/PN-3/PN-7** ``enrich_progress_notes`` — read hook: resolves actor names,
-  the per-note attachment count, and the computed ``is_locked`` flag (no N+1).
+- **PN-7/PN-4/PN-8/PN-9/PN-11** ``ProgressNoteCRUD`` — a CRUDBase subclass wired
+  into the generic engine that scopes tenancy through the patient (the table
+  has no ``tenant_id``), enforces the server-side lock (signed or prior-day
+  notes reject text edits — the *day* being the note's office's local day),
+  keeps the Date of Service correctable after the prior-day lock, maintains
+  the strike-off audit (``struck_off_at``/``struck_off_by``) on the
+  false→true / true→false transition, and delegates to ``CRUDBase.update`` so
+  every real change stamps ``updated_at``/``updated_by`` and lands its
+  before/after diff in ``audit_logs`` (the PN-8 open question: a DOS
+  correction *is* audited, field-level).
+- **PN-12** the write path derives ``notes`` from ``notes_html`` when a client
+  sends only the rich body, so the plain column ``search=`` runs against
+  cannot drift from what the screen shows.
+- **PN-5/PN-3/PN-7** ``enrich_progress_notes`` — read hook: resolves actor
+  names, the per-note attachment count, and the computed ``is_locked`` /
+  ``locks_at`` / ``timezone`` (no N+1).
 - **PN-2** ``sign_progress_note`` — sign as the caller, or as a verified provider
   (over-the-shoulder credentials).
 - **PN-3** per-note attachment list/create/delete.
-- **PN-6** ``note_macro_categories`` — distinct macro categories for the dropdown.
+- **PN-6** ``note_macro_categories`` — distinct macro categories, labelled.
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, Iterable
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core import filestore
+from app.core.datetimes import as_utc, office_tz
 from app.core.exceptions import (
     ConflictError,
     NotFoundError,
@@ -29,14 +42,16 @@ from app.core.exceptions import (
 from app.crud.base import CRUDBase
 from app.db.models import (
     NoteMacro,
+    Office,
     Patient,
     ProgressNote,
     ProgressNoteAttachment,
-    User,
 )
 from app.services import auth_service
-from app.services.user_admin_service import resolve_user_names
+from app.services import note_macro_service as macro_svc
 from app.services import signature_service as sig_svc
+from app.services.progress_note_content import html_to_text
+from app.services.user_admin_service import resolve_user_names
 
 # PN-7 lock scope. ``note_date`` is deliberately NOT here (PN-8): doctors write
 # notes days after the visit and often pick the wrong Date of Service, so the
@@ -59,29 +74,115 @@ def _attachment_url(note_id: int, att_id: int) -> str:
     )
 
 
-def _note_is_locked(note: ProgressNote, today: date) -> bool:
-    """PN-7: a note locks once signed, or after midnight of its creation day."""
+# ── PN-9: the note's clock ───────────────────────────────────────────────────
+def _tenant_patient_ids(tenant_id: int):  # noqa: ANN202
+    """Subquery of the patient ids in ``tenant_id`` — the only handle the
+    progress-note tables have on tenancy."""
+    return select(Patient.id).where(Patient.tenant_id == tenant_id)
+
+
+def note_timezones(db: Session, notes: Iterable[ProgressNote]) -> dict[int, ZoneInfo]:
+    """``{note_id: zone}`` — the office the note was written in, else the
+    patient's home office, else the default zone. Batched (two statements for
+    any number of notes) because the list feed calls this per page.
+
+    PN-9: ``created_at`` is UTC. A US-Eastern note written at 3 PM used to
+    lock at 8 PM local (00:00 UTC) and one written after 8 PM read as created
+    "tomorrow"; the lock day has to be judged on the office's clock.
+    """
+    rows = list(notes)
+    if not rows:
+        return {}
+    patient_ids = {r.patient_id for r in rows if r.office_id is None}
+    home_office: dict[int, int | None] = {}
+    if patient_ids:
+        home_office = dict(
+            db.execute(
+                select(Patient.id, Patient.home_office_id).where(Patient.id.in_(patient_ids))
+            ).all()
+        )
+    office_ids = {r.office_id for r in rows if r.office_id is not None}
+    office_ids |= {oid for oid in home_office.values() if oid is not None}
+    tz_by_office: dict[int, str | None] = {}
+    if office_ids:
+        tz_by_office = dict(
+            db.execute(select(Office.id, Office.timezone).where(Office.id.in_(office_ids))).all()
+        )
+    out: dict[int, ZoneInfo] = {}
+    for r in rows:
+        oid = r.office_id if r.office_id is not None else home_office.get(r.patient_id)
+        out[r.id] = office_tz(tz_by_office.get(oid) if oid is not None else None)
+    return out
+
+
+def note_lock_instant(note: ProgressNote, tz: ZoneInfo) -> datetime | None:
+    """The UTC instant the note's text locks: office-local midnight after the
+    creation day. ``None`` when the note has no ``created_at`` yet."""
+    if note.created_at is None:
+        return None
+    local_created = as_utc(note.created_at).astimezone(tz)
+    next_midnight = datetime.combine(local_created.date() + timedelta(days=1), datetime.min.time(), tz)
+    return next_midnight.astimezone(timezone.utc)
+
+
+def _note_is_locked(note: ProgressNote, tz: ZoneInfo, now: datetime | None = None) -> bool:
+    """PN-7/PN-9: a note locks once signed, or after midnight — *the office's*
+    midnight — of its creation day."""
     if note.signed_at is not None:
         return True
-    return note.created_at is not None and note.created_at.date() < today
+    if note.created_at is None:
+        return False
+    now = as_utc(now) if now is not None else datetime.now(timezone.utc)
+    return as_utc(note.created_at).astimezone(tz).date() < now.astimezone(tz).date()
 
 
-# ── PN-7 / PN-4: lock enforcement + strike-off audit on PATCH ────────────────
+def _derive_plain_text(data: dict[str, Any]) -> None:
+    """PN-12: a client that sends only ``notes_html`` gets ``notes`` derived
+    from it, so the searchable column never holds a stale or empty body."""
+    if "notes_html" in data and data.get("notes") is None and data["notes_html"] is not None:
+        derived = html_to_text(data["notes_html"])
+        data["notes"] = derived or None
+
+
+# ── PN-7 / PN-4 / PN-8 / PN-11: lock enforcement + audit on the write path ──
 class ProgressNoteCRUD(CRUDBase):
+    def _scope_tenant(self, stmt, tenant_id: int | None):  # noqa: ANN001
+        # progress_notes has no tenant_id: scope through the patient, else a
+        # note id from another practice reads and patches.
+        if tenant_id is None:
+            return stmt
+        return stmt.where(ProgressNote.patient_id.in_(_tenant_patient_ids(tenant_id)))
+
+    def create(self, db, data, *, tenant_id=None, created_by=None):  # noqa: ANN001
+        payload = dict(data)
+        if tenant_id is not None and "patient_id" in payload:
+            owner = db.execute(
+                select(Patient.id).where(
+                    Patient.id == payload["patient_id"], Patient.tenant_id == tenant_id
+                )
+            ).scalar_one_or_none()
+            if owner is None:
+                raise NotFoundError(f"Patient '{payload['patient_id']}' was not found")
+        _derive_plain_text(payload)
+        return super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
+
     def update(self, db, obj_id, data, *, tenant_id=None, updated_by=None):  # noqa: ANN001
         obj = self.get(db, obj_id, tenant_id=tenant_id)
         data = dict(data)
         # struck_off_* are server-managed — never honour a client-supplied value.
         data.pop("struck_off_at", None)
         data.pop("struck_off_by", None)
+        _derive_plain_text(data)
 
-        # PN-7: reject text mutations on a locked note (signing/strike-off still ok).
-        if _note_is_locked(obj, datetime.now(timezone.utc).date()):
+        # PN-7/PN-9: reject text mutations on a locked note (signing/strike-off
+        # still ok). "Today" is the note's office's today, not UTC's.
+        tz = note_timezones(db, [obj])[obj.id]
+        if _note_is_locked(obj, tz):
             changed = [f for f in _TEXT_FIELDS if f in data and data[f] != getattr(obj, f)]
             if changed:
                 raise ConflictError(
                     "This note is locked (signed or from a prior day) and cannot be edited",
-                    details={"locked_fields": changed},
+                    details={"locked_fields": changed, "timezone": str(tz)},
                 )
         # PN-8: the DOS survives the prior-day lock but not a signature.
         if obj.signed_at is not None and "note_date" in data:
@@ -105,21 +206,20 @@ class ProgressNoteCRUD(CRUDBase):
                     obj.struck_off_at = None
                     obj.struck_off_by = None
 
-        for key, value in data.items():
-            setattr(obj, key, value)
-        self._commit(db)
-        db.refresh(obj)
-        return obj
+        # PN-11 + PN-8: the engine diffs first (a no-op PATCH stamps nothing),
+        # stamps updated_by, and hands the before/after diff to the audit
+        # context — so a Date-of-Service correction is recorded field-level.
+        return super().update(db, obj_id, data, tenant_id=tenant_id, updated_by=updated_by)
 
 
-# ── PN-5 / PN-3 / PN-7: read enrichment ──────────────────────────────────────
+# ── PN-5 / PN-3 / PN-7 / PN-9 / PN-11: read enrichment ───────────────────────
 def enrich_progress_notes(db: Session, items, tenant_id: int | None = None) -> None:  # noqa: ARG001
     rows = list(items)
     if not rows:
         return
     wanted: set[int] = set()
     for r in rows:
-        for actor in (r.created_by, r.signed_by, r.struck_off_by):
+        for actor in (r.created_by, r.updated_by, r.signed_by, r.struck_off_by):
             if actor is not None:
                 wanted.add(actor)
     names = resolve_user_names(db, wanted)
@@ -136,14 +236,19 @@ def enrich_progress_notes(db: Session, items, tenant_id: int | None = None) -> N
         ).all()
     )
 
-    today = datetime.now(timezone.utc).date()
+    zones = note_timezones(db, rows)
+    now = datetime.now(timezone.utc)
     for r in rows:
+        tz = zones[r.id]
         r.signature_status = sig_svc.progress_note_signature_status(r)  # SIG-7
         r.created_by_name = names.get(r.created_by) if r.created_by is not None else None
+        r.updated_by_name = names.get(r.updated_by) if r.updated_by is not None else None
         r.signed_by_name = names.get(r.signed_by) if r.signed_by is not None else None
         r.struck_off_by_name = names.get(r.struck_off_by) if r.struck_off_by is not None else None
         r.attachment_count = counts.get(r.id, 0)
-        r.is_locked = _note_is_locked(r, today)
+        r.is_locked = _note_is_locked(r, tz, now)
+        r.locks_at = None if r.is_locked else note_lock_instant(r, tz)
+        r.timezone = str(tz)
 
 
 # ── tenant-safe note lookup (progress_notes isn't tenant-columned) ───────────
@@ -268,10 +373,19 @@ def delete_attachment(db: Session, tenant_id: int, note_id: int, att_id: int) ->
 
 # ── PN-6: macro category lookup ──────────────────────────────────────────────
 def note_macro_categories(db: Session, tenant_id: int) -> list[dict]:
+    """Distinct stored categories with a display ``label`` — a Denticon code
+    (``179``) resolves through the tenant's ``NOTESMACROS`` definitions, a
+    label stored as-is is its own label."""
     rows = db.execute(
         select(NoteMacro.category, func.count())
         .where(NoteMacro.tenant_id == tenant_id, NoteMacro.category.is_not(None))
         .group_by(NoteMacro.category)
         .order_by(NoteMacro.category)
     ).all()
-    return [{"category": cat, "macro_count": count} for cat, count in rows]
+    labels = macro_svc.category_labels(db, tenant_id)
+    out = [
+        {"category": cat, "label": macro_svc.category_label(cat, labels), "macro_count": count}
+        for cat, count in rows
+    ]
+    out.sort(key=lambda c: (c["label"] or "").lower())
+    return out

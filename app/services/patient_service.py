@@ -35,7 +35,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from sqlalchemy import and_, case, func, literal, or_, select
+from sqlalchemy import and_, case, false, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
@@ -68,39 +68,64 @@ def assign_chart_no(db: Session, obj: Patient) -> None:
 class PatientCRUD(CRUDBase[Patient]):
     # MH-10: ``phone`` is resolved by this class, not by the generic equality
     # pass, so one query param can reach all three number columns.
-    custom_filter_fields = ("phone",)
+    custom_filter_fields = ("phone", "legacy_id")
 
     def _extra_list_clauses(self, filters: dict[str, Any]) -> list:
+        clauses: list = []
+        # PT-SEARCH-1: Legacy ID is an exact match on the pre-import id. It is
+        # resolved here rather than by the generic equality pass only so that a
+        # pasted value with stray whitespace still hits; the stored column holds
+        # no padding (0 of 83,861 live values), so the compare stays a plain
+        # ``=`` and rides the unique index.
+        legacy = filters.get("legacy_id")
+        if legacy is not None:
+            legacy = str(legacy).strip()
+            if legacy:
+                clauses.append(Patient.legacy_id == legacy)
+            else:
+                # An explicit blank means "match nothing", never "unfiltered":
+                # the FE detects an ignored filter by rows that do not carry the
+                # requested value, and a random page is the bug being fixed.
+                clauses.append(false())
         raw = (filters.get("phone") or "").strip()
         if not raw:
-            return []
+            return clauses
         digits = re.sub(r"\D", "", raw)
         columns = (Patient.phone, Patient.cell_phone, Patient.work_phone)
-        clauses = []
+        phone_clauses = []
         for column in columns:
-            clauses.append(column == raw)
+            phone_clauses.append(column == raw)
             if digits:
                 # Migrated numbers are stored unformatted, so a digits-only
                 # contains match is what finds them; a formatted stored value
                 # still matches the verbatim comparison above.
-                clauses.append(column.ilike(f"%{digits}%"))
-        return [or_(*clauses)]
+                phone_clauses.append(column.ilike(f"%{digits}%"))
+        clauses.append(or_(*phone_clauses))
+        return clauses
 
     def _extra_search_clauses(self, search: str) -> list:
         """MH-9: recognise ``"Last, First"`` — the form the legacy pickers show
         and staff therefore type. No single column contains it, so the generic
         per-column ilike can never match."""
         term = (search or "").strip()
+        clauses: list = []
+        # PT-SEARCH-1: the Dashboard Quick Search box has no mode selector, so a
+        # typed legacy id has to resolve through free text too. Exact only (an
+        # index probe) — a substring ilike on a numeric column would drown a
+        # name search in unrelated ids.
+        if term:
+            clauses.append(Patient.legacy_id == term)
         if "," not in term:
-            return []
+            return clauses
         last, _, first = term.partition(",")
         last, first = last.strip(), first.strip()
         if not last:
-            return []
+            return clauses
         clause = Patient.last_name.ilike(f"{last}%")
         if first:
             clause = and_(clause, Patient.first_name.ilike(f"{first}%"))
-        return [clause]
+        clauses.append(clause)
+        return clauses
 
     def _search_order(self, search: str) -> list:
         """Rank exact matches ahead of prefix ahead of substring (MH-9)."""
@@ -111,7 +136,7 @@ class PatientCRUD(CRUDBase[Patient]):
         last, _, first = term.partition(",")
         last, first = last.strip().lower(), first.strip().lower()
 
-        exact = [func.lower(Patient.chart_no) == lowered]
+        exact = [func.lower(Patient.chart_no) == lowered, Patient.legacy_id == term]
         if term.isdigit():
             exact.append(Patient.id == int(term))
         name_exact = or_(
@@ -142,13 +167,20 @@ class PatientCRUD(CRUDBase[Patient]):
         # Contradictory Patient Status / Patient Type selections are resolved or
         # rejected before anything is written.
         payload = rules.normalize_patient_payload(data)
+        # GAP-AP-21: the same duplicate guard (and the same override) as
+        # /patients/register — the plain create was the unguarded back door.
+        force_create = bool(payload.pop("force_create", False))
+        if tenant_id is not None:
+            from app.services.patient_extra_service import raise_if_duplicate
+
+            raise_if_duplicate(db, tenant_id, payload, force_create=force_create)
         if tenant_id is not None and hasattr(self.model, "tenant_id"):
             payload.setdefault("tenant_id", tenant_id)
         if created_by is not None and self._is_int_col("created_by"):
             payload.setdefault("created_by", created_by)
         obj = self.model(**payload)
         db.add(obj)
-        db.flush()  # obtain the SERIAL id before deriving chart_no
+        self._flush(db)  # obtain the SERIAL id before deriving chart_no
         assign_chart_no(db, obj)
         self._commit(db)
         db.refresh(obj)
@@ -169,6 +201,7 @@ class PatientCRUD(CRUDBase[Patient]):
         # sitting true in the database.
         existing = self.get(db, obj_id, tenant_id=tenant_id)
         payload = rules.normalize_patient_payload(data, existing=existing)
+        payload.pop("force_create", None)  # create-only; never a column
         return super().update(
             db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by
         )

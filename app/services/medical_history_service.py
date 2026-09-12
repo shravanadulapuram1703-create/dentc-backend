@@ -28,12 +28,14 @@ from __future__ import annotations
 
 import hashlib
 import io
+import itertools
 import json
 from datetime import datetime
 from typing import Any, Iterable
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.exceptions import NotFoundError, ValidationError
 from app.crud.base import CRUDBase
@@ -59,6 +61,7 @@ from app.services.medical_history_catalog import (
     QUESTIONNAIRE_GROUP_TYPES,
     input_type_for,
 )
+from app.services.medical_history_catalog import ALERT_CATALOG
 from app.services import signature_service as sig_svc
 
 #: Mirrors the frontend's ``MIN_TENANT_CATALOG_ITEMS`` guard. A tenant catalog
@@ -230,18 +233,118 @@ def resolve_catalogs(db: Session, tenant_id: int) -> tuple[dict[str, list[dict[s
     return catalogs, sources
 
 
-def _alert_flags(db: Session, tenant_id: int) -> dict[str, dict[str, Any]]:
-    """MH-14: ``alert_code`` -> the Setup catalog's flags for that item."""
-    catalog, _ = _catalog_for(db, tenant_id, ALERT_GROUP_TYPE)
-    return {
+#: GAP-AP-22: ``alert_flags`` is read three times per single-row alert write
+#: (guard, catalog fill, flash-alert sync) and every read is two round trips
+#: to a remote database. Cached on the *session* (``Session.info``) — one
+#: request, one session — and dropped the moment a flush touches the
+#: definition tables, so a Setup edit in the same session is never served stale.
+_FLAGS_CACHE_KEY = "medical_history.alert_flags"
+
+
+@event.listens_for(Session, "after_flush")
+def _invalidate_alert_flags(session: Session, _flush_context: Any) -> None:
+    cache = session.info.get(_FLAGS_CACHE_KEY)
+    if not cache:
+        return
+    for obj in itertools.chain(session.new, session.dirty, session.deleted):
+        if isinstance(obj, (Definition, DefinitionGroup)):
+            session.info.pop(_FLAGS_CACHE_KEY, None)
+            return
+
+
+def alert_flags(db: Session, tenant_id: int) -> dict[str, dict[str, Any]]:
+    """MH-14/MA-3/MA-4: ``alert_code`` -> label / section / flags / display order.
+
+    Built as the **built-in catalog overlaid with every tenant MEDALERT
+    definition**, tenant winning per code — deliberately not gated by the
+    ``MIN_TENANT_CATALOG_ITEMS`` guard that decides which *list* the screen
+    renders. The guard exists so a stray test group cannot replace ~90 alerts;
+    it must not also hide the one definition an office flagged ``is_flash_alert``
+    (MA-4: every answered row read ``false / false`` because the flags only ever
+    came from a catalog the guard was rejecting), nor drop the section of a code
+    the tenant list lacks (MA-3: ``cardiac_pacemaker`` read ``null``).
+    """
+    cache = db.info.setdefault(_FLAGS_CACHE_KEY, {})
+    cached = cache.get(tenant_id)
+    if cached is not None:
+        return cached
+    flags = _build_alert_flags(db, tenant_id)
+    cache[tenant_id] = flags
+    return flags
+
+
+def _build_alert_flags(db: Session, tenant_id: int) -> dict[str, dict[str, Any]]:
+    flags: dict[str, dict[str, Any]] = {
         item["code"]: {
-            "is_flash_alert": item["is_flash_alert"],
-            "blocks_charges": item["blocks_charges"],
+            "is_flash_alert": False,
+            "blocks_charges": False,
             "label": item["label"],
             "section": item["section"],
+            "order": index,
         }
-        for item in catalog
+        for index, item in enumerate(ALERT_CATALOG)
     }
+    for index, d in enumerate(_tenant_definitions(db, tenant_id, ALERT_GROUP_TYPE)):
+        base = flags.get(d.key1, {})
+        flags[d.key1] = {
+            "is_flash_alert": bool(d.is_flash_alert),
+            "blocks_charges": bool(d.blocks_charges),
+            "label": d.description or base.get("label"),
+            "section": d.section or base.get("section"),
+            "order": base.get("order", 100_000 + index),
+        }
+    return flags
+
+
+# Backwards-compatible alias (older call sites / tests).
+_alert_flags = alert_flags
+
+
+def humanize_code(code: str) -> str:
+    """``cardiac_pacemaker`` -> ``Cardiac Pacemaker`` — the frontend's own
+    fallback when neither the row nor the catalog carries a label."""
+    return " ".join(w.capitalize() for w in (code or "").replace("_", " ").split()) or code
+
+
+def effective_alert_meta(
+    row: PatientMedicalAlert, flags: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """MA-3/MA-4: what the answered row *means* — stored override, else the
+    catalog, else derived. The read models, the summary, the flash-alert sync
+    and the PDF all go through here so they cannot disagree."""
+    meta = flags.get(row.alert_code, {})
+    return {
+        "label": row.alert_label or meta.get("label") or humanize_code(row.alert_code),
+        "section": row.section or meta.get("section"),
+        "is_flash_alert": bool(row.is_flash_alert) if row.is_flash_alert is not None
+        else bool(meta.get("is_flash_alert")),
+        "blocks_charges": bool(row.blocks_charges) if row.blocks_charges is not None
+        else bool(meta.get("blocks_charges")),
+    }
+
+
+def parse_patient_ids(raw: Any, *, limit: int = 200) -> list[int] | None:
+    """MA-2: ``?patient_ids=1,2,3`` (<= ``limit``) for the bulk alert reads."""
+    if raw is None:
+        return None
+    if isinstance(raw, (list, tuple, set)):
+        parts = [str(p) for p in raw]
+    else:
+        parts = str(raw).split(",")
+    ids: list[int] = []
+    for part in parts:
+        part = part.strip()
+        if part.isdigit():
+            value = int(part)
+            if value not in ids:
+                ids.append(value)
+    if len(ids) > limit:
+        raise ValidationError(
+            f"patient_ids accepts at most {limit} ids per request.",
+            code="too_many_patient_ids",
+            details={"limit": limit, "received": len(ids)},
+        )
+    return ids
 
 
 # ── reads ────────────────────────────────────────────────────────────────────
@@ -316,22 +419,22 @@ def _actor_names(db: Session, ids: set[int]) -> dict[int, str]:
 
 
 def _alert_out(row: PatientMedicalAlert, flags: dict[str, Any], names: dict[int, str]) -> dict[str, Any]:
-    meta = flags.get(row.alert_code, {})
+    meta = effective_alert_meta(row, flags)
     return {
         "id": row.id,
         "patient_id": row.patient_id,
         "alert_code": row.alert_code,
-        "alert_label": row.alert_label or meta.get("label"),
-        "section": meta.get("section"),
+        "alert_label": meta["label"],
+        "section": meta["section"],
         "response": row.response,
         "comments": row.comments,
         "answered_at": row.answered_at,
         "is_active": row.is_active,
-        # MH-14: the Setup catalog's flags, denormalised so a scheduler popover or
-        # a charge gate can act on the patient's answer without re-reading
-        # /definitions per row.
-        "is_flash_alert": bool(meta.get("is_flash_alert")),
-        "blocks_charges": bool(meta.get("blocks_charges")),
+        # MH-14/MA-4: the effective flags — a per-answer override, else the Setup
+        # catalog's — denormalised so a scheduler popover or a charge gate can act
+        # on the patient's answer without re-reading /definitions per row.
+        "is_flash_alert": meta["is_flash_alert"],
+        "blocks_charges": meta["blocks_charges"],
         "created_by": row.created_by,
         "created_by_name": names.get(row.created_by) if row.created_by else None,
         "updated_by": row.updated_by,
@@ -434,7 +537,7 @@ def get_document(db: Session, tenant_id: int, patient_id: int) -> dict[str, Any]
     dental = _responses(db, tenant_id, patient_id, "dental")
     medical = _responses(db, tenant_id, patient_id, "medical")
     catalogs, catalog_sources = resolve_catalogs(db, tenant_id)
-    flags = {item["code"]: item for item in catalogs["alerts"]}
+    flags = alert_flags(db, tenant_id)
 
     # MH-13: a legacy comments row keeps working - it is read out of the alert
     # list and surfaced as the document's comments when the header has none.
@@ -543,6 +646,142 @@ def get_document(db: Session, tenant_id: int, patient_id: int) -> dict[str, Any]
         "copied_from_patient_id": head.copied_from_patient_id if head else None,
         "copied_at": head.copied_at if head else None,
         "copied_by_name": names.get(head.copied_by) if head and head.copied_by else None,
+        # MH-18: Created / Modified stamps, server-computed.
+        "audit": get_audit(db, tenant_id, patient_id, head=head),
+    }
+
+
+# ── MH-18: Created / Modified stamps + last reviewed, server-side ──────────
+_SECTION_ENTITY_TYPES: dict[str, tuple[str, ...]] = {
+    "alerts": ("alert",),
+    "dental": ("dental",),
+    "medical": ("medical",),
+    "signature": ("signature",),
+    "comments": ("comments",),
+}
+
+
+def _stamp(when: datetime | None, who: int | None) -> dict[str, Any]:
+    return {"at": when, "by": who}
+
+
+def _later(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    if a["at"] is None:
+        return b
+    if b["at"] is None:
+        return a
+    return b if b["at"] > a["at"] else a
+
+
+def _earlier(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    if a["at"] is None:
+        return b
+    if b["at"] is None:
+        return a
+    return b if b["at"] < a["at"] else a
+
+
+def get_audit(db: Session, tenant_id: int, patient_id: int, *,
+              head: PatientMedicalHistory | None = None) -> dict[str, Any]:
+    """MH-18: *when was this history created / last modified, and by whom* —
+    overall and per section — computed here instead of from five client-side
+    list calls (two of them over the soft-deleted rows, capped at one page).
+
+    Sources, merged: every answer row **including inactive ones** (a cleared
+    answer is often the latest modification), the signatures, the header, and
+    the field-level change log — which is the only complete record, because the
+    composite write hard-deletes a reset row, so the row itself is gone.
+    ``last_reviewed`` is the MH-16 completion assertion, never inferred.
+    """
+    empty = {"created_at": None, "created_by": None, "updated_at": None, "updated_by": None}
+    created: dict[str, dict[str, Any]] = {k: _stamp(None, None) for k in _SECTION_ENTITY_TYPES}
+    updated: dict[str, dict[str, Any]] = {k: _stamp(None, None) for k in _SECTION_ENTITY_TYPES}
+
+    def fold(section: str, c_at, c_by, u_at, u_by) -> None:  # noqa: ANN001
+        created[section] = _earlier(created[section], _stamp(c_at, c_by))
+        updated[section] = _later(updated[section], _stamp(c_at, c_by))
+        if u_at is not None:
+            actor = u_by if u_by is not None else c_by
+            updated[section] = _later(updated[section], _stamp(u_at, actor))
+
+    for row in db.execute(
+        select(PatientMedicalAlert.created_at, PatientMedicalAlert.created_by,
+               PatientMedicalAlert.updated_at, PatientMedicalAlert.updated_by).where(
+            PatientMedicalAlert.tenant_id == tenant_id,
+            PatientMedicalAlert.patient_id == patient_id,
+        )
+    ).all():
+        fold("alerts", *row)
+    for row in db.execute(
+        select(PatientQuestionnaireResponse.questionnaire_type,
+               PatientQuestionnaireResponse.created_at, PatientQuestionnaireResponse.created_by,
+               PatientQuestionnaireResponse.updated_at,
+               PatientQuestionnaireResponse.updated_by).where(
+            PatientQuestionnaireResponse.tenant_id == tenant_id,
+            PatientQuestionnaireResponse.patient_id == patient_id,
+        )
+    ).all():
+        kind, *stamps = row
+        if kind in ("dental", "medical"):
+            fold(kind, *stamps)
+    for row in db.execute(
+        select(PatientSignature.created_at, PatientSignature.created_by,
+               PatientSignature.updated_at, PatientSignature.updated_by).where(
+            PatientSignature.patient_id == patient_id,
+        )
+    ).all():
+        fold("signature", *row)
+    for row in db.execute(
+        select(PatientMedicalHistoryEvent.entity_type, PatientMedicalHistoryEvent.created_at,
+               PatientMedicalHistoryEvent.changed_by).where(
+            PatientMedicalHistoryEvent.tenant_id == tenant_id,
+            PatientMedicalHistoryEvent.patient_id == patient_id,
+        )
+    ).all():
+        entity_type, at, by = row
+        for section, kinds in _SECTION_ENTITY_TYPES.items():
+            if entity_type in kinds:
+                fold(section, at, by, None, None)
+    if head is None:
+        head = header(db, tenant_id, patient_id)
+    if head is not None:
+        fold("comments", head.created_at, head.created_by, head.updated_at, head.updated_by)
+
+    overall_c = _stamp(None, None)
+    overall_u = _stamp(None, None)
+    for section in _SECTION_ENTITY_TYPES:
+        overall_c = _earlier(overall_c, created[section])
+        overall_u = _later(overall_u, updated[section])
+
+    actor_ids = {s["by"] for s in (*created.values(), *updated.values()) if s["by"]}
+    reviewed = {
+        "alerts": (head.alerts_completed_at, head.alerts_completed_by) if head else (None, None),
+        "dental": (head.dental_completed_at, head.dental_completed_by) if head else (None, None),
+        "medical": (head.medical_completed_at, head.medical_completed_by) if head else (None, None),
+    }
+    actor_ids |= {by for _, by in reviewed.values() if by}
+    names = _actor_names(db, actor_ids)
+
+    def block(c: dict[str, Any], u: dict[str, Any]) -> dict[str, Any]:
+        if c["at"] is None and u["at"] is None:
+            return dict(empty, created_by_name=None, updated_by_name=None)
+        return {
+            "created_at": c["at"], "created_by": c["by"],
+            "created_by_name": names.get(c["by"]) if c["by"] else None,
+            "updated_at": u["at"], "updated_by": u["by"],
+            "updated_by_name": names.get(u["by"]) if u["by"] else None,
+        }
+
+    return {
+        "overall": block(overall_c, overall_u),
+        "sections": {k: block(created[k], updated[k]) for k in _SECTION_ENTITY_TYPES},
+        "last_reviewed": {
+            k: {
+                "last_reviewed_at": at, "last_reviewed_by": by,
+                "last_reviewed_by_name": names.get(by) if by else None,
+            }
+            for k, (at, by) in reviewed.items()
+        },
     }
 
 
@@ -554,13 +793,16 @@ def sync_flash_alerts(db: Session, tenant_id: int, patient_id: int, *, user_id: 
     is the link) - a hand-typed banner alert is never deactivated by a
     questionnaire edit. Returns the number of banner rows written.
     """
-    flags = _alert_flags(db, tenant_id)
-    answered = {
-        a.id: a
-        for a in _alerts(db, tenant_id, patient_id)
-        if (a.response or "").lower() == "yes"
-        and (flags.get(a.alert_code, {}).get("is_flash_alert") or flags.get(a.alert_code, {}).get("blocks_charges"))
-    }
+    flags = alert_flags(db, tenant_id)
+    answered: dict[int, PatientMedicalAlert] = {}
+    metas: dict[int, dict[str, Any]] = {}
+    for a in _alerts(db, tenant_id, patient_id):
+        if (a.response or "").lower() != "yes":
+            continue
+        meta = effective_alert_meta(a, flags)
+        if meta["is_flash_alert"] or meta["blocks_charges"]:
+            answered[a.id] = a
+            metas[a.id] = meta
     existing = {
         row.source_medical_alert_id: row
         for row in db.execute(
@@ -571,17 +813,17 @@ def sync_flash_alerts(db: Session, tenant_id: int, patient_id: int, *, user_id: 
         ).scalars()
     }
     written = 0
-    for alert_id, alert in answered.items():
-        meta = flags.get(alert.alert_code, {})
-        label = alert.alert_label or meta.get("label") or alert.alert_code
+    for alert_id in answered:
+        meta = metas[alert_id]
+        label = meta["label"]
         row = existing.get(alert_id)
         if row is None:
             db.add(
                 PatientAlert(
                     patient_id=patient_id,
                     alert=label,
-                    is_flash_alert=bool(meta.get("is_flash_alert")),
-                    blocks_charges=bool(meta.get("blocks_charges")),
+                    is_flash_alert=meta["is_flash_alert"],
+                    blocks_charges=meta["blocks_charges"],
                     source_medical_alert_id=alert_id,
                     is_active=True,
                     created_by=user_id,
@@ -589,16 +831,205 @@ def sync_flash_alerts(db: Session, tenant_id: int, patient_id: int, *, user_id: 
             )
             written += 1
         else:
+            # MA-6: re-answered YES reactivates the *same* row.
             row.alert = label
-            row.is_flash_alert = bool(meta.get("is_flash_alert"))
-            row.blocks_charges = bool(meta.get("blocks_charges"))
-            row.is_active = True
+            row.is_flash_alert = meta["is_flash_alert"]
+            row.blocks_charges = meta["blocks_charges"]
+            if not row.is_active:
+                row.is_active = True
+                row.deactivated_on = None
             written += 1
     for alert_id, row in existing.items():
+        # MA-6: YES -> NO / unknown / cleared / soft-deleted deactivates the
+        # linked banner row and dates it; a hand-typed row has no link and is
+        # never touched.
         if alert_id not in answered and row.is_active:
             row.is_active = False
+            row.deactivated_on = _now().date()
     db.flush()
     return written
+
+
+# ── GAP-AP-22: reusable, non-committing reconcile of one patient's answers ───
+def _precheck_alert_contradictions(
+    db: Session, tenant_id: int, stored: dict[str, PatientMedicalAlert],
+    alerts_in: list[dict[str, Any]], *, allow: bool,
+) -> list[dict[str, Any]]:
+    """MH-12: judge the *merge* of payload and stored answers, before writing."""
+    flags = alert_flags(db, tenant_id)
+    merged: dict[str, str | None] = {code: row.response for code, row in stored.items()}
+    for item in alerts_in:
+        code = _clean(item.get("alert_code"))
+        if code:
+            merged[code] = _clean(item.get("response"))
+    would_change = {
+        code
+        for code in (_clean(i.get("alert_code")) for i in alerts_in)
+        if code and merged.get(code) != (stored[code].response if code in stored else None)
+    }
+    sections = {code: meta.get("section") for code, meta in flags.items()}
+    return rules.check_alert_contradictions(
+        merged, sections, changed_codes=would_change, allow=allow,
+    )
+
+
+def _counts(sent: list[str], before: set[str], after: set[str], changed: set[str]) -> dict[str, int]:
+    created = {c for c in changed if c in after and c not in before}
+    deleted = {c for c in changed if c in before and c not in after}
+    updated = changed - created - deleted
+    return {
+        "created": len(created), "updated": len(updated), "deleted": len(deleted),
+        "unchanged": len({c for c in sent if c not in changed}),
+    }
+
+
+def apply_alert_answers(
+    db: Session,
+    tenant_id: int,
+    patient_id: int,
+    items: list[dict[str, Any]],
+    *,
+    user_id: int | None,
+    allow_contradictions: bool = False,
+    replace: bool = False,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Reconcile alert answers for one patient **without committing**.
+
+    The single write path behind ``POST /patient-medical-alerts/bulk``, the
+    composite ``PUT …/medical-history`` and the atomic ``POST /patients/register``
+    — so the MH-12 contradiction rules, the MA-3 catalog fill and the MH-8 change
+    log hold on every one of them, and a registration no longer writes bare
+    rows the generic resource would have refused. The caller commits (or rolls
+    the whole transaction back) and runs :func:`sync_flash_alerts` once.
+    """
+    now = now or _now()
+    stored = {a.alert_code: a for a in _alerts(db, tenant_id, patient_id)}
+    alerts_in = [dict(i) for i in items]
+    sent = [c for c in (_clean(i.get("alert_code")) for i in alerts_in) if c]
+    if replace:
+        omitted = set(sent)
+        alerts_in += [
+            {"alert_code": code, "response": None, "comments": None}
+            for code in stored
+            if code not in omitted and code != LEGACY_COMMENTS_CODE
+        ]
+    contradictions = _precheck_alert_contradictions(
+        db, tenant_id, stored, alerts_in, allow=allow_contradictions,
+    )
+    before = set(stored)
+    changed = _apply_alerts(
+        db, tenant_id=tenant_id, patient_id=patient_id, items=alerts_in,
+        stored=stored, user_id=user_id, now=now,
+    )
+    if contradictions:
+        _event(db, tenant_id=tenant_id, patient_id=patient_id, entity_type="alert",
+               action="update", code="contradiction_override",
+               new_value=json.dumps(contradictions, default=str), user_id=user_id)
+    db.flush()
+    return {
+        "changed": changed,
+        "contradictions": contradictions,
+        "rows": [stored[c] for c in dict.fromkeys(sent) if c in stored],
+        **_counts(sent, before, set(stored), changed),
+    }
+
+
+def apply_questionnaire_answers(
+    db: Session,
+    tenant_id: int,
+    patient_id: int,
+    items: list[dict[str, Any]],
+    *,
+    user_id: int | None,
+    replace: bool = False,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Questionnaire twin of :func:`apply_alert_answers` (non-committing).
+
+    Items carry their own ``questionnaire_type``; ``replace`` clears the stored
+    codes of every type *present in the payload* that the payload omits — a
+    type the payload does not mention is never touched.
+    """
+    now = now or _now()
+    by_type: dict[str, list[dict[str, Any]]] = {}
+    for item in items:
+        kind = _clean(item.get("questionnaire_type"))
+        if not kind:
+            continue
+        kind = kind.lower()
+        if kind not in ("dental", "medical"):
+            raise ValidationError(
+                f"Unknown questionnaire_type '{kind}'.",
+                code="invalid_questionnaire_type",
+                details={"field": "questionnaire_type", "allowed": ["dental", "medical"]},
+            )
+        by_type.setdefault(kind, []).append(dict(item))
+
+    changed_all: set[str] = set()
+    rows: list[PatientQuestionnaireResponse] = []
+    totals = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0}
+    for kind, kind_items in by_type.items():
+        stored = {q.question_code: q for q in _responses(db, tenant_id, patient_id, kind)}
+        sent = [c for c in (_clean(i.get("question_code")) for i in kind_items) if c]
+        if replace:
+            omitted = set(sent)
+            kind_items += [{"question_code": c, "answer": None} for c in stored if c not in omitted]
+        before = set(stored)
+        changed = _apply_responses(
+            db, tenant_id=tenant_id, patient_id=patient_id, questionnaire_type=kind,
+            items=kind_items, stored=stored, user_id=user_id, now=now,
+        )
+        changed_all |= {f"{kind}:{c}" for c in changed}
+        rows += [stored[c] for c in dict.fromkeys(sent) if c in stored]
+        for key, value in _counts(sent, before, set(stored), changed).items():
+            totals[key] += value
+    db.flush()
+    return {"changed": changed_all, "rows": rows, **totals}
+
+
+def bulk_upsert_alerts(
+    db: Session, tenant_id: int, patient_id: int, items: list[dict[str, Any]], *,
+    user_id: int | None, allow_contradictions: bool = False, replace: bool = False,
+) -> dict[str, Any]:
+    """``POST /patient-medical-alerts/bulk`` — one transaction, one patient."""
+    _patient(db, tenant_id, patient_id)
+    try:
+        result = apply_alert_answers(
+            db, tenant_id, patient_id, items, user_id=user_id,
+            allow_contradictions=allow_contradictions, replace=replace,
+        )
+        sync_flash_alerts(db, tenant_id, patient_id, user_id=user_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    rows = result["rows"]
+    for row in rows:
+        db.refresh(row)
+    enrich_medical_alerts(db, rows, tenant_id)
+    return {"patient_id": patient_id, "items": rows, **{k: v for k, v in result.items() if k != "rows"}}
+
+
+def bulk_upsert_responses(
+    db: Session, tenant_id: int, patient_id: int, items: list[dict[str, Any]], *,
+    user_id: int | None, replace: bool = False,
+) -> dict[str, Any]:
+    """``POST /patient-questionnaire-responses/bulk`` — one transaction, one patient."""
+    _patient(db, tenant_id, patient_id)
+    try:
+        result = apply_questionnaire_answers(
+            db, tenant_id, patient_id, items, user_id=user_id, replace=replace,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    rows = result["rows"]
+    for row in rows:
+        db.refresh(row)
+    enrich_questionnaire_responses(db, rows, tenant_id)
+    return {"patient_id": patient_id, "items": rows, **{k: v for k, v in result.items() if k != "rows"}}
 
 
 # ── MH-3: the composite write ────────────────────────────────────────────────
@@ -613,6 +1044,7 @@ def _apply_alerts(
     now: datetime,
 ) -> set[str]:
     changed: set[str] = set()
+    flags = alert_flags(db, tenant_id)
     for item in items:
         code = _clean(item.get("alert_code"))
         if not code:
@@ -620,6 +1052,7 @@ def _apply_alerts(
         response = _clean(item.get("response"))
         comments = _clean(item.get("comments"))
         row = stored.get(code)
+        catalog = flags.get(code, {})
         if response is None and comments is None:
             # Reset to Not Answered - the row is removed, which is what makes
             # "absent" and "unknown" different facts (MH-5).
@@ -636,7 +1069,12 @@ def _apply_alerts(
                 tenant_id=tenant_id,
                 patient_id=patient_id,
                 alert_code=code,
-                alert_label=_clean(item.get("alert_label")),
+                # MA-3: the row is self-describing — client value, else catalog.
+                alert_label=_clean(item.get("alert_label")) or catalog.get("label"),
+                section=_clean(item.get("section")) or catalog.get("section"),
+                # MA-4: per-answer flag overrides; absent = derive from the catalog.
+                is_flash_alert=item.get("is_flash_alert"),
+                blocks_charges=item.get("blocks_charges"),
                 response=response,
                 comments=comments,
                 answered_at=now,
@@ -655,6 +1093,16 @@ def _apply_alerts(
         label = _clean(item.get("alert_label"))
         if label:
             row.alert_label = label
+        elif not row.alert_label and catalog.get("label"):
+            row.alert_label = catalog["label"]
+        section = _clean(item.get("section"))
+        if section:
+            row.section = section
+        elif not row.section and catalog.get("section"):
+            row.section = catalog["section"]
+        for flag in ("is_flash_alert", "blocks_charges"):
+            if flag in item:
+                setattr(row, flag, item[flag])
         row.response = response
         row.comments = comments
         row.is_active = True
@@ -820,22 +1268,8 @@ def save_document(
         medical_in += [{"question_code": c, "answer": None} for c in stored_medical if c not in sent]
 
     # MH-12: judge the *merge* of payload and stored answers, before writing.
-    flags = _alert_flags(db, tenant_id)
-    merged: dict[str, str | None] = {code: row.response for code, row in stored_alerts.items()}
-    for item in alerts_in:
-        code = _clean(item.get("alert_code"))
-        if code:
-            merged[code] = _clean(item.get("response"))
-    would_change = {
-        code
-        for code in (
-            _clean(i.get("alert_code")) for i in alerts_in
-        )
-        if code and merged.get(code) != (stored_alerts[code].response if code in stored_alerts else None)
-    }
-    sections = {code: meta.get("section") for code, meta in flags.items()}
-    contradictions = rules.check_alert_contradictions(
-        merged, sections, changed_codes=would_change,
+    contradictions = _precheck_alert_contradictions(
+        db, tenant_id, stored_alerts, alerts_in,
         allow=bool(payload.get("allow_contradictions")),
     )
 
@@ -1367,14 +1801,23 @@ class PatientMedicalAlertCRUD(CRUDBase[PatientMedicalAlert]):
     to hold on the *generic* resource too, or a client can route around the
     composite write and store the contradiction one row at a time. Same
     reasoning as ``PatientCRUD`` and the patient checkbox rules.
+
+    MA-2: ``?patient_ids=1,2,3`` (<= 200) is a declared extra filter resolved
+    here, so the scheduler can read a whole day's alerts in one call.
     """
+
+    custom_filter_fields = ("patient_ids",)
+
+    def _extra_list_clauses(self, filters: dict[str, Any]) -> list:
+        ids = parse_patient_ids(filters.get("patient_ids"))
+        return [PatientMedicalAlert.patient_id.in_(ids)] if ids is not None else []
 
     def _guard(self, db: Session, tenant_id: int | None, patient_id: int,
                code: str | None, response: str | None, *, exclude_id: int | None = None,
                allow: bool = False) -> None:
         if tenant_id is None or not code:
             return
-        flags = _alert_flags(db, tenant_id)
+        flags = alert_flags(db, tenant_id)
         merged: dict[str, str | None] = {}
         for row in _alerts(db, tenant_id, patient_id):
             if exclude_id is not None and row.id == exclude_id:
@@ -1394,6 +1837,13 @@ class PatientMedicalAlertCRUD(CRUDBase[PatientMedicalAlert]):
         self._guard(db, tenant_id, patient_id, _clean(payload.get("alert_code")),
                     _clean(payload.get("response")), allow=allow)
         payload.setdefault("answered_at", _now())
+        # MA-3: populate label/section from the catalog when the client sent none.
+        if tenant_id is not None:
+            catalog = alert_flags(db, tenant_id).get(_clean(payload.get("alert_code")) or "", {})
+            if not _clean(payload.get("alert_label")) and catalog.get("label"):
+                payload["alert_label"] = catalog["label"]
+            if not _clean(payload.get("section")) and catalog.get("section"):
+                payload["section"] = catalog["section"]
         obj = super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
         if tenant_id is not None:
             _event(db, tenant_id=tenant_id, patient_id=obj.patient_id, entity_type="alert",
@@ -1436,6 +1886,34 @@ class PatientMedicalAlertCRUD(CRUDBase[PatientMedicalAlert]):
                    action="delete", entity_id=obj_id, code=code, old_value=response)
             sync_flash_alerts(db, tenant_id, patient_id)
             db.commit()
+
+
+class PatientAlertCRUD(CRUDBase[PatientAlert]):
+    """Free-text banner alerts. ``patient_alerts`` carries no ``tenant_id``, so
+    tenancy is enforced through the owning patient (the generic engine only
+    scopes models that carry the column), and MA-2's ``?patient_ids=`` bulk
+    filter is resolved here."""
+
+    custom_filter_fields = ("patient_ids",)
+
+    def _scope_tenant(self, stmt, tenant_id: int | None):  # noqa: ANN001
+        if tenant_id is not None:
+            stmt = stmt.where(
+                PatientAlert.patient_id.in_(
+                    select(Patient.id).where(Patient.tenant_id == tenant_id)
+                )
+            )
+        return stmt
+
+    def _extra_list_clauses(self, filters: dict[str, Any]) -> list:
+        ids = parse_patient_ids(filters.get("patient_ids"))
+        return [PatientAlert.patient_id.in_(ids)] if ids is not None else []
+
+    def create(self, db: Session, data: dict[str, Any], *, tenant_id: int | None = None,
+               created_by: int | None = None) -> PatientAlert:
+        if tenant_id is not None and data.get("patient_id") is not None:
+            _patient(db, tenant_id, int(data["patient_id"]))
+        return super().create(db, data, tenant_id=tenant_id, created_by=created_by)
 
 
 class PatientQuestionnaireResponseCRUD(CRUDBase[PatientQuestionnaireResponse]):
@@ -1490,13 +1968,18 @@ def enrich_medical_alerts(db: Session, items, tenant_id=None) -> None:  # noqa: 
     rows = list(items)
     if not rows:
         return
-    flags = _alert_flags(db, tenant_id) if tenant_id is not None else {}
+    flags = alert_flags(db, tenant_id) if tenant_id is not None else {}
     names = _actor_names(db, {r.created_by for r in rows} | {r.updated_by for r in rows})
     for row in rows:
-        meta = flags.get(row.alert_code, {})
-        row.section = meta.get("section")
-        row.is_flash_alert = bool(meta.get("is_flash_alert"))
-        row.blocks_charges = bool(meta.get("blocks_charges"))
+        meta = effective_alert_meta(row, flags)
+        # ``section`` / ``is_flash_alert`` / ``blocks_charges`` are real columns
+        # now (MA-3/MA-4 overrides), so the *effective* value is set as a
+        # committed value — the read reports it without the row becoming dirty
+        # and a later autoflush writing a derived value back as an override.
+        set_committed_value(row, "alert_label", meta["label"])
+        set_committed_value(row, "section", meta["section"])
+        set_committed_value(row, "is_flash_alert", meta["is_flash_alert"])
+        set_committed_value(row, "blocks_charges", meta["blocks_charges"])
         row.created_by_name = names.get(row.created_by) if row.created_by else None
         row.updated_by_name = names.get(row.updated_by) if row.updated_by else None
 

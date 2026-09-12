@@ -15,10 +15,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Optional
 
-from fastapi import APIRouter, Depends, Path, Query, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 from sqlalchemy import inspect as sa_inspect
 
-from app.api.deps import DbSession, PageParams, TenantId, get_current_user
+from app.api.deps import DbSession, PageParams, TenantId, get_current_user, require_permission
+from app.core import concurrency
 from app.crud.base import CRUDBase
 from app.schemas.common import ErrorResponse, PaginatedResponse
 
@@ -66,6 +67,10 @@ class CrudConfig:
     # that need real business rules (e.g. progress-note lock + strike-off). Defaults
     # to the generic CRUDBase. Must accept the same constructor kwargs.
     crud_class: type[CRUDBase] = CRUDBase
+    # EDIT-PLAN-5: permission codes (any of) a caller must hold to POST / PATCH /
+    # DELETE this resource. Empty = role-only (the historical behaviour). Reads
+    # are never gated here — a view-only user still lists the plans.
+    write_permissions: tuple[str, ...] = ()
 
 
 def _col_pytype(columns, name: str) -> type | None:  # noqa: ANN001
@@ -222,6 +227,21 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         responses=_ERRORS,
     )
     PkPath = Annotated[cfg.pk_type, Path(description=f"{cfg.singular} identifier")]
+    # EDIT-PLAN-5: the write routes carry the permission dependency; reads do not.
+    write_deps = (
+        [Depends(require_permission(*cfg.write_permissions,
+                                    action=f"modify {plural.replace('_', ' ')}"))]
+        if cfg.write_permissions else []
+    )
+    versioned = hasattr(cfg.model, concurrency.VERSION_FIELD)
+    # EDIT-PLAN-1: every versioned resource documents the precondition headers
+    # its PATCH / DELETE honour and the 412 they can return.
+    precondition_doc = (
+        " Honours `If-Match` (the ETag from GET) and `If-Unmodified-Since`; "
+        "a stale precondition is **412 precondition_failed** with the current version."
+        if versioned else ""
+    )
+    write_responses = {412: {"model": ErrorResponse}} if versioned else {}
 
     router.get(
         "",
@@ -236,6 +256,7 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         status_code=status.HTTP_201_CREATED,
         operation_id=f"create_{cfg.singular}",
         summary=f"Create {cfg.singular.replace('_', ' ')}",
+        dependencies=write_deps,
     )
     def create_item(
         db: DbSession,
@@ -243,6 +264,7 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         body: cfg.create_schema,  # type: ignore[valid-type]
         current=Depends(get_current_user),
     ):
+        concurrency.reset()
         data = body.model_dump(exclude_unset=True)
         obj = crud.create(db, data, tenant_id=tenant_id, created_by=current.id)
         if cfg.read_enrich is not None:
@@ -255,10 +277,14 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         operation_id=f"get_{cfg.singular}",
         summary=f"Get {cfg.singular.replace('_', ' ')} by id",
     )
-    def get_item(db: DbSession, tenant_id: TenantId, item_id: PkPath):
+    def get_item(db: DbSession, tenant_id: TenantId, item_id: PkPath, response: Response):
         obj = crud.get(db, item_id, tenant_id=tenant_id)
         if cfg.read_enrich is not None:
             cfg.read_enrich(db, [obj], tenant_id)
+        # EDIT-PLAN-1: the version a later PATCH / DELETE can assert with If-Match.
+        etag = concurrency.etag_for(obj) if versioned else None
+        if etag:
+            response.headers["ETag"] = etag
         return obj
 
     @router.patch(
@@ -266,18 +292,27 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         response_model=cfg.read_schema,
         operation_id=f"update_{cfg.singular}",
         summary=f"Update {cfg.singular.replace('_', ' ')}",
+        description=f"Partial update of one {cfg.singular.replace('_', ' ')}.{precondition_doc}",
+        dependencies=write_deps,
+        responses=write_responses,
     )
     def update_item(
         db: DbSession,
         tenant_id: TenantId,
         item_id: PkPath,
         body: cfg.update_schema,  # type: ignore[valid-type]
+        request: Request,
+        response: Response,
         current=Depends(get_current_user),
     ):
+        concurrency.from_headers(request.headers)
         data = body.model_dump(exclude_unset=True)
         obj = crud.update(db, item_id, data, tenant_id=tenant_id, updated_by=current.id)
         if cfg.read_enrich is not None:
             cfg.read_enrich(db, [obj], tenant_id)
+        etag = concurrency.etag_for(obj) if versioned else None
+        if etag:
+            response.headers["ETag"] = etag
         return obj
 
     @router.delete(
@@ -285,8 +320,12 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         status_code=status.HTTP_204_NO_CONTENT,
         operation_id=f"delete_{cfg.singular}",
         summary=f"Delete {cfg.singular.replace('_', ' ')}",
+        description=f"Delete one {cfg.singular.replace('_', ' ')}.{precondition_doc}",
+        dependencies=write_deps,
+        responses=write_responses,
     )
-    def delete_item(db: DbSession, tenant_id: TenantId, item_id: PkPath):
+    def delete_item(db: DbSession, tenant_id: TenantId, item_id: PkPath, request: Request):
+        concurrency.from_headers(request.headers)
         crud.delete(db, item_id, tenant_id=tenant_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 

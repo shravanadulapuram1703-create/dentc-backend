@@ -33,12 +33,19 @@ _MAX_BACKOFF_SECONDS = 30.0
 
 try:  # pragma: no cover - import guard
     import redis.asyncio as _aioredis
+    from redis.backoff import NoBackoff
+    from redis.retry import Retry
     from redis.exceptions import RedisError
 except ImportError:  # pragma: no cover
     _aioredis = None  # type: ignore[assignment]
+    NoBackoff = Retry = None  # type: ignore[assignment]
 
     class RedisError(Exception):  # type: ignore[no-redef]
         """Fallback when redis isn't installed."""
+
+
+def _no_retry():
+    return Retry(NoBackoff(), 0) if Retry is not None else None
 
 
 class RedisFanout:
@@ -75,6 +82,8 @@ class RedisFanout:
                 decode_responses=True,
                 socket_connect_timeout=2,
                 socket_timeout=None,  # the reader blocks indefinitely by design
+                # MA-8: no connect retry/back-off (see redis_store._no_retry).
+                retry=_no_retry(),
                 health_check_interval=30,
             )
             await self._client.ping()

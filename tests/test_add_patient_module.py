@@ -24,17 +24,19 @@ def test_new_patient_columns_persist(client):
         "pronouns": "She/Her", "driver_license": "DL-TEST-777",
         "student_status": "full_time", "school_name": "Yale",
         "referred_to": "Dr. Specialist", "referral_to_date": "2026-07-01",
-        "responsible_party_relationship": "self",
         "patient_types": ["CH", "OR", "SS"],
         "hipaa_sharing_notes": "Spouse may access records.",
         "assign_benefits": True, "add_to_quickfill": True, "no_correspondence": True,
     }
-    created = client.post("/api/v1/patients", json=body)
+    created = client.post("/api/v1/patients",
+                          json={**body, "responsible_party_relationship": "self"})
     assert created.status_code == 201, created.text
     pid = created.json()["id"]
     got = client.get(f"/api/v1/patients/{pid}").json()
     for key, val in body.items():
         assert got[key] == val, f"{key}: {got.get(key)!r} != {val!r}"
+    # GAP-AP-25: the lowercase key is folded to the canonical legacy code.
+    assert got["responsible_party_relationship"] == "S"
 
 
 def test_chart_no_auto_generated(client):
