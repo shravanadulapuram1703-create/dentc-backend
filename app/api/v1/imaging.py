@@ -28,6 +28,7 @@ from app.integrations import object_storage as obj
 from app.schemas.common import ErrorResponse
 from app.schemas.imaging import (
     DicomInstanceOut,
+    DicomInstanceToothUpdate,
     PatientImagingResponse,
     PatientImagingSummary,
 )
@@ -119,6 +120,19 @@ def get_patient_imaging_summary(db: DbSession, tenant_id: TenantId, patient_id: 
 )
 def get_dicom_instance(db: DbSession, tenant_id: TenantId, sop_instance_uid: Annotated[str, Path()]):
     return svc.get_instance_detail(db, sop_instance_uid, tenant_id)
+
+
+@instances_router.patch(
+    "/{sop_instance_uid}/tooth-numbers",
+    response_model=DicomInstanceOut,
+    operation_id="update_dicom_instance_tooth_numbers",
+    summary="Tag (or clear) the teeth associated with one scanned image",
+)
+def update_dicom_instance_tooth_numbers(
+    db: DbSession, tenant_id: TenantId, sop_instance_uid: Annotated[str, Path()],
+    body: DicomInstanceToothUpdate,
+):
+    return svc.update_instance_tooth_numbers(db, sop_instance_uid, tenant_id, body.tooth_numbers)
 
 
 def _serve_asset(db: Session, request: Request, sop_instance_uid: str, kind: str, token: str) -> Response:
