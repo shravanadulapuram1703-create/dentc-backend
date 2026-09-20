@@ -19,6 +19,17 @@ from app.crud.base import CRUDBase
 from app.crud.router_factory import CrudConfig, register_crud
 from app.db import models as m
 from app.schemas.factory import build_schemas
+from app.services.office_scope_service import OfficeCRUD as OfficeScopeOfficeCRUD
+from app.services.office_scope_service import OfficeScopeSpec
+
+# OFF-SCOPE-1/2/4/11: reusable office-scope specs. Day-data lists narrow to the
+# caller's assigned offices by default and exclude null-office rows; catalog
+# lists narrow the same way but keep null-office (global) rows (include_global
+# default true). ``_POS`` marks a point-of-service create whose office is
+# required when ``OFFICE_REQUIRE_POS_OFFICE`` is on (OFF-SCOPE-11).
+_DAY = OfficeScopeSpec(kind="day_data")
+_CATALOG = OfficeScopeSpec(kind="catalog")
+_POS = OfficeScopeSpec(kind="day_data", require_on_create=True)
 from app.services.enrich_service import (
     enrich_insurance_plan,
     enrich_ortho_plan,
@@ -60,6 +71,11 @@ from app.services.medical_history_service import (
     enrich_medical_alerts,
     enrich_questionnaire_responses,
     PatientAlertCRUD,
+)
+from app.services.fee_schedule_service import (
+    FeeScheduleAssignmentCRUD,
+    FeeScheduleCRUD,
+    FeeScheduleEntryCRUD,
 )
 from app.services.patient_procedure_service import PatientProcedureCRUD
 from app.services.payment_plan_service import PaymentPlanCRUD
@@ -232,6 +248,11 @@ def _cfg(
     read_exclude: tuple[str, ...] = (),
     hide_soft_deleted: bool = False,
     crud_class: type[CRUDBase] = CRUDBase,
+    office_scope: OfficeScopeSpec | None = None,
+    write_permissions: tuple[str, ...] = (),
+    create_permissions: tuple[str, ...] = (),
+    update_permissions: tuple[str, ...] = (),
+    delete_permissions: tuple[str, ...] = (),
 ) -> CrudConfig:
     create_s, update_s, read_s = build_schemas(model, name, read_exclude=read_exclude)
     return CrudConfig(
@@ -255,6 +276,11 @@ def _cfg(
         default_sort=default_sort,
         hide_soft_deleted=hide_soft_deleted,
         crud_class=crud_class,
+        office_scope=office_scope,
+        write_permissions=write_permissions,
+        create_permissions=create_permissions,
+        update_permissions=update_permissions,
+        delete_permissions=delete_permissions,
     )
 
 
@@ -278,8 +304,14 @@ _ORG = [
         singular="office", plural="offices",
         search_fields=("name", "office_code", "city"),
         sortable_fields=_DEFAULT_SORT,
-        filter_fields=("is_active",),
+        filter_fields=("is_active", "office_group_id"),
+        # OFF-SCOPE-8: assigned_to_me=true narrows to the caller's offices (opt-in;
+        # the default list stays tenant-wide — it is the badge label table, so
+        # list_scope_only keeps the generic office narrowing off).
+        extra_filters=(("assigned_to_me", bool),),
         read_enrich=enrich_office,
+        crud_class=OfficeScopeOfficeCRUD,
+        office_scope=OfficeScopeSpec(list_scope_only=True),
     ),
     # PROV-1: ProviderCRUD widens ``?office_id=`` to the provider_offices join ∪ the
     # legacy home-office scalar — a provider serves many offices, so the scalar
@@ -304,7 +336,7 @@ _ORG = [
         crud_class=ProviderCRUD,
     ),
     _cfg(m.Operatory, "Operatory", "operatories", "Organization", "operatory", "operatories",
-         pk_type=str, search=("name",), filters=("office_id", "is_active")),
+         pk_type=str, search=("name",), filters=("office_id", "is_active"), office_scope=_DAY),
     _cfg(m.UserOffice, "UserOffice", "user-offices", "Organization", "user_office", "user_offices",
          filters=("user_id", "office_id"), soft_field=None),
     _cfg(m.OfficeGroup, "OfficeGroup", "office-groups", "Organization", "office_group", "office_groups",
@@ -337,10 +369,25 @@ _PATIENTS = [
                        "patient_type", "responsible_party_id", "preferred_hygienist_id",
                        "fee_schedule_id", "legacy_id", "id"),
         range_fields=("created_at", "dob"),
+        # OFF-SCOPE-5: seen_at_office_id (join appointments/procedures) and
+        # search_scope (current|all|group) — resolved by PatientCRUD.
+        extra_filters=(("seen_at_office_id", int), ("search_scope", str)),
         default_sort="created_at",
         id_in_param=True,
         crud_class=PatientCRUD,
         read_enrich=enrich_patient_office,  # LEG-16: home_office_name/code
+        # OFF-SCOPE-1/5: the chart is organisation-wide, so patients are NOT
+        # narrowed to the caller's offices by default (patient search stays "All
+        # offices"). An explicit ``?home_office_id=`` is still validated against
+        # the caller's assignments, and office_ids/all_offices work; the
+        # ``seen_at_office_id`` / ``search_scope`` contract (OFF-SCOPE-5) is
+        # resolved by PatientCRUD. OFF-SCOPE-6: GET /patients/{id} enforces
+        # per-chart visibility for callers without patients:view_cross_office.
+        office_scope=OfficeScopeSpec(field="home_office_id", kind="day_data",
+                                     default_narrow=False, enforce_patient_visibility=True),
+        # ACCESS-RIGHTS C1: deleting a patient is high-risk; gate DELETE on its own
+        # right (create/update stay on the role check).
+        delete_permissions=("patient_delete_patient_information",),
     ),
     # legacy_plan_type ("D"/"M") + insurance_type ("primary"…) address one slot
     # (INS-PT); is_active toggles a slot on/off.
@@ -350,7 +397,9 @@ _PATIENTS = [
          "patient_insurance", "patient_insurance",
          filters=("patient_id", "insurance_type", "ins_plan_id",
                   "legacy_plan_type", "is_active"),
-         crud_class=PatientInsuranceCRUD),
+         crud_class=PatientInsuranceCRUD,
+         # ACCESS-RIGHTS C1: DELETE = removing a patient's insurance plan link.
+         delete_permissions=("patient_delete_patient_insurance_plan_information",)),
     # MA-2: ``?patient_ids=`` bulk read; PatientAlertCRUD scopes tenancy through
     # the owning patient (the table has no tenant_id column).
     CrudConfig(
@@ -424,7 +473,7 @@ _PATIENTS = [
          # Left-rail SEARCH ON (referral_type direction) + TYPE (reason_code) server filters.
          # PO-6: legacy_id lets the FE resolve patients.referred_by (a legacy referral id).
          filters=("patient_id", "office_id", "referral_type", "reason_code", "legacy_id"),
-         soft_field=None),
+         soft_field=None, office_scope=_CATALOG),
     # NOTE-DOC-1: a note can reference an uploaded document. PatientNoteCRUD
     # enforces that the document is in the same tenant and on the same patient;
     # enrich_patient_notes denormalises it onto the read so the Notes list renders
@@ -437,13 +486,16 @@ _PATIENTS = [
         prefix="patient-notes", tag="Patients",
         singular="patient_note", plural="patient_notes",
         sortable_fields=_DEFAULT_SORT,
-        filter_fields=("patient_id", "note_type", "is_deleted", "is_archived", "document_id"),
+        filter_fields=("patient_id", "note_type", "is_deleted", "is_archived", "document_id",
+                       "office_id"),
         soft_delete_field="is_deleted", soft_delete_value=True,
         crud_class=PatientNoteCRUD,
         read_enrich=enrich_patient_notes,
+        office_scope=_POS,
     ),
     _cfg(m.PatientRecall, "PatientRecall", "patient-recalls", "Patients",
-         "patient_recall", "patient_recalls", filters=("patient_id", "status", "is_active")),
+         "patient_recall", "patient_recalls", filters=("patient_id", "status", "is_active"),
+         office_scope=_POS),
     # GAP-AP-16: per-patient Yes/No medical-alert responses (MEDALERT catalog).
     # LEG-2: custom schemas constrain response to the tri-state yes|no|unknown.
     # MH-12/MH-14: PatientMedicalAlertCRUD enforces the contradiction rules and
@@ -494,7 +546,7 @@ _PATIENTS = [
          "patient_adjustment", "patient_adjustments",
          sortable=("adjustment_date", "created_at"), ranges=("adjustment_date",),
          filters=("patient_id", "office_id", "provider_id", "procedure_id"),
-         soft_field="is_void", soft_value=True),
+         soft_field="is_void", soft_value=True, office_scope=_POS),
 ]
 
 # ── Insurance ──────────────────────────────────────────────────────────────
@@ -651,13 +703,23 @@ _CODES = [
         singular="fee_schedule", plural="fee_schedules",
         search_fields=("name",),
         sortable_fields=("created_at", "id", "effective_date", "name"),
-        filter_fields=("ins_plan_id", "office_id", "is_active", "parent_schedule_id"),
+        filter_fields=("ins_plan_id", "office_id", "is_active", "parent_schedule_id",
+                       "fee_type", "pricing_model"),
         range_fields=("effective_date",),
         default_sort="created_at",
+        # §3.6: retired schedules stay out of the default listing (?is_active=false
+        # surfaces them); the guardrail CRUD normalises the type/model and refuses
+        # a copay-on-non-payer list or retiring one still referenced.
+        hide_soft_deleted=True,
+        crud_class=FeeScheduleCRUD,
+        # OFF-SCOPE-4: an office-pinned fee schedule is a catalog — narrowing by
+        # office must keep the global (office_id IS NULL) practice schedules.
+        office_scope=_CATALOG,
     ),
     _cfg(m.FeeScheduleEntry, "FeeScheduleEntry", "fee-schedule-entries", "Procedures",
          "fee_schedule_entry", "fee_schedule_entries",
-         filters=("fee_schedule_id", "procedure_code"), soft_field=None),
+         filters=("fee_schedule_id", "procedure_code"), soft_field=None,
+         crud_class=FeeScheduleEntryCRUD),
     _cfg(m.CodeBundle, "CodeBundle", "code-bundles", "Procedures",
          "code_bundle", "code_bundles", search=("name", "display_code"), soft_field=None),
     # PROC-INT-9: surface + quadrant (aligned with explosion_code_items); tooth /
@@ -712,7 +774,7 @@ _CODES = [
     _cfg(m.PlaceOfServiceCode, "PlaceOfServiceCode", "place-of-service-codes", "Procedures",
          "place_of_service_code", "place_of_service_codes",
          search=("code", "type", "name"), sortable=("code", "created_at"),
-         filters=("office_id", "is_active")),
+         filters=("office_id", "is_active"), office_scope=_CATALOG),
     _cfg(m.IcdCode, "IcdCode", "icd-codes", "Procedures",
          "icd_code", "icd_codes", search=("code", "description", "icd10", "snomed"),
          sortable=("code", "created_at"), filters=("is_active",)),
@@ -721,7 +783,7 @@ _CODES = [
     # expanded procedure list; these CRUD routes maintain the catalog.
     _cfg(m.ExplosionCode, "ExplosionCode", "explosion-codes", "Procedures",
          "explosion_code", "explosion_codes", search=("code", "description"),
-         filters=("office_id", "is_active")),
+         filters=("office_id", "is_active"), office_scope=_CATALOG),
     _cfg(m.ExplosionCodeItem, "ExplosionCodeItem", "explosion-code-items", "Procedures",
          "explosion_code_item", "explosion_code_items",
          filters=("explosion_code_id", "procedure_code"), soft_field=None,
@@ -760,6 +822,12 @@ _SCHEDULING = [
         # items the appointment's lines point at. LAB-1/8/9: lab write rules.
         crud_class=AppointmentCRUD,
         read_enrich=enrich_appointments,
+        # OFF-SCOPE-2/12: the scheduler is the archetypal operational day-data
+        # list — narrow to the caller's offices; AppointmentCRUD validates the
+        # operatory↔office match and derives office from the operatory.
+        office_scope=_DAY,
+        # ACCESS-RIGHTS C1: DELETE = archive an existing appointment.
+        delete_permissions=("appointments_delete_existing_appointment",),
     ),
     # LAB-1: the dental-lab vendor catalog behind appointments.lab_vendor_id.
     CrudConfig(
@@ -775,6 +843,7 @@ _SCHEDULING = [
         id_in_param=True,
         crud_class=LabCRUD,
         read_enrich=attach_actor_names,
+        office_scope=_CATALOG,
     ),
     # APPT-PROC-4: DELETE soft-archives the line, so the default listing must hide
     # archived rows (hide_soft_deleted) — otherwise a removed procedure comes back
@@ -795,7 +864,7 @@ _SCHEDULING = [
          "appointnow_reason", "appointnow_reasons",
          search=("label", "reason_code"),
          sortable=("display_order", "created_at"), default_sort="display_order",
-         filters=("office_id", "is_active", "requires_provider")),
+         filters=("office_id", "is_active", "requires_provider"), office_scope=_CATALOG),
 ]
 
 # ── Treatment plans ────────────────────────────────────────────────────────
@@ -814,6 +883,9 @@ _TREATMENT = [
         soft_delete_field=None, default_sort="created_at",
         read_enrich=enrich_treatment_plan,
         crud_class=TreatmentPlanCRUD,
+        office_scope=_POS,
+        # RBAC-6: deleting a treatment plan.
+        delete_permissions=("transactions_treatment_plan_delete",),
     ),
     # Items: custom schemas add phase_id/dates/provider_id/discount + status enum
     # (PLAN-1/2/5/10); is_archived soft-delete (PLAN-14) via TreatmentPlanItemCRUD,
@@ -865,6 +937,13 @@ _CLINICAL = [
         # AL-17: a held charge must not be claimable from any caller, not just from
         # the one screen that disables the checkbox.
         crud_class=PatientProcedureCRUD,
+        # OFF-SCOPE-7: office-level production lists narrow; a chart read
+        # (?patient_id=) stays organisation-wide. Not a required-office create —
+        # charge entry must never be blocked at the chair.
+        office_scope=_DAY,
+        # RBAC-5: DELETE = deleting a charge from the account ledger. (Editing the
+        # fee is guarded separately, field-scoped, inside PatientProcedureCRUD.)
+        delete_permissions=("transactions_delete_procedure",),
     ),
     # Server-side chart filters (REST capability §6): procedure_code / chart_as /
     # is_inactive / group_id / status so the chart can be queried by ADA code,
@@ -872,8 +951,10 @@ _CLINICAL = [
     _cfg(m.ChartCondition, "ChartCondition", "chart-conditions", "Clinical",
          "chart_condition", "chart_conditions",
          filters=("patient_id", "tooth", "provider_id", "procedure_code",
-                  "chart_as", "is_inactive", "group_id", "status", "material_id"),
-         soft_field="is_inactive", soft_value=True),
+                  "chart_as", "is_inactive", "group_id", "status", "material_id", "office_id"),
+         soft_field="is_inactive", soft_value=True, office_scope=_DAY,
+         # ACCESS-RIGHTS C1: DELETE = removing a charted condition/procedure.
+         delete_permissions=("charting_restorative_delete_condition",)),
     # Progress notes. Custom Read adds struck_off audit + resolved names + computed
     # is_locked + attachment_count (PN-4/5/7/3); ProgressNoteCRUD enforces lock +
     # strike-off transitions on PATCH (PN-7/4).
@@ -892,6 +973,7 @@ _CLINICAL = [
         default_sort="created_at",
         read_enrich=enrich_progress_notes,
         crud_class=ProgressNoteCRUD,
+        office_scope=_POS,
     ),
     # Perio exam header. Custom Read embeds resolved actor + provider names
     # (PERIO-BE-6/14); is_voided soft-delete (PERIO-BE-3) + is_voided filter so
@@ -914,6 +996,9 @@ _CLINICAL = [
         default_sort="exam_date",
         read_enrich=attach_actor_names,
         crud_class=PerioExamCRUD,
+        office_scope=_DAY,
+        # RBAC-6: charting a perio exam is a write; reads stay open (view-only).
+        write_permissions=("charting_perio_full_control",),
     ),
     # Per-tooth detail. Custom Create/Update enforce clinical value ranges
     # (PERIO-BE-7); Read carries audit cols + names (PERIO-BE-5). One row per
@@ -935,6 +1020,8 @@ _CLINICAL = [
         soft_delete_field=None,
         read_enrich=attach_actor_names,
         crud_class=PerioExamDetailCRUD,
+        # RBAC-6: per-tooth perio writes gate the same as the exam header.
+        write_permissions=("charting_perio_full_control",),
     ),
     # MA-5: PrescriptionCRUD runs the drug<->medical-alert check on create (409
     # ``prescription_alert_conflict`` unless ``alerts_acknowledged``) and persists
@@ -948,8 +1035,9 @@ _CLINICAL = [
         singular="prescription", plural="prescriptions",
         search_fields=("drug_name",),
         sortable_fields=_DEFAULT_SORT,
-        filter_fields=("patient_id", "provider_id", "is_active"),
+        filter_fields=("patient_id", "provider_id", "is_active", "office_id"),
         crud_class=PrescriptionCRUD,
+        office_scope=_POS,
     ),
     # Per-user perio prefs. See /perio-chart-settings/me (PERIO-BE-11) for the
     # token-resolved, self-seeding convenience accessor.
@@ -981,7 +1069,8 @@ _CLINICAL = [
         default_sort="created_at",
     ),
     _cfg(m.PerioChartActivity, "PerioChartActivity", "perio-chart-activity", "Clinical",
-         "perio_chart_activity", "perio_chart_activity", filters=("patient_id",), soft_field=None),
+         "perio_chart_activity", "perio_chart_activity", filters=("patient_id", "office_id"),
+         soft_field=None, office_scope=_DAY),
     # REST-2: practice-editable bridge/denture preset catalog.
     _cfg(m.ChartStatusTemplate, "ChartStatusTemplate", "chart-status-templates", "Clinical",
          "chart_status_template", "chart_status_templates", search=("name",),
@@ -1005,6 +1094,15 @@ _BILLING = [
         filter_fields=("patient_id", "payment_type", "provider_id", "office_id", "is_void"),
         range_fields=("payment_date",), soft_delete_field="is_void", soft_delete_value=True,
         default_sort="created_at", read_enrich=enrich_patient_provider,
+        # OFF-SCOPE-11: a payment records both where the money was applied
+        # (office_id) and where it was posted from (created_office_id, the working
+        # office), stamped from X-Office-ID.
+        office_scope=OfficeScopeSpec(kind="day_data", require_on_create=True,
+                                     created_office_field="created_office_id"),
+        # ACCESS-RIGHTS C1: DELETE = voiding a patient payment.
+        delete_permissions=("transactions_delete_patient_payments",),
+        # RBAC-6: POST = posting a patient payment.
+        create_permissions=("transactions_add_post_patient_payments",),
     ),
     # G7: patient_name/carrier_name; G10: submitted/paid/created date-range filters.
     CrudConfig(
@@ -1022,6 +1120,9 @@ _BILLING = [
         # and the "other" plan at creation (``procedure_ids`` links the lines in
         # the same transaction) and validates the fill-out vocabulary on PATCH.
         crud_class=InsuranceClaimCRUD,
+        office_scope=_POS,
+        # ACCESS-RIGHTS C1: DELETE = deleting an insurance claim.
+        delete_permissions=("transactions_delete_insurance_claims",),
     ),
     _cfg(m.ClaimSubmission, "ClaimSubmission", "claim-submissions", "Billing",
          "claim_submission", "claim_submissions", filters=("claim_id", "batch_id"), soft_field=None),
@@ -1033,9 +1134,9 @@ _BILLING = [
     # records who reversed it and why. ``?is_void=true`` still surfaces them.
     _cfg(m.LedgerInsuranceDetail, "LedgerInsuranceDetail", "ledger-insurance-details", "Billing",
          "ledger_insurance_detail", "ledger_insurance_details",
-         filters=("patient_id", "claim_id", "procedure_id", "is_void"),
+         filters=("patient_id", "claim_id", "procedure_id", "is_void", "office_id"),
          soft_field="is_void", soft_value=True, hide_soft_deleted=True,
-         crud_class=LedgerInsuranceDetailCRUD),
+         crud_class=LedgerInsuranceDetailCRUD, office_scope=_DAY),
     _cfg(m.PaymentAllocation, "PaymentAllocation", "payment-allocations", "Billing",
          "payment_allocation", "payment_allocations",
          filters=("patient_id", "payment_id", "adjustment_id", "procedure_id", "claim_id"),
@@ -1052,11 +1153,12 @@ _BILLING = [
         prefix="patient-payment-plans", tag="Billing",
         singular="patient_payment_plan", plural="patient_payment_plans",
         sortable_fields=_DEFAULT_SORT,
-        filter_fields=("patient_id", "is_active", "plan_type", "treatment_plan_id"),
+        filter_fields=("patient_id", "is_active", "plan_type", "treatment_plan_id", "office_id"),
         range_fields=("setup_date", "first_due_date"),
         crud_class=PaymentPlanCRUD,
         read_enrich=enrich_payment_plan,
         hide_soft_deleted=True,
+        office_scope=_DAY,
     ),
     # PP-6: ortho_plan_id ties an instalment row back to the contract that made it.
     _cfg(m.PatientInsPaymentPlan, "PatientInsPaymentPlan", "patient-ins-payment-plans", "Billing",
@@ -1073,8 +1175,8 @@ _BILLING = [
          filters=("patient_id", "is_billed", "plan_side", "ortho_plan_id", "payment_plan_id"),
          ranges=("periodic_date",), soft_field=None),
     _cfg(m.PatientRegPlan, "PatientRegPlan", "patient-reg-plans", "Billing",
-         "patient_reg_plan", "patient_reg_plans", filters=("patient_id", "is_active"),
-         hide_soft_deleted=True),
+         "patient_reg_plan", "patient_reg_plans", filters=("patient_id", "is_active", "office_id"),
+         hide_soft_deleted=True, office_scope=_DAY),
     CrudConfig(
         model=m.OrthoPlan,
         create_schema=OrthoPlanCreate,
@@ -1083,11 +1185,12 @@ _BILLING = [
         prefix="ortho-plans", tag="Billing",
         singular="ortho_plan", plural="ortho_plans",
         sortable_fields=_DEFAULT_SORT,
-        filter_fields=("patient_id", "is_active", "pref_provider_id", "ins_plan_id"),
+        filter_fields=("patient_id", "is_active", "pref_provider_id", "ins_plan_id", "office_id"),
         range_fields=("banding_date", "treat_start_date"),
         crud_class=PaymentPlanCRUD,
         read_enrich=enrich_ortho_plan,
         hide_soft_deleted=True,
+        office_scope=OfficeScopeSpec(kind="day_data", created_office_field="created_office_id"),
     ),
 ]
 
@@ -1120,14 +1223,15 @@ _REFERENCE = [
     _cfg(m.FeeScheduleAssignment, "FeeScheduleAssignment", "fee-schedule-assignments", "Procedures",
          "fee_schedule_assignment", "fee_schedule_assignments",
          filters=("fee_schedule_id", "ins_plan_id", "provider_id", "office_id",
-                  "office_group_id", "carrier_id"), soft_field=None),
+                  "office_group_id", "carrier_id"), soft_field=None,
+         crud_class=FeeScheduleAssignmentCRUD),
     # MH-6: the frozen answers of one version; ``answer_type`` says which tab.
     _cfg(m.MedicalHistoryDetail, "MedicalHistoryDetail", "medical-history-details", "Patients",
          "medical_history_detail", "medical_history_details",
          filters=("history_id",), soft_field=None),
     _cfg(m.CariesRiskAssessment, "CariesRiskAssessment", "caries-risk-assessments", "Clinical",
          "caries_risk_assessment", "caries_risk_assessments",
-         filters=("patient_id", "risk_level"), soft_field=None),
+         filters=("patient_id", "risk_level", "office_id"), soft_field=None, office_scope=_DAY),
     # is_archived filterable so the list can exclude archived rows (PLAN-13);
     # PLAN-24: archived rows are hidden from the default listing. PLAN-9:
     # preauth_status normalised + stamped, and tenancy scoped through the item
@@ -1172,6 +1276,9 @@ _COMMS = [
         default_sort="created_at",
         crud_class=SmsMessageCRUD,
         read_enrich=enrich_sms_messages,
+        # OFF-SCOPE-14: an existing thread keeps its office; a hand-posted row's
+        # office is the working office. The inbox narrows to the caller's offices.
+        office_scope=_DAY,
     ),
     # SMS-5: practice-authored text templates (were browser localStorage).
     CrudConfig(
@@ -1186,6 +1293,7 @@ _COMMS = [
         filter_fields=("office_id", "message_type", "is_active"),
         soft_delete_field="is_active", soft_delete_value=False,
         default_sort="name",
+        office_scope=_CATALOG,
     ),
     # EMAIL-1: the e-mail log (send goes through POST /email/send).
     CrudConfig(
@@ -1207,7 +1315,8 @@ _COMMS = [
          "letter_template", "letter_templates", search=("name", "title"),
          filters=("letter_type", "is_active")),
     _cfg(m.PostcardTemplate, "PostcardTemplate", "postcard-templates", "Communications",
-         "postcard_template", "postcard_templates", search=("name",), soft_field=None),
+         "postcard_template", "postcard_templates", search=("name",),
+         filters=("office_id",), soft_field=None, office_scope=_CATALOG),
     # APPT-7: the catalog behind the appointment's Campaign ID box. The appointment
     # still stores the campaign *code* as a string (no wire change) — this makes it
     # a picker instead of free text, and gives reports something to group by.
@@ -1215,14 +1324,14 @@ _COMMS = [
          search=("code", "name", "description"),
          sortable=("code", "name", "start_date", "created_at"),
          filters=("office_id", "channel", "is_active"),
-         ranges=("start_date", "end_date")),
+         ranges=("start_date", "end_date"), office_scope=_CATALOG),
 ]
 
 # ── Staff & operations ─────────────────────────────────────────────────────
 _STAFF = [
     _cfg(m.TimeClockEntry, "TimeClockEntry", "time-clock-entries", "Staff",
          "time_clock_entry", "time_clock_entries", sortable=("clock_in", "created_at"),
-         filters=("user_id", "office_id"), soft_field=None),
+         filters=("user_id", "office_id"), soft_field=None, office_scope=_POS),
     _cfg(m.ProviderInsuranceId, "ProviderInsuranceId", "provider-insurance-ids", "Staff",
          "provider_insurance_id", "provider_insurance_ids",
          filters=("provider_id", "carrier_id", "in_network"), soft_field=None),
@@ -1234,10 +1343,18 @@ _STAFF = [
 _MISC = [
     _cfg(m.ImageGroup, "ImageGroup", "image-groups", "Imaging",
          "image_group", "image_groups", search=("name",),
-         filters=("patient_id", "office_id"), soft_field="is_deleted", soft_value=True),
+         filters=("patient_id", "office_id"), soft_field="is_deleted", soft_value=True,
+         office_scope=_DAY,
+         # ACCESS-RIGHTS C1: DELETE = deleting an image group / tile.
+         delete_permissions=("imaging_delete_image",)),
     _cfg(m.ImageDetail, "ImageDetail", "image-details", "Imaging",
-         "image_detail", "image_details", filters=("image_group_id",),
-         soft_field="is_deleted", soft_value=True),
+         "image_detail", "image_details", filters=("image_group_id", "office_id"),
+         soft_field="is_deleted", soft_value=True,
+         # No patient_id column — a list scoped to an image group is patient-adjacent,
+         # so treat image_group_id as the patient-scope marker (never office-narrowed).
+         office_scope=OfficeScopeSpec(kind="day_data", patient_filter="image_group_id"),
+         # ACCESS-RIGHTS C1: DELETE = deleting an image.
+         delete_permissions=("imaging_delete_image",)),
     _cfg(m.CollectionAgency, "CollectionAgency", "collection-agencies", "Imaging",
          "collection_agency", "collection_agencies", search=("name",), soft_field=None),
     # Referral demographics feed (referral dev-report gap 5). Tagged "Patients" so it

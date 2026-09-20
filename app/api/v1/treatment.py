@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query
 
-from app.api.deps import DbSession, TenantId, get_current_user
+from app.api.deps import DbSession, TenantId, get_current_user, require_permission
 from app.schemas.common import ErrorResponse, PaginatedResponse
 from app.schemas.enriched import PatientProcedureRead
 from app.schemas.treatment import (
@@ -178,6 +178,10 @@ def patient_treatment_plan_items(
         "supplies one. Voiding the charge later reopens the item."
     ),
     responses={409: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+    # ACCESS-RIGHTS C1: Post to Ledger creates a real charge — gate it.
+    dependencies=[Depends(require_permission(
+        "transactions_treatment_plan_post_to_ledger",
+        action="post a treatment-plan item to the ledger"))],
 )
 def post_treatment_plan_item(
     db: DbSession,

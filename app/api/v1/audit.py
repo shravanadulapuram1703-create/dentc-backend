@@ -58,6 +58,7 @@ def list_audit_logs(
     resource_type: str | None = None,
     resource_id: str | None = None,
     patient_id: Annotated[int | None, Query(description="MH-19: only entries for this chart")] = None,
+    office_id: Annotated[int | None, Query(description="OFF-SCOPE-17: access-by-location — only entries made in this office")] = None,
 ):
     # AUD-1: ``resource_id`` retrieves the full change history of one record, e.g.
     # ``?resource_type=insurance-claims&resource_id={id}``.
@@ -71,6 +72,7 @@ def list_audit_logs(
         filters={
             "user_id": user_id, "resource_type": resource_type,
             "resource_id": resource_id, "patient_id": patient_id,
+            "office_id": office_id,
         },
     )
     return PaginatedResponse.build(items, total, page.page, page.size)
@@ -93,6 +95,7 @@ def list_patient_audit_logs(
     ] = None,
     resource_id: str | None = None,
     user_id: int | None = None,
+    office_id: Annotated[int | None, Query(description="OFF-SCOPE-17: only entries made in this office")] = None,
 ):
     """Every audited mutation whose ``patient_id`` resolved to this chart, newest
     first, with the ``details`` block (``row_id`` / ``before`` / ``after``) the
@@ -113,7 +116,7 @@ def list_patient_audit_logs(
         order=page.order,
         filters={
             "patient_id": patient_id, "resource_type": resource_type,
-            "resource_id": resource_id, "user_id": user_id,
+            "resource_id": resource_id, "user_id": user_id, "office_id": office_id,
         },
     )
     return PaginatedResponse.build(items, total, page.page, page.size)

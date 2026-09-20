@@ -20,6 +20,7 @@ from app.core.config import settings as cfg
 from app.core.crypto import decrypt, encrypt, mask
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.db.models import FeeSchedule, Office, Provider
+from app.services import fee_vocab
 from app.db.models.office_setup import (
     OfficeAdvancedSettings,
     OfficeIntegrations,
@@ -215,3 +216,41 @@ def delete_statement_logo(db: Session, office_id: int, tenant_id: int) -> None:
             pass
     row.logo_url = None
     db.commit()
+
+
+def set_fee_defaults(db: Session, office_id: int, tenant_id: int, data: dict) -> dict:
+    """PATCH /offices/{id}/fee-defaults — the office's UCR list, its default patient
+    list and its unpriced-charge policy, each validated (§3.5/§3.6). A schedule
+    pointer must be a live schedule of this tenant (clearing it with ``null`` is
+    allowed); an unrecognised policy is refused. Only fields present in the body
+    are touched."""
+    from app.services.fee_schedule_service import _schedule_valid  # noqa: PLC0415
+
+    office = get_office_in_tenant(db, office_id, tenant_id)
+    for field in ("default_ucr_fee_schedule_id", "default_fee_schedule_id"):
+        if field not in data:
+            continue
+        value = data[field]
+        if value is not None and not _schedule_valid(db, value, tenant_id):
+            raise ValidationError(
+                fee_vocab.ERROR_CODES["office_schedule_invalid"],
+                details={"code": "office_schedule_invalid", "field": field},
+            )
+        setattr(office, field, value)
+    if "unpriced_charge_policy" in data and data["unpriced_charge_policy"] is not None:
+        policy = str(data["unpriced_charge_policy"]).strip().lower()
+        if policy not in fee_vocab.UNPRICED_POLICY_CODES:
+            raise ValidationError(
+                "Unknown unpriced-charge policy",
+                details={"code": "invalid_unpriced_policy", "field": "unpriced_charge_policy",
+                         "allowed": list(fee_vocab.UNPRICED_POLICY_CODES)},
+            )
+        office.unpriced_charge_policy = policy
+    db.commit()
+    db.refresh(office)
+    return {
+        "office_id": office.id,
+        "default_ucr_fee_schedule_id": office.default_ucr_fee_schedule_id,
+        "default_fee_schedule_id": office.default_fee_schedule_id,
+        "unpriced_charge_policy": office.unpriced_charge_policy,
+    }

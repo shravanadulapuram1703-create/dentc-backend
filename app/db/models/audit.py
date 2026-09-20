@@ -33,6 +33,11 @@ class AuditLog(Base):
     # read ("everything that happened to this chart") is one indexed filter.
     # Resolved from the CRUD engine's audit context, the 201 body, or the path.
     patient_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    # OFF-SCOPE-17: the office the mutation was made in (the caller's validated
+    # ``X-Office-ID`` working office, else the touched row's office_id). HIPAA
+    # access-by-location: ``GET /audit-logs?office_id=`` answers "who did what,
+    # where". Indexed for that filter.
+    office_id: Mapped[int | None] = mapped_column(Integer, index=True)
     method: Mapped[str] = mapped_column(String(10))
     path: Mapped[str] = mapped_column(String(500))
     status_code: Mapped[int | None] = mapped_column(Integer)

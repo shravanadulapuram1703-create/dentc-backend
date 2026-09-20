@@ -138,6 +138,22 @@ class InsurancePlan(Base, IntPKMixin, TimestampMixin):
     per_visit_copay: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     lifetime_ortho_benefits: Mapped[bool] = mapped_column(Boolean, default=True)
     plan_notes: Mapped[str | None] = mapped_column(Text)
+    # ── Coordination of benefits ─────────────────────────────────────────────
+    #: Denticon ``InsPlans.ISNONDUPBENEFITS``. A non-duplication secondary pays
+    #: only the excess of its own benefit over what the primary paid
+    #: (``max(0, pct2 x fee - prim)``) instead of the remaining balance
+    #: (``min(pct2 x fee, fee - prim)``). The two give materially different
+    #: answers, so the engine must be told which, not guess.
+    is_non_dup_benefits: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    #: The raw ``InsPlans.ISPREPAID`` code, kept because it is **not** a boolean:
+    #: its values are 9 (15,364 plans), 0 (8,440), 2 (7,459), 8, 4, 1, 3, 5, and
+    #: ``s07`` pushed them through ``parse_bool``, so ``is_prepaid`` ended up True
+    #: on 9 of 31,337 rows and the whole prepaid/capitation signal was lost.
+    #: Stored verbatim until the code meanings are confirmed; nothing prices from
+    #: it (the schedule's ``pricing_model`` decides the arithmetic).
+    legacy_prepaid_code: Mapped[str | None] = mapped_column(String(5))
     # EDIT-PLAN-5: a locked plan can only be edited (or unlocked) by a caller
     # holding ``setup_insurance_plans_screen_edit_locked_plan`` — the right
     # existed in the catalog with nothing to honour it. ``locked_at``/
@@ -294,17 +310,55 @@ class InsCustomCoverage(Base, IntPKMixin, CreatedAtMixin):
     created_by: Mapped[str | None] = mapped_column(String(100))
 
 
-class FeeScheduleAssignment(Base, IntPKMixin, CreatedAtMixin):
+class FeeScheduleAssignment(Base, IntPKMixin, TimestampMixin):
+    """Binds one fee schedule to a payer / person, optionally narrowed by place.
+
+    This is the **only** table that binds a price list to a payer. The competing
+    mechanisms are retired: ``fee_schedules.ins_plan_id``/``office_id`` (empty in
+    the Denticon export and NULL on every row here) and
+    ``insurance_carriers.fee_id`` (a free-text legacy id with no reader, folded
+    into carrier-keyed rows by the backfill).
+
+    Precedence is **lexicographic** on ``ins_plan_id > carrier_id > provider_id >
+    specialty_id`` (:func:`app.services.fee_vocab.assignment_sort_key`); a row must
+    set at least one of them. ``office_id``/``office_group_id`` only *narrow* who a
+    row applies to and cannot stand alone — a practice-wide default is an office
+    pointer in Office Setup, not an assignment. That rule is what the migrated
+    tenant's eight all-keys-NULL rows argue for: ``s51`` inserted two source rows
+    four times each (no unique key behind its ``ON CONFLICT``), leaving two
+    "practice-wide defaults" pointing at different schedules and separated only by
+    "newest row wins".
+
+    The key-tuple unique index and the has-a-target CHECK live in Alembic
+    ``d4f1a9c7b3e2`` (Postgres); ``FeeScheduleAssignmentCRUD`` carries both rules
+    in Python so SQLite tests and Postgres behave alike.
+    """
+
     __tablename__ = "fee_schedule_assignments"
+    __table_args__ = (
+        # ``s51``'s ``ON CONFLICT DO NOTHING`` had nothing to conflict on, so every
+        # migration re-run appended the whole file again.
+        UniqueConstraint(
+            "tenant_id", "legacy_id", name="uq_fee_schedule_assignments_tenant_legacy"
+        ),
+    )
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     legacy_id: Mapped[str | None] = mapped_column(String(20))
+    # ── Rank keys: at least one is required, and they decide precedence ───────
     ins_plan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_plans.id"), index=True)
-    carrier_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_carriers.id"))
+    carrier_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_carriers.id"), index=True)
     provider_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("providers.id"))
+    specialty_id: Mapped[str | None] = mapped_column(String(20))
+    # ── Scope keys: they narrow a row, never raise it, never stand alone ──────
     office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
     # FEE-3: legacy "Office Group" target — assign a fee schedule at the group level.
     office_group_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("office_groups.id"))
     fee_schedule_id: Mapped[int] = mapped_column(Integer, ForeignKey("fee_schedules.id"), index=True)
-    specialty_id: Mapped[str | None] = mapped_column(String(20))
+    #: Legacy Denticon login (``FeeScheA.CREATEDBY``) — a free-text actor with no
+    #: ``users`` row to point a FK at, same shape as the carrier/plan audit pair.
     created_by: Mapped[str | None] = mapped_column(String(100))
+    #: A mis-keyed row is corrected in place (PATCH) rather than deleted and
+    #: re-created, which used to destroy its provenance. ``updated_at`` comes from
+    #: the mixin; ``CRUDBase.update`` stamps this.
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))

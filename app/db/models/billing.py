@@ -33,7 +33,13 @@ class PatientPayment(Base, CreatedAtMixin):
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    # ``office_id`` is the payment's operational office (which office the money was
+    # applied at). OFF-SCOPE-11: ``created_office_id`` records the *posting* office
+    # — the office the user was working in when the payment was entered, stamped
+    # from ``X-Office-ID`` — which can differ from ``office_id`` when a caller
+    # posts a payment for another office's balance.
     office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
+    created_office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
     legacy_id: Mapped[str | None] = mapped_column(String(20), index=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     payment_date: Mapped[date] = mapped_column()

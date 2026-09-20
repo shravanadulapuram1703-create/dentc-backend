@@ -17,6 +17,11 @@ import sys
 request_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 user_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("user_id", default="-")
 tenant_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("tenant_id", default="-")
+# OFF-SCOPE-3/17: the caller's working office (validated ``X-Office-ID``). Set by
+# the office-scope dependency and read by the audit trail so every mutation
+# records *where* it was made (HIPAA access-by-location). ``None`` when the
+# request carries no office context.
+office_id_ctx: contextvars.ContextVar[int | None] = contextvars.ContextVar("office_id", default=None)
 # SIG-8: the signature audit trail records *which workstation* captured a
 # signature. The CRUD engine never sees the Request object, so the middleware
 # parks the client address + User-Agent here and ``signature_service`` reads them.

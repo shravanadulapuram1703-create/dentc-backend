@@ -88,8 +88,43 @@ class PatientProcedure(Base, CreatedAtMixin):
     # 0.0000, so the per-procedure roll-ups had nothing to add up (AL-16).
     pat_paid: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     pat_adjust: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # ── Pricing provenance: how this charge got its numbers ───────────────────
+    # A charge is a **snapshot**. Editing a fee schedule later never re-prices
+    # posted history, which is both what Denticon does (it stamps
+    # ``LEDGERINSD.FEEID`` + ``EFFECTIVEDATE`` on every line) and what makes "why is
+    # this 44.00?" answerable at all. Before these columns the answer was
+    # unrecoverable: ``fee_schedule_id`` was NULL on all 1,372,616 rows.
     # AL-13: which fee schedule produced `fee`.
     fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
+    #: Which tier of the resolver won (``fee_vocab.FEE_SOURCES``) — an assignment,
+    #: the patient's list, the office default, the office UCR list, an explicit
+    #: override, or ``unpriced``. Migrated rows carry ``migrated``.
+    fee_source: Mapped[str | None] = mapped_column(String(24))
+    #: The ``effective_date`` of the entry that priced it, so a re-quote of this
+    #: charge can be reproduced exactly even after the list is re-stamped.
+    fee_effective_date: Mapped[date | None]
+    #: Why a human overrode the resolved fee. Required when ``fee_source`` is
+    #: ``override`` — an office may charge what it decides to charge, but not
+    #: silently.
+    fee_override_reason: Mapped[str | None] = mapped_column(String(255))
+    #: The primary plan's coverage percentage and the band that supplied it, as
+    #: applied. Stored because the plan's table is editable: without them a printed
+    #: estimate cannot be reconciled with the plan a year later.
+    coverage_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    coverage_rule_id: Mapped[int | None] = mapped_column(
+        # Named explicitly: the naming convention would generate a 65-character
+        # name and Postgres caps identifiers at 63.
+        Integer, ForeignKey("insurance_coverage_rules.id", name="fk_patient_procedures_coverage_rule")
+    )
+    #: Deductible consumed by this line. ``outstanding_claims`` reads "deductible
+    #: used" from the remittance rows, so without this the planned and the posted
+    #: deductible could never be reconciled.
+    estimated_deductible: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    #: The **secondary** payer's expectation. ``insurance_estimate`` stays the
+    #: primary's, because ``claim.est_insurance`` sums it per payer — folding both
+    #: tiers into one column would tell the primary carrier it owes the secondary's
+    #: share too.
+    sec_insurance_estimate: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     # ADA-BE-3: Item 29a — which of the claim's four diagnosis codes (A–D,
     # priority order) this line points at; 837D loop 2400 SV3 pointer positions.
     # Normalised by claim_form_service.normalise_claim_line (upper, deduped, ≤4).
@@ -97,6 +132,73 @@ class PatientProcedure(Base, CreatedAtMixin):
     # ADA-BE-4: Item 29b / 837D SV304 units. One line may report the same
     # procedure on several teeth (teeth in Item 27, count here).
     quantity: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class ProcedureFeeProvenance(Base, IntPKMixin, CreatedAtMixin):
+    """How a *historical* charge was priced, recovered from the Denticon export.
+
+    Denticon keeps a per-charge insurance ledger (``LEDGERINSD``: 19 files,
+    1,447,988 rows) carrying ``FEEID`` and ``EFFECTIVEDATE`` — the only record of
+    which price list, and which version of it, produced each posted fee. The
+    migration read only the 12,192-row ``LedgerInsDetail_Archive.txt`` and its
+    column list dropped both, so that record was discarded. Joined back offline,
+    ``FeeScheD[FEEID][CODE].PATAMT`` equals ``LEDGER.AMOUNT`` on **99.66 %** of
+    50,348 charges from 2025, which makes this the evidence base for validating
+    the new resolver against real history before it is switched on.
+
+    **Deliberately not ``ledger_insurance_details``.** That table is the live
+    insurance *payment* ledger: ``billing_service`` derives ``claim.total_paid``
+    from it by summing ``prim_ins_paid``/``prim_ins_adjust`` over non-void rows and
+    *adding* the migrated ``opening_paid`` baseline, and ``outstanding_claims``
+    reads "deductible used" from its per-tier deductible columns. Loading 1.45M
+    historical rows there would double every migrated claim's paid total and
+    report estimated deductibles as consumed before any EOB exists. This table has
+    no ``claim_id``, no paid/adjust columns, no API resource and no reader in
+    billing — it is a write-once archive, scoped through the procedure like every
+    other patient-keyed table.
+    """
+
+    __tablename__ = "procedure_fee_provenance"
+    __table_args__ = (
+        # One provenance row per charge, so the import is idempotent.
+        UniqueConstraint("procedure_id", name="uq_procedure_fee_provenance_procedure"),
+        Index("ix_procedure_fee_provenance_schedule", "fee_schedule_id"),
+        # The name is short on purpose: the convention builds
+        # ``fk_<table>_<column>_<referred table>`` and Postgres caps identifiers at
+        # 63 characters, which ``patient_procedure_fee_provenance`` overran.
+    )
+
+    procedure_id: Mapped[str] = mapped_column(
+        String(50), ForeignKey("patient_procedures.id"), index=True
+    )
+    #: The resolved schedule, when the legacy id mapped to a row here.
+    fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
+    #: ``LEDGERINSD.FEEID`` as exported, kept even when it resolves to nothing:
+    #: several ids that priced ~18 % of 2025 charges belong to bindings that no
+    #: longer exist, and that is a fact about history, not an error to drop.
+    fee_schedule_legacy_id: Mapped[str | None] = mapped_column(String(20))
+    #: ``LEDGERINSD.EFFECTIVEDATE`` — which version of the list was in force.
+    fee_effective_date: Mapped[date | None]
+    #: ``LEDGER`` row this came from, for spot-checking against the export.
+    legacy_ledger_id: Mapped[str | None] = mapped_column(String(50), index=True)
+    #: ``PRIMCONTRACTEDAMT`` — the payer's contracted allowable for the line.
+    contracted_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # ── Per-tier split as Denticon computed it ────────────────────────────────
+    # ``*_max_consumed`` is what it sounds like: in the export ``PRIMINDMAX``
+    # equals ``PRIMEST`` on sampled rows, so those columns are amounts drawn *from*
+    # the maximum, not the maximum itself.
+    prim_ins_plan_legacy_id: Mapped[str | None] = mapped_column(String(20))
+    prim_estimated: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    prim_deductible: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    prim_max_consumed: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    sec_estimated: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    sec_deductible: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    ter_estimated: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    ter_deductible: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    #: The legacy fourth tier. The live ledger table models only three, so this is
+    #: the one place the quaternary figures survive.
+    quad_estimated: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    quad_deductible: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
 
 
 class ChartCondition(Base, IntPKMixin, TimestampMixin):

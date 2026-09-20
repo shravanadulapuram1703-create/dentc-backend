@@ -568,6 +568,27 @@ def _price_item(db: Session, payload: dict, plan: TreatmentPlan | None, tenant_i
         payload["fee_schedule_id"] = quote["fee_schedule_id"]
 
 
+def _fill_item_split(db: Session, payload: dict, plan: TreatmentPlan | None,
+                     tenant_id: int | None, *, current: TreatmentPlanItem | None = None) -> None:
+    """Fill the item's coverage split (behind ``PRICING_ENGINE_V2``) through the
+    one shared arithmetic in ``estimate_service`` — split-only, so the fee and
+    ``fee_schedule_id`` set by :func:`_price_item` (PLAN-29) are untouched.
+
+    Flag off it is a no-op, so an item's estimate stays owned by the plan-level
+    ``re_estimate`` exactly as today. Flag on, a created line carries a
+    provisional per-line estimate immediately, and a fee edit re-splits in place
+    (``re_estimate`` still gives the authoritative plan-level figure that nets
+    the deductible across the plan)."""
+    if plan is None or tenant_id is None:
+        return
+    from app.services import estimate_service  # local: matches _estimate_single_item
+
+    estimate_service.apply_split(
+        db, payload, tenant_id, price_fee=False, current=current,
+        patient_id=plan.patient_id, office_id=plan.office_id,
+    )
+
+
 def _stamp_accepted(payload: dict, current: TreatmentPlanItem | None, tz: str | None) -> None:
     """PLAN-18: ``accepted_date`` = the day the line first became accepted,
     unless the caller states one."""
@@ -649,6 +670,7 @@ class TreatmentPlanItemCRUD(CRUDBase):
         _price_item(db, payload, plan, tenant_id)
         if payload.get("fee") is None:
             payload["fee"] = Decimal("0")
+        _fill_item_split(db, payload, plan, tenant_id)
         _stamp_accepted(payload, None, _plan_office_tz(db, plan))
         ordered = _validate_icd_ids(db, icd_ids) if icd_ids is not None else None
 
@@ -688,6 +710,7 @@ class TreatmentPlanItemCRUD(CRUDBase):
                 )
         _validate_item_refs(db, payload, tenant_id)
         _stamp_accepted(payload, current, _plan_office_tz(db, plan))
+        _fill_item_split(db, payload, plan, tenant_id, current=current)
         if icd_ids is not None:
             _set_icd_codes(db, current.id, _validate_icd_ids(db, icd_ids))
         obj = super().update(db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by)

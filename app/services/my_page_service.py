@@ -29,6 +29,41 @@ def update_self(db: Session, user: User, data: dict) -> User:
     for key in ("first_name", "last_name", "phone", "email"):
         if key in data:
             setattr(user, key, data[key])
+    # OFF-SCOPE-3: the working office is validated against the caller's own
+    # assignments (a user cannot remember an office they are not assigned to);
+    # ``None`` clears it. Resolved here rather than at the route so the generic
+    # PATCH /users/me shares the rule.
+    if "current_office_id" in data:
+        office_id = data["current_office_id"]
+        if office_id is not None:
+            from app.services import office_scope_service, permission_service
+
+            assigned = office_scope_service.assigned_office_ids(db, user.id, user.tenant_id)
+            privileged = bool(
+                permission_service.office_rights(db, user)
+                & {permission_service.OFFICES_VIEW_ALL, permission_service.OFFICES_SWITCH_ANY}
+            )
+            if int(office_id) not in assigned and not privileged and assigned:
+                from app.core.exceptions import ForbiddenError
+
+                raise ForbiddenError(
+                    f"Office '{office_id}' is not assigned to you",
+                    code="office_not_assigned",
+                    details={"office_id": int(office_id), "field": "current_office_id"},
+                )
+        user.current_office_id = office_id
+    # OFF-SCOPE-3: cross-device restore of the default patient (validated against
+    # the tenant; a missing/cross-tenant patient is rejected, ``None`` clears).
+    # Validated in-memory (no intermediate commit) so a bad patient id rolls the
+    # whole PATCH back rather than half-applying the office change.
+    if "last_patient_id" in data:
+        pid = data["last_patient_id"]
+        if pid is not None:
+            from app.services import patient_context_service
+
+            if patient_context_service._valid_patient(db, pid, user.tenant_id) is None:
+                raise NotFoundError(f"Patient '{pid}' was not found")
+        user.last_patient_id = pid
     try:
         db.commit()
     except Exception as exc:  # unique email, etc.  # noqa: BLE001

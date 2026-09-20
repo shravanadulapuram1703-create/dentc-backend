@@ -9,9 +9,10 @@ strings and dates ``"YYYY-MM-DD"`` — the service formats them, never a bare
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from app.core.datetimes import UtcDatetime
 
 
@@ -75,6 +76,13 @@ class ContactInput(BaseModel):
     date_of_birth: date | None = None
     is_new_patient: bool = True
     notes: str | None = Field(default=None, max_length=2000)
+    # AN-16: persisted as real columns. The two acknowledgements are REQUIRED to
+    # be ``true`` at intake (422 ``acknowledgement_required`` otherwise). ``None``
+    # means "not sent" — the service then looks for the frontend's interim
+    # ``notes`` markers before refusing, so deploy order cannot break booking.
+    insurance_info: str | None = Field(default=None, max_length=500)
+    disclaimer_accepted: bool | None = None
+    consent_accepted: bool | None = None
 
 
 class SubmitRequestInput(BaseModel):
@@ -104,6 +112,9 @@ class ContactOut(BaseModel):
     date_of_birth: date | None = None
     is_new_patient: bool = True
     notes: str | None = None
+    insurance_info: str | None = None
+    disclaimer_accepted: bool = False
+    consent_accepted: bool = False
 
 
 class BookingRequestRead(BaseModel):
@@ -120,7 +131,19 @@ class BookingRequestRead(BaseModel):
     appointment_id: str | None = None
     patient_id: int | None = None
     decline_reason: str | None = None
+    # AN-17: who approved/declined (id + display name resolved from ``users``).
+    actioned_by_id: int | None = None
+    actioned_by_name: str | None = None
     actioned_at: UtcDatetime | None = None
+    # AN-14: the slot the patient first asked for; null until a staff reschedule.
+    original_slot: SlotOut | None = None
+    reschedule_count: int = 0
+    rescheduled_by_id: int | None = None
+    rescheduled_by_name: str | None = None
+    rescheduled_at: UtcDatetime | None = None
+    # AN-21: last outbound notification to the contact (``sms`` | ``email``).
+    contact_notified_at: UtcDatetime | None = None
+    contact_notified_via: str | None = None
     created_at: UtcDatetime
     updated_at: UtcDatetime | None = None
 
@@ -156,6 +179,37 @@ class ApproveInput(BaseModel):
 
 class DeclineInput(BaseModel):
     reason: str | None = Field(default=None, max_length=2000)
+
+
+# ── Reschedule (AN-14) ───────────────────────────────────────────────────────
+class RescheduleSlotInput(BaseModel):
+    date: str
+    start_time: str
+    end_time: str | None = None
+    duration_minutes: int | None = Field(default=None, ge=5, le=480)
+    # Omitted = keep the request's provider. Any active provider of the office is
+    # allowed (staff may place the visit with a provider not offered publicly).
+    provider_id: str | None = None
+
+
+class RescheduleInput(BaseModel):
+    slot: RescheduleSlotInput
+
+
+class SlotConflict(BaseModel):
+    """One existing appointment overlapping the requested slot (409
+    ``slot_conflict`` → ``details.conflicts[]``, AN-14/AN-15)."""
+
+    appointment_id: str
+    patient_name: str | None = None
+    provider_id: str | None = None
+    provider_name: str | None = None
+    operatory_id: str | None = None
+    operatory_name: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    procedure_label: str | None = None
+    kind: str  # "provider" | "operatory"
 
 
 # ── Duplicate-patient matching (AN-9) ────────────────────────────────────────

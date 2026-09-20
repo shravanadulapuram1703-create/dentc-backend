@@ -55,6 +55,7 @@ from app.services import (
     insurance_plan_service,
     insurance_service,
     permission_service,
+    pricing_service,
 )
 
 _ERRORS = {401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}}
@@ -114,6 +115,20 @@ def verify_subscriber_eligibility(
         db, subscriber_id, tenant_id, current,
         elig_status=req.elig_status, notes=req.notes,
     )
+
+
+@plans_router.get(
+    "/{plan_id}/fee-binding",
+    operation_id="get_insurance_plan_fee_binding",
+    summary="Which fee schedule this plan binds, via the payer assignment tiers (§3.5)",
+)
+def get_insurance_plan_fee_binding(
+    db: DbSession, tenant_id: TenantId, plan_id: Annotated[int, Path()],
+):
+    """Read-only: the schedule (if any) bound to this plan or its carrier through
+    ``fee_schedule_assignments``, ranked as the resolver ranks them. The wizard
+    shows this with a deep link to Assignments; it never picks a schedule here."""
+    return pricing_service.fee_binding(db, tenant_id, plan_id)
 
 
 @plans_router.get(

@@ -98,6 +98,31 @@ class BookingRequest(Base, TimestampMixin):
     date_of_birth: Mapped[date | None] = mapped_column(Date)
     is_new_patient: Mapped[bool] = mapped_column(Boolean, default=True)
     notes: Mapped[str | None] = mapped_column(Text)
+    # AN-16: the intake acknowledgements are legal text the patient ticked
+    # (``BOOKING_DISCLAIMER_TEXT`` / ``BOOKING_CONSENT_TEXT`` on the public page)
+    # and must be auditable as *columns* — the frontend had been folding them
+    # into ``notes`` because ``ContactInput`` silently dropped them.
+    insurance_info: Mapped[str | None] = mapped_column(String(500))
+    disclaimer_accepted: Mapped[bool] = mapped_column(Boolean, default=False)
+    consent_accepted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # ── reschedule (AN-14) ───────────────────────────────────────────────────
+    # The slot the PATIENT first asked for, set on the first staff reschedule
+    # only (``slot_*`` then holds the new time). Null = never rescheduled.
+    original_slot_date: Mapped[date | None] = mapped_column(Date)
+    original_start_time: Mapped[time | None] = mapped_column(Time)
+    original_end_time: Mapped[time | None] = mapped_column(Time)
+    original_duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    original_provider_id: Mapped[str | None] = mapped_column(String(50))
+    original_provider_name: Mapped[str | None] = mapped_column(String(255))
+    reschedule_count: Mapped[int] = mapped_column(Integer, default=0)
+    rescheduled_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    rescheduled_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    # AN-21: last outbound notification to the *contact* (approve/decline/
+    # reschedule). ``via`` is ``sms`` | ``email``; null = nothing was sent.
+    contact_notified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    contact_notified_via: Mapped[str | None] = mapped_column(String(10))
 
     # ── hold / lifecycle ─────────────────────────────────────────────────────
     # AN-8: while > now, the slot is locked against concurrent requests.

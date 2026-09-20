@@ -60,12 +60,29 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationError
 from app.crud.base import CRUDBase
 from app.db.models import PatientProcedure
-from app.services import pricing_service, procedure_events, treatment_service
+from app.services import estimate_service, permission_service, procedure_events, treatment_service
 from app.services.claim_form_service import attach_procedure_to_claim, normalise_claim_line
 from app.services.procedure_rules_service import apply_entry_rules
 
 CHARGE_SOURCE = "patient_procedures"
 _INHERITED_FROM_ITEM = ("tooth", "surface", "quadrant", "material_id")
+#: RBAC-4: editing the fee of a posted charge ("Edit Fee – Ledger") is gated on
+#: this right. Field-scoped: only a PATCH that actually *changes* the fee is
+#: guarded, so re-pricing 1.37M migrated charges or any other edit is untouched.
+FEE_EDIT_RIGHT = "transactions_edit_fee_ledger"
+
+
+def _enforce_fee_edit_right(db: Session, data: dict, current, updated_by) -> None:  # noqa: ANN001
+    """RBAC-4: 403 unless the actor may edit a ledger charge's fee, but only when
+    the payload moves the fee. An actorless (internal / trusted) write is never
+    gated; an ungated or full-access caller passes as everywhere else."""
+    if "fee" not in data or data["fee"] == current.fee or updated_by is None:
+        return
+    perms = permission_service.permissions_for_user_id(db, updated_by)
+    if perms is None:
+        return
+    permission_service.assert_permission(perms, FEE_EDIT_RIGHT,
+                                         action="edit a ledger charge's fee")
 
 
 def _truthy(value: Any) -> bool:  # noqa: ANN401
@@ -109,7 +126,10 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
 
         payload = apply_entry_rules(db, payload)
         payload = normalise_claim_line(payload)  # ADA-BE-3/4
-        payload = self._price(db, payload, tenant_id)
+        # FEE-3 / split (§3.3): the single write-path pricing helper. Flag off it
+        # only fills an omitted fee (today's behaviour); flag on it also fills the
+        # insurance/patient/deductible split from the patient's coverage.
+        payload = estimate_service.apply_split(db, payload, tenant_id)
 
         # Same steps as CRUDBase.create, inlined so the item flip lands in the
         # same transaction as the charge (a half-applied Post to Ledger is
@@ -144,31 +164,9 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
         if claim is not None:
             attach_procedure_to_claim(db, claim, proc)
 
-    @staticmethod
-    def _price(db: Session, data: dict, tenant_id: int | None) -> dict:
-        """Fill ``fee`` (and the fee provenance) when the caller omitted it."""
-        if data.get("fee") is not None or tenant_id is None:
-            return data
-        code = data.get("procedure_code")
-        if not code:
-            return data
-        quote = pricing_service.resolve_procedure_fee(
-            db, tenant_id, code,
-            patient_id=data.get("patient_id"),
-            office_id=data.get("office_id"),
-            provider_id=data.get("provider_id"),
-        )
-        data["fee"] = quote["fee"]
-        # Provenance only where the caller left it blank — never overwrite an
-        # explicit value.
-        if data.get("fee_schedule_id") is None and quote["fee_schedule_id"]:
-            data["fee_schedule_id"] = quote["fee_schedule_id"]
-        if data.get("ucr_fee") is None and quote["ucr_fee"] is not None:
-            data["ucr_fee"] = quote["ucr_fee"]
-        return data
-
     def update(self, db: Session, obj_id, data: dict, *, tenant_id=None, updated_by=None):  # noqa: ANN001, ANN201
         current = self.get(db, obj_id, tenant_id=tenant_id)
+        _enforce_fee_edit_right(db, data, current, updated_by)  # RBAC-4
         payload = dict(data)
         if payload.get("claim_id"):
             # A PATCH may carry claim_id alone, so the hold to check is the
@@ -177,6 +175,11 @@ class PatientProcedureCRUD(CRUDBase[PatientProcedure]):
             _reject_held_claim(held, payload["claim_id"])
         payload = apply_entry_rules(db, payload, current)
         payload = normalise_claim_line(payload, current)  # ADA-BE-3/4
+        # Flag off, this is a no-op on a PATCH (today's behaviour: a charge is
+        # never re-priced on edit). Flag on, a fee change on an unclaimed charge
+        # re-runs the split only — re-pricing the fee itself is the explicit
+        # reprice action, not an implicit PATCH side effect (§3.4).
+        payload = estimate_service.apply_split(db, payload, tenant_id, current=current)
         claim_changed = bool(payload.get("claim_id")) and payload["claim_id"] != current.claim_id
 
         # ── plan-item link transitions ─────────────────────────────────────

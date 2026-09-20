@@ -346,6 +346,51 @@ returns an unfiltered per-status **count summary** for the tab badges.
 — no WS consumer yet (the FE `subscribe()` is a no-op, falls back to Refresh);
 AN-11 (per-practice CORS / iframe `frame-ancestors`) is deploy-config, not code.
 
+**AppointNow round 2** (AN-BUG-1, AN-14/16/17/6/18/19/20/21/24/25 of
+[docs/appointnow/appointnow_backend_devreport.md](docs/appointnow/appointnow_backend_devreport.md)
+/ [response](docs/appointnow/appointnow_backend_response.md); Alembic
+`431b5da5630e`, **applied to the dev DB**).
+- **AN-BUG-1 (P0)**: approve 422'd `foreign_key_violation` on Postgres —
+  `BookingRequest.appointment_id` is a bare FK with no `relationship()`, so the
+  unit of work had no dependency edge and emitted the UPDATE before the
+  appointment INSERT. `db.flush()` before linking (verified on the Postgres dev
+  DB in a rolled-back txn). The suite was green because SQLite ignores FKs;
+  `tests/conftest.py` issues `PRAGMA foreign_keys=ON` for modules marked
+  `pytestmark = pytest.mark.enforce_fks` (OFF again for `drop_all` — the
+  schema has FK cycles). **Opt-in, not default**: suite-wide enforcement broke
+  ≥5 other modules (operatory-before-provider fixtures, charges posted against
+  unseeded ids) — a separate cleanup; then drop the marker check.
+- **AN-14** `POST …/requests/{id}/reschedule` (pending only; `original_slot_*`
+  frozen on the first reschedule; hold re-taken; actor + count recorded).
+  `appointment_conflicts()` now returns denormalised `details.conflicts[]`
+  (`kind: provider|operatory`) for **both** reschedule and approve.
+- **AN-16** `insurance_info` / `disclaimer_accepted` / `consent_accepted` are
+  columns and **422 `acknowledgement_required`** unless both are true. An
+  *absent* field is looked up in the FE's interim `notes` markers
+  (`split_contact_extras`, the exact `foldContactExtrasIntoNotes` format) so a
+  backend deployed before the FE cut-over keeps booking; markers are stripped
+  from the stored note and the migration backfilled old rows the same way.
+- **AN-6** events ride the **messaging WS tenant topic** (`appointnow.request`,
+  `event: created|updated|rescheduled|expired|deleted`, full read in
+  `request`, client filters by `office_id`) — the PROC-INT-3/SMS-4 pattern; the
+  orphan `appointnow:{tenant}:{office}` Redis channel is gone. **AN-17**
+  `read_many()` batches `office_code` + `actioned_by_name`/`rescheduled_by_name`.
+- **AN-18** `visible_in_appointnow` is **opt-in** (default false, migration set
+  all 99 dev-DB rows false); `scripts/appointnow_visible_providers.py` curates.
+  Staff reschedule accepts any *active* office provider, visible or not.
+- **AN-19 was data**: MOON's Monday `office_schedule_days` row ends 23:04, so
+  22:00 is the correct last start; Tuesday caps at 16:00. Ride-along: a provider
+  row with no lunch now inherits the office lunch. **AN-20** the rate limit
+  falls back to an in-process per-worker window instead of degrading open
+  (tests must `svc._local_rate.clear()` — same IP + office id every test), and
+  startup warns outside `ENV=dev` when Turnstile/Redis are unset. **AN-21**
+  [app/services/appointnow_notification_service.py](app/services/appointnow_notification_service.py):
+  office e-mail on intake, contact SMS (consented + not quiet hours) → e-mail on
+  approve/decline/reschedule, channel stamped on the row, log-only without
+  creds. **AN-24** admin `DELETE …/requests/{id}` (`force` for approved).
+  **AN-25** `scripts/expire_booking_requests.py`; the premise was wrong — the
+  sweep already ran inside availability and holds are TTL-bounded.
+
 **Help Center support tickets** (Help → Report an Issue → Jira; HELP-1…5 of
 [docs/help/help_module_backend_devreport.md](docs/help/help_module_backend_devreport.md)
 / [response](docs/help/help_module_backend_response.md)). `POST/GET /api/v1/support/tickets`
@@ -1322,6 +1367,26 @@ pad model/serial were captured by the FE and dropped by every store.
   `claim_patient_consent` are **both** Item 36. List gains
   `signature_types=a,b` + `latest_per_type=true` (window function).
 
+**Consent forms signed in the Report Viewer** (Letters → Print/Preview → sign on the
+sheet; CS-1…8 of
+[docs/letters/consent_inline_signing_backend_devreport.md](docs/letters/consent_inline_signing_backend_devreport.md)
+/ [response](docs/letters/consent_inline_signing_backend_response.md); Alembic
+`7c862ec97e84`, **applied to the dev DB**). `patient_consents.signed_document_id`
+(the signed PDF rendition, kept **beside** `document_id` — the printed/scanned copy —
+and accepted together with `signature_data`; CS-1), new `consent_signatures`
+countersign lines (`countersigns[]` on `/sign` or `POST /patient-consents/{id}/countersign`
+for the stored flow, `GET …/signatures`, `…/signatures/{sid}/void`; CS-2),
+`captured_at` + `signed_at_source` (client `signed_at` honoured within 15 min, the
+raw value kept either way; CS-3), `signed_rendered_html` frozen on sign — and
+**`content_hash` is over `rendered_html` only, never the image** (CS-4).
+`?include_signature=false` on the consent list (CS-5). **CS-6**: `document_store.public_url`
+builds `file_url` from the *request origin* (`request_base_url_ctx`, set by
+`RequestContextMiddleware`); `PUBLIC_API_BASE_URL` is only the out-of-request
+fallback — it used to be the only answer, which is how dev viewers pointed at
+Cloud Run. **CS-8**: a derived `capture_method` (`topaz|drawn|scanned|verbal|legacy|unknown`,
+`signature_service.capture_method_for`) on every signature read; stored columns
+untouched.
+
 **Prescriptions Setup round 2** (Setup -> Prescriptions; RX-1/2/4 of
 [docs/pick-list/pick_list_setup_backend_devreport.md](docs/pick-list/pick_list_setup_backend_devreport.md)
 / [response](docs/pick-list/pick_list_setup_backend_response.md); Alembic
@@ -1613,6 +1678,115 @@ and rendering with jsPDF; every item without a column printed from `localStorage
   `max_length` fires **before** a CRUD normaliser, so a normalised column needs a looser
   wire cap on the write schema (`diagnosis_pointers` 4 → 16); `rules_metadata` is
   duck-typed, no schema.
+
+**Office Scope module** (cross-cutting office context; OFF-SCOPE-1…19 of
+[docs/office-scope/office_scope_backend_devreport.md](docs/office-scope/office_scope_backend_devreport.md)
+/ [response](docs/office-scope/office_scope_backend_response.md); Alembic
+`f811e916183e`). **Office = the user's working context, not a fence — the tenant
+is the fence.** The enforcement only ever covers what a client could bypass by
+editing a query string.
+- The engine is [app/services/office_scope_service.py](app/services/office_scope_service.py):
+  a resource opts in with an `OfficeScopeSpec` on its `CrudConfig`
+  (`office_scope=`), and the CRUD router
+  ([app/crud/router_factory.py](app/crud/router_factory.py)) applies list
+  narrowing (OFF-SCOPE-2), explicit-target + body-office validation (OFF-SCOPE-1,
+  403 `office_not_assigned`), the `include_global` null-office rule (OFF-SCOPE-4),
+  the `office_ids[]`/`office_group_id`/`all_offices` controls (OFF-SCOPE-8) and
+  the `X-Office-ID` default write-stamp (OFF-SCOPE-3) uniformly. `CRUDBase.list`
+  gained `office_column`/`office_ids`/`office_include_null`.
+- **Two escape hatches** (mirroring "a user in no group is ungated"): a caller
+  holding `offices:view_all`/`offices:switch_any` is never narrowed/blocked, and
+  a caller with **zero** `user_offices` is *ungated* (tenant-wide). This is why
+  the seeded `super_admin` — which holds every office right — is unaffected and
+  the whole existing suite passed unchanged. `settings.OFFICE_SCOPE_ENFORCED`
+  (default on) is the ops kill switch.
+- **OFF-SCOPE-13** office rights live in `permission_service`. **Round 2 /
+  FE-OFF-2**: reconciled to the curated access-rights catalog, which carries ONE
+  master office-scope code — **`office_scope_view_all_offices`** — plus the legacy
+  `appointments_add_appointment_in_other_office` coverage alias. The colon-style
+  codes from round 1 (`offices:view_all` …) were invented and never existed in
+  the catalog; the server now keys on and `MeFull.permissions` emits the real
+  code. No distinct switch/cross-office/reports code — they collapse into the
+  master right (the legacy alias additionally grants *targeting* another office).
+  Role drives it (owner/admin/manager/super_admin hold the master right); the
+  internal `OFFICES_VIEW_ALL`/… constants are now aliases pointing at the two real
+  codes, so the `office_scope_service` checks resolve unchanged. `MeFull.
+  current_office_id` + `UserSelfUpdate.current_office_id`/`last_patient_id` are
+  writable (`users.current_office_id`). Round 2 write-up +
+  contract answers (FE-OFF-1…9): `docs/office-scope/office_scope_backend_response_r2.md`.
+- A **patient-scoped** list (`?patient_id=`) is never office-narrowed — the
+  chart/ledger stay organisation-wide (`OfficeScopeSpec.patient_filter`).
+  **Patients** set `default_narrow=False` (search stays "All offices") +
+  `enforce_patient_visibility=True` (OFF-SCOPE-6, `GET /patients/{id}` → 403
+  `patient_not_in_office`); `seen_at_office_id`/`search_scope` (OFF-SCOPE-5) live
+  in `PatientCRUD`. **Offices** use `list_scope_only=True` (the badge label table
+  is never fenced; `?assigned_to_me=true` opt-in, OFF-SCOPE-8) via `OfficeCRUD`.
+- **OFF-SCOPE-11** `require_on_create` (payments/adjustments/claims/notes/
+  recalls/prescriptions/treatment-plans/time-clock) is gated by
+  `OFFICE_REQUIRE_POS_OFFICE` (default **off** — it fires for every caller, so
+  turning it on before the FE always supplies an office would 422 valid creates);
+  `patient_payments.created_office_id` records the posting office. **OFF-SCOPE-12**
+  `AppointmentCRUD` validates operatory↔office (422 `operatory_office_mismatch`)
+  and derives office/provider from the operatory. **OFF-SCOPE-16** utilities
+  validate/require office. **OFF-SCOPE-17** `audit_logs.office_id` (+ `?office_id=`
+  on the audit reads). **OFF-SCOPE-18** `GET /dashboard/summary` sums the
+  DASH-1/2 roll-ups server-side over the resolved office set. **OFF-SCOPE-9**
+  `/offices/{id}/{procedure-codes|exp-codes|production-types|note-macros|
+  prescription-library}/effective` (unassigned = all). `scripts/backfill_user_offices.py`
+  seeds the data-hygiene assignments.
+
+**Access Rights catalog curation + RBAC enforcement** (Security -> Groups rights
+picker; A1/A2/A3/C2 + B1/B2 + C1 of
+[docs/setup/implement/ACCESS_RIGHTS_BACKEND_HANDOVER.md](docs/setup/implement/ACCESS_RIGHTS_BACKEND_HANDOVER.md)
+/ [response](docs/setup/implement/ACCESS_RIGHTS_BACKEND_RESPONSE.md); Alembic
+`8e4a6a8e5ab0`). The `permissions` catalog was the legacy Denticon rights list
+imported wholesale (**529** rows — scraped `Modified On:` audit metadata, other
+products, client-org custom reports). Curated to the DentC-accurate **363** (319
+kept + 44 added).
+- **A1/A2/A3/C2 live once** in
+  [app/services/access_rights_catalog.py](app/services/access_rights_catalog.py)
+  (`REMOVED_ROWS` 210, `ADDED_RIGHTS` 44, `RENAMES` 4 + idempotent
+  `apply_curation`/`revert_curation`) so the migration and `scripts/seed_permissions.py`
+  cannot drift — the seeder builds 529 from `data/Groups.txt` then calls the same
+  `apply_curation`, landing on 363. **C2**: the delete cascades to
+  `user_group_rights` (rights deleted **before** the permission rows) so no group
+  references a dead code. Verified: 529 = KEEP ∪ REMOVE exactly, ADD collides with
+  nothing, `code` treated immutable (a "replacement" is delete-old + add-new).
+- **B1 was already correct** (EDIT-PLAN-5): `me-full.permissions` = union of the
+  caller's active groups' rights; **`admin`/`super_admin` bypass** (whole active
+  catalog, `groups:[]`). **B2**: `permissions_enforced` is *not* informational —
+  true iff full-access role **or** ≥1 group; a non-admin in **no group is ungated**
+  (false, legacy role-only, never 403'd — refusing them would lock a migrated
+  tenant out on deploy day).
+- **C1** (phased): new `CrudConfig.delete_permissions` gates **only DELETE**
+  (create/update stay on the role check), because e.g.
+  `patient_delete_patient_information` must not also gate editing a patient. Wired
+  on patients / patient-insurance / patient-payments / insurance-claims /
+  appointments / chart-conditions / image-groups+details, plus per-route
+  `require_permission` on `POST /treatment-plan-items/{id}/post`
+  (`transactions_treatment_plan_post_to_ledger`) and AppointNow approve/decline.
+  `transactions_edit_fee_ledger` deferred (would over-gate the generic
+  patient-procedures PATCH — needs a fee-field-only guard).
+- **Round 2 (RBAC-1..6,
+  [docs/setup/security/ACCESS_RIGHTS_RBAC_GAPS.md](docs/setup/security/ACCESS_RIGHTS_RBAC_GAPS.md)
+  / [response](docs/setup/security/ACCESS_RIGHTS_RBAC_GAPS_RESPONSE.md); no
+  migration).** **RBAC-1/2/3**: reads were gated only by the coarse `users.role`,
+  so a `*_view_only` right granted nothing. New `require_read_access(*codes)` in
+  [app/api/deps.py](app/api/deps.py) — a read passes for a full-access role **or** a
+  caller who *holds* one of the screen's view/full codes (uses `has_strict`, so an
+  ungated non-admin does **not** pass — these were admin-only). Applied to
+  `GET /user-groups/{id}/rights` and `GET /users` (+ `/{id}`); user **writes** stay
+  admin-only. **RBAC-4**: `transactions_edit_fee_ledger` enforced **field-scoped**
+  inside `PatientProcedureCRUD.update` — only a PATCH that *moves* the fee is gated
+  (re-price of migrated charges / tooth edits untouched). **RBAC-5**:
+  `transactions_delete_procedure` on the patient-procedures DELETE. **RBAC-6**: new
+  per-verb `CrudConfig.create_permissions`/`update_permissions` (one-line gates);
+  wired — `transactions_add_post_patient_payments` (POST /patient-payments),
+  `transactions_add_post_insurance_payments` (`/ledger-insurance-details/payment(-batch)`),
+  `charting_perio_full_control` (perio writes + bulk chart save),
+  `transactions_treatment_plan_delete` (DELETE /treatment-plans). Deferred (field/
+  bespoke-route): prescription strike-off, tx-plan discount/edit-fee/change-status,
+  progress-note lock, medical-history, imaging capture, post-adjustments.
 
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))

@@ -12,6 +12,7 @@ from app.api.v1 import (
     auth,
     balances,
     billing,
+    dashboard,
     email,
     fee_schedules,
     groups,
@@ -74,6 +75,9 @@ api_router.include_router(supporting_records.router)
 # Fee Schedule supplements (restore / new-version). Before generic CRUD so
 # /fee-schedules/{id}/restore & /new-version win over /fee-schedules/{item_id}.
 api_router.include_router(fee_schedules.router)
+# Pricing hierarchy step 5: POST /pricing/quote and GET /setup/pricing-health.
+api_router.include_router(fee_schedules.pricing_router)
+api_router.include_router(fee_schedules.setup_router)
 api_router.include_router(balances.router)
 api_router.include_router(ledger.router)
 api_router.include_router(patient_reports.router)  # PRINT-1: server-rendered PDFs
@@ -100,6 +104,8 @@ api_router.include_router(audit.router)
 api_router.include_router(audit.patient_router)
 # Reports module: practice-wide aggregation (summary/trends/AR/aging).
 api_router.include_router(reports.router)
+# OFF-SCOPE-18: office(s) financial dashboard, aggregated server-side.
+api_router.include_router(dashboard.router)
 # Help Center support tickets (Jira proxy) + Utilities execution/audit.
 api_router.include_router(support.router)
 api_router.include_router(utilities.router)

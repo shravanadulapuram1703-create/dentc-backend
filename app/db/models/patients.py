@@ -132,6 +132,13 @@ class PatientInsurance(Base, IntPKMixin, TimestampMixin):
     )
 
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    #: Denticon ``PatInsPlans`` row identity. The table had no legacy key, so the
+    #: repair that restores the 954 secondary slots ``s19`` destroyed (it read a
+    #: ``BILLINGORDER`` column that does not exist, made every slot ``primary``, and
+    #: let ``ON CONFLICT`` overwrite the rest) had nothing deterministic to match
+    #: on — and re-pointing the wrong row would change which plan is primary, i.e.
+    #: which coverage rules price the patient.
+    legacy_id: Mapped[str | None] = mapped_column(String(50), index=True)
     ins_plan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_plans.id"))
     subscriber_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("insurance_subscribers.id"))
     legacy_plan_type: Mapped[str | None] = mapped_column(String(5))

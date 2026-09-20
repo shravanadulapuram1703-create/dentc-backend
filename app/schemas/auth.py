@@ -50,6 +50,9 @@ class UserRead(ORMModel):
     custom_2: str | None = None
     signature_data: str | None = None
     image_url: str | None = None
+    # OFF-SCOPE-3: last-selected working office + persistent default patient.
+    current_office_id: int | None = None
+    last_patient_id: int | None = None
     # Audit Information panel (users dev-report gap #8): created/updated actors.
     created_at: UtcDatetime
     created_by: int | None = None
@@ -82,6 +85,13 @@ class OfficeAssignment(BaseModel):
     name: str | None = None
     office_code: str | None = None
     is_primary: bool = False
+    # OFF-SCOPE-10: the switcher needs these without a second /offices fetch —
+    # short_id for the compact chip, is_active to grey a retired office out,
+    # office_group_id for regional grouping, timezone for the office's "today".
+    short_id: str | None = None
+    is_active: bool = True
+    office_group_id: int | None = None
+    timezone: str | None = None
 
 
 class TenantBrief(ORMModel):
@@ -99,6 +109,10 @@ class MeFull(BaseModel):
     # PDP-1: persistent default patient, validated (null if missing/archived/cross-tenant),
     # so the session restores it without an extra round-trip.
     last_patient_id: int | None = None
+    # OFF-SCOPE-3: the caller's remembered working office (validated: null if it
+    # is no longer one of their assignments), so the switcher restores across
+    # devices. Defaults to the primary assignment when none was stored.
+    current_office_id: int | None = None
     # MP-7: the provider row linked to this user (My Schedule scoping); null if none.
     provider_id: str | None = None
     # EDIT-PLAN-5: the caller's effective right codes (union over their active

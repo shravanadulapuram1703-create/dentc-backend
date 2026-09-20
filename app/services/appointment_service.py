@@ -25,8 +25,61 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ValidationError
 from app.crud.base import CRUDBase
-from app.db.models import Appointment, AppointmentProcedure, Office
+from app.db.models import Appointment, AppointmentProcedure, Office, Operatory
 from app.services import lab_tracking_service, treatment_service
+
+
+def apply_operatory_rules(
+    db: Session, payload: dict, current: Appointment | None = None, *, tenant_id: int | None = None
+) -> dict:
+    """OFF-SCOPE-12: an appointment's operatory and office must agree.
+
+    * an operatory pins the office — when the payload omits ``office_id`` it is
+      derived from the operatory;
+    * an operatory whose office differs from a supplied ``office_id`` is a 422
+      ``operatory_office_mismatch`` (a chair belongs to exactly one office, so a
+      cross-office booking is a data error, not a coverage decision);
+    * ``provider_id`` defaults to the operatory's column-header provider when the
+      payload leaves it blank.
+
+    Judged against the merge of payload + stored row so a PATCH that touches only
+    one of the three still validates the trio.
+    """
+    def _merged(field: str):
+        if field in payload:
+            return payload[field]
+        return getattr(current, field, None) if current is not None else None
+
+    op_id = _merged("operatory_id")
+    if not op_id:
+        return payload
+    op = db.get(Operatory, op_id)
+    if op is None:
+        raise ValidationError(
+            f"Operatory '{op_id}' was not found",
+            # FE-OFF-4: the machine code is at ``error.code`` (uniform with the
+            # other office errors); ``details.code`` is kept for the appointment
+            # domain's existing readers.
+            code="operatory_not_found",
+            details={"code": "operatory_not_found", "field": "operatory_id"},
+        )
+    office_id = _merged("office_id")
+    if office_id is None:
+        payload["office_id"] = op.office_id
+    elif op.office_id != office_id:
+        raise ValidationError(
+            "The operatory belongs to a different office than the appointment",
+            code="operatory_office_mismatch",
+            details={
+                "code": "operatory_office_mismatch",
+                "field": "operatory_id",
+                "operatory_office_id": op.office_id,
+                "office_id": office_id,
+            },
+        )
+    if not _merged("provider_id") and op.provider_id:
+        payload["provider_id"] = op.provider_id
+    return payload
 
 _INHERITED_FROM_ITEM = (
     ("procedure_code", "procedure_code"),
@@ -177,14 +230,16 @@ class AppointmentCRUD(CRUDBase[Appointment]):
         return [lab_tracking_service.lab_status_clause(status, lab_tracking_service.utc_today())]
 
     def create(self, db: Session, data: dict, *, tenant_id=None, created_by=None):  # noqa: ANN001, ANN201
-        payload = lab_tracking_service.apply_lab_rules(db, dict(data), None, tenant_id=tenant_id)
+        payload = apply_operatory_rules(db, dict(data), None, tenant_id=tenant_id)
+        payload = lab_tracking_service.apply_lab_rules(db, payload, None, tenant_id=tenant_id)
         return super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
 
     def update(self, db: Session, obj_id, data: dict, *, tenant_id=None, updated_by=None):  # noqa: ANN001, ANN201
         current = self.get(db, obj_id, tenant_id=tenant_id)
         was_live = treatment_service.appointment_is_live(current)
         old_date = current.date
-        data = lab_tracking_service.apply_lab_rules(db, dict(data), current, tenant_id=tenant_id)
+        data = apply_operatory_rules(db, dict(data), current, tenant_id=tenant_id)
+        data = lab_tracking_service.apply_lab_rules(db, data, current, tenant_id=tenant_id)
         obj = super().update(db, obj_id, data, tenant_id=tenant_id, updated_by=updated_by)
         now_live = treatment_service.appointment_is_live(obj)
         if was_live != now_live:

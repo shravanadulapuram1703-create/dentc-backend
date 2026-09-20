@@ -1,0 +1,3 @@
+patient_id,home_office_id,fee_schedule_id,active_slots,reasons
+18111,7,,1,insured_but_no_coverage_rules
+21870,4,24,1,insured_but_no_coverage_rules

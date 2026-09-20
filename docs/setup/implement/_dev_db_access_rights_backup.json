@@ -1,0 +1,7083 @@
+{
+  "cascade_deleted_user_group_rights": [
+    {
+      "id": 2300,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 26,
+      "code": "appointments_short_call_list"
+    },
+    {
+      "id": 2301,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 27,
+      "code": "appointments_short_notice_list"
+    },
+    {
+      "id": 2307,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 33,
+      "code": "athenanet_search_athenanet_patients"
+    },
+    {
+      "id": 2308,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 34,
+      "code": "charting_ai_assist_screen_full_control"
+    },
+    {
+      "id": 2309,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 2310,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 36,
+      "code": "denticon_practice_analytics_collection_analysis_full_control"
+    },
+    {
+      "id": 2311,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 37,
+      "code": "denticon_practice_analytics_executive_dashboard_full_control"
+    },
+    {
+      "id": 2312,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 38,
+      "code": "denticon_practice_analytics_front_office_full_control"
+    },
+    {
+      "id": 2313,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 39,
+      "code": "denticon_practice_analytics_hygiene_recall_full_control"
+    },
+    {
+      "id": 2314,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 40,
+      "code": "denticon_practice_analytics_morning_huddle_full_control"
+    },
+    {
+      "id": 2315,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 41,
+      "code": "denticon_practice_analytics_patient_visit_analysis_full_control"
+    },
+    {
+      "id": 2316,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 42,
+      "code": "denticon_practice_analytics_production_analysis_full_control"
+    },
+    {
+      "id": 2317,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 43,
+      "code": "denticon_practice_analytics_provider_breakdown_full_control"
+    },
+    {
+      "id": 2318,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 44,
+      "code": "denticon_practice_analytics_referral_analytics_full_control"
+    },
+    {
+      "id": 2319,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 45,
+      "code": "denticon_practice_analytics_treatment_plan_analysis_full_control"
+    },
+    {
+      "id": 2320,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 46,
+      "code": "ehr_user_can_edit_instructions_and_bibliography_information"
+    },
+    {
+      "id": 2321,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 47,
+      "code": "ehr_user_can_see_and_access_the_infobutton"
+    },
+    {
+      "id": 2322,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 48,
+      "code": "ehr_user_will_see_cds_interventions_based_on_allergies"
+    },
+    {
+      "id": 2323,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 49,
+      "code": "ehr_user_will_see_cds_interventions_based_on_demographic_information"
+    },
+    {
+      "id": 2324,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 50,
+      "code": "ehr_user_will_see_cds_interventions_based_on_lab_results"
+    },
+    {
+      "id": 2325,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 51,
+      "code": "ehr_user_will_see_cds_interventions_based_on_medications"
+    },
+    {
+      "id": 2326,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 52,
+      "code": "ehr_user_will_see_cds_interventions_based_on_problems"
+    },
+    {
+      "id": 2327,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 53,
+      "code": "ehr_user_will_see_cds_interventions_based_on_vital_signs"
+    },
+    {
+      "id": 2328,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 54,
+      "code": "ehr_user_will_see_cds_interventions_for_allowed_categories"
+    },
+    {
+      "id": 2329,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 55,
+      "code": "help_access_invoices"
+    },
+    {
+      "id": 2331,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 57,
+      "code": "helpandsupport_api_access_full_control"
+    },
+    {
+      "id": 2332,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 2333,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 2334,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 2336,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 2345,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 2346,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 2355,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts"
+    },
+    {
+      "id": 2377,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 103,
+      "code": "patient_reallocate_screen_full_control"
+    },
+    {
+      "id": 2384,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 2385,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 2391,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 117,
+      "code": "report_batch_schedule_report_add_schedule"
+    },
+    {
+      "id": 2392,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 118,
+      "code": "report_batch_schedule_report_delete_schedule"
+    },
+    {
+      "id": 2393,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 119,
+      "code": "report_batch_schedule_report_access_full_control"
+    },
+    {
+      "id": 2394,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 120,
+      "code": "report_batch_schedule_report_view_only"
+    },
+    {
+      "id": 2396,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 122,
+      "code": "reports_batch_collection_letters_full_control"
+    },
+    {
+      "id": 2397,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 123,
+      "code": "reports_batch_collection_letters_view_only"
+    },
+    {
+      "id": 2398,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 124,
+      "code": "reports_blank_insurance_form_screen_full_control"
+    },
+    {
+      "id": 2400,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 126,
+      "code": "reports_custom_postcard_full_control"
+    },
+    {
+      "id": 2402,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 128,
+      "code": "reports_dha_reports_screen_full_control"
+    },
+    {
+      "id": 2403,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 129,
+      "code": "reports_excel_reports_full_control"
+    },
+    {
+      "id": 2416,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 142,
+      "code": "reports_labels_screen_full_control"
+    },
+    {
+      "id": 2433,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 159,
+      "code": "reports_office_reports_adrpts_screen_full_con"
+    },
+    {
+      "id": 2434,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 160,
+      "code": "reports_office_reports_bnrpts_screen_full_cont"
+    },
+    {
+      "id": 2435,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 161,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_full_control"
+    },
+    {
+      "id": 2436,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only"
+    },
+    {
+      "id": 2437,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 163,
+      "code": "reports_office_reports_dental_care_access"
+    },
+    {
+      "id": 2438,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 164,
+      "code": "reports_office_reports_greathillsrpts_access"
+    },
+    {
+      "id": 2439,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 165,
+      "code": "reports_office_reports_hawaiirpts_full_control"
+    },
+    {
+      "id": 2440,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 166,
+      "code": "reports_office_reports_healthcare_network_access_full_control"
+    },
+    {
+      "id": 2441,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 167,
+      "code": "reports_office_reports_kane_dental_access"
+    },
+    {
+      "id": 2442,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 168,
+      "code": "reports_office_reports_kane_dental_view"
+    },
+    {
+      "id": 2443,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 169,
+      "code": "reports_office_reports_kansas_rpts_full_contro"
+    },
+    {
+      "id": 2444,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 170,
+      "code": "reports_office_reports_lumina_reports_full_control"
+    },
+    {
+      "id": 2445,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 171,
+      "code": "reports_office_reports_lumina_reports_view_only"
+    },
+    {
+      "id": 2446,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 172,
+      "code": "reports_office_reports_nedmrpts_screen_full_co"
+    },
+    {
+      "id": 2447,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 173,
+      "code": "reports_office_reports_ohc_reports_full_contro"
+    },
+    {
+      "id": 2448,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 174,
+      "code": "reports_office_reports_ottawareports_access"
+    },
+    {
+      "id": 2449,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 175,
+      "code": "reports_office_reports_premier_perio_full_cont"
+    },
+    {
+      "id": 2450,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 176,
+      "code": "reports_office_reports_sgkreports_screen_full_control"
+    },
+    {
+      "id": 2451,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 177,
+      "code": "reports_office_reports_sgkreports_screen_view_only"
+    },
+    {
+      "id": 2452,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 178,
+      "code": "reports_office_reports_tru_family_rpts_full_control"
+    },
+    {
+      "id": 2453,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 179,
+      "code": "reports_office_reports_uop_reports_full_contro"
+    },
+    {
+      "id": 2454,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 180,
+      "code": "reports_office_reports_vhrpts_screen_full_con"
+    },
+    {
+      "id": 2455,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 181,
+      "code": "reports_office_reports_village_family_dental_reports_full_control"
+    },
+    {
+      "id": 2456,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 182,
+      "code": "reports_office_reports_village_family_dental_reports_view_only"
+    },
+    {
+      "id": 2457,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 183,
+      "code": "reports_office_reports_abbeydental_full_control"
+    },
+    {
+      "id": 2458,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 184,
+      "code": "reports_office_reports_healthysmileskids_full_co"
+    },
+    {
+      "id": 2459,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 185,
+      "code": "reports_ortho_reports_access_full_control"
+    },
+    {
+      "id": 2462,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 188,
+      "code": "reports_postcards_full_control"
+    },
+    {
+      "id": 2463,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 189,
+      "code": "reports_postcards_view_only"
+    },
+    {
+      "id": 2464,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 190,
+      "code": "reports_recall_reports_screen_full_control"
+    },
+    {
+      "id": 2469,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 2470,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 196,
+      "code": "setup_emergency_now"
+    },
+    {
+      "id": 2482,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 208,
+      "code": "setup_code_bundling_full_control"
+    },
+    {
+      "id": 2483,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 209,
+      "code": "setup_code_bundling_view_only"
+    },
+    {
+      "id": 2484,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 210,
+      "code": "setup_collection_agencies_screen_full_control"
+    },
+    {
+      "id": 2489,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 215,
+      "code": "setup_dentigram_downloads_full_control"
+    },
+    {
+      "id": 2490,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 216,
+      "code": "setup_ehr_cds_rules"
+    },
+    {
+      "id": 2517,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 243,
+      "code": "setup_misc_screen_full_control"
+    },
+    {
+      "id": 2524,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 250,
+      "code": "setup_ortho_misc_setup_full_control"
+    },
+    {
+      "id": 2525,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 251,
+      "code": "setup_ortho_misc_setup_view_only"
+    },
+    {
+      "id": 2526,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 252,
+      "code": "setup_ortho_questionnaire_full_control"
+    },
+    {
+      "id": 2527,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 253,
+      "code": "setup_ortho_questionnaire_view_only"
+    },
+    {
+      "id": 2534,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 260,
+      "code": "setup_provider_goals_screen_full_control"
+    },
+    {
+      "id": 2535,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 261,
+      "code": "setup_provider_goals_screen_view_only"
+    },
+    {
+      "id": 2541,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 267,
+      "code": "setup_reset_benefits_for_all_offices_in_pgid"
+    },
+    {
+      "id": 2542,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 268,
+      "code": "setup_reset_benefits_for_current_office_only"
+    },
+    {
+      "id": 2550,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 276,
+      "code": "setup_security_multi_pgid_users_screen_full_control"
+    },
+    {
+      "id": 2553,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 279,
+      "code": "setup_sso_users_setup_screen_full_control"
+    },
+    {
+      "id": 2554,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 280,
+      "code": "setup_sso_users_setup_screen_view_only"
+    },
+    {
+      "id": 2557,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 283,
+      "code": "transaction_batch_insurance_payment_dentical_full_control"
+    },
+    {
+      "id": 2561,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 287,
+      "code": "transactions_add_post_batch_insurance_payments"
+    },
+    {
+      "id": 2562,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 288,
+      "code": "transactions_add_post_batch_insurance_payments_835"
+    },
+    {
+      "id": 2564,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 290,
+      "code": "transactions_add_post_capitation_payments"
+    },
+    {
+      "id": 2568,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 294,
+      "code": "transactions_batch_insurance_payments_835_view_only"
+    },
+    {
+      "id": 2603,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 329,
+      "code": "utilities_835_hub_full_control"
+    },
+    {
+      "id": 2604,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 330,
+      "code": "utilities_835_hub_view_only"
+    },
+    {
+      "id": 2605,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 331,
+      "code": "utilities_access_to_dentilytics_enterprise"
+    },
+    {
+      "id": 2607,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 333,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_management"
+    },
+    {
+      "id": 2608,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 2609,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 335,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_view_only"
+    },
+    {
+      "id": 2610,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 336,
+      "code": "utilities_automated_campaigns_appointment_campaign_management"
+    },
+    {
+      "id": 2611,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 2612,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 338,
+      "code": "utilities_automated_campaigns_appointment_campaign_view_only"
+    },
+    {
+      "id": 2613,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 339,
+      "code": "utilities_automated_campaigns_dashboard_full_control"
+    },
+    {
+      "id": 2614,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 340,
+      "code": "utilities_automated_campaigns_dashboard_view_only"
+    },
+    {
+      "id": 2615,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 341,
+      "code": "utilities_automated_campaigns_mailing_list_management"
+    },
+    {
+      "id": 2616,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 2617,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 343,
+      "code": "utilities_automated_campaigns_mailing_list_view_only"
+    },
+    {
+      "id": 2618,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 344,
+      "code": "utilities_automated_campaigns_patient_care_campaign_management"
+    },
+    {
+      "id": 2619,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 2620,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 346,
+      "code": "utilities_automated_campaigns_patient_care_campaign_view_only"
+    },
+    {
+      "id": 2621,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 347,
+      "code": "utilities_automated_campaigns_recurring_campaign_management"
+    },
+    {
+      "id": 2622,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 2623,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 349,
+      "code": "utilities_automated_campaigns_recurring_campaign_view_only"
+    },
+    {
+      "id": 2624,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 350,
+      "code": "utilities_automated_campaigns_template_management"
+    },
+    {
+      "id": 2625,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 2626,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 352,
+      "code": "utilities_automated_campaigns_template_view_only"
+    },
+    {
+      "id": 2627,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 353,
+      "code": "utilities_batch_claim_processing_screen_full_control"
+    },
+    {
+      "id": 2628,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 354,
+      "code": "utilities_batch_eligibility_full_control"
+    },
+    {
+      "id": 2634,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 360,
+      "code": "utilities_consolidate_carriers_full_control"
+    },
+    {
+      "id": 2635,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 361,
+      "code": "utilities_consolidate_carriers_view_only"
+    },
+    {
+      "id": 2639,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 365,
+      "code": "utilities_data_conversion_mapping_full_control"
+    },
+    {
+      "id": 2640,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 366,
+      "code": "utilities_denticon_download_full_control"
+    },
+    {
+      "id": 2641,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 367,
+      "code": "utilities_dentigram_download_full_control"
+    },
+    {
+      "id": 2642,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 368,
+      "code": "utilities_dhaclaims837_full_control"
+    },
+    {
+      "id": 2643,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 369,
+      "code": "utilities_direct_claims_full_control"
+    },
+    {
+      "id": 2644,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 370,
+      "code": "utilities_dldfeeschexls_download_full_control"
+    },
+    {
+      "id": 2645,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 371,
+      "code": "utilities_download837_full_control"
+    },
+    {
+      "id": 2646,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 372,
+      "code": "utilities_eclaims_management_screen_full_control"
+    },
+    {
+      "id": 373,
+      "tenant_id": 1,
+      "group_id": 1,
+      "permission_id": 373,
+      "code": "utilities_encounter_download_full_control"
+    },
+    {
+      "id": 2647,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 373,
+      "code": "utilities_encounter_download_full_control"
+    },
+    {
+      "id": 2648,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 374,
+      "code": "utilities_encounterdownload_full_control"
+    },
+    {
+      "id": 2649,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 375,
+      "code": "utilities_launch_mouthwatch_teledentistry"
+    },
+    {
+      "id": 377,
+      "tenant_id": 1,
+      "group_id": 1,
+      "permission_id": 377,
+      "code": "utilities_office_dha_close_mananged_full_control"
+    },
+    {
+      "id": 2650,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 376,
+      "code": "utilities_office_specific_dca_close_out_claims_full_control"
+    },
+    {
+      "id": 2651,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 377,
+      "code": "utilities_office_dha_close_mananged_full_control"
+    },
+    {
+      "id": 2655,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 381,
+      "code": "utilities_radius_global_full_access"
+    },
+    {
+      "id": 2659,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 385,
+      "code": "utilities_replace_carriers_full_control"
+    },
+    {
+      "id": 2660,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 386,
+      "code": "utilities_replace_insurance_plans_full_control"
+    },
+    {
+      "id": 2661,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 387,
+      "code": "utilities_replace_procedure_code_full_control"
+    },
+    {
+      "id": 2662,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 388,
+      "code": "utilities_scheduled_reallocation_list"
+    },
+    {
+      "id": 2663,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 389,
+      "code": "utilities_task_manager_access"
+    },
+    {
+      "id": 2664,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 390,
+      "code": "utilities_task_manager_assign_task"
+    },
+    {
+      "id": 2665,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 391,
+      "code": "utilities_task_manager_change_action_of_task"
+    },
+    {
+      "id": 2666,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 392,
+      "code": "utilities_task_manager_create_task"
+    },
+    {
+      "id": 2667,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 393,
+      "code": "utilities_task_manager_delete_task"
+    },
+    {
+      "id": 2668,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 394,
+      "code": "utilities_task_manager_supervisor_user"
+    },
+    {
+      "id": 2671,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 397,
+      "code": "utilities_tickler_full_control"
+    },
+    {
+      "id": 2672,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 398,
+      "code": "utilities_time_clock_editor_full_control"
+    },
+    {
+      "id": 2673,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 399,
+      "code": "utilities_time_clock_full_control"
+    },
+    {
+      "id": 2674,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 400,
+      "code": "utilities_transworld_full_access"
+    },
+    {
+      "id": 2677,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 403,
+      "code": "utilities_ehr_ehrreport_fullcontrol"
+    },
+    {
+      "id": 2678,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 404,
+      "code": "utilities_office_specific_dha_statementxmldld_full"
+    },
+    {
+      "id": 2679,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 405,
+      "code": "utilities_office_specific_mid_atlantic_batchaddflashalerts_full"
+    },
+    {
+      "id": 2680,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 406,
+      "code": "utilities_office_specific_mid_atlantic_batchaddflashalerts_view"
+    },
+    {
+      "id": 2681,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 407,
+      "code": "utilities_office_specific_mid_atlantic_batchdeactivateflashalerts_full"
+    },
+    {
+      "id": 2682,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 408,
+      "code": "utilities_office_specific_mid_atlantic_batchdeactivateflashalerts_view"
+    },
+    {
+      "id": 2683,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 409,
+      "code": "modified_on"
+    },
+    {
+      "id": 2684,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 410,
+      "code": "modified_by"
+    },
+    {
+      "id": 2700,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 426,
+      "code": "reports_blank_insurance_form_screen_view_only"
+    },
+    {
+      "id": 2702,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 428,
+      "code": "reports_custom_postcard_screen_view_only"
+    },
+    {
+      "id": 2704,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 430,
+      "code": "reports_dha_reports_screen_view_only"
+    },
+    {
+      "id": 2705,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 431,
+      "code": "reports_excel_reports_view_only"
+    },
+    {
+      "id": 2709,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 435,
+      "code": "reports_labels_screen_view_only"
+    },
+    {
+      "id": 2720,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 446,
+      "code": "reports_office_reports_adrpts_screen_view_only"
+    },
+    {
+      "id": 2721,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 447,
+      "code": "reports_office_reports_bnrpts_screen_view_only"
+    },
+    {
+      "id": 2722,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 448,
+      "code": "reports_office_reports_hawaiirpts_view_only"
+    },
+    {
+      "id": 2723,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 449,
+      "code": "reports_office_reports_nedmrpts_screen_view_on"
+    },
+    {
+      "id": 2724,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 450,
+      "code": "reports_office_reports_vhrpts_screen_view_only"
+    },
+    {
+      "id": 2725,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 451,
+      "code": "reports_ortho_reports_view_only"
+    },
+    {
+      "id": 2726,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 452,
+      "code": "reports_recall_reports_screen_view_only"
+    },
+    {
+      "id": 2733,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 459,
+      "code": "setup_collection_agencies_screen_view_only"
+    },
+    {
+      "id": 2735,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 461,
+      "code": "setup_dentigram_downloads_view_only"
+    },
+    {
+      "id": 2747,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 473,
+      "code": "setup_misc_screen_view_only"
+    },
+    {
+      "id": 2758,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 484,
+      "code": "setup_reset_benefits_view_only"
+    },
+    {
+      "id": 2764,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 490,
+      "code": "transactions_batch_insurance_payments_view_only"
+    },
+    {
+      "id": 2772,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 498,
+      "code": "utilities_batch_claim_processing_screen_view_only"
+    },
+    {
+      "id": 2773,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 499,
+      "code": "utilities_batch_eligibility_view_only"
+    },
+    {
+      "id": 2775,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 501,
+      "code": "utilities_denticon_download_view_only"
+    },
+    {
+      "id": 2776,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 502,
+      "code": "utilities_dentigram_download_view_only"
+    },
+    {
+      "id": 2777,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 503,
+      "code": "utilities_dhaclaims837_view_only"
+    },
+    {
+      "id": 2778,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 504,
+      "code": "utilities_direct_claims_view_only"
+    },
+    {
+      "id": 2779,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 505,
+      "code": "utilities_dldfeeschexls_download_view_only"
+    },
+    {
+      "id": 2780,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 506,
+      "code": "utilities_download837_view_only"
+    },
+    {
+      "id": 2781,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 507,
+      "code": "utilities_encounter_download_view_only"
+    },
+    {
+      "id": 2782,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 508,
+      "code": "utilities_encounterdownload_view_only"
+    },
+    {
+      "id": 2783,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 509,
+      "code": "utilities_office_dha_close_mananged_view_only"
+    },
+    {
+      "id": 2786,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 512,
+      "code": "utilities_replace_carriers_view_only"
+    },
+    {
+      "id": 2787,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 513,
+      "code": "utilities_replace_insurance_plans_view_only"
+    },
+    {
+      "id": 2788,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 514,
+      "code": "utilities_replace_procedure_code_view_only"
+    },
+    {
+      "id": 2789,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 515,
+      "code": "utilities_tickler_view_only_control"
+    },
+    {
+      "id": 2790,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 516,
+      "code": "utilities_time_clock_editor_view_only"
+    },
+    {
+      "id": 2791,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 517,
+      "code": "utilities_time_clock_view_only"
+    },
+    {
+      "id": 2792,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 518,
+      "code": "utilities_office_specific_dha_statementxmldld_view"
+    },
+    {
+      "id": 2793,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 519,
+      "code": "modified_on_3_13_2025_10_05_00_am_pt"
+    },
+    {
+      "id": 2794,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 520,
+      "code": "modified_by_elizabethh"
+    },
+    {
+      "id": 2795,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 521,
+      "code": "patient_reallocate_view_only"
+    },
+    {
+      "id": 2796,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 522,
+      "code": "modified_on_9_23_2025_6_30_00_am_pt"
+    },
+    {
+      "id": 2797,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 523,
+      "code": "modified_on_4_3_2025_10_34_00_am_pt"
+    },
+    {
+      "id": 2798,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 524,
+      "code": "modified_on_6_3_2026_11_09_00_am_pt"
+    },
+    {
+      "id": 2799,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 525,
+      "code": "modified_by_dhileep_jin2829"
+    },
+    {
+      "id": 2800,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 526,
+      "code": "modified_on_3_18_2026_7_05_00_am_pt"
+    },
+    {
+      "id": 2801,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 527,
+      "code": "modified_on_9_23_2025_6_43_00_am_pt"
+    },
+    {
+      "id": 2802,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 528,
+      "code": "modified_on_6_17_2016_6_40_00_pm_pt"
+    },
+    {
+      "id": 2803,
+      "tenant_id": 1,
+      "group_id": 21,
+      "permission_id": 529,
+      "code": "modified_on_1_14_2022_6_09_00_am_pt"
+    },
+    {
+      "id": 3046,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 243,
+      "code": "setup_misc_screen_full_control"
+    },
+    {
+      "id": 3053,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 250,
+      "code": "setup_ortho_misc_setup_full_control"
+    },
+    {
+      "id": 3054,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 251,
+      "code": "setup_ortho_misc_setup_view_only"
+    },
+    {
+      "id": 3055,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 252,
+      "code": "setup_ortho_questionnaire_full_control"
+    },
+    {
+      "id": 3056,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 253,
+      "code": "setup_ortho_questionnaire_view_only"
+    },
+    {
+      "id": 3063,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 260,
+      "code": "setup_provider_goals_screen_full_control"
+    },
+    {
+      "id": 3064,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 261,
+      "code": "setup_provider_goals_screen_view_only"
+    },
+    {
+      "id": 3070,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 267,
+      "code": "setup_reset_benefits_for_all_offices_in_pgid"
+    },
+    {
+      "id": 3071,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 268,
+      "code": "setup_reset_benefits_for_current_office_only"
+    },
+    {
+      "id": 3079,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 276,
+      "code": "setup_security_multi_pgid_users_screen_full_control"
+    },
+    {
+      "id": 3082,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 279,
+      "code": "setup_sso_users_setup_screen_full_control"
+    },
+    {
+      "id": 3083,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 280,
+      "code": "setup_sso_users_setup_screen_view_only"
+    },
+    {
+      "id": 3086,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 283,
+      "code": "transaction_batch_insurance_payment_dentical_full_control"
+    },
+    {
+      "id": 3090,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 287,
+      "code": "transactions_add_post_batch_insurance_payments"
+    },
+    {
+      "id": 3091,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 288,
+      "code": "transactions_add_post_batch_insurance_payments_835"
+    },
+    {
+      "id": 3093,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 290,
+      "code": "transactions_add_post_capitation_payments"
+    },
+    {
+      "id": 3097,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 294,
+      "code": "transactions_batch_insurance_payments_835_view_only"
+    },
+    {
+      "id": 3132,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 329,
+      "code": "utilities_835_hub_full_control"
+    },
+    {
+      "id": 3133,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 330,
+      "code": "utilities_835_hub_view_only"
+    },
+    {
+      "id": 2829,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 26,
+      "code": "appointments_short_call_list"
+    },
+    {
+      "id": 2830,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 27,
+      "code": "appointments_short_notice_list"
+    },
+    {
+      "id": 2836,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 33,
+      "code": "athenanet_search_athenanet_patients"
+    },
+    {
+      "id": 2837,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 34,
+      "code": "charting_ai_assist_screen_full_control"
+    },
+    {
+      "id": 2838,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 2839,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 36,
+      "code": "denticon_practice_analytics_collection_analysis_full_control"
+    },
+    {
+      "id": 2840,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 37,
+      "code": "denticon_practice_analytics_executive_dashboard_full_control"
+    },
+    {
+      "id": 2841,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 38,
+      "code": "denticon_practice_analytics_front_office_full_control"
+    },
+    {
+      "id": 2842,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 39,
+      "code": "denticon_practice_analytics_hygiene_recall_full_control"
+    },
+    {
+      "id": 2843,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 40,
+      "code": "denticon_practice_analytics_morning_huddle_full_control"
+    },
+    {
+      "id": 2844,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 41,
+      "code": "denticon_practice_analytics_patient_visit_analysis_full_control"
+    },
+    {
+      "id": 2845,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 42,
+      "code": "denticon_practice_analytics_production_analysis_full_control"
+    },
+    {
+      "id": 2846,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 43,
+      "code": "denticon_practice_analytics_provider_breakdown_full_control"
+    },
+    {
+      "id": 2847,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 44,
+      "code": "denticon_practice_analytics_referral_analytics_full_control"
+    },
+    {
+      "id": 2848,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 45,
+      "code": "denticon_practice_analytics_treatment_plan_analysis_full_control"
+    },
+    {
+      "id": 2849,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 46,
+      "code": "ehr_user_can_edit_instructions_and_bibliography_information"
+    },
+    {
+      "id": 2850,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 47,
+      "code": "ehr_user_can_see_and_access_the_infobutton"
+    },
+    {
+      "id": 2851,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 48,
+      "code": "ehr_user_will_see_cds_interventions_based_on_allergies"
+    },
+    {
+      "id": 2852,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 49,
+      "code": "ehr_user_will_see_cds_interventions_based_on_demographic_information"
+    },
+    {
+      "id": 2853,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 50,
+      "code": "ehr_user_will_see_cds_interventions_based_on_lab_results"
+    },
+    {
+      "id": 2854,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 51,
+      "code": "ehr_user_will_see_cds_interventions_based_on_medications"
+    },
+    {
+      "id": 2855,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 52,
+      "code": "ehr_user_will_see_cds_interventions_based_on_problems"
+    },
+    {
+      "id": 2856,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 53,
+      "code": "ehr_user_will_see_cds_interventions_based_on_vital_signs"
+    },
+    {
+      "id": 2857,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 54,
+      "code": "ehr_user_will_see_cds_interventions_for_allowed_categories"
+    },
+    {
+      "id": 2858,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 55,
+      "code": "help_access_invoices"
+    },
+    {
+      "id": 2860,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 57,
+      "code": "helpandsupport_api_access_full_control"
+    },
+    {
+      "id": 2861,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 2862,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 2863,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 2865,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 2874,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 2875,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 2884,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts"
+    },
+    {
+      "id": 2906,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 103,
+      "code": "patient_reallocate_screen_full_control"
+    },
+    {
+      "id": 2913,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 2914,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 2920,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 117,
+      "code": "report_batch_schedule_report_add_schedule"
+    },
+    {
+      "id": 2921,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 118,
+      "code": "report_batch_schedule_report_delete_schedule"
+    },
+    {
+      "id": 2922,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 119,
+      "code": "report_batch_schedule_report_access_full_control"
+    },
+    {
+      "id": 2923,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 120,
+      "code": "report_batch_schedule_report_view_only"
+    },
+    {
+      "id": 2925,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 122,
+      "code": "reports_batch_collection_letters_full_control"
+    },
+    {
+      "id": 2926,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 123,
+      "code": "reports_batch_collection_letters_view_only"
+    },
+    {
+      "id": 2927,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 124,
+      "code": "reports_blank_insurance_form_screen_full_control"
+    },
+    {
+      "id": 2929,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 126,
+      "code": "reports_custom_postcard_full_control"
+    },
+    {
+      "id": 2931,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 128,
+      "code": "reports_dha_reports_screen_full_control"
+    },
+    {
+      "id": 2932,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 129,
+      "code": "reports_excel_reports_full_control"
+    },
+    {
+      "id": 2945,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 142,
+      "code": "reports_labels_screen_full_control"
+    },
+    {
+      "id": 792,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 519,
+      "code": "modified_on_3_13_2025_10_05_00_am_pt"
+    },
+    {
+      "id": 793,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 520,
+      "code": "modified_by_elizabethh"
+    },
+    {
+      "id": 812,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 26,
+      "code": "appointments_short_call_list"
+    },
+    {
+      "id": 813,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 27,
+      "code": "appointments_short_notice_list"
+    },
+    {
+      "id": 819,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 820,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 517,
+      "code": "utilities_time_clock_view_only"
+    },
+    {
+      "id": 821,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 822,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 823,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 824,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 825,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 521,
+      "code": "patient_reallocate_view_only"
+    },
+    {
+      "id": 833,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 834,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 840,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts"
+    },
+    {
+      "id": 859,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 103,
+      "code": "patient_reallocate_screen_full_control"
+    },
+    {
+      "id": 863,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 864,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 870,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 161,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_full_control"
+    },
+    {
+      "id": 871,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only"
+    },
+    {
+      "id": 872,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 185,
+      "code": "reports_ortho_reports_access_full_control"
+    },
+    {
+      "id": 873,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 883,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 250,
+      "code": "setup_ortho_misc_setup_full_control"
+    },
+    {
+      "id": 884,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 251,
+      "code": "setup_ortho_misc_setup_view_only"
+    },
+    {
+      "id": 885,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 252,
+      "code": "setup_ortho_questionnaire_full_control"
+    },
+    {
+      "id": 886,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 253,
+      "code": "setup_ortho_questionnaire_view_only"
+    },
+    {
+      "id": 887,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 261,
+      "code": "setup_provider_goals_screen_view_only"
+    },
+    {
+      "id": 911,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 912,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 913,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 914,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 915,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 916,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 932,
+      "tenant_id": 1,
+      "group_id": 9,
+      "permission_id": 451,
+      "code": "reports_ortho_reports_view_only"
+    },
+    {
+      "id": 933,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 409,
+      "code": "modified_on"
+    },
+    {
+      "id": 934,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 410,
+      "code": "modified_by"
+    },
+    {
+      "id": 935,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 283,
+      "code": "transaction_batch_insurance_payment_dentical_full_control"
+    },
+    {
+      "id": 938,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 287,
+      "code": "transactions_add_post_batch_insurance_payments"
+    },
+    {
+      "id": 939,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 288,
+      "code": "transactions_add_post_batch_insurance_payments_835"
+    },
+    {
+      "id": 940,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 949,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 950,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 951,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 952,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 953,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 956,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 958,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 962,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 963,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 966,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 967,
+      "tenant_id": 1,
+      "group_id": 6,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 973,
+      "tenant_id": 1,
+      "group_id": 10,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 974,
+      "tenant_id": 1,
+      "group_id": 10,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 980,
+      "tenant_id": 1,
+      "group_id": 10,
+      "permission_id": 409,
+      "code": "modified_on"
+    },
+    {
+      "id": 981,
+      "tenant_id": 1,
+      "group_id": 10,
+      "permission_id": 410,
+      "code": "modified_by"
+    },
+    {
+      "id": 982,
+      "tenant_id": 1,
+      "group_id": 10,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 983,
+      "tenant_id": 1,
+      "group_id": 10,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 991,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 520,
+      "code": "modified_by_elizabethh"
+    },
+    {
+      "id": 993,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 522,
+      "code": "modified_on_9_23_2025_6_30_00_am_pt"
+    },
+    {
+      "id": 1010,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 26,
+      "code": "appointments_short_call_list"
+    },
+    {
+      "id": 1011,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 27,
+      "code": "appointments_short_notice_list"
+    },
+    {
+      "id": 1017,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 1018,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 517,
+      "code": "utilities_time_clock_view_only"
+    },
+    {
+      "id": 1019,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 48,
+      "code": "ehr_user_will_see_cds_interventions_based_on_allergies"
+    },
+    {
+      "id": 1020,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 1021,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 1022,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 1024,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 1032,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 1033,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 1040,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts"
+    },
+    {
+      "id": 1059,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 103,
+      "code": "patient_reallocate_screen_full_control"
+    },
+    {
+      "id": 1065,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 1066,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 1070,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 122,
+      "code": "reports_batch_collection_letters_full_control"
+    },
+    {
+      "id": 1071,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 123,
+      "code": "reports_batch_collection_letters_view_only"
+    },
+    {
+      "id": 1072,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 124,
+      "code": "reports_blank_insurance_form_screen_full_control"
+    },
+    {
+      "id": 1083,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 142,
+      "code": "reports_labels_screen_full_control"
+    },
+    {
+      "id": 1093,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only"
+    },
+    {
+      "id": 1094,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 181,
+      "code": "reports_office_reports_village_family_dental_reports_full_control"
+    },
+    {
+      "id": 1095,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 182,
+      "code": "reports_office_reports_village_family_dental_reports_view_only"
+    },
+    {
+      "id": 1096,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 185,
+      "code": "reports_ortho_reports_access_full_control"
+    },
+    {
+      "id": 1099,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 188,
+      "code": "reports_postcards_full_control"
+    },
+    {
+      "id": 1100,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 189,
+      "code": "reports_postcards_view_only"
+    },
+    {
+      "id": 1101,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 190,
+      "code": "reports_recall_reports_screen_full_control"
+    },
+    {
+      "id": 1105,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 1124,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 290,
+      "code": "transactions_add_post_capitation_payments"
+    },
+    {
+      "id": 1149,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 1150,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 1151,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 1152,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 1153,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 1154,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 1155,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 353,
+      "code": "utilities_batch_claim_processing_screen_full_control"
+    },
+    {
+      "id": 1171,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 428,
+      "code": "reports_custom_postcard_screen_view_only"
+    },
+    {
+      "id": 1172,
+      "tenant_id": 1,
+      "group_id": 3,
+      "permission_id": 451,
+      "code": "reports_ortho_reports_view_only"
+    },
+    {
+      "id": 1182,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 520,
+      "code": "modified_by_elizabethh"
+    },
+    {
+      "id": 1185,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 523,
+      "code": "modified_on_4_3_2025_10_34_00_am_pt"
+    },
+    {
+      "id": 1201,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 26,
+      "code": "appointments_short_call_list"
+    },
+    {
+      "id": 1202,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 27,
+      "code": "appointments_short_notice_list"
+    },
+    {
+      "id": 1208,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 1209,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 517,
+      "code": "utilities_time_clock_view_only"
+    },
+    {
+      "id": 1210,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 1211,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 1212,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 1214,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 1222,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 1223,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 1228,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts"
+    },
+    {
+      "id": 1245,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 1246,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 1250,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 122,
+      "code": "reports_batch_collection_letters_full_control"
+    },
+    {
+      "id": 1251,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 123,
+      "code": "reports_batch_collection_letters_view_only"
+    },
+    {
+      "id": 1263,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 161,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_full_control"
+    },
+    {
+      "id": 1264,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only"
+    },
+    {
+      "id": 1265,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 170,
+      "code": "reports_office_reports_lumina_reports_full_control"
+    },
+    {
+      "id": 1266,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 171,
+      "code": "reports_office_reports_lumina_reports_view_only"
+    },
+    {
+      "id": 1267,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 181,
+      "code": "reports_office_reports_village_family_dental_reports_full_control"
+    },
+    {
+      "id": 1268,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 182,
+      "code": "reports_office_reports_village_family_dental_reports_view_only"
+    },
+    {
+      "id": 1269,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 185,
+      "code": "reports_ortho_reports_access_full_control"
+    },
+    {
+      "id": 1272,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 188,
+      "code": "reports_postcards_full_control"
+    },
+    {
+      "id": 1273,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 189,
+      "code": "reports_postcards_view_only"
+    },
+    {
+      "id": 1274,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 190,
+      "code": "reports_recall_reports_screen_full_control"
+    },
+    {
+      "id": 1276,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 1287,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 250,
+      "code": "setup_ortho_misc_setup_full_control"
+    },
+    {
+      "id": 1288,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 251,
+      "code": "setup_ortho_misc_setup_view_only"
+    },
+    {
+      "id": 1289,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 252,
+      "code": "setup_ortho_questionnaire_full_control"
+    },
+    {
+      "id": 1290,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 253,
+      "code": "setup_ortho_questionnaire_view_only"
+    },
+    {
+      "id": 1291,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 261,
+      "code": "setup_provider_goals_screen_view_only"
+    },
+    {
+      "id": 1315,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 1316,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 1317,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 1318,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 1319,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 1320,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 1338,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 428,
+      "code": "reports_custom_postcard_screen_view_only"
+    },
+    {
+      "id": 1339,
+      "tenant_id": 1,
+      "group_id": 11,
+      "permission_id": 451,
+      "code": "reports_ortho_reports_view_only"
+    },
+    {
+      "id": 1357,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 524,
+      "code": "modified_on_6_3_2026_11_09_00_am_pt"
+    },
+    {
+      "id": 1358,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 525,
+      "code": "modified_by_dhileep_jin2829"
+    },
+    {
+      "id": 1372,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 1376,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 1377,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 1378,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 1380,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 1387,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 1388,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 1396,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 1397,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 336,
+      "code": "utilities_automated_campaigns_appointment_campaign_management"
+    },
+    {
+      "id": 1399,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 1400,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 339,
+      "code": "utilities_automated_campaigns_dashboard_full_control"
+    },
+    {
+      "id": 1403,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 1404,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 1407,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 1408,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 1411,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 1412,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 1414,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 367,
+      "code": "utilities_dentigram_download_full_control"
+    },
+    {
+      "id": 1417,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 1426,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 250,
+      "code": "setup_ortho_misc_setup_full_control"
+    },
+    {
+      "id": 1427,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 251,
+      "code": "setup_ortho_misc_setup_view_only"
+    },
+    {
+      "id": 1428,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 252,
+      "code": "setup_ortho_questionnaire_full_control"
+    },
+    {
+      "id": 1429,
+      "tenant_id": 1,
+      "group_id": 12,
+      "permission_id": 253,
+      "code": "setup_ortho_questionnaire_view_only"
+    },
+    {
+      "id": 1437,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 520,
+      "code": "modified_by_elizabethh"
+    },
+    {
+      "id": 1443,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 526,
+      "code": "modified_on_3_18_2026_7_05_00_am_pt"
+    },
+    {
+      "id": 1457,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 26,
+      "code": "appointments_short_call_list"
+    },
+    {
+      "id": 1458,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 27,
+      "code": "appointments_short_notice_list"
+    },
+    {
+      "id": 1464,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 33,
+      "code": "athenanet_search_athenanet_patients"
+    },
+    {
+      "id": 1465,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 1466,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 517,
+      "code": "utilities_time_clock_view_only"
+    },
+    {
+      "id": 1467,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 46,
+      "code": "ehr_user_can_edit_instructions_and_bibliography_information"
+    },
+    {
+      "id": 1468,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 47,
+      "code": "ehr_user_can_see_and_access_the_infobutton"
+    },
+    {
+      "id": 1469,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 48,
+      "code": "ehr_user_will_see_cds_interventions_based_on_allergies"
+    },
+    {
+      "id": 1470,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 49,
+      "code": "ehr_user_will_see_cds_interventions_based_on_demographic_information"
+    },
+    {
+      "id": 1471,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 50,
+      "code": "ehr_user_will_see_cds_interventions_based_on_lab_results"
+    },
+    {
+      "id": 1472,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 51,
+      "code": "ehr_user_will_see_cds_interventions_based_on_medications"
+    },
+    {
+      "id": 1473,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 52,
+      "code": "ehr_user_will_see_cds_interventions_based_on_problems"
+    },
+    {
+      "id": 1474,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 53,
+      "code": "ehr_user_will_see_cds_interventions_based_on_vital_signs"
+    },
+    {
+      "id": 1475,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 54,
+      "code": "ehr_user_will_see_cds_interventions_for_allowed_categories"
+    },
+    {
+      "id": 1476,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 55,
+      "code": "help_access_invoices"
+    },
+    {
+      "id": 1478,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 57,
+      "code": "helpandsupport_api_access_full_control"
+    },
+    {
+      "id": 1479,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 1480,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 1481,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 1483,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 1489,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 1493,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts"
+    },
+    {
+      "id": 1509,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 103,
+      "code": "patient_reallocate_screen_full_control"
+    },
+    {
+      "id": 1515,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 1521,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 1561,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 1562,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 1563,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 1564,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 1565,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 1566,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 1568,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 372,
+      "code": "utilities_eclaims_management_screen_full_control"
+    },
+    {
+      "id": 1569,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 386,
+      "code": "utilities_replace_insurance_plans_full_control"
+    },
+    {
+      "id": 1570,
+      "tenant_id": 1,
+      "group_id": 5,
+      "permission_id": 399,
+      "code": "utilities_time_clock_full_control"
+    },
+    {
+      "id": 1585,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 520,
+      "code": "modified_by_elizabethh"
+    },
+    {
+      "id": 1592,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 527,
+      "code": "modified_on_9_23_2025_6_43_00_am_pt"
+    },
+    {
+      "id": 1603,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 26,
+      "code": "appointments_short_call_list"
+    },
+    {
+      "id": 1604,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 27,
+      "code": "appointments_short_notice_list"
+    },
+    {
+      "id": 1610,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 1611,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 1612,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 1613,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 1615,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 1623,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 1624,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 1633,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts"
+    },
+    {
+      "id": 1652,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 103,
+      "code": "patient_reallocate_screen_full_control"
+    },
+    {
+      "id": 1658,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 1659,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 1663,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 122,
+      "code": "reports_batch_collection_letters_full_control"
+    },
+    {
+      "id": 1664,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 123,
+      "code": "reports_batch_collection_letters_view_only"
+    },
+    {
+      "id": 1665,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 124,
+      "code": "reports_blank_insurance_form_screen_full_control"
+    },
+    {
+      "id": 1667,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 126,
+      "code": "reports_custom_postcard_full_control"
+    },
+    {
+      "id": 1669,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 128,
+      "code": "reports_dha_reports_screen_full_control"
+    },
+    {
+      "id": 1670,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 129,
+      "code": "reports_excel_reports_full_control"
+    },
+    {
+      "id": 1681,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 142,
+      "code": "reports_labels_screen_full_control"
+    },
+    {
+      "id": 1694,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 161,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_full_control"
+    },
+    {
+      "id": 1695,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only"
+    },
+    {
+      "id": 1696,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 170,
+      "code": "reports_office_reports_lumina_reports_full_control"
+    },
+    {
+      "id": 1697,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 171,
+      "code": "reports_office_reports_lumina_reports_view_only"
+    },
+    {
+      "id": 1698,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 181,
+      "code": "reports_office_reports_village_family_dental_reports_full_control"
+    },
+    {
+      "id": 1699,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 182,
+      "code": "reports_office_reports_village_family_dental_reports_view_only"
+    },
+    {
+      "id": 1700,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 185,
+      "code": "reports_ortho_reports_access_full_control"
+    },
+    {
+      "id": 1703,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 188,
+      "code": "reports_postcards_full_control"
+    },
+    {
+      "id": 1704,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 189,
+      "code": "reports_postcards_view_only"
+    },
+    {
+      "id": 1705,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 190,
+      "code": "reports_recall_reports_screen_full_control"
+    },
+    {
+      "id": 1710,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 1716,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 210,
+      "code": "setup_collection_agencies_screen_full_control"
+    },
+    {
+      "id": 1732,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 243,
+      "code": "setup_misc_screen_full_control"
+    },
+    {
+      "id": 1734,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 250,
+      "code": "setup_ortho_misc_setup_full_control"
+    },
+    {
+      "id": 1735,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 251,
+      "code": "setup_ortho_misc_setup_view_only"
+    },
+    {
+      "id": 1736,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 252,
+      "code": "setup_ortho_questionnaire_full_control"
+    },
+    {
+      "id": 1737,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 253,
+      "code": "setup_ortho_questionnaire_view_only"
+    },
+    {
+      "id": 1743,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 261,
+      "code": "setup_provider_goals_screen_view_only"
+    },
+    {
+      "id": 1748,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 268,
+      "code": "setup_reset_benefits_for_current_office_only"
+    },
+    {
+      "id": 1752,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 276,
+      "code": "setup_security_multi_pgid_users_screen_full_control"
+    },
+    {
+      "id": 1759,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 287,
+      "code": "transactions_add_post_batch_insurance_payments"
+    },
+    {
+      "id": 1761,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 290,
+      "code": "transactions_add_post_capitation_payments"
+    },
+    {
+      "id": 1794,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 1795,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 1796,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 1797,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 1798,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 1799,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 1800,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 353,
+      "code": "utilities_batch_claim_processing_screen_full_control"
+    },
+    {
+      "id": 1804,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 372,
+      "code": "utilities_eclaims_management_screen_full_control"
+    },
+    {
+      "id": 1809,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 399,
+      "code": "utilities_time_clock_full_control"
+    },
+    {
+      "id": 1813,
+      "tenant_id": 1,
+      "group_id": 2,
+      "permission_id": 451,
+      "code": "reports_ortho_reports_view_only"
+    },
+    {
+      "id": 1817,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 261,
+      "code": "setup_provider_goals_screen_view_only"
+    },
+    {
+      "id": 1820,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 525,
+      "code": "modified_by_dhileep_jin2829"
+    },
+    {
+      "id": 1821,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 528,
+      "code": "modified_on_6_17_2016_6_40_00_pm_pt"
+    },
+    {
+      "id": 1825,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 1831,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 1832,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 1833,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 1840,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 1841,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 1846,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 1847,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 1850,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 1851,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 1854,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 1857,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 1862,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 1863,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 1866,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 122,
+      "code": "reports_batch_collection_letters_full_control"
+    },
+    {
+      "id": 1867,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 123,
+      "code": "reports_batch_collection_letters_view_only"
+    },
+    {
+      "id": 1878,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 399,
+      "code": "utilities_time_clock_full_control"
+    },
+    {
+      "id": 1881,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 161,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_full_control"
+    },
+    {
+      "id": 1882,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only"
+    },
+    {
+      "id": 1883,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 170,
+      "code": "reports_office_reports_lumina_reports_full_control"
+    },
+    {
+      "id": 1884,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 171,
+      "code": "reports_office_reports_lumina_reports_view_only"
+    },
+    {
+      "id": 1885,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 181,
+      "code": "reports_office_reports_village_family_dental_reports_full_control"
+    },
+    {
+      "id": 1886,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 182,
+      "code": "reports_office_reports_village_family_dental_reports_view_only"
+    },
+    {
+      "id": 1887,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 185,
+      "code": "reports_ortho_reports_access_full_control"
+    },
+    {
+      "id": 1890,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 188,
+      "code": "reports_postcards_full_control"
+    },
+    {
+      "id": 1891,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 189,
+      "code": "reports_postcards_view_only"
+    },
+    {
+      "id": 1893,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 1894,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 451,
+      "code": "reports_ortho_reports_view_only"
+    },
+    {
+      "id": 1904,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 250,
+      "code": "setup_ortho_misc_setup_full_control"
+    },
+    {
+      "id": 1905,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 251,
+      "code": "setup_ortho_misc_setup_view_only"
+    },
+    {
+      "id": 1906,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 252,
+      "code": "setup_ortho_questionnaire_full_control"
+    },
+    {
+      "id": 1907,
+      "tenant_id": 1,
+      "group_id": 13,
+      "permission_id": 253,
+      "code": "setup_ortho_questionnaire_view_only"
+    },
+    {
+      "id": 1920,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 525,
+      "code": "modified_by_dhileep_jin2829"
+    },
+    {
+      "id": 1924,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 529,
+      "code": "modified_on_1_14_2022_6_09_00_am_pt"
+    },
+    {
+      "id": 1935,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 26,
+      "code": "appointments_short_call_list"
+    },
+    {
+      "id": 1936,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 27,
+      "code": "appointments_short_notice_list"
+    },
+    {
+      "id": 1942,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 1943,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 1944,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 1945,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 1947,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 1955,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 1956,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 1961,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts"
+    },
+    {
+      "id": 1980,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 1981,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 1984,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 122,
+      "code": "reports_batch_collection_letters_full_control"
+    },
+    {
+      "id": 1985,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 123,
+      "code": "reports_batch_collection_letters_view_only"
+    },
+    {
+      "id": 1994,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 161,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_full_control"
+    },
+    {
+      "id": 1995,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only"
+    },
+    {
+      "id": 1996,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 170,
+      "code": "reports_office_reports_lumina_reports_full_control"
+    },
+    {
+      "id": 1997,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 171,
+      "code": "reports_office_reports_lumina_reports_view_only"
+    },
+    {
+      "id": 1998,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 181,
+      "code": "reports_office_reports_village_family_dental_reports_full_control"
+    },
+    {
+      "id": 1999,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 182,
+      "code": "reports_office_reports_village_family_dental_reports_view_only"
+    },
+    {
+      "id": 2000,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 185,
+      "code": "reports_ortho_reports_access_full_control"
+    },
+    {
+      "id": 2003,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 188,
+      "code": "reports_postcards_full_control"
+    },
+    {
+      "id": 2004,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 189,
+      "code": "reports_postcards_view_only"
+    },
+    {
+      "id": 2006,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 2016,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 250,
+      "code": "setup_ortho_misc_setup_full_control"
+    },
+    {
+      "id": 2017,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 251,
+      "code": "setup_ortho_misc_setup_view_only"
+    },
+    {
+      "id": 2018,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 252,
+      "code": "setup_ortho_questionnaire_full_control"
+    },
+    {
+      "id": 2019,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 253,
+      "code": "setup_ortho_questionnaire_view_only"
+    },
+    {
+      "id": 2020,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 261,
+      "code": "setup_provider_goals_screen_view_only"
+    },
+    {
+      "id": 2029,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 2030,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 2031,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 2032,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 2033,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 2034,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 2048,
+      "tenant_id": 1,
+      "group_id": 14,
+      "permission_id": 451,
+      "code": "reports_ortho_reports_view_only"
+    },
+    {
+      "id": 2084,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 26,
+      "code": "appointments_short_call_list"
+    },
+    {
+      "id": 2085,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 27,
+      "code": "appointments_short_notice_list"
+    },
+    {
+      "id": 2088,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 35,
+      "code": "denticon_mobile_access"
+    },
+    {
+      "id": 2089,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control"
+    },
+    {
+      "id": 2090,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control"
+    },
+    {
+      "id": 2091,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 60,
+      "code": "mytooth_check_the_activity_report_full_control"
+    },
+    {
+      "id": 2093,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 62,
+      "code": "patient_add_new_flash_alerts"
+    },
+    {
+      "id": 2101,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 71,
+      "code": "patient_caries_risk_assessment_full_control"
+    },
+    {
+      "id": 2102,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 72,
+      "code": "patient_caries_risk_assessment_view_only"
+    },
+    {
+      "id": 2107,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts"
+    },
+    {
+      "id": 2128,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 110,
+      "code": "patient_status_tracker_full_control"
+    },
+    {
+      "id": 2129,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 111,
+      "code": "patient_status_tracker_view_only"
+    },
+    {
+      "id": 2133,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 122,
+      "code": "reports_batch_collection_letters_full_control"
+    },
+    {
+      "id": 2134,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 123,
+      "code": "reports_batch_collection_letters_view_only"
+    },
+    {
+      "id": 2135,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 124,
+      "code": "reports_blank_insurance_form_screen_full_control"
+    },
+    {
+      "id": 2137,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 128,
+      "code": "reports_dha_reports_screen_full_control"
+    },
+    {
+      "id": 2138,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 129,
+      "code": "reports_excel_reports_full_control"
+    },
+    {
+      "id": 2159,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 159,
+      "code": "reports_office_reports_adrpts_screen_full_con"
+    },
+    {
+      "id": 2160,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 160,
+      "code": "reports_office_reports_bnrpts_screen_full_cont"
+    },
+    {
+      "id": 2161,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 161,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_full_control"
+    },
+    {
+      "id": 2162,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only"
+    },
+    {
+      "id": 2163,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 165,
+      "code": "reports_office_reports_hawaiirpts_full_control"
+    },
+    {
+      "id": 2164,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 170,
+      "code": "reports_office_reports_lumina_reports_full_control"
+    },
+    {
+      "id": 2165,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 171,
+      "code": "reports_office_reports_lumina_reports_view_only"
+    },
+    {
+      "id": 2166,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 172,
+      "code": "reports_office_reports_nedmrpts_screen_full_co"
+    },
+    {
+      "id": 2167,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 180,
+      "code": "reports_office_reports_vhrpts_screen_full_con"
+    },
+    {
+      "id": 2168,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 181,
+      "code": "reports_office_reports_village_family_dental_reports_full_control"
+    },
+    {
+      "id": 2169,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 182,
+      "code": "reports_office_reports_village_family_dental_reports_view_only"
+    },
+    {
+      "id": 2170,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 185,
+      "code": "reports_ortho_reports_access_full_control"
+    },
+    {
+      "id": 2173,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 188,
+      "code": "reports_postcards_full_control"
+    },
+    {
+      "id": 2174,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 189,
+      "code": "reports_postcards_view_only"
+    },
+    {
+      "id": 2175,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 190,
+      "code": "reports_recall_reports_screen_full_control"
+    },
+    {
+      "id": 2179,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 2198,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 250,
+      "code": "setup_ortho_misc_setup_full_control"
+    },
+    {
+      "id": 2199,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 251,
+      "code": "setup_ortho_misc_setup_view_only"
+    },
+    {
+      "id": 2200,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 252,
+      "code": "setup_ortho_questionnaire_full_control"
+    },
+    {
+      "id": 2201,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 253,
+      "code": "setup_ortho_questionnaire_view_only"
+    },
+    {
+      "id": 2202,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 261,
+      "code": "setup_provider_goals_screen_view_only"
+    },
+    {
+      "id": 2208,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 287,
+      "code": "transactions_add_post_batch_insurance_payments"
+    },
+    {
+      "id": 2209,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 290,
+      "code": "transactions_add_post_capitation_payments"
+    },
+    {
+      "id": 2236,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 2237,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 2238,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 2239,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 2240,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 2241,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 2242,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 353,
+      "code": "utilities_batch_claim_processing_screen_full_control"
+    },
+    {
+      "id": 2243,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 354,
+      "code": "utilities_batch_eligibility_full_control"
+    },
+    {
+      "id": 2246,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 372,
+      "code": "utilities_eclaims_management_screen_full_control"
+    },
+    {
+      "id": 2248,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 385,
+      "code": "utilities_replace_carriers_full_control"
+    },
+    {
+      "id": 2249,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 386,
+      "code": "utilities_replace_insurance_plans_full_control"
+    },
+    {
+      "id": 2250,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 387,
+      "code": "utilities_replace_procedure_code_full_control"
+    },
+    {
+      "id": 2254,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 409,
+      "code": "modified_on"
+    },
+    {
+      "id": 2255,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 410,
+      "code": "modified_by"
+    },
+    {
+      "id": 2259,
+      "tenant_id": 1,
+      "group_id": 15,
+      "permission_id": 451,
+      "code": "reports_ortho_reports_view_only"
+    },
+    {
+      "id": 2962,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 159,
+      "code": "reports_office_reports_adrpts_screen_full_con"
+    },
+    {
+      "id": 2963,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 160,
+      "code": "reports_office_reports_bnrpts_screen_full_cont"
+    },
+    {
+      "id": 2964,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 161,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_full_control"
+    },
+    {
+      "id": 2965,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only"
+    },
+    {
+      "id": 2966,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 163,
+      "code": "reports_office_reports_dental_care_access"
+    },
+    {
+      "id": 2967,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 164,
+      "code": "reports_office_reports_greathillsrpts_access"
+    },
+    {
+      "id": 2968,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 165,
+      "code": "reports_office_reports_hawaiirpts_full_control"
+    },
+    {
+      "id": 2969,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 166,
+      "code": "reports_office_reports_healthcare_network_access_full_control"
+    },
+    {
+      "id": 2970,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 167,
+      "code": "reports_office_reports_kane_dental_access"
+    },
+    {
+      "id": 2971,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 168,
+      "code": "reports_office_reports_kane_dental_view"
+    },
+    {
+      "id": 2972,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 169,
+      "code": "reports_office_reports_kansas_rpts_full_contro"
+    },
+    {
+      "id": 2973,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 170,
+      "code": "reports_office_reports_lumina_reports_full_control"
+    },
+    {
+      "id": 2974,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 171,
+      "code": "reports_office_reports_lumina_reports_view_only"
+    },
+    {
+      "id": 2975,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 172,
+      "code": "reports_office_reports_nedmrpts_screen_full_co"
+    },
+    {
+      "id": 2976,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 173,
+      "code": "reports_office_reports_ohc_reports_full_contro"
+    },
+    {
+      "id": 2977,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 174,
+      "code": "reports_office_reports_ottawareports_access"
+    },
+    {
+      "id": 2978,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 175,
+      "code": "reports_office_reports_premier_perio_full_cont"
+    },
+    {
+      "id": 2979,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 176,
+      "code": "reports_office_reports_sgkreports_screen_full_control"
+    },
+    {
+      "id": 2980,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 177,
+      "code": "reports_office_reports_sgkreports_screen_view_only"
+    },
+    {
+      "id": 2981,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 178,
+      "code": "reports_office_reports_tru_family_rpts_full_control"
+    },
+    {
+      "id": 2982,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 179,
+      "code": "reports_office_reports_uop_reports_full_contro"
+    },
+    {
+      "id": 2983,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 180,
+      "code": "reports_office_reports_vhrpts_screen_full_con"
+    },
+    {
+      "id": 2984,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 181,
+      "code": "reports_office_reports_village_family_dental_reports_full_control"
+    },
+    {
+      "id": 2985,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 182,
+      "code": "reports_office_reports_village_family_dental_reports_view_only"
+    },
+    {
+      "id": 2986,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 183,
+      "code": "reports_office_reports_abbeydental_full_control"
+    },
+    {
+      "id": 2987,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 184,
+      "code": "reports_office_reports_healthysmileskids_full_co"
+    },
+    {
+      "id": 2988,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 185,
+      "code": "reports_ortho_reports_access_full_control"
+    },
+    {
+      "id": 2991,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 188,
+      "code": "reports_postcards_full_control"
+    },
+    {
+      "id": 2992,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 189,
+      "code": "reports_postcards_view_only"
+    },
+    {
+      "id": 2993,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 190,
+      "code": "reports_recall_reports_screen_full_control"
+    },
+    {
+      "id": 2998,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 195,
+      "code": "reports_voice_charting_adoption_full_control"
+    },
+    {
+      "id": 2999,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 196,
+      "code": "setup_emergency_now"
+    },
+    {
+      "id": 3011,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 208,
+      "code": "setup_code_bundling_full_control"
+    },
+    {
+      "id": 3012,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 209,
+      "code": "setup_code_bundling_view_only"
+    },
+    {
+      "id": 3013,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 210,
+      "code": "setup_collection_agencies_screen_full_control"
+    },
+    {
+      "id": 3018,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 215,
+      "code": "setup_dentigram_downloads_full_control"
+    },
+    {
+      "id": 3019,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 216,
+      "code": "setup_ehr_cds_rules"
+    },
+    {
+      "id": 3134,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 331,
+      "code": "utilities_access_to_dentilytics_enterprise"
+    },
+    {
+      "id": 3136,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 333,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_management"
+    },
+    {
+      "id": 3137,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific"
+    },
+    {
+      "id": 3138,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 335,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_view_only"
+    },
+    {
+      "id": 3139,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 336,
+      "code": "utilities_automated_campaigns_appointment_campaign_management"
+    },
+    {
+      "id": 3140,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific"
+    },
+    {
+      "id": 3141,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 338,
+      "code": "utilities_automated_campaigns_appointment_campaign_view_only"
+    },
+    {
+      "id": 3142,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 339,
+      "code": "utilities_automated_campaigns_dashboard_full_control"
+    },
+    {
+      "id": 3143,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 340,
+      "code": "utilities_automated_campaigns_dashboard_view_only"
+    },
+    {
+      "id": 3144,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 341,
+      "code": "utilities_automated_campaigns_mailing_list_management"
+    },
+    {
+      "id": 3145,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific"
+    },
+    {
+      "id": 3146,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 343,
+      "code": "utilities_automated_campaigns_mailing_list_view_only"
+    },
+    {
+      "id": 3147,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 344,
+      "code": "utilities_automated_campaigns_patient_care_campaign_management"
+    },
+    {
+      "id": 3148,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific"
+    },
+    {
+      "id": 3149,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 346,
+      "code": "utilities_automated_campaigns_patient_care_campaign_view_only"
+    },
+    {
+      "id": 3150,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 347,
+      "code": "utilities_automated_campaigns_recurring_campaign_management"
+    },
+    {
+      "id": 3151,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific"
+    },
+    {
+      "id": 3152,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 349,
+      "code": "utilities_automated_campaigns_recurring_campaign_view_only"
+    },
+    {
+      "id": 3153,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 350,
+      "code": "utilities_automated_campaigns_template_management"
+    },
+    {
+      "id": 3154,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific"
+    },
+    {
+      "id": 3155,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 352,
+      "code": "utilities_automated_campaigns_template_view_only"
+    },
+    {
+      "id": 3156,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 353,
+      "code": "utilities_batch_claim_processing_screen_full_control"
+    },
+    {
+      "id": 3157,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 354,
+      "code": "utilities_batch_eligibility_full_control"
+    },
+    {
+      "id": 3163,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 360,
+      "code": "utilities_consolidate_carriers_full_control"
+    },
+    {
+      "id": 3164,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 361,
+      "code": "utilities_consolidate_carriers_view_only"
+    },
+    {
+      "id": 3168,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 365,
+      "code": "utilities_data_conversion_mapping_full_control"
+    },
+    {
+      "id": 3169,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 366,
+      "code": "utilities_denticon_download_full_control"
+    },
+    {
+      "id": 3170,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 367,
+      "code": "utilities_dentigram_download_full_control"
+    },
+    {
+      "id": 3171,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 368,
+      "code": "utilities_dhaclaims837_full_control"
+    },
+    {
+      "id": 3172,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 369,
+      "code": "utilities_direct_claims_full_control"
+    },
+    {
+      "id": 3173,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 370,
+      "code": "utilities_dldfeeschexls_download_full_control"
+    },
+    {
+      "id": 3174,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 371,
+      "code": "utilities_download837_full_control"
+    },
+    {
+      "id": 3175,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 372,
+      "code": "utilities_eclaims_management_screen_full_control"
+    },
+    {
+      "id": 3176,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 373,
+      "code": "utilities_encounter_download_full_control"
+    },
+    {
+      "id": 3177,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 374,
+      "code": "utilities_encounterdownload_full_control"
+    },
+    {
+      "id": 3178,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 375,
+      "code": "utilities_launch_mouthwatch_teledentistry"
+    },
+    {
+      "id": 3179,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 376,
+      "code": "utilities_office_specific_dca_close_out_claims_full_control"
+    },
+    {
+      "id": 3180,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 377,
+      "code": "utilities_office_dha_close_mananged_full_control"
+    },
+    {
+      "id": 3184,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 381,
+      "code": "utilities_radius_global_full_access"
+    },
+    {
+      "id": 3188,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 385,
+      "code": "utilities_replace_carriers_full_control"
+    },
+    {
+      "id": 3189,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 386,
+      "code": "utilities_replace_insurance_plans_full_control"
+    },
+    {
+      "id": 3190,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 387,
+      "code": "utilities_replace_procedure_code_full_control"
+    },
+    {
+      "id": 3191,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 388,
+      "code": "utilities_scheduled_reallocation_list"
+    },
+    {
+      "id": 3192,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 389,
+      "code": "utilities_task_manager_access"
+    },
+    {
+      "id": 3193,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 390,
+      "code": "utilities_task_manager_assign_task"
+    },
+    {
+      "id": 3194,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 391,
+      "code": "utilities_task_manager_change_action_of_task"
+    },
+    {
+      "id": 3195,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 392,
+      "code": "utilities_task_manager_create_task"
+    },
+    {
+      "id": 3196,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 393,
+      "code": "utilities_task_manager_delete_task"
+    },
+    {
+      "id": 3197,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 394,
+      "code": "utilities_task_manager_supervisor_user"
+    },
+    {
+      "id": 3200,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 397,
+      "code": "utilities_tickler_full_control"
+    },
+    {
+      "id": 3201,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 398,
+      "code": "utilities_time_clock_editor_full_control"
+    },
+    {
+      "id": 3202,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 399,
+      "code": "utilities_time_clock_full_control"
+    },
+    {
+      "id": 3203,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 400,
+      "code": "utilities_transworld_full_access"
+    },
+    {
+      "id": 3206,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 403,
+      "code": "utilities_ehr_ehrreport_fullcontrol"
+    },
+    {
+      "id": 3207,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 404,
+      "code": "utilities_office_specific_dha_statementxmldld_full"
+    },
+    {
+      "id": 3208,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 405,
+      "code": "utilities_office_specific_mid_atlantic_batchaddflashalerts_full"
+    },
+    {
+      "id": 3209,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 406,
+      "code": "utilities_office_specific_mid_atlantic_batchaddflashalerts_view"
+    },
+    {
+      "id": 3210,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 407,
+      "code": "utilities_office_specific_mid_atlantic_batchdeactivateflashalerts_full"
+    },
+    {
+      "id": 3211,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 408,
+      "code": "utilities_office_specific_mid_atlantic_batchdeactivateflashalerts_view"
+    },
+    {
+      "id": 3212,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 409,
+      "code": "modified_on"
+    },
+    {
+      "id": 3213,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 410,
+      "code": "modified_by"
+    },
+    {
+      "id": 3229,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 426,
+      "code": "reports_blank_insurance_form_screen_view_only"
+    },
+    {
+      "id": 3231,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 428,
+      "code": "reports_custom_postcard_screen_view_only"
+    },
+    {
+      "id": 3233,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 430,
+      "code": "reports_dha_reports_screen_view_only"
+    },
+    {
+      "id": 3234,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 431,
+      "code": "reports_excel_reports_view_only"
+    },
+    {
+      "id": 3238,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 435,
+      "code": "reports_labels_screen_view_only"
+    },
+    {
+      "id": 3249,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 446,
+      "code": "reports_office_reports_adrpts_screen_view_only"
+    },
+    {
+      "id": 3250,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 447,
+      "code": "reports_office_reports_bnrpts_screen_view_only"
+    },
+    {
+      "id": 3251,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 448,
+      "code": "reports_office_reports_hawaiirpts_view_only"
+    },
+    {
+      "id": 3252,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 449,
+      "code": "reports_office_reports_nedmrpts_screen_view_on"
+    },
+    {
+      "id": 3253,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 450,
+      "code": "reports_office_reports_vhrpts_screen_view_only"
+    },
+    {
+      "id": 3254,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 451,
+      "code": "reports_ortho_reports_view_only"
+    },
+    {
+      "id": 3255,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 452,
+      "code": "reports_recall_reports_screen_view_only"
+    },
+    {
+      "id": 3262,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 459,
+      "code": "setup_collection_agencies_screen_view_only"
+    },
+    {
+      "id": 3264,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 461,
+      "code": "setup_dentigram_downloads_view_only"
+    },
+    {
+      "id": 3276,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 473,
+      "code": "setup_misc_screen_view_only"
+    },
+    {
+      "id": 3287,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 484,
+      "code": "setup_reset_benefits_view_only"
+    },
+    {
+      "id": 3293,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 490,
+      "code": "transactions_batch_insurance_payments_view_only"
+    },
+    {
+      "id": 3301,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 498,
+      "code": "utilities_batch_claim_processing_screen_view_only"
+    },
+    {
+      "id": 3302,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 499,
+      "code": "utilities_batch_eligibility_view_only"
+    },
+    {
+      "id": 3304,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 501,
+      "code": "utilities_denticon_download_view_only"
+    },
+    {
+      "id": 3305,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 502,
+      "code": "utilities_dentigram_download_view_only"
+    },
+    {
+      "id": 3306,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 503,
+      "code": "utilities_dhaclaims837_view_only"
+    },
+    {
+      "id": 3307,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 504,
+      "code": "utilities_direct_claims_view_only"
+    },
+    {
+      "id": 3308,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 505,
+      "code": "utilities_dldfeeschexls_download_view_only"
+    },
+    {
+      "id": 3309,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 506,
+      "code": "utilities_download837_view_only"
+    },
+    {
+      "id": 3310,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 507,
+      "code": "utilities_encounter_download_view_only"
+    },
+    {
+      "id": 3311,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 508,
+      "code": "utilities_encounterdownload_view_only"
+    },
+    {
+      "id": 3312,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 509,
+      "code": "utilities_office_dha_close_mananged_view_only"
+    },
+    {
+      "id": 3315,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 512,
+      "code": "utilities_replace_carriers_view_only"
+    },
+    {
+      "id": 3316,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 513,
+      "code": "utilities_replace_insurance_plans_view_only"
+    },
+    {
+      "id": 3317,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 514,
+      "code": "utilities_replace_procedure_code_view_only"
+    },
+    {
+      "id": 3318,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 515,
+      "code": "utilities_tickler_view_only_control"
+    },
+    {
+      "id": 3319,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 516,
+      "code": "utilities_time_clock_editor_view_only"
+    },
+    {
+      "id": 3320,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 517,
+      "code": "utilities_time_clock_view_only"
+    },
+    {
+      "id": 3321,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 518,
+      "code": "utilities_office_specific_dha_statementxmldld_view"
+    },
+    {
+      "id": 3322,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 519,
+      "code": "modified_on_3_13_2025_10_05_00_am_pt"
+    },
+    {
+      "id": 3323,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 520,
+      "code": "modified_by_elizabethh"
+    },
+    {
+      "id": 3324,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 521,
+      "code": "patient_reallocate_view_only"
+    },
+    {
+      "id": 3325,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 522,
+      "code": "modified_on_9_23_2025_6_30_00_am_pt"
+    },
+    {
+      "id": 3326,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 523,
+      "code": "modified_on_4_3_2025_10_34_00_am_pt"
+    },
+    {
+      "id": 3327,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 524,
+      "code": "modified_on_6_3_2026_11_09_00_am_pt"
+    },
+    {
+      "id": 3328,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 525,
+      "code": "modified_by_dhileep_jin2829"
+    },
+    {
+      "id": 3329,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 526,
+      "code": "modified_on_3_18_2026_7_05_00_am_pt"
+    },
+    {
+      "id": 3330,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 527,
+      "code": "modified_on_9_23_2025_6_43_00_am_pt"
+    },
+    {
+      "id": 3331,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 528,
+      "code": "modified_on_6_17_2016_6_40_00_pm_pt"
+    },
+    {
+      "id": 3332,
+      "tenant_id": 1,
+      "group_id": 7,
+      "permission_id": 529,
+      "code": "modified_on_1_14_2022_6_09_00_am_pt"
+    }
+  ],
+  "removed_permission_rows": [
+    {
+      "id": 26,
+      "code": "appointments_short_call_list",
+      "label": "Appointments - Short call list",
+      "category": "Appointments",
+      "is_active": true
+    },
+    {
+      "id": 27,
+      "code": "appointments_short_notice_list",
+      "label": "Appointments - Short notice list",
+      "category": "Appointments",
+      "is_active": true
+    },
+    {
+      "id": 33,
+      "code": "athenanet_search_athenanet_patients",
+      "label": "AthenaNet - Search AthenaNet Patients",
+      "category": "AthenaNet",
+      "is_active": true
+    },
+    {
+      "id": 34,
+      "code": "charting_ai_assist_screen_full_control",
+      "label": "Charting - AI Assist Screen Full Control",
+      "category": "Charting",
+      "is_active": true
+    },
+    {
+      "id": 35,
+      "code": "denticon_mobile_access",
+      "label": "Denticon Mobile Access",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 36,
+      "code": "denticon_practice_analytics_collection_analysis_full_control",
+      "label": "Denticon Practice Analytics - Collection Analysis Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 37,
+      "code": "denticon_practice_analytics_executive_dashboard_full_control",
+      "label": "Denticon Practice Analytics - Executive Dashboard Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 38,
+      "code": "denticon_practice_analytics_front_office_full_control",
+      "label": "Denticon Practice Analytics - Front Office Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 39,
+      "code": "denticon_practice_analytics_hygiene_recall_full_control",
+      "label": "Denticon Practice Analytics - Hygiene Recall Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 40,
+      "code": "denticon_practice_analytics_morning_huddle_full_control",
+      "label": "Denticon Practice Analytics - Morning Huddle Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 41,
+      "code": "denticon_practice_analytics_patient_visit_analysis_full_control",
+      "label": "Denticon Practice Analytics - Patient Visit Analysis Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 42,
+      "code": "denticon_practice_analytics_production_analysis_full_control",
+      "label": "Denticon Practice Analytics - Production Analysis Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 43,
+      "code": "denticon_practice_analytics_provider_breakdown_full_control",
+      "label": "Denticon Practice Analytics - Provider Breakdown Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 44,
+      "code": "denticon_practice_analytics_referral_analytics_full_control",
+      "label": "Denticon Practice Analytics - Referral Analytics Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 45,
+      "code": "denticon_practice_analytics_treatment_plan_analysis_full_control",
+      "label": "Denticon Practice Analytics - Treatment Plan Analysis Full Control",
+      "category": "Denticon Practice Analytics",
+      "is_active": true
+    },
+    {
+      "id": 46,
+      "code": "ehr_user_can_edit_instructions_and_bibliography_information",
+      "label": "EHR - User can edit instructions and bibliography information",
+      "category": "EHR",
+      "is_active": true
+    },
+    {
+      "id": 47,
+      "code": "ehr_user_can_see_and_access_the_infobutton",
+      "label": "EHR - User can see and access the Infobutton",
+      "category": "EHR",
+      "is_active": true
+    },
+    {
+      "id": 48,
+      "code": "ehr_user_will_see_cds_interventions_based_on_allergies",
+      "label": "EHR - User will see CDS interventions based on Allergies",
+      "category": "EHR",
+      "is_active": true
+    },
+    {
+      "id": 49,
+      "code": "ehr_user_will_see_cds_interventions_based_on_demographic_information",
+      "label": "EHR - User will see CDS interventions based on Demographic information",
+      "category": "EHR",
+      "is_active": true
+    },
+    {
+      "id": 50,
+      "code": "ehr_user_will_see_cds_interventions_based_on_lab_results",
+      "label": "EHR - User will see CDS interventions based on Lab Results",
+      "category": "EHR",
+      "is_active": true
+    },
+    {
+      "id": 51,
+      "code": "ehr_user_will_see_cds_interventions_based_on_medications",
+      "label": "EHR - User will see CDS interventions based on Medications",
+      "category": "EHR",
+      "is_active": true
+    },
+    {
+      "id": 52,
+      "code": "ehr_user_will_see_cds_interventions_based_on_problems",
+      "label": "EHR - User will see CDS interventions based on Problems",
+      "category": "EHR",
+      "is_active": true
+    },
+    {
+      "id": 53,
+      "code": "ehr_user_will_see_cds_interventions_based_on_vital_signs",
+      "label": "EHR - User will see CDS interventions based on Vital Signs",
+      "category": "EHR",
+      "is_active": true
+    },
+    {
+      "id": 54,
+      "code": "ehr_user_will_see_cds_interventions_for_allowed_categories",
+      "label": "EHR - User will see CDS interventions for allowed categories",
+      "category": "EHR",
+      "is_active": true
+    },
+    {
+      "id": 55,
+      "code": "help_access_invoices",
+      "label": "Help - Access Invoices",
+      "category": "Help",
+      "is_active": true
+    },
+    {
+      "id": 57,
+      "code": "helpandsupport_api_access_full_control",
+      "label": "HelpAndSupport - API Access Full Control",
+      "category": "HelpAndSupport",
+      "is_active": true
+    },
+    {
+      "id": 58,
+      "code": "mytooth_assign_forms_packets_from_scheduler_full_control",
+      "label": "MyTooth \u2013 Assign Forms/Packets from Scheduler Full Control",
+      "category": "MyTooth",
+      "is_active": true
+    },
+    {
+      "id": 59,
+      "code": "mytooth_assign_forms_packets_from_twc_or_messaging_hub_full_control",
+      "label": "MyTooth \u2013 Assign Forms/Packets from TWC or Messaging Hub Full Control",
+      "category": "MyTooth",
+      "is_active": true
+    },
+    {
+      "id": 60,
+      "code": "mytooth_check_the_activity_report_full_control",
+      "label": "MyTooth \u2013 Check the Activity Report Full Control",
+      "category": "MyTooth",
+      "is_active": true
+    },
+    {
+      "id": 62,
+      "code": "patient_add_new_flash_alerts",
+      "label": "Patient - Add New Flash Alerts",
+      "category": "Patient",
+      "is_active": true
+    },
+    {
+      "id": 71,
+      "code": "patient_caries_risk_assessment_full_control",
+      "label": "Patient - Caries Risk Assessment Full Control",
+      "category": "Patient",
+      "is_active": true
+    },
+    {
+      "id": 72,
+      "code": "patient_caries_risk_assessment_view_only",
+      "label": "Patient - Caries Risk Assessment View Only",
+      "category": "Patient",
+      "is_active": true
+    },
+    {
+      "id": 81,
+      "code": "patient_edit_or_deactivate_existing_flash_alerts",
+      "label": "Patient - Edit Or Deactivate Existing Flash Alerts",
+      "category": "Patient",
+      "is_active": true
+    },
+    {
+      "id": 103,
+      "code": "patient_reallocate_screen_full_control",
+      "label": "Patient - Reallocate Screen Full Control",
+      "category": "Patient",
+      "is_active": true
+    },
+    {
+      "id": 110,
+      "code": "patient_status_tracker_full_control",
+      "label": "Patient - Status Tracker Full Control",
+      "category": "Patient",
+      "is_active": true
+    },
+    {
+      "id": 111,
+      "code": "patient_status_tracker_view_only",
+      "label": "Patient - Status Tracker View Only",
+      "category": "Patient",
+      "is_active": true
+    },
+    {
+      "id": 117,
+      "code": "report_batch_schedule_report_add_schedule",
+      "label": "Report - Batch Schedule Report - Add Schedule",
+      "category": "Report",
+      "is_active": true
+    },
+    {
+      "id": 118,
+      "code": "report_batch_schedule_report_delete_schedule",
+      "label": "Report - Batch Schedule Report - Delete Schedule",
+      "category": "Report",
+      "is_active": true
+    },
+    {
+      "id": 119,
+      "code": "report_batch_schedule_report_access_full_control",
+      "label": "Report - Batch Schedule Report Access Full Control",
+      "category": "Report",
+      "is_active": true
+    },
+    {
+      "id": 120,
+      "code": "report_batch_schedule_report_view_only",
+      "label": "Report - Batch Schedule Report View Only",
+      "category": "Report",
+      "is_active": true
+    },
+    {
+      "id": 122,
+      "code": "reports_batch_collection_letters_full_control",
+      "label": "Reports - Batch Collection Letters Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 123,
+      "code": "reports_batch_collection_letters_view_only",
+      "label": "Reports - Batch Collection Letters View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 124,
+      "code": "reports_blank_insurance_form_screen_full_control",
+      "label": "Reports - Blank Insurance Form Screen Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 126,
+      "code": "reports_custom_postcard_full_control",
+      "label": "Reports - Custom Postcard Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 128,
+      "code": "reports_dha_reports_screen_full_control",
+      "label": "Reports - DHA Reports Screen Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 129,
+      "code": "reports_excel_reports_full_control",
+      "label": "Reports - Excel Reports Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 142,
+      "code": "reports_labels_screen_full_control",
+      "label": "Reports - Labels Screen Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 159,
+      "code": "reports_office_reports_adrpts_screen_full_con",
+      "label": "Reports - Office Reports - ADRpts Screen Full Con",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 160,
+      "code": "reports_office_reports_bnrpts_screen_full_cont",
+      "label": "Reports - Office Reports - BNRpts Screen Full Cont",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 161,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_full_control",
+      "label": "Reports - Office Reports - CHI St. Joseph Children's Health Reports Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 162,
+      "code": "reports_office_reports_chi_st_joseph_children_s_health_reports_view_only",
+      "label": "Reports - Office Reports - CHI St. Joseph Children's Health Reports View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 163,
+      "code": "reports_office_reports_dental_care_access",
+      "label": "Reports - Office Reports - Dental Care Access",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 164,
+      "code": "reports_office_reports_greathillsrpts_access",
+      "label": "Reports - Office Reports - GreatHillsRpts Access",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 165,
+      "code": "reports_office_reports_hawaiirpts_full_control",
+      "label": "Reports - Office Reports - HawaiiRpts Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 166,
+      "code": "reports_office_reports_healthcare_network_access_full_control",
+      "label": "Reports - Office Reports - Healthcare Network Access Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 167,
+      "code": "reports_office_reports_kane_dental_access",
+      "label": "Reports - Office Reports - Kane Dental Access",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 168,
+      "code": "reports_office_reports_kane_dental_view",
+      "label": "Reports - Office Reports - Kane Dental View",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 169,
+      "code": "reports_office_reports_kansas_rpts_full_contro",
+      "label": "Reports - Office Reports - Kansas Rpts Full Contro",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 170,
+      "code": "reports_office_reports_lumina_reports_full_control",
+      "label": "Reports - Office Reports - Lumina Reports Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 171,
+      "code": "reports_office_reports_lumina_reports_view_only",
+      "label": "Reports - Office Reports - Lumina Reports View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 172,
+      "code": "reports_office_reports_nedmrpts_screen_full_co",
+      "label": "Reports - Office Reports - NEDMRpts Screen Full Co",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 173,
+      "code": "reports_office_reports_ohc_reports_full_contro",
+      "label": "Reports - Office Reports - OHC Reports Full Contro",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 174,
+      "code": "reports_office_reports_ottawareports_access",
+      "label": "Reports - Office Reports - OttawaReports Access",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 175,
+      "code": "reports_office_reports_premier_perio_full_cont",
+      "label": "Reports - Office Reports - Premier Perio Full Cont",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 176,
+      "code": "reports_office_reports_sgkreports_screen_full_control",
+      "label": "Reports - Office Reports - SGKReports Screen Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 177,
+      "code": "reports_office_reports_sgkreports_screen_view_only",
+      "label": "Reports - Office Reports - SGKReports Screen View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 178,
+      "code": "reports_office_reports_tru_family_rpts_full_control",
+      "label": "Reports - Office Reports - Tru Family Rpts Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 179,
+      "code": "reports_office_reports_uop_reports_full_contro",
+      "label": "Reports - Office Reports - UOP Reports Full Contro",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 180,
+      "code": "reports_office_reports_vhrpts_screen_full_con",
+      "label": "Reports - Office Reports - VHRpts Screen Full Con",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 181,
+      "code": "reports_office_reports_village_family_dental_reports_full_control",
+      "label": "Reports - Office Reports - Village Family Dental Reports Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 182,
+      "code": "reports_office_reports_village_family_dental_reports_view_only",
+      "label": "Reports - Office Reports - Village Family Dental Reports View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 183,
+      "code": "reports_office_reports_abbeydental_full_control",
+      "label": "Reports - Office Reports-AbbeyDental Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 184,
+      "code": "reports_office_reports_healthysmileskids_full_co",
+      "label": "Reports - Office Reports-HealthySmilesKids Full Co",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 185,
+      "code": "reports_ortho_reports_access_full_control",
+      "label": "Reports - Ortho Reports Access Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 188,
+      "code": "reports_postcards_full_control",
+      "label": "Reports - Postcards Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 189,
+      "code": "reports_postcards_view_only",
+      "label": "Reports - Postcards View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 190,
+      "code": "reports_recall_reports_screen_full_control",
+      "label": "Reports - Recall Reports Screen Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 195,
+      "code": "reports_voice_charting_adoption_full_control",
+      "label": "Reports - Voice Charting Adoption Full Control",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 196,
+      "code": "setup_emergency_now",
+      "label": "Setup - > Emergency Now",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 208,
+      "code": "setup_code_bundling_full_control",
+      "label": "Setup - Code Bundling - Full Control",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 209,
+      "code": "setup_code_bundling_view_only",
+      "label": "Setup - Code Bundling - View Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 210,
+      "code": "setup_collection_agencies_screen_full_control",
+      "label": "Setup - Collection Agencies Screen Full Control",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 215,
+      "code": "setup_dentigram_downloads_full_control",
+      "label": "Setup - Dentigram Downloads Full Control",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 216,
+      "code": "setup_ehr_cds_rules",
+      "label": "Setup - EHR - CDS Rules",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 243,
+      "code": "setup_misc_screen_full_control",
+      "label": "Setup - Misc. Screen Full Control",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 250,
+      "code": "setup_ortho_misc_setup_full_control",
+      "label": "Setup - Ortho Misc Setup Full Control",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 251,
+      "code": "setup_ortho_misc_setup_view_only",
+      "label": "Setup - Ortho Misc Setup View Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 252,
+      "code": "setup_ortho_questionnaire_full_control",
+      "label": "Setup - Ortho Questionnaire Full Control",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 253,
+      "code": "setup_ortho_questionnaire_view_only",
+      "label": "Setup - Ortho Questionnaire View Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 260,
+      "code": "setup_provider_goals_screen_full_control",
+      "label": "Setup - Provider Goals Screen Full Control",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 261,
+      "code": "setup_provider_goals_screen_view_only",
+      "label": "Setup - Provider Goals Screen View Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 267,
+      "code": "setup_reset_benefits_for_all_offices_in_pgid",
+      "label": "Setup - Reset Benefits for All Offices in PGID",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 268,
+      "code": "setup_reset_benefits_for_current_office_only",
+      "label": "Setup - Reset Benefits for Current Office Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 276,
+      "code": "setup_security_multi_pgid_users_screen_full_control",
+      "label": "Setup - Security Multi PGID Users Screen Full Control",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 279,
+      "code": "setup_sso_users_setup_screen_full_control",
+      "label": "Setup - SSO Users Setup Screen Full Control",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 280,
+      "code": "setup_sso_users_setup_screen_view_only",
+      "label": "Setup - SSO Users Setup Screen View Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 283,
+      "code": "transaction_batch_insurance_payment_dentical_full_control",
+      "label": "Transaction - Batch Insurance Payment Dentical Full Control",
+      "category": "Transaction",
+      "is_active": true
+    },
+    {
+      "id": 287,
+      "code": "transactions_add_post_batch_insurance_payments",
+      "label": "Transactions - Add/Post Batch Insurance Payments",
+      "category": "Transactions",
+      "is_active": true
+    },
+    {
+      "id": 288,
+      "code": "transactions_add_post_batch_insurance_payments_835",
+      "label": "Transactions - Add/Post Batch Insurance Payments 835",
+      "category": "Transactions",
+      "is_active": true
+    },
+    {
+      "id": 290,
+      "code": "transactions_add_post_capitation_payments",
+      "label": "Transactions - Add/Post Capitation Payments",
+      "category": "Transactions",
+      "is_active": true
+    },
+    {
+      "id": 294,
+      "code": "transactions_batch_insurance_payments_835_view_only",
+      "label": "Transactions - Batch Insurance Payments 835 View Only",
+      "category": "Transactions",
+      "is_active": true
+    },
+    {
+      "id": 329,
+      "code": "utilities_835_hub_full_control",
+      "label": "Utilities - 835 Hub - Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 330,
+      "code": "utilities_835_hub_view_only",
+      "label": "Utilities - 835 Hub - View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 331,
+      "code": "utilities_access_to_dentilytics_enterprise",
+      "label": "Utilities - Access to Dentilytics Enterprise",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 333,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_management",
+      "label": "Utilities - Automated Campaigns Ad-hoc Campaign Management",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 334,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_user_specific",
+      "label": "Utilities - Automated Campaigns Ad-hoc Campaign User Specific",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 335,
+      "code": "utilities_automated_campaigns_ad_hoc_campaign_view_only",
+      "label": "Utilities - Automated Campaigns Ad-hoc Campaign View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 336,
+      "code": "utilities_automated_campaigns_appointment_campaign_management",
+      "label": "Utilities - Automated Campaigns Appointment Campaign Management",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 337,
+      "code": "utilities_automated_campaigns_appointment_campaign_user_specific",
+      "label": "Utilities - Automated Campaigns Appointment Campaign User Specific",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 338,
+      "code": "utilities_automated_campaigns_appointment_campaign_view_only",
+      "label": "Utilities - Automated Campaigns Appointment Campaign View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 339,
+      "code": "utilities_automated_campaigns_dashboard_full_control",
+      "label": "Utilities - Automated Campaigns Dashboard Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 340,
+      "code": "utilities_automated_campaigns_dashboard_view_only",
+      "label": "Utilities - Automated Campaigns Dashboard View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 341,
+      "code": "utilities_automated_campaigns_mailing_list_management",
+      "label": "Utilities - Automated Campaigns Mailing List Management",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 342,
+      "code": "utilities_automated_campaigns_mailing_list_user_specific",
+      "label": "Utilities - Automated Campaigns Mailing List User Specific",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 343,
+      "code": "utilities_automated_campaigns_mailing_list_view_only",
+      "label": "Utilities - Automated Campaigns Mailing List View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 344,
+      "code": "utilities_automated_campaigns_patient_care_campaign_management",
+      "label": "Utilities - Automated Campaigns Patient Care Campaign Management",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 345,
+      "code": "utilities_automated_campaigns_patient_care_campaign_user_specific",
+      "label": "Utilities - Automated Campaigns Patient Care Campaign User Specific",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 346,
+      "code": "utilities_automated_campaigns_patient_care_campaign_view_only",
+      "label": "Utilities - Automated Campaigns Patient Care Campaign View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 347,
+      "code": "utilities_automated_campaigns_recurring_campaign_management",
+      "label": "Utilities - Automated Campaigns Recurring Campaign Management",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 348,
+      "code": "utilities_automated_campaigns_recurring_campaign_user_specific",
+      "label": "Utilities - Automated Campaigns Recurring Campaign User Specific",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 349,
+      "code": "utilities_automated_campaigns_recurring_campaign_view_only",
+      "label": "Utilities - Automated Campaigns Recurring Campaign View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 350,
+      "code": "utilities_automated_campaigns_template_management",
+      "label": "Utilities - Automated Campaigns Template Management",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 351,
+      "code": "utilities_automated_campaigns_template_user_specific",
+      "label": "Utilities - Automated Campaigns Template User Specific",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 352,
+      "code": "utilities_automated_campaigns_template_view_only",
+      "label": "Utilities - Automated Campaigns Template View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 353,
+      "code": "utilities_batch_claim_processing_screen_full_control",
+      "label": "Utilities - Batch Claim Processing Screen Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 354,
+      "code": "utilities_batch_eligibility_full_control",
+      "label": "Utilities - Batch Eligibility Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 360,
+      "code": "utilities_consolidate_carriers_full_control",
+      "label": "Utilities - Consolidate Carriers Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 361,
+      "code": "utilities_consolidate_carriers_view_only",
+      "label": "Utilities - Consolidate Carriers View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 365,
+      "code": "utilities_data_conversion_mapping_full_control",
+      "label": "Utilities - Data Conversion Mapping - Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 366,
+      "code": "utilities_denticon_download_full_control",
+      "label": "Utilities - Denticon Download Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 367,
+      "code": "utilities_dentigram_download_full_control",
+      "label": "Utilities - Dentigram Download Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 368,
+      "code": "utilities_dhaclaims837_full_control",
+      "label": "Utilities - DHAClaims837- Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 369,
+      "code": "utilities_direct_claims_full_control",
+      "label": "Utilities - Direct Claims Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 370,
+      "code": "utilities_dldfeeschexls_download_full_control",
+      "label": "Utilities - DldFeeScheXls Download Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 371,
+      "code": "utilities_download837_full_control",
+      "label": "Utilities - Download837 - Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 372,
+      "code": "utilities_eclaims_management_screen_full_control",
+      "label": "Utilities - Eclaims Management Screen Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 373,
+      "code": "utilities_encounter_download_full_control",
+      "label": "Utilities - Encounter Download Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 374,
+      "code": "utilities_encounterdownload_full_control",
+      "label": "Utilities - EncounterDownload - Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 375,
+      "code": "utilities_launch_mouthwatch_teledentistry",
+      "label": "Utilities - Launch Mouthwatch (Teledentistry)",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 376,
+      "code": "utilities_office_specific_dca_close_out_claims_full_control",
+      "label": "Utilities - Office Specific - DCA - Close Out Claims Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 377,
+      "code": "utilities_office_dha_close_mananged_full_control",
+      "label": "Utilities - Office-DHA-Close Mananged Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 381,
+      "code": "utilities_radius_global_full_access",
+      "label": "Utilities - Radius Global Full Access",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 385,
+      "code": "utilities_replace_carriers_full_control",
+      "label": "Utilities - Replace Carriers Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 386,
+      "code": "utilities_replace_insurance_plans_full_control",
+      "label": "Utilities - Replace Insurance Plans Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 387,
+      "code": "utilities_replace_procedure_code_full_control",
+      "label": "Utilities - Replace Procedure Code Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 388,
+      "code": "utilities_scheduled_reallocation_list",
+      "label": "Utilities - Scheduled Reallocation List",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 389,
+      "code": "utilities_task_manager_access",
+      "label": "Utilities - Task Manager - Access",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 390,
+      "code": "utilities_task_manager_assign_task",
+      "label": "Utilities - Task Manager - Assign Task",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 391,
+      "code": "utilities_task_manager_change_action_of_task",
+      "label": "Utilities - Task Manager - Change Action of Task",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 392,
+      "code": "utilities_task_manager_create_task",
+      "label": "Utilities - Task Manager - Create Task",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 393,
+      "code": "utilities_task_manager_delete_task",
+      "label": "Utilities - Task Manager - Delete Task",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 394,
+      "code": "utilities_task_manager_supervisor_user",
+      "label": "Utilities - Task Manager - Supervisor User",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 397,
+      "code": "utilities_tickler_full_control",
+      "label": "Utilities - Tickler Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 398,
+      "code": "utilities_time_clock_editor_full_control",
+      "label": "Utilities - Time Clock Editor Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 399,
+      "code": "utilities_time_clock_full_control",
+      "label": "Utilities - Time Clock Full Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 400,
+      "code": "utilities_transworld_full_access",
+      "label": "Utilities - Transworld Full Access",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 403,
+      "code": "utilities_ehr_ehrreport_fullcontrol",
+      "label": "Utilities->EHR-EHRReport-FullControl",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 404,
+      "code": "utilities_office_specific_dha_statementxmldld_full",
+      "label": "Utilities-Office Specific-DHA-StatementXMLDld Full",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 405,
+      "code": "utilities_office_specific_mid_atlantic_batchaddflashalerts_full",
+      "label": "Utilities-Office Specific-Mid Atlantic-BatchAddFlashAlerts Full",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 406,
+      "code": "utilities_office_specific_mid_atlantic_batchaddflashalerts_view",
+      "label": "Utilities-Office Specific-Mid Atlantic-BatchAddFlashAlerts View",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 407,
+      "code": "utilities_office_specific_mid_atlantic_batchdeactivateflashalerts_full",
+      "label": "Utilities-Office Specific-Mid Atlantic-BatchDeactivateFlashAlerts Full",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 408,
+      "code": "utilities_office_specific_mid_atlantic_batchdeactivateflashalerts_view",
+      "label": "Utilities-Office Specific-Mid Atlantic-BatchDeactivateFlashAlerts View",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 409,
+      "code": "modified_on",
+      "label": "Modified On:",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 410,
+      "code": "modified_by",
+      "label": "Modified By:",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 426,
+      "code": "reports_blank_insurance_form_screen_view_only",
+      "label": "Reports - Blank Insurance Form Screen View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 428,
+      "code": "reports_custom_postcard_screen_view_only",
+      "label": "Reports - Custom Postcard Screen View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 430,
+      "code": "reports_dha_reports_screen_view_only",
+      "label": "Reports - DHA Reports Screen View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 431,
+      "code": "reports_excel_reports_view_only",
+      "label": "Reports - Excel Reports View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 435,
+      "code": "reports_labels_screen_view_only",
+      "label": "Reports - Labels Screen View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 446,
+      "code": "reports_office_reports_adrpts_screen_view_only",
+      "label": "Reports - Office Reports - ADRpts Screen View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 447,
+      "code": "reports_office_reports_bnrpts_screen_view_only",
+      "label": "Reports - Office Reports - BNRpts Screen View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 448,
+      "code": "reports_office_reports_hawaiirpts_view_only",
+      "label": "Reports - Office Reports - HawaiiRpts View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 449,
+      "code": "reports_office_reports_nedmrpts_screen_view_on",
+      "label": "Reports - Office Reports - NEDMRpts Screen View On",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 450,
+      "code": "reports_office_reports_vhrpts_screen_view_only",
+      "label": "Reports - Office Reports - VHRpts Screen View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 451,
+      "code": "reports_ortho_reports_view_only",
+      "label": "Reports - Ortho Reports View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 452,
+      "code": "reports_recall_reports_screen_view_only",
+      "label": "Reports - Recall Reports Screen View Only",
+      "category": "Reports",
+      "is_active": true
+    },
+    {
+      "id": 459,
+      "code": "setup_collection_agencies_screen_view_only",
+      "label": "Setup - Collection Agencies Screen View Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 461,
+      "code": "setup_dentigram_downloads_view_only",
+      "label": "Setup - Dentigram Downloads View Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 473,
+      "code": "setup_misc_screen_view_only",
+      "label": "Setup - Misc. Screen View Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 484,
+      "code": "setup_reset_benefits_view_only",
+      "label": "Setup - Reset Benefits View Only",
+      "category": "Setup",
+      "is_active": true
+    },
+    {
+      "id": 490,
+      "code": "transactions_batch_insurance_payments_view_only",
+      "label": "Transactions - Batch Insurance Payments View Only",
+      "category": "Transactions",
+      "is_active": true
+    },
+    {
+      "id": 498,
+      "code": "utilities_batch_claim_processing_screen_view_only",
+      "label": "Utilities - Batch Claim Processing Screen View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 499,
+      "code": "utilities_batch_eligibility_view_only",
+      "label": "Utilities - Batch Eligibility View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 501,
+      "code": "utilities_denticon_download_view_only",
+      "label": "Utilities - Denticon Download View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 502,
+      "code": "utilities_dentigram_download_view_only",
+      "label": "Utilities - Dentigram Download View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 503,
+      "code": "utilities_dhaclaims837_view_only",
+      "label": "Utilities - DHAClaims837- View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 504,
+      "code": "utilities_direct_claims_view_only",
+      "label": "Utilities - Direct Claims View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 505,
+      "code": "utilities_dldfeeschexls_download_view_only",
+      "label": "Utilities - DldFeeScheXls Download View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 506,
+      "code": "utilities_download837_view_only",
+      "label": "Utilities - Download837 - View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 507,
+      "code": "utilities_encounter_download_view_only",
+      "label": "Utilities - Encounter Download View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 508,
+      "code": "utilities_encounterdownload_view_only",
+      "label": "Utilities - EncounterDownload - View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 509,
+      "code": "utilities_office_dha_close_mananged_view_only",
+      "label": "Utilities - Office-DHA-Close Mananged View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 512,
+      "code": "utilities_replace_carriers_view_only",
+      "label": "Utilities - Replace Carriers View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 513,
+      "code": "utilities_replace_insurance_plans_view_only",
+      "label": "Utilities - Replace Insurance Plans View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 514,
+      "code": "utilities_replace_procedure_code_view_only",
+      "label": "Utilities - Replace Procedure Code View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 515,
+      "code": "utilities_tickler_view_only_control",
+      "label": "Utilities - Tickler View Only Control",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 516,
+      "code": "utilities_time_clock_editor_view_only",
+      "label": "Utilities - Time Clock Editor View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 517,
+      "code": "utilities_time_clock_view_only",
+      "label": "Utilities - Time Clock View Only",
+      "category": "Utilities",
+      "is_active": true
+    },
+    {
+      "id": 518,
+      "code": "utilities_office_specific_dha_statementxmldld_view",
+      "label": "Utilities-Office Specific-DHA-StatementXMLDld View",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 519,
+      "code": "modified_on_3_13_2025_10_05_00_am_pt",
+      "label": "Modified On: 3/13/2025 10:05:00 AM PT",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 520,
+      "code": "modified_by_elizabethh",
+      "label": "Modified By: ELIZABETHH",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 521,
+      "code": "patient_reallocate_view_only",
+      "label": "Patient - Reallocate View Only",
+      "category": "Patient",
+      "is_active": true
+    },
+    {
+      "id": 522,
+      "code": "modified_on_9_23_2025_6_30_00_am_pt",
+      "label": "Modified On: 9/23/2025 6:30:00 AM PT",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 523,
+      "code": "modified_on_4_3_2025_10_34_00_am_pt",
+      "label": "Modified On: 4/3/2025 10:34:00 AM PT",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 524,
+      "code": "modified_on_6_3_2026_11_09_00_am_pt",
+      "label": "Modified On: 6/3/2026 11:09:00 AM PT",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 525,
+      "code": "modified_by_dhileep_jin2829",
+      "label": "Modified By: DHILEEP.JIN2829",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 526,
+      "code": "modified_on_3_18_2026_7_05_00_am_pt",
+      "label": "Modified On: 3/18/2026 7:05:00 AM PT",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 527,
+      "code": "modified_on_9_23_2025_6_43_00_am_pt",
+      "label": "Modified On: 9/23/2025 6:43:00 AM PT",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 528,
+      "code": "modified_on_6_17_2016_6_40_00_pm_pt",
+      "label": "Modified On: 6/17/2016 6:40:00 PM PT",
+      "category": "General",
+      "is_active": true
+    },
+    {
+      "id": 529,
+      "code": "modified_on_1_14_2022_6_09_00_am_pt",
+      "label": "Modified On: 1/14/2022 6:09:00 AM PT",
+      "category": "General",
+      "is_active": true
+    }
+  ]
+}
