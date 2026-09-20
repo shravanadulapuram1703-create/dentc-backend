@@ -14,12 +14,18 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, status
 
-from app.api.deps import DbSession, TenantId, get_current_user, require_roles
+from app.api.deps import DbSession, TenantId, get_current_user, require_read_access, require_roles
 from app.schemas.common import ErrorResponse
 from app.schemas.groups import GroupRead, GroupRightsSet, PermissionRead
 from app.services import group_rights_service as svc
 
 _admin = Depends(require_roles("admin"))
+# RBAC-2: reading a group's rights is a read of the Security -> Groups screen —
+# open it to a caller holding that screen's view (or full) right, not just admin.
+_groups_read = Depends(require_read_access(
+    "setup_security_groups_screen_view_only",
+    "setup_security_groups_screen_full_control",
+))
 
 # ── Rights catalog (gap #1) — its own /permissions prefix ────────────────────
 permissions_router = APIRouter(
@@ -45,7 +51,7 @@ groups_router = APIRouter(
 )
 
 
-@groups_router.get("/{group_id}/rights", response_model=list[str], dependencies=[_admin],
+@groups_router.get("/{group_id}/rights", response_model=list[str], dependencies=[_groups_read],
                    operation_id="get_user_group_rights", summary="List a group's assigned right codes")
 def get_group_rights(db: DbSession, tenant_id: TenantId, group_id: Annotated[int, Path()]):
     return svc.get_group_rights(db, group_id, tenant_id)

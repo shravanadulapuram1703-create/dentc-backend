@@ -88,9 +88,32 @@ class TreatmentPlanItem(Base, TimestampMixin):
     re_estimate_at_posting: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
     )
+    # ── Pricing provenance (mirrors patient_procedures) ───────────────────────
+    # A planned line is priced by the same resolver and the same split engine as a
+    # charge, so it records the same provenance. ``ucr_fee`` is here because a plan
+    # posted to the ledger used to arrive with no UCR figure at all: the charge was
+    # created with an explicit fee, which short-circuited the server's pricing, so
+    # nothing ever filled it — and the contractual write-off is UCR minus fee.
     # PLAN-29: which fee schedule priced ``fee`` (stamped at create / re-estimate
     # when the server resolved it; a client may also state it).
     fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
+    ucr_fee: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    #: ``fee_vocab.FEE_SOURCES`` — which tier priced this line.
+    fee_source: Mapped[str | None] = mapped_column(String(24))
+    #: The ``effective_date`` of the entry that priced it.
+    fee_effective_date: Mapped[date | None]
+    #: Why a human overrode the resolved fee (required with ``fee_source='override'``).
+    fee_override_reason: Mapped[str | None] = mapped_column(String(255))
+    #: The coverage percentage and band as applied, and the deductible attributed.
+    coverage_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    coverage_rule_id: Mapped[int | None] = mapped_column(
+        # Named explicitly: the naming convention would generate a 65-character
+        # name and Postgres caps identifiers at 63.
+        Integer, ForeignKey("insurance_coverage_rules.id", name="fk_treatment_plan_items_coverage_rule")
+    )
+    estimated_deductible: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    #: The secondary payer's expectation; ``insurance_estimate`` stays the primary's.
+    sec_insurance_estimate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     # PLAN-11: the Treatment Counselor who presented / owns the case for this line.
     counselor_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     # PLAN-APPT-1: the status the item held before it was booked, so cancelling /

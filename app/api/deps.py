@@ -104,6 +104,35 @@ def require_permission(*codes: str, action: str | None = None):
     return _guard
 
 
+def require_read_access(*codes: str, action: str | None = None):
+    """RBAC-1: read gate for a screen whose data was historically admin-only.
+
+    A read passes when the caller **holds** one of the screen's view/full
+    ``codes`` (``*_view_only`` / ``*_full_control``) — so assigning a group the
+    view right grants read of that screen's data, which it did not before — **or**
+    the caller is a full-access role (``admin`` / ``super_admin``). Unlike
+    :func:`require_permission`, an *ungated* non-admin does **not** pass: these
+    endpoints were admin-only, so a user in no group keeps the legacy behaviour
+    (refused) until a view/full right is actually granted. 403 ``permission_denied``.
+    """
+
+    def _guard(db: DbSession, current_user: CurrentUser) -> User:
+        from app.services import permission_service
+
+        perms = permission_service.effective_permissions(db, current_user)
+        # ``has_strict`` is True for a full-access role or a genuinely-held code,
+        # and False for an ungated user — exactly the read rule above.
+        if perms.has_strict(*codes):
+            return current_user
+        raise ForbiddenError(
+            "You do not have permission to view this",
+            code="permission_denied",
+            details={"required_any_of": list(codes), "groups": perms.groups},
+        )
+
+    return _guard
+
+
 class Pagination(BaseModel):
     page: int
     size: int

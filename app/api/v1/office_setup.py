@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Path, Query, Response, UploadFile, status
+from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
@@ -57,6 +58,28 @@ def _office_scope(office_id: Annotated[int, Path()], tenant_id: TenantId, db: Db
 
 
 OfficeScope = Annotated[int, Depends(_office_scope)]
+
+
+class FeeDefaultsUpdate(BaseModel):
+    """Only the fields present are applied; a schedule pointer may be set to null
+    to clear it. Pricing hierarchy §3.5."""
+
+    default_ucr_fee_schedule_id: int | None = None
+    default_fee_schedule_id: int | None = None
+    unpriced_charge_policy: str | None = None
+
+
+@router.patch(
+    "/{office_id}/fee-defaults",
+    operation_id="update_office_fee_defaults",
+    summary="Set the office UCR list, default patient list and unpriced-charge policy",
+)
+def update_office_fee_defaults(
+    db: DbSession, office_id: OfficeScope, tenant_id: TenantId, body: FeeDefaultsUpdate,
+):
+    return svc.set_fee_defaults(
+        db, office_id, tenant_id, body.model_dump(exclude_unset=True),
+    )
 
 
 # ── #10 metadata aggregate (flat; declared before /{office_id}) ──────────────

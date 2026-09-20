@@ -22,7 +22,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query
 
-from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
+from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user, require_permission
 from app.schemas.common import ErrorResponse
 from app.schemas.perio import (
     PerioChartSettingRead,
@@ -49,6 +49,9 @@ router = APIRouter(
     response_model=list[PerioExamDetailRead],
     operation_id="bulk_upsert_perio_exam_details",
     summary="Atomically insert-or-update a chart's tooth rows (PERIO-BE-8)",
+    # RBAC-6: the bulk chart save gates the same as the per-row perio writes.
+    dependencies=[Depends(require_permission(
+        "charting_perio_full_control", action="chart a perio exam"))],
 )
 def bulk_upsert_perio_exam_details(
     db: DbSession,

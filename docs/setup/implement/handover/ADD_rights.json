@@ -1,0 +1,56 @@
+[
+  { "code": "charting_restorative_full_control", "label": "Charting - Restorative Chart Full Control", "category": "Charting" },
+  { "code": "charting_restorative_view_only", "label": "Charting - Restorative Chart View Only", "category": "Charting" },
+  { "code": "charting_restorative_delete_condition", "label": "Charting - Restorative Delete Condition/Procedure", "category": "Charting" },
+  { "code": "charting_perio_full_control", "label": "Charting - Perio Chart Full Control", "category": "Charting" },
+  { "code": "charting_perio_view_only", "label": "Charting - Perio Chart View Only", "category": "Charting" },
+  { "code": "charting_perio_compare", "label": "Charting - Perio Compare Exams", "category": "Charting" },
+  { "code": "charting_perio_print", "label": "Charting - Perio Chart Print", "category": "Charting" },
+
+  { "code": "imaging_full_control", "label": "Imaging - X-Rays / Images Full Control", "category": "Imaging" },
+  { "code": "imaging_view_only", "label": "Imaging - X-Rays / Images View Only", "category": "Imaging" },
+  { "code": "imaging_capture_acquire", "label": "Imaging - Capture / Acquire Image", "category": "Imaging" },
+  { "code": "imaging_delete_image", "label": "Imaging - Delete Image", "category": "Imaging" },
+  { "code": "imaging_export", "label": "Imaging - Export / Download Image", "category": "Imaging" },
+
+  { "code": "patient_lab_cases_full_control", "label": "Patient - Lab Tracking (Cases) Full Control", "category": "Patient" },
+  { "code": "patient_lab_cases_view_only", "label": "Patient - Lab Tracking (Cases) View Only", "category": "Patient" },
+  { "code": "patient_documents_full_control", "label": "Patient - Documents Full Control", "category": "Patient" },
+  { "code": "patient_documents_view_only", "label": "Patient - Documents View Only", "category": "Patient" },
+  { "code": "patient_documents_upload", "label": "Patient - Documents Upload", "category": "Patient" },
+  { "code": "patient_documents_delete", "label": "Patient - Documents Delete", "category": "Patient" },
+  { "code": "patient_letters_full_control", "label": "Patient - Letters Full Control", "category": "Patient" },
+  { "code": "patient_letters_view_only", "label": "Patient - Letters View Only", "category": "Patient" },
+  { "code": "patient_letters_generate", "label": "Patient - Letters Generate / Produce", "category": "Patient" },
+  { "code": "patient_consent_sign", "label": "Patient - Consent Form e-Signature Capture", "category": "Patient" },
+  { "code": "patient_emergency_contacts_full_control", "label": "Patient - Emergency Contacts Full Control", "category": "Patient" },
+  { "code": "patient_emergency_contacts_view_only", "label": "Patient - Emergency Contacts View Only", "category": "Patient" },
+
+  { "code": "transactions_claims_ada_direct_print", "label": "Transactions - Claims ADA Direct Print", "category": "Transactions" },
+  { "code": "transactions_claims_save_draft", "label": "Transactions - Claims Save as Draft", "category": "Transactions" },
+  { "code": "transactions_claims_create_secondary_plus", "label": "Transactions - Create Secondary/Tertiary/Quaternary Claim", "category": "Transactions" },
+
+  { "code": "appointments_scheduler_print", "label": "Appointments - Scheduler Print", "category": "Appointments" },
+
+  { "code": "appointnow_request_inbox_full_control", "label": "AppointNow - Request Inbox Full Control", "category": "AppointNow" },
+  { "code": "appointnow_request_inbox_view_only", "label": "AppointNow - Request Inbox View Only", "category": "AppointNow" },
+  { "code": "appointnow_approve_booking", "label": "AppointNow - Approve Online Booking", "category": "AppointNow" },
+  { "code": "appointnow_decline_booking", "label": "AppointNow - Decline Online Booking", "category": "AppointNow" },
+  { "code": "setup_appointnow_config_full_control", "label": "Setup - AppointNow / Public Booking Config Full Control", "category": "Setup" },
+
+  { "code": "messaging_direct_messages_full_control", "label": "Messaging - Direct Messages Full Control", "category": "Messaging" },
+  { "code": "messaging_direct_messages_view_only", "label": "Messaging - Direct Messages View Only", "category": "Messaging" },
+
+  { "code": "setup_communications_phone_assignments_full_control", "label": "Setup - Communications / Phone Assignments Full Control", "category": "Setup" },
+  { "code": "setup_communications_phone_assignments_view_only", "label": "Setup - Communications / Phone Assignments View Only", "category": "Setup" },
+  { "code": "setup_signature_pad_device_full_control", "label": "Setup - Signature Pad Device Full Control", "category": "Setup" },
+
+  { "code": "help_center_access", "label": "Help - Help Center Access", "category": "Help" },
+  { "code": "help_report_an_issue", "label": "Help - Report an Issue (Submit Ticket)", "category": "Help" },
+  { "code": "help_my_tickets_view", "label": "Help - My Tickets View", "category": "Help" },
+
+  { "code": "dashboard_view", "label": "Dashboard - View", "category": "Dashboard" },
+  { "code": "my_page_access", "label": "My Page - Access", "category": "Dashboard" },
+
+  { "code": "office_scope_view_all_offices", "label": "General - View Data Across All Offices", "category": "General" }
+]

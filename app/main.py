@@ -36,6 +36,20 @@ async def lifespan(_: FastAPI):
     # schedule socket delivery) and opens the Redis Pub/Sub subscriber. Degrades
     # to in-process delivery when Redis is off — see app.services.messaging_events.
     await messaging_events.start_fanout()
+    # AN-20: the public booking intake is CAPTCHA-gated only when a Turnstile
+    # secret is set, and the per-IP throttle is shared across workers only with
+    # Redis. Say so loudly outside dev rather than run unprotected in silence.
+    if settings.ENV != "dev":
+        if not settings.APPOINTNOW_TURNSTILE_SECRET:
+            logger.warning(
+                "AppointNow: APPOINTNOW_TURNSTILE_SECRET is unset — the public "
+                "booking intake runs without CAPTCHA verification"
+            )
+        if not settings.REDIS_ENABLED or not messaging_events.fanout.available:
+            logger.warning(
+                "AppointNow: Redis unavailable — the public intake rate limit is "
+                "enforced per worker only, and booking push events stay in-process"
+            )
     yield
     await messaging_events.stop_fanout()
     logger.info("Shutting down %s", settings.APP_NAME)
@@ -77,6 +91,10 @@ def create_app() -> FastAPI:
         allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
         allow_credentials=True,
         allow_methods=["*"],
+        # ``["*"]`` reflects the browser's requested headers, so the custom
+        # request headers the client sends — Authorization, X-Tenant-ID and
+        # X-Office-ID (OFF-SCOPE-3, the caller's working office) — are all
+        # allowed through preflight without listing each one.
         allow_headers=["*"],
         expose_headers=["X-Request-ID", "X-Process-Time"],
     )

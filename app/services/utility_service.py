@@ -16,16 +16,47 @@ from datetime import date, datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.db.models import User, UtilityRun
 
 _ACTIVE = ("submitted", "running")
+
+#: OFF-SCOPE-16: utilities that operate on one office's data and therefore
+#: require an ``office_id``. The frontend marks these ``officeScoped``; the set
+#: is here (rather than a config list) so it versions with the code. Empty until
+#: the office-scoped batch engines land — an office-scoped utility with no
+#: office is a 422 ``office_id_required``.
+OFFICE_SCOPED_UTILITIES: frozenset[str] = frozenset()
 
 
 def submit_run(
     db: Session, tenant_id: int, user: User, utility_id: str,
     *, office_id: int | None = None, parameters: dict | None = None,
 ) -> UtilityRun:
+    # OFF-SCOPE-16: an office-scoped utility must name an office, and any office a
+    # run targets must be one the caller is assigned to (unless privileged).
+    if utility_id in OFFICE_SCOPED_UTILITIES and office_id is None:
+        raise ValidationError(
+            f"Utility '{utility_id}' requires an office",
+            code="office_id_required",
+            details={"field": "office_id", "utility_id": utility_id},
+        )
+    if office_id is not None:
+        from app.services import office_scope_service, permission_service
+
+        rights = permission_service.office_rights(db, user)
+        privileged = bool(
+            rights & {permission_service.OFFICES_VIEW_ALL, permission_service.OFFICES_SWITCH_ANY}
+        )
+        assigned = office_scope_service.assigned_office_ids(db, user.id, tenant_id)
+        if not privileged and assigned and int(office_id) not in assigned:
+            from app.core.exceptions import ForbiddenError
+
+            raise ForbiddenError(
+                f"Office '{office_id}' is not assigned to you",
+                code="office_not_assigned",
+                details={"office_id": int(office_id), "field": "office_id"},
+            )
     # UTIL-1: server-side duplicate-run prevention per (utility, office).
     existing = db.execute(
         select(UtilityRun.id).where(

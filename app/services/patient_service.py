@@ -38,9 +38,31 @@ from typing import Any
 from sqlalchemy import and_, case, false, func, literal, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ValidationError
 from app.crud.base import CRUDBase
-from app.db.models import Patient, PatientInsurance
+from app.db.models import Appointment, Office, Patient, PatientInsurance, PatientProcedure
+from app.services import fee_vocab
 from app.services import patient_rules_service as rules
+
+
+def _validate_fee_schedule_pointer(db: Session, payload: dict, tenant_id: int | None,
+                                   *, existing: Patient | None = None) -> None:
+    """A patient's ``fee_schedule_id`` (the default-input tier of the pricing
+    card) must point at a live schedule of this tenant. Fires only when the field
+    is present and actually changing to a non-null value, so clearing it or a
+    PATCH that never touches it stays free; a migrated pointer stays editable."""
+    if tenant_id is None or "fee_schedule_id" not in payload:
+        return
+    value = payload["fee_schedule_id"]
+    if value is None or (existing is not None and value == existing.fee_schedule_id):
+        return
+    from app.services.fee_schedule_service import _schedule_valid  # noqa: PLC0415
+
+    if not _schedule_valid(db, value, tenant_id):
+        raise ValidationError(
+            fee_vocab.ERROR_CODES["patient_schedule_invalid"],
+            details={"code": "patient_schedule_invalid", "field": "fee_schedule_id"},
+        )
 
 
 def assign_chart_no(db: Session, obj: Patient) -> None:
@@ -70,8 +92,44 @@ class PatientCRUD(CRUDBase[Patient]):
     # pass, so one query param can reach all three number columns.
     custom_filter_fields = ("phone", "legacy_id")
 
+    def _office_scope_clauses(self, filters: dict[str, Any]) -> list:
+        """OFF-SCOPE-5: the patient-search office contract.
+
+        * ``seen_at_office_id`` — patients with an appointment or a procedure at
+          that office (the "seen here" concept the chart-office alone can't give).
+        * ``search_scope`` — ``current`` narrows to the caller's working office's
+          home patients, ``group`` to that office's group, ``all`` (the default)
+          is organisation-wide. The working office comes from ``X-Office-ID`` via
+          the office scope the list endpoint injects; without one, ``current``/
+          ``group`` are no-ops (org-wide) rather than an error.
+        """
+        clauses: list = []
+        seen = filters.get("seen_at_office_id")
+        if seen is not None:
+            appt_pids = select(Appointment.patient_id).where(Appointment.office_id == seen)
+            proc_pids = select(PatientProcedure.patient_id).where(PatientProcedure.office_id == seen)
+            clauses.append(Patient.id.in_(appt_pids.union(proc_pids)))
+        search_scope = (filters.get("search_scope") or "").strip().lower()
+        scope_obj = filters.get("__office_scope")
+        if search_scope in ("current", "group") and scope_obj is not None and scope_obj.x_office_id:
+            db = scope_obj._db
+            if search_scope == "group":
+                from app.services.office_scope_service import office_group_office_ids
+
+                office = db.get(Office, scope_obj.x_office_id)
+                group_id = office.office_group_id if office is not None else None
+                if group_id is not None:
+                    ids = office_group_office_ids(db, scope_obj.tenant_id, group_id)
+                    clauses.append(Patient.home_office_id.in_(sorted(ids)))
+                else:  # office in no group → just its own home patients
+                    clauses.append(Patient.home_office_id == scope_obj.x_office_id)
+            else:  # current
+                clauses.append(Patient.home_office_id == scope_obj.x_office_id)
+        return clauses
+
     def _extra_list_clauses(self, filters: dict[str, Any]) -> list:
         clauses: list = []
+        clauses.extend(self._office_scope_clauses(filters))
         # PT-SEARCH-1: Legacy ID is an exact match on the pre-import id. It is
         # resolved here rather than by the generic equality pass only so that a
         # pasted value with stray whitespace still hits; the stored column holds
@@ -174,6 +232,7 @@ class PatientCRUD(CRUDBase[Patient]):
             from app.services.patient_extra_service import raise_if_duplicate
 
             raise_if_duplicate(db, tenant_id, payload, force_create=force_create)
+        _validate_fee_schedule_pointer(db, payload, tenant_id)
         if tenant_id is not None and hasattr(self.model, "tenant_id"):
             payload.setdefault("tenant_id", tenant_id)
         if created_by is not None and self._is_int_col("created_by"):
@@ -202,6 +261,7 @@ class PatientCRUD(CRUDBase[Patient]):
         existing = self.get(db, obj_id, tenant_id=tenant_id)
         payload = rules.normalize_patient_payload(data, existing=existing)
         payload.pop("force_create", None)  # create-only; never a column
+        _validate_fee_schedule_pointer(db, payload, tenant_id, existing=existing)
         return super().update(
             db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by
         )

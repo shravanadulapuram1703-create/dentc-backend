@@ -79,6 +79,30 @@ def copy_users_from(db: Session, target_office_id: int, source_office_id: int) -
     return get_office_users(db, target_office_id)
 
 
+# ── OFF-SCOPE-9: the *effective* catalog for an office (unassigned = all) ─────
+def get_effective(
+    db: Session, link_model: type, fk_attr: str, target_model: type, target_pk: str,
+    office_id: int, tenant_id: int, *, include_inactive: bool = False,
+) -> list:
+    """The catalog an office can actually pick from, pinning the same semantic as
+    the letter-template effective view (LTR-7): **unassigned = all**. An office
+    with no curated assignment sees the full (tenant) catalog; once anything is
+    assigned it sees exactly the assigned set. Tenant scoping and the active
+    filter are applied only when the target catalog carries those columns (a
+    global catalog like ``procedure_codes`` has neither ``tenant_id``)."""
+    stmt = select(target_model)
+    if hasattr(target_model, "tenant_id"):
+        stmt = stmt.where(target_model.tenant_id == tenant_id)
+    if not include_inactive and hasattr(target_model, "is_active"):
+        stmt = stmt.where(target_model.is_active.is_(True))
+    assigned_ids = list(db.execute(
+        select(getattr(link_model, fk_attr)).where(link_model.office_id == office_id)
+    ).scalars().all())
+    if assigned_ids:
+        stmt = stmt.where(getattr(target_model, target_pk).in_(assigned_ids))
+    return list(db.execute(stmt).scalars().all())
+
+
 # ── LTR-7: the *effective* letter catalog for an office ──────────────────────
 def get_effective_letter_templates(
     db: Session, office_id: int, tenant_id: int, *, include_inactive: bool = False

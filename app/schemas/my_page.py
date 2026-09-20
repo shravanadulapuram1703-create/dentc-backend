@@ -17,6 +17,13 @@ class UserSelfUpdate(BaseModel):
     last_name: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    # OFF-SCOPE-3: the working office + default patient are writable here so the
+    # switcher / patient selection restore across devices. ``current_office_id``
+    # is validated against the caller's ``user_offices`` (403 if not assigned);
+    # ``last_patient_id`` against the tenant (null if missing/archived). Both
+    # accept an explicit ``null`` to clear (a PATCH that omits them leaves them).
+    current_office_id: Optional[int] = None
+    last_patient_id: Optional[int] = None
 
 
 # ── MP-3: personal tasks ──────────────────────────────────────────────────────

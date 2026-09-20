@@ -17,7 +17,14 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
-from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
+from app.api.deps import (
+    CurrentUser,
+    DbSession,
+    TenantId,
+    get_current_user,
+    require_permission,
+    require_roles,
+)
 from app.schemas.appointnow import (
     ApproveInput,
     AvailabilityResponse,
@@ -26,6 +33,7 @@ from app.schemas.appointnow import (
     PatientMatch,
     PublicOfficeInfo,
     RequestListResponse,
+    RescheduleInput,
     SubmitRequestInput,
 )
 from app.schemas.common import ErrorResponse
@@ -106,7 +114,7 @@ def public_submit_request(
     slot soft-held). Does NOT create a patient or appointment — that happens on
     staff approval."""
     req = svc.submit_request(db, office_code, body, source_ip=_client_ip(request))
-    return BookingRequestRead(**svc.to_read(req, office_code=office_code))
+    return BookingRequestRead(**svc.read_one(db, req))
 
 
 # ── Staff (AUTH) ─────────────────────────────────────────────────────────────
@@ -120,6 +128,7 @@ def list_requests(
     tenant_id: TenantId,
     status: str | None = Query(default=None, description="pending|approved|declined|expired"),
     office_id: int | None = Query(default=None),
+    office_ids: list[int] | None = Query(default=None, description="OFF-SCOPE-15: My-offices inbox (repeatable)"),
     q: str | None = Query(default=None, description="name/phone/email/reason/code"),
     reason_id: str | None = Query(default=None),
     reason_label: str | None = Query(default=None),
@@ -137,6 +146,7 @@ def list_requests(
         tenant_id,
         status=status,
         office_id=office_id,
+        office_ids=office_ids,
         q=q,
         reason_id=reason_id,
         reason_label=reason_label,
@@ -148,7 +158,7 @@ def list_requests(
         size=size,
     )
     return RequestListResponse(
-        items=[BookingRequestRead(**svc.to_read(r)) for r in result["items"]],
+        items=[BookingRequestRead(**d) for d in svc.read_many(db, result["items"])],
         counts=result["counts"],
         page=result["page"],
         size=result["size"],
@@ -163,7 +173,7 @@ def list_requests(
 )
 def get_request(request_id: str, db: DbSession, tenant_id: TenantId) -> BookingRequestRead:
     req = svc.get_request(db, tenant_id, request_id)
-    return BookingRequestRead(**svc.to_read(req))
+    return BookingRequestRead(**svc.read_one(db, req))
 
 
 @staff_router.get(
@@ -185,6 +195,9 @@ def request_patient_matches(
     response_model=BookingRequestRead,
     operation_id="appointnow_approve_request",
     responses={409: {"model": ErrorResponse}},
+    # ACCESS-RIGHTS C1: approving books a real appointment — gate it.
+    dependencies=[Depends(require_permission(
+        "appointnow_approve_booking", action="approve an online booking"))],
 )
 def approve_request(
     request_id: str,
@@ -198,7 +211,7 @@ def approve_request(
     req = svc.approve_request(
         db, tenant_id, request_id, body or ApproveInput(), actor_id=current.id
     )
-    return BookingRequestRead(**svc.to_read(req))
+    return BookingRequestRead(**svc.read_one(db, req))
 
 
 @staff_router.post(
@@ -206,6 +219,9 @@ def approve_request(
     response_model=BookingRequestRead,
     operation_id="appointnow_decline_request",
     responses={409: {"model": ErrorResponse}},
+    # ACCESS-RIGHTS C1: declining actions a booking request — gate it.
+    dependencies=[Depends(require_permission(
+        "appointnow_decline_booking", action="decline an online booking"))],
 )
 def decline_request(
     request_id: str,
@@ -217,4 +233,44 @@ def decline_request(
     """AN-5: mark the request declined (stores the reason + actor)."""
     reason = body.reason if body else None
     req = svc.decline_request(db, tenant_id, request_id, reason, actor_id=current.id)
-    return BookingRequestRead(**svc.to_read(req))
+    return BookingRequestRead(**svc.read_one(db, req))
+
+
+@staff_router.post(
+    "/requests/{request_id}/reschedule",
+    response_model=BookingRequestRead,
+    operation_id="appointnow_reschedule_request",
+    responses={409: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+)
+def reschedule_request(
+    request_id: str,
+    body: RescheduleInput,
+    db: DbSession,
+    tenant_id: TenantId,
+    current: CurrentUser,
+) -> BookingRequestRead:
+    """AN-14: move a *pending* request to a staff-chosen slot. Keeps the contact,
+    preserves the patient's first-requested slot in ``original_slot``, re-takes
+    the soft-hold, records the actor. 409 ``request_not_pending`` once settled;
+    409 ``slot_conflict`` with ``details.conflicts[]`` on an overlapping
+    appointment for the provider."""
+    req = svc.reschedule_request(db, tenant_id, request_id, body, actor_id=current.id)
+    return BookingRequestRead(**svc.read_one(db, req))
+
+
+@staff_router.delete(
+    "/requests/{request_id}",
+    operation_id="appointnow_purge_request",
+    dependencies=[Depends(require_roles("admin"))],
+    responses={409: {"model": ErrorResponse}},
+)
+def purge_request(
+    request_id: str,
+    db: DbSession,
+    tenant_id: TenantId,
+    force: bool = Query(default=False, description="Also purge an approved request"),
+) -> dict:
+    """AN-24 (admin): hard-delete a spam/test request. An approved request is
+    refused (409 ``request_approved``) without ``force=true``; the booked
+    appointment is never touched."""
+    return svc.purge_request(db, tenant_id, request_id, force=force)

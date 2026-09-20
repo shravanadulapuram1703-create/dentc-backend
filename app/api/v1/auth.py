@@ -112,17 +112,31 @@ def me_full(db: DbSession, current_user: CurrentUser, tenant_id: TenantId) -> Me
         .join(Office, Office.id == UserOffice.office_id)
         .where(UserOffice.user_id == current_user.id)
     ).all()
+    # OFF-SCOPE-10: the assignment carries what the switcher needs (short_id,
+    # is_active, office_group_id, timezone) so it renders without a second fetch.
     offices = [
         OfficeAssignment(
             office_id=office.id,
             name=office.name,
             office_code=office.office_code,
             is_primary=link.is_primary,
+            short_id=office.short_id,
+            is_active=office.is_active,
+            office_group_id=office.office_group_id,
+            timezone=office.timezone,
         )
         for link, office in rows
     ]
     last_patient_id = patient_context_service.resolve_last_patient(db, current_user, tenant_id)
     provider_id = my_page_service.linked_provider_id(db, current_user.id)
+    # OFF-SCOPE-3: the remembered working office, validated against the current
+    # assignments; falls back to the primary (else first) assignment so a fresh
+    # session always resolves *some* office to work in.
+    assigned_ids = {o.office_id for o in offices}
+    current_office_id = current_user.current_office_id
+    if current_office_id is None or (assigned_ids and current_office_id not in assigned_ids):
+        primary = next((o.office_id for o in offices if o.is_primary), None)
+        current_office_id = primary or (offices[0].office_id if offices else None)
     # EDIT-PLAN-5: effective rights. A full-access role lists the whole active
     # catalog so a client can key on codes without special-casing the role.
     perms = permission_service.effective_permissions(db, current_user)
@@ -132,8 +146,16 @@ def me_full(db: DbSession, current_user: CurrentUser, tenant_id: TenantId) -> Me
         ).scalars().all())
     else:
         codes = sorted(perms.codes)
+    # OFF-SCOPE-13 / FE-OFF-2: surface the office-scope right the caller holds
+    # using the REAL catalog code (``office_scope_view_all_offices`` / the legacy
+    # coverage alias), so the switcher keys on it (``officeScopeModel.ts``) like
+    # any other permission. Leadership roles (owner/manager) hold the master right
+    # without a group, so it is unioned in for them too.
+    office_right_codes = sorted(permission_service.office_rights(db, current_user))
+    codes = sorted(set(codes) | set(office_right_codes))
     return MeFull(user=current_user, tenant=tenant, offices=offices,
-                  last_patient_id=last_patient_id, provider_id=provider_id,
+                  last_patient_id=last_patient_id, current_office_id=current_office_id,
+                  provider_id=provider_id,
                   permissions=codes,
                   permissions_enforced=perms.enforced or perms.full_access,
                   groups=perms.groups)

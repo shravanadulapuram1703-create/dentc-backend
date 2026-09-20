@@ -23,11 +23,14 @@ disabled office), 409 (slot taken), 422 (bad input), 429 (rate-limited).
 from __future__ import annotations
 
 import json
+import re
+import threading
+from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.core.config import settings
 from app.core.datetimes import office_tz as office_timezone
@@ -54,11 +57,15 @@ from app.db.models import (
 )
 from app.db.models.office_setup import OfficeScheduleDay
 from app.integrations import redis_store
+from app.services import messaging_events
 from app.services.patient_service import PatientCRUD
 
 logger = get_logger(__name__)
 
 _patient_crud = PatientCRUD(Patient)
+
+# AN-6: envelope ``type`` on the messaging WebSocket's tenant topic.
+EVENT_TYPE = "appointnow.request"
 
 # Built-in reason catalog served when an office has customised none. Mirrors the
 # frontend ``APPOINTMENT_REASONS`` fallback so a fresh office still books.
@@ -322,7 +329,12 @@ def _provider_window(
     # Intersect with the office window so a provider can't be booked outside office hours.
     start = max(row.start_time, office_window.start) if office_window.start else row.start_time
     end = min(row.end_time, office_window.end) if office_window.end else row.end_time
-    return _Window(start, end, row.lunch_start, row.lunch_end)
+    # AN-19 ride-along: an office lunch closure is office-wide — a provider row
+    # that simply carries no lunch of its own must not re-open it.
+    lunch_start, lunch_end = row.lunch_start, row.lunch_end
+    if not (lunch_start and lunch_end):
+        lunch_start, lunch_end = office_window.lunch_start, office_window.lunch_end
+    return _Window(start, end, lunch_start, lunch_end)
 
 
 # ── availability (AN-2) ──────────────────────────────────────────────────────
@@ -530,18 +542,108 @@ def get_availability(
 
 
 # ── request intake (AN-3) ────────────────────────────────────────────────────
+# AN-20: in-process fallback counters for when Redis is unavailable. Per worker
+# (so N gunicorn workers allow up to N× the limit) — strictly weaker than the
+# shared Redis counter, but no longer "degrades open" to unlimited.
+_local_rate: dict[str, list[float]] = {}
+_local_rate_lock = threading.Lock()
+
+
+def _local_rate_count(key: str, window_seconds: int, now: float) -> int:
+    with _local_rate_lock:
+        hits = [t for t in _local_rate.get(key, ()) if now - t < window_seconds]
+        hits.append(now)
+        _local_rate[key] = hits
+        # Opportunistic GC so a scan of IPs can't grow the dict without bound.
+        if len(_local_rate) > 10_000:
+            for k in [k for k, v in _local_rate.items() if not v or now - v[-1] >= window_seconds]:
+                _local_rate.pop(k, None)
+        return len(hits)
+
+
 def _rate_limit(office_id: int, ip: str | None) -> None:
-    """Per-IP/office throttle for the public write. Degrades open when Redis is off."""
+    """Per-IP/office throttle for the public write. Redis-backed (shared across
+    workers) when available; falls back to an in-process window otherwise (AN-20)."""
     if not ip:
         return
     key = f"appointnow:rl:{office_id}:{ip}"
     window = settings.APPOINTNOW_RATE_LIMIT_WINDOW_MINUTES * 60
     count = redis_store.incr_counter(key, window)
-    if count is not None and count > settings.APPOINTNOW_RATE_LIMIT_MAX:
+    if count is None:
+        import time as _time
+
+        count = _local_rate_count(key, window, _time.monotonic())
+    if count > settings.APPOINTNOW_RATE_LIMIT_MAX:
         raise RateLimitError(
             "Too many booking requests from this device. Please try again later.",
             code="appointnow_rate_limited",
         )
+
+
+# ── AN-16: intake acknowledgements ───────────────────────────────────────────
+# The frontend's interim workaround folded the three extras into ``notes`` with
+# these markers (``realTransport.ts::foldContactExtrasIntoNotes``). The service
+# still understands them so that a backend deployed *before* the frontend cut-over
+# keeps accepting bookings — and moves the values into their columns either way.
+MARK_INSURANCE = "Insurance:"
+MARK_DISCLAIMER = "Disclaimer accepted:"
+MARK_CONSENT = "Contact consent (calls/texts):"
+
+
+def split_contact_extras(notes: str | None) -> dict:
+    """Inverse of the frontend's fold: ``{notes, insurance_info, disclaimer_accepted,
+    consent_accepted}`` with the marker lines removed from ``notes``. Values not
+    present come back ``None`` (never ``False`` — absence is not a refusal)."""
+    out = {
+        "notes": None,
+        "insurance_info": None,
+        "disclaimer_accepted": None,
+        "consent_accepted": None,
+    }
+    if not notes:
+        return out
+    keep: list[str] = []
+    for raw in re.split(r"\r?\n", notes):
+        line = raw.strip()
+        if line.startswith(MARK_INSURANCE):
+            out["insurance_info"] = line[len(MARK_INSURANCE):].strip() or None
+        elif line.startswith(MARK_DISCLAIMER):
+            out["disclaimer_accepted"] = bool(re.search(r"yes", line[len(MARK_DISCLAIMER):], re.I))
+        elif line.startswith(MARK_CONSENT):
+            out["consent_accepted"] = bool(re.search(r"yes", line[len(MARK_CONSENT):], re.I))
+        elif line:
+            keep.append(raw)
+    out["notes"] = "\n".join(keep).strip() or None
+    return out
+
+
+def resolve_acknowledgements(contact) -> dict:
+    """Merge the explicit ``ContactInput`` fields with the interim ``notes``
+    markers (explicit field wins), then **require** both legal acknowledgements to
+    be ``true`` — 422 ``acknowledgement_required`` naming the field otherwise."""
+    parsed = split_contact_extras(contact.notes)
+    insurance = contact.insurance_info if contact.insurance_info is not None else parsed["insurance_info"]
+    disclaimer = (
+        contact.disclaimer_accepted
+        if contact.disclaimer_accepted is not None
+        else parsed["disclaimer_accepted"]
+    )
+    consent = (
+        contact.consent_accepted if contact.consent_accepted is not None else parsed["consent_accepted"]
+    )
+    for field, value in (("disclaimer_accepted", disclaimer), ("consent_accepted", consent)):
+        if value is not True:
+            raise ValidationError(
+                "Both acknowledgements must be accepted to request an appointment.",
+                code="acknowledgement_required",
+                details={"field": field, "value": value},
+            )
+    return {
+        "notes": parsed["notes"],
+        "insurance_info": (insurance or "").strip()[:500] or None,
+        "disclaimer_accepted": True,
+        "consent_accepted": True,
+    }
 
 
 def _verify_turnstile(token: str | None, ip: str | None) -> None:
@@ -606,6 +708,7 @@ def submit_request(
     resolved_provider_name = match.get("provider_name") or payload.slot.provider_name
 
     contact = payload.contact
+    extras = resolve_acknowledgements(contact)  # AN-16 (422 before anything is written)
     req = BookingRequest(
         id=str(uuid7()),
         tenant_id=office.tenant_id,
@@ -625,7 +728,10 @@ def submit_request(
         email=contact.email,
         date_of_birth=contact.date_of_birth,
         is_new_patient=contact.is_new_patient,
-        notes=contact.notes,
+        notes=extras["notes"],
+        insurance_info=extras["insurance_info"],
+        disclaimer_accepted=extras["disclaimer_accepted"],
+        consent_accepted=extras["consent_accepted"],
         hold_expires_at=_office_now(office)
         + timedelta(minutes=settings.APPOINTNOW_HOLD_TTL_MINUTES),
         source_ip=source_ip,
@@ -634,8 +740,19 @@ def submit_request(
     db.commit()
     db.refresh(req)
     _invalidate_availability_cache(office.id, day)
-    notify_new_request(office, req)
+    notify_new_request(db, office, req)
+    _notify_office(db, office, req)
     return req
+
+
+def _notify_office(db: Session, office: Office, req: BookingRequest) -> None:
+    """AN-21: best-effort e-mail to the office on a new request. Never raises."""
+    try:
+        from app.services import appointnow_notification_service as notify
+
+        notify.notify_office_new_request(db, office, req)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("AppointNow office notification skipped: %s", exc)
 
 
 def _reason_label(reasons: list[dict], reason_id: str | None) -> str | None:
@@ -661,6 +778,7 @@ def list_requests(
     *,
     status: str | None = None,
     office_id: int | None = None,
+    office_ids: list[int] | None = None,
     q: str | None = None,
     reason_id: str | None = None,
     reason_label: str | None = None,
@@ -676,6 +794,9 @@ def list_requests(
     base = select(BookingRequest).where(BookingRequest.tenant_id == tenant_id)
     if office_id is not None:
         base = base.where(BookingRequest.office_id == office_id)
+    # OFF-SCOPE-15: "My offices" — restrict the inbox to a set of offices.
+    if office_ids:
+        base = base.where(BookingRequest.office_id.in_(office_ids))
 
     # Filters that apply to the returned page (status is one of them).
     filtered = base
@@ -804,31 +925,74 @@ def _digits(value: str | None) -> str:
 
 
 # ── approve / decline (AN-5) ─────────────────────────────────────────────────
-def _appointment_conflict(
+def appointment_conflicts(
     db: Session, office_id: int, provider_id: str | None, operatory_id: str | None,
     day: date, start: time, end: time,
-) -> bool:
-    """A hard conflict for booking: an existing active appointment overlaps the
-    same provider or the same operatory."""
+) -> list[dict]:
+    """Every active appointment overlapping the slot on the same provider or the
+    same operatory, denormalised for the staff conflict dialog (AN-14/AN-15:
+    ``patient_name`` / ``provider_name`` / ``operatory_name`` / ``procedure_label``
+    / ``kind``). Empty list = bookable."""
     if provider_id is None and operatory_id is None:
-        return False
+        return []
+    patient = aliased(Patient)
     rows = db.execute(
-        select(Appointment.provider_id, Appointment.operatory_id,
-               Appointment.start_time, Appointment.end_time).where(
+        select(
+            Appointment.id,
+            Appointment.provider_id,
+            Appointment.operatory_id,
+            Appointment.start_time,
+            Appointment.end_time,
+            Appointment.procedure_label,
+            patient.first_name,
+            patient.last_name,
+            Provider.name,
+            Operatory.name,
+        )
+        .outerjoin(patient, patient.id == Appointment.patient_id)
+        .outerjoin(Provider, Provider.id == Appointment.provider_id)
+        .outerjoin(Operatory, Operatory.id == Appointment.operatory_id)
+        .where(
             Appointment.office_id == office_id,
             Appointment.date == day,
             Appointment.is_archived.is_(False),
             Appointment.is_cancelled.is_(False),
         )
+        .order_by(Appointment.start_time.asc())
     ).all()
-    for pid, oid, s, e in rows:
+    conflicts: list[dict] = []
+    for aid, pid, oid, s, e, label, p_first, p_last, prov_name, op_name in rows:
         if s is None or e is None or not _overlaps(start, end, s, e):
             continue
         if provider_id is not None and pid == provider_id:
-            return True
-        if operatory_id is not None and oid == operatory_id:
-            return True
-    return False
+            kind = "provider"
+        elif operatory_id is not None and oid == operatory_id:
+            kind = "operatory"
+        else:
+            continue
+        conflicts.append(
+            {
+                "appointment_id": aid,
+                "patient_name": " ".join(x for x in (p_first, p_last) if x) or None,
+                "provider_id": pid,
+                "provider_name": prov_name,
+                "operatory_id": oid,
+                "operatory_name": op_name,
+                "start_time": _fmt_time(s),
+                "end_time": _fmt_time(e),
+                "procedure_label": label,
+                "kind": kind,
+            }
+        )
+    return conflicts
+
+
+def _raise_slot_conflict(conflicts: list[dict]) -> None:
+    raise ConflictError(
+        "That slot was booked by someone else. Decline or pick a new time.",
+        code="slot_conflict",
+        details={"conflicts": conflicts},
+    )
 
 
 def _resolve_provider_for_booking(
@@ -937,13 +1101,11 @@ def approve_request(
     provider_id = provider.id
     operatory_id = _resolve_operatory_for_booking(db, office, provider_id, body.operatory_id)
 
-    if _appointment_conflict(
+    conflicts = appointment_conflicts(
         db, office.id, provider_id, operatory_id, req.slot_date, req.start_time, req.end_time
-    ):
-        raise ConflictError(
-            "That slot was booked by someone else. Decline or pick a new time.",
-            code="slot_conflict",
-        )
+    )
+    if conflicts:
+        _raise_slot_conflict(conflicts)
 
     patient_id = _resolve_patient_for_booking(db, office, req, body, actor_id)
 
@@ -976,6 +1138,12 @@ def approve_request(
         created_by=actor_id,
     )
     db.add(appt)
+    # AN-BUG-1: there is no relationship() between BookingRequest.appointment_id
+    # and Appointment, so the unit of work has no dependency edge and emitted the
+    # UPDATE booking_requests before the INSERT appointments — Postgres rejected
+    # the FK (23503) and the whole approval rolled back. INSERT the appointment
+    # first; the transaction is still one commit.
+    db.flush()
 
     req.status = "approved"
     req.appointment_id = appt.id
@@ -986,7 +1154,8 @@ def approve_request(
     db.commit()
     db.refresh(req)
     _invalidate_availability_cache(office.id, req.slot_date)
-    notify_updated_request(office, req)
+    notify_updated_request(db, office, req)
+    _notify_contact(db, office, req, "approved")
     return req
 
 
@@ -1006,8 +1175,134 @@ def decline_request(
     db.refresh(req)
     if office is not None:
         _invalidate_availability_cache(office.id, req.slot_date)
-        notify_updated_request(office, req)
+        notify_updated_request(db, office, req)
+        _notify_contact(db, office, req, "declined")
     return req
+
+
+# ── reschedule (AN-14) ───────────────────────────────────────────────────────
+def _resolve_provider_for_reschedule(
+    db: Session, office: Office, provider_id: str | None
+) -> Provider | None:
+    """Any *active* provider of the office — staff may place the visit with a
+    provider who is not offered publicly (``visible_in_appointnow`` gates the
+    public page, not the practice's own scheduling)."""
+    if not provider_id:
+        return None
+    p = db.get(Provider, provider_id)
+    if p is None or p.office_id != office.id or p.tenant_id != office.tenant_id:
+        raise ValidationError(f"Provider '{provider_id}' is not valid for this office",
+                              code="bad_provider")
+    if not p.is_active:
+        raise ValidationError(f"Provider '{provider_id}' is inactive", code="provider_inactive")
+    return p
+
+
+def reschedule_request(
+    db: Session, tenant_id: int, request_id: str, body, *, actor_id: int | None
+) -> BookingRequest:
+    """Replace a *pending* request's slot with a staff-chosen one (409
+    ``request_not_pending`` otherwise). The contact block is never touched; the
+    patient's first-requested slot is preserved in ``original_slot_*`` on the first
+    reschedule; the soft-hold is re-taken for the new time. Overlapping active
+    appointments on the provider are a 409 ``slot_conflict`` with
+    ``details.conflicts[]`` so the red dialog can list them."""
+    req = get_request(db, tenant_id, request_id)
+    if req.status != "pending":
+        raise ConflictError(f"Request is already {req.status}", code="request_not_pending")
+    office = db.get(Office, req.office_id)
+    if office is None or office.tenant_id != tenant_id:
+        raise ForbiddenError("Request does not belong to the authenticated tenant")
+
+    slot = body.slot
+    day = _parse_date(slot.date)
+    start = _parse_time(slot.start_time)
+    duration = slot.duration_minutes or req.duration_minutes or _DEFAULT_DURATION
+    end = _parse_time(slot.end_time) if slot.end_time else _add_minutes(start, duration)
+    if end <= start:
+        raise ValidationError("end_time must be after start_time", code="bad_slot")
+    duration = _minutes(end) - _minutes(start)
+    now = _office_now(office)
+    if datetime.combine(day, start) < now:
+        raise ValidationError("The new slot is in the past", code="slot_in_past")
+
+    provider = _resolve_provider_for_reschedule(db, office, slot.provider_id)
+    provider_id = provider.id if provider is not None else req.provider_id
+    provider_name = provider.name if provider is not None else req.provider_name
+    if provider is None and provider_id and slot.provider_id is None:
+        # Keep the request's provider — but it may have been deactivated since.
+        current = db.get(Provider, provider_id)
+        if current is not None:
+            provider_name = current.name
+
+    conflicts = appointment_conflicts(db, office.id, provider_id, None, day, start, end)
+    if conflicts:
+        _raise_slot_conflict(conflicts)
+
+    if req.original_slot_date is None:
+        req.original_slot_date = req.slot_date
+        req.original_start_time = req.start_time
+        req.original_end_time = req.end_time
+        req.original_duration_minutes = req.duration_minutes
+        req.original_provider_id = req.provider_id
+        req.original_provider_name = req.provider_name
+    previous_day = req.slot_date
+
+    req.slot_date = day
+    req.start_time = start
+    req.end_time = end
+    req.duration_minutes = duration
+    req.provider_id = provider_id
+    req.provider_name = provider_name
+    req.reschedule_count = (req.reschedule_count or 0) + 1
+    req.rescheduled_by = actor_id
+    req.rescheduled_at = datetime.utcnow()
+    req.hold_expires_at = now + timedelta(minutes=settings.APPOINTNOW_HOLD_TTL_MINUTES)
+    req.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(req)
+    _invalidate_availability_cache(office.id, previous_day)
+    _invalidate_availability_cache(office.id, day)
+    _publish_event(db, office, "rescheduled", req)
+    _notify_contact(db, office, req, "rescheduled")
+    return req
+
+
+# ── purge (AN-24) ────────────────────────────────────────────────────────────
+def purge_request(db: Session, tenant_id: int, request_id: str, *, force: bool = False) -> dict:
+    """Hard-delete a spam/test request. An **approved** request is the audit
+    link to a real appointment and is refused (409 ``request_approved``) unless
+    ``force`` — the appointment itself is never touched either way."""
+    req = get_request(db, tenant_id, request_id)
+    if req.status == "approved" and not force:
+        raise ConflictError(
+            "An approved request is linked to a booked appointment; pass force=true to purge it anyway.",
+            code="request_approved",
+            details={"appointment_id": req.appointment_id},
+        )
+    office = db.get(Office, req.office_id)
+    summary = {"id": req.id, "status": req.status, "office_id": req.office_id,
+               "appointment_id": req.appointment_id, "deleted": True}
+    db.delete(req)
+    db.commit()
+    if office is not None:
+        _invalidate_availability_cache(office.id, req.slot_date)
+        messaging_events.publish_tenant(
+            office.tenant_id,
+            {"type": EVENT_TYPE, "event": "deleted", "office_id": office.id,
+             "request_id": summary["id"], "status": summary["status"], "request": None},
+        )
+    return summary
+
+
+def _notify_contact(db: Session, office: Office, req: BookingRequest, event: str) -> None:
+    """AN-21: best-effort SMS/e-mail to the requesting contact. Never raises."""
+    try:
+        from app.services import appointnow_notification_service as notify
+
+        notify.notify_contact(db, office, req, event)
+    except Exception as exc:  # noqa: BLE001 - a notification must never undo a transition
+        logger.warning("AppointNow contact notification skipped (%s): %s", event, exc)
 
 
 # ── expiry sweep (AN-8) ──────────────────────────────────────────────────────
@@ -1023,7 +1318,7 @@ def expire_stale_requests(db: Session, offices: list[Office]) -> None:
     inbox and availability stay truthful. Best-effort; never raises."""
     if not offices:
         return
-    changed = False
+    expired: list[tuple[Office, BookingRequest]] = []
     try:
         for office in offices:
             now = _office_now(office)
@@ -1042,34 +1337,77 @@ def expire_stale_requests(db: Session, offices: list[Office]) -> None:
                 if slot_dt < now:
                     req.status = "expired"
                     req.hold_expires_at = None
-                    changed = True
-        if changed:
+                    expired.append((office, req))
+        if expired:
             db.commit()
     except Exception as exc:  # noqa: BLE001 - a sweep must never break the request
         logger.warning("AppointNow expiry sweep failed: %s", exc)
         db.rollback()
+        return
+    for office, req in expired:
+        _publish_event(db, office, "expired", req)
 
 
-# ── realtime notification seam (AN-6) ────────────────────────────────────────
-def _publish_event(office: Office, event: str, req: BookingRequest) -> None:
-    """Best-effort fan-out for a future staff SSE/WS consumer. Published on
-    ``appointnow:{tenant}:{office}``; a missing consumer is harmless (the inbox
-    still refreshes on load and the badge polls the count summary)."""
-    payload = json.dumps(
-        {"event": event, "office_id": office.id, "request_id": req.id, "status": req.status}
-    )
+def expire_all(db: Session, tenant_id: int | None = None) -> dict:
+    """AN-25: the cron entry (``scripts/expire_booking_requests.py``) — sweep
+    every office (or one tenant's) so a passed slot flips to ``expired`` without
+    waiting for someone to open the inbox. Returns a count summary."""
+    stmt = select(Office).where(Office.is_active.is_(True))
+    if tenant_id is not None:
+        stmt = stmt.where(Office.tenant_id == tenant_id)
+    offices = list(db.execute(stmt).scalars().all())
+    before = db.execute(
+        select(func.count()).select_from(BookingRequest).where(BookingRequest.status == "expired")
+    ).scalar_one()
+    expire_stale_requests(db, offices)
+    after = db.execute(
+        select(func.count()).select_from(BookingRequest).where(BookingRequest.status == "expired")
+    ).scalar_one()
+    return {"offices_swept": len(offices), "expired": int(after - before)}
+
+
+# ── realtime push (AN-6) ─────────────────────────────────────────────────────
+# Rides the **existing messaging WebSocket** on the tenant-wide topic, exactly
+# like PROC-INT-3 (procedures.changed) and SMS-4 (sms.inbound): the staff client
+# already holds that socket for DMs/presence, so there is no second socket to
+# open and no per-office subscription to track server-side — the client drops
+# envelopes whose ``office_id`` is not the office it is showing. Redis Pub/Sub
+# across gunicorn workers when Redis is up, in-process otherwise, always
+# best-effort. The full ``BookingRequestRead`` rides along so the inbox can
+# upsert the card without a refetch.
+#
+# Envelope::
+#
+#     {"type": "appointnow.request",
+#      "event": "created" | "updated" | "rescheduled" | "expired" | "deleted",
+#      "office_id": 1, "request_id": "01a0…", "status": "pending",
+#      "request": {...BookingRequestRead...} | null}
+def _publish_event(db: Session, office: Office, event: str, req: BookingRequest) -> None:
     try:
-        redis_store.publish(f"appointnow:{office.tenant_id}:{office.id}", payload)
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("AppointNow publish skipped: %s", exc)
+        from app.schemas.appointnow import BookingRequestRead
+
+        payload = BookingRequestRead(**read_one(db, req)).model_dump(mode="json")
+        messaging_events.publish_tenant(
+            office.tenant_id,
+            {
+                "type": EVENT_TYPE,
+                "event": event,
+                "office_id": office.id,
+                "request_id": req.id,
+                "status": req.status,
+                "request": payload,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 - fan-out never fails the write
+        logger.warning("AppointNow push skipped (%s): %s", event, exc)
 
 
-def notify_new_request(office: Office, req: BookingRequest) -> None:
-    _publish_event(office, "request.created", req)
+def notify_new_request(db: Session, office: Office, req: BookingRequest) -> None:
+    _publish_event(db, office, "created", req)
 
 
-def notify_updated_request(office: Office, req: BookingRequest) -> None:
-    _publish_event(office, "request.updated", req)
+def notify_updated_request(db: Session, office: Office, req: BookingRequest) -> None:
+    _publish_event(db, office, "updated", req)
 
 
 def _invalidate_availability_cache(office_id: int, day: date) -> None:
@@ -1079,7 +1417,22 @@ def _invalidate_availability_cache(office_id: int, day: date) -> None:
 
 
 # ── serialisation (ORM → wire) ───────────────────────────────────────────────
-def to_read(req: BookingRequest, office_code: str | None = None) -> dict:
+def to_read(
+    req: BookingRequest,
+    office_code: str | None = None,
+    user_names: dict[int, str] | None = None,
+) -> dict:
+    names = user_names or {}
+    original_slot = None
+    if req.original_slot_date is not None:
+        original_slot = {
+            "date": req.original_slot_date.strftime("%Y-%m-%d"),
+            "start_time": _fmt_time(req.original_start_time),
+            "end_time": _fmt_time(req.original_end_time),
+            "duration_minutes": req.original_duration_minutes or req.duration_minutes,
+            "provider_id": req.original_provider_id,
+            "provider_name": req.original_provider_name,
+        }
     return {
         "id": req.id,
         "office_code": office_code,
@@ -1103,11 +1456,51 @@ def to_read(req: BookingRequest, office_code: str | None = None) -> dict:
             "date_of_birth": req.date_of_birth,
             "is_new_patient": req.is_new_patient,
             "notes": req.notes,
+            "insurance_info": req.insurance_info,
+            "disclaimer_accepted": bool(req.disclaimer_accepted),
+            "consent_accepted": bool(req.consent_accepted),
         },
         "appointment_id": req.appointment_id,
         "patient_id": req.patient_id,
         "decline_reason": req.decline_reason,
+        "actioned_by_id": req.actioned_by,
+        "actioned_by_name": names.get(req.actioned_by) if req.actioned_by is not None else None,
         "actioned_at": req.actioned_at,
+        "original_slot": original_slot,
+        "reschedule_count": req.reschedule_count or 0,
+        "rescheduled_by_id": req.rescheduled_by,
+        "rescheduled_by_name": (
+            names.get(req.rescheduled_by) if req.rescheduled_by is not None else None
+        ),
+        "rescheduled_at": req.rescheduled_at,
+        "contact_notified_at": req.contact_notified_at,
+        "contact_notified_via": req.contact_notified_via,
         "created_at": req.created_at,
         "updated_at": req.updated_at,
     }
+
+
+def read_many(db: Session, rows: Iterable[BookingRequest]) -> list[dict]:
+    """AN-17: serialise a page with ``office_code`` and the actor display names
+    resolved in **two** batched lookups (never per row)."""
+    from app.services.user_admin_service import resolve_user_names
+
+    rows = list(rows)
+    office_ids = {r.office_id for r in rows}
+    codes: dict[int, str] = {}
+    if office_ids:
+        codes = {
+            oid: code
+            for oid, code in db.execute(
+                select(Office.id, Office.office_code).where(Office.id.in_(office_ids))
+            ).all()
+        }
+    user_ids = {r.actioned_by for r in rows if r.actioned_by is not None} | {
+        r.rescheduled_by for r in rows if r.rescheduled_by is not None
+    }
+    names = resolve_user_names(db, user_ids) if user_ids else {}
+    return [to_read(r, office_code=codes.get(r.office_id), user_names=names) for r in rows]
+
+
+def read_one(db: Session, req: BookingRequest) -> dict:
+    return read_many(db, [req])[0]

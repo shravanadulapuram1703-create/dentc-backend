@@ -5,6 +5,9 @@ description = "Dental PMS REST API — FastAPI, SQLAlchemy 2.x, Pydantic v2; col
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
+markers = [
+    "enforce_fks: run the in-memory SQLite DB with PRAGMA foreign_keys=ON (see tests/conftest.py)",
+]
 testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = ["ignore::DeprecationWarning"]

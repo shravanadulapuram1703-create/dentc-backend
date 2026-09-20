@@ -87,6 +87,13 @@ class User(Base, IntPKMixin, TimestampMixin):
     last_patient_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("patients.id", ondelete="SET NULL")
     )
+    # OFF-SCOPE-3: the caller's remembered working office (the switcher's last
+    # selection), so the session restores it across devices. Not a fence — the
+    # office is the working context, validated against ``user_offices`` on write.
+    # ON DELETE SET NULL so a removed office can't strand the user.
+    current_office_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("offices.id", ondelete="SET NULL")
+    )
 
 
 class RefreshToken(Base, IntPKMixin, CreatedAtMixin):
@@ -148,8 +155,27 @@ class Office(Base, IntPKMixin, TimestampMixin):
     use_billing_license: Mapped[bool] = mapped_column(Boolean, default=False)
     office_group_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("office_groups.id"))
     opening_date: Mapped[date | None]
+    # ── The two pricing pointers (Denticon Office.PATIENTFEEID / Office.FEEID) ─
+    #: The price list a patient registered at this office starts on (the self-pay /
+    #: practice list). Denticon ``Office.PATIENTFEEID``; falls back to the UCR list
+    #: when the office sets none.
     default_fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
+    #: What the office normally charges. This is the source of ``ucr_fee`` on every
+    #: charge whichever list priced the fee, and therefore of the contractual
+    #: write-off (UCR minus the contracted fee: mean $143.85 on 53% of 2025 legacy
+    #: lines). Denticon ``Office.FEEID``, which explains ``LEDGER.UCRFEE`` on 96.3%
+    #: of those charges — the *only* fee column that is office-determined.
     default_ucr_fee_schedule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("fee_schedules.id"))
+    #: What to do when no reachable list prices a code
+    #: (``fee_vocab.UNPRICED_POLICY_CODES``). ``flag`` posts at 0.00, marks the
+    #: charge unpriced and lists it for Setup; ``refuse`` blocks the charge. A
+    #: migrated tenant starts on ``flag`` because 206 codes that appear on real
+    #: historical charges are priced by no schedule at all, so refusing on day one
+    #: would stop charge entry at the chair. An office moves to ``refuse`` once its
+    #: "codes needing a price" queue is empty.
+    unpriced_charge_policy: Mapped[str] = mapped_column(
+        String(10), default="flag", server_default="flag", nullable=False
+    )
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     # ADA-BE-8: the Type 2 (organisation) NPI + taxonomy an incorporated practice
     # bills under (ADA claim form Item 49 / 837D loop 2010AA). The billing
@@ -197,7 +223,11 @@ class Provider(Base, CreatedAtMixin):
     # Provider Setup -> Info "Provider/Advanced Settings" (provider dev-report gap #7).
     scheduler_color: Mapped[str | None] = mapped_column(String(20))  # hex
     is_ortho_provider: Mapped[bool] = mapped_column(Boolean, default=False)
-    visible_in_appointnow: Mapped[bool] = mapped_column(Boolean, default=True)
+    # AN-18: opt-IN. With ``True`` every active provider of an office was offered
+    # on the public booking page (MOON: 91 rows incl. test/placeholder providers)
+    # and the engine booked "any provider" requests against the first one
+    # alphabetically. A practice curates the list from Provider Setup.
+    visible_in_appointnow: Mapped[bool] = mapped_column(Boolean, default=False)
     # LTR-3: provider letterhead. 10 letter templates print the *provider's* own
     # address/phone block (#PAT_PREF_PROV_Address# …); with no columns they fell
     # back to the office block, i.e. the wrong address on a patient-facing letter.

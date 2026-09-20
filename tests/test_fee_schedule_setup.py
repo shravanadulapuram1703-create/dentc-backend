@@ -43,10 +43,34 @@ def test_fee_entry_amb_code(client, schedule_id, db_session):
 
 
 def test_assignment_office_group_filter(client, db_session):
-    # FEE-3: office_group_id is stored and server-filterable.
-    from app.db.models import FeeSchedule, OfficeGroup
+    # FEE-3: office_group_id is stored and server-filterable. §3.6: an assignment
+    # must also name a payer/person (office_group only *narrows* — a scope-only
+    # row is refused), so the row carries a carrier here.
+    from app.db.models import FeeSchedule, InsuranceCarrier, OfficeGroup
     grp = OfficeGroup(tenant_id=db_session._tenant_id, name="North Group")
     fs = FeeSchedule(tenant_id=db_session._tenant_id, name="Grp Sched")
+    carrier = InsuranceCarrier(tenant_id=db_session._tenant_id, name="Grp Carrier")
+    db_session.add_all([grp, fs, carrier])
+    db_session.commit()
+    db_session.refresh(grp)
+    db_session.refresh(fs)
+    db_session.refresh(carrier)
+    c = client.post("/api/v1/fee-schedule-assignments", json={
+        "fee_schedule_id": fs.id, "office_group_id": grp.id, "carrier_id": carrier.id,
+    })
+    assert c.status_code == 201, c.text
+    assert c.json()["office_group_id"] == grp.id
+    listed = client.get("/api/v1/fee-schedule-assignments", params={"office_group_id": grp.id}).json()
+    assert len(listed["items"]) == 1
+    assert listed["items"][0]["office_group_id"] == grp.id
+
+
+def test_assignment_scope_only_is_refused(client, db_session):
+    # §3.6: a scope-only assignment (office / office group, no payer or person)
+    # is a 422 — office-wide defaults have exactly one home (Office Setup).
+    from app.db.models import FeeSchedule, OfficeGroup
+    grp = OfficeGroup(tenant_id=db_session._tenant_id, name="Scope Only Group")
+    fs = FeeSchedule(tenant_id=db_session._tenant_id, name="Scope Sched")
     db_session.add_all([grp, fs])
     db_session.commit()
     db_session.refresh(grp)
@@ -54,11 +78,8 @@ def test_assignment_office_group_filter(client, db_session):
     c = client.post("/api/v1/fee-schedule-assignments", json={
         "fee_schedule_id": fs.id, "office_group_id": grp.id,
     })
-    assert c.status_code == 201
-    assert c.json()["office_group_id"] == grp.id
-    listed = client.get("/api/v1/fee-schedule-assignments", params={"office_group_id": grp.id}).json()
-    assert len(listed["items"]) == 1
-    assert listed["items"][0]["office_group_id"] == grp.id
+    assert c.status_code == 422, c.text
+    assert c.json()["error"]["details"]["code"] == "assignment_needs_target"
 
 
 def test_fee_schedule_new_version_clones_entries(client, schedule_id, db_session):

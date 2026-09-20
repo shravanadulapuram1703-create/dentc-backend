@@ -61,6 +61,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     patient_id = _resolve_patient_id(
                         request.url.path, resource_type, resolved_resource_id, details, body_ids
                     )
+                    office_id = _resolve_office_id(request, details, body_ids)
                     write_audit(
                         tenant_id=payload.get("tenant_id"),
                         user_id=int(payload["sub"]) if payload.get("sub") else None,
@@ -72,6 +73,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                         resource_type=resource_type,
                         resource_id=resolved_resource_id,
                         patient_id=patient_id,
+                        office_id=office_id,
                         details=_details_payload(details, body_ids) or None,
                     )
         except Exception:  # noqa: BLE001 - never break the response
@@ -99,6 +101,25 @@ def _resolve_patient_id(
         return int(resource_id)
     match = _PATIENT_PATH.search(path)
     return int(match.group(1)) if match else None
+
+
+def _resolve_office_id(request: Request, details: dict, body_ids: dict) -> int | None:
+    """OFF-SCOPE-17: the office a mutation was made in — the caller's validated
+    ``X-Office-ID`` working office (recorded by the office-scope dependency),
+    else the touched row's / body's ``office_id``, else the raw header. Best
+    effort: this is an access-by-location trail, never a request gate."""
+    candidate = details.get("office_id")
+    if isinstance(candidate, int) and not isinstance(candidate, bool):
+        return candidate
+    for source in (details.get("after"), details.get("before"), body_ids):
+        if isinstance(source, dict):
+            value = source.get("office_id")
+            if isinstance(value, int) and not isinstance(value, bool):
+                return value
+    raw = request.headers.get("X-Office-ID")
+    if raw and raw.strip().lstrip("-").isdigit():
+        return int(raw.strip())
+    return None
 
 
 def _details_payload(details: dict, body_ids: dict) -> dict:

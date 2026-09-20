@@ -123,12 +123,26 @@ class CRUDBase(Generic[ModelT]):
         filters: dict[str, Any] | None = None,
         range_filters: dict[str, dict[str, Any]] | None = None,
         id_in: list[Any] | None = None,
+        office_column: str | None = None,
+        office_ids: list[int] | None = None,
+        office_include_null: bool = False,
     ) -> tuple[list[ModelT], int]:
         stmt = self._scope_tenant(select(self.model), tenant_id)
 
         # restrict to an explicit id set (e.g. join-derived membership)
         if id_in is not None:
             stmt = stmt.where(self._pk.in_(id_in))
+
+        # OFF-SCOPE-2/4: restrict to a resolved set of offices (the caller's
+        # assigned offices, an explicit office target, an office group, …).
+        # ``office_ids=None`` means no restriction (tenant-wide). ``include_null``
+        # also keeps global (office_id IS NULL) catalog rows (PLAN-8).
+        if office_column and office_ids is not None and hasattr(self.model, office_column):
+            col = getattr(self.model, office_column)
+            if office_include_null:
+                stmt = stmt.where(or_(col.in_(office_ids), col.is_(None)))
+            else:
+                stmt = stmt.where(col.in_(office_ids))
 
         # equality filters on whitelisted columns
         for field, value in (filters or {}).items():

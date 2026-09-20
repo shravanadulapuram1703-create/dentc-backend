@@ -7,13 +7,19 @@ Resolves docs/users/groups_backend_devreport.md gaps #1 & #2 at the data level:
      concatenated/truncated).
   2. Seed the GLOBAL ``permissions`` catalog = the de-duplicated union of every
      right label, with a stable slug ``code`` (matches the frontend) and a
-     ``category`` (the leading "X - …" segment).
+     ``category`` (the leading "X - …" segment) — then apply the DentC **curation**
+     (``app.services.access_rights_catalog``): drop 210 obsolete legacy codes
+     (cascading to group assignments), add 44 DentC codes, rename 4 labels, so a
+     fresh seed lands on the curated 363-row catalog, not the raw 529.
   3. (default) Seed the 13 legacy groups + their right assignments into a tenant,
      mapping to groups that already exist there by name (case-insensitive, with a
-     small alias for the "Office Manger" typo). Creates missing groups.
+     small alias for the "Office Manger" typo). Creates missing groups. A curated-
+     away legacy right is skipped (its permission row no longer exists), so groups
+     never reference a dead code.
 
-Idempotent: permissions upsert by ``code``; group rights are reconciled to exactly
-the legacy set each run. Only the 13 legacy-named groups are touched.
+Idempotent: permissions upsert by ``code`` then the curation reconciles the set;
+group rights are reconciled to exactly the (curated) legacy set each run. Only the
+13 legacy-named groups are touched.
 
     python -m scripts.seed_permissions                 # catalog + groups into tenant 1
     python -m scripts.seed_permissions --tenant 3      # groups into tenant 3
@@ -30,6 +36,7 @@ from sqlalchemy import select
 
 from app.db.models import Permission, UserGroup, UserGroupRight
 from app.db.session import SessionLocal
+from app.services import access_rights_catalog
 
 _DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "Groups.txt"
 _MARKER = "This Group has the following rights"
@@ -88,6 +95,9 @@ def seed_catalog(db, groups) -> dict[str, int]:
     for _, _, rights in groups:
         for label in rights:
             labels.setdefault(slugify(label), label)
+    # Never (re-)create the curated-away legacy codes: apply_curation deletes them
+    # anyway, so upserting them would churn 210 rows in and out on every run.
+    labels = {c: l for c, l in labels.items() if c not in access_rights_catalog.REMOVED_CODES}
 
     existing = {p.code: p for p in db.execute(select(Permission)).scalars()}
     created = updated = 0
@@ -101,8 +111,17 @@ def seed_catalog(db, groups) -> dict[str, int]:
             row.label, row.category, row.is_active = label, cat, True
             updated += 1
     db.commit()
-    print(f"catalog: {len(labels)} distinct rights ({created} created, {updated} updated)")
-    return {p.code: p.id for p in db.execute(select(Permission)).scalars()}
+    print(f"catalog: {len(labels)} kept legacy rights ({created} created, {updated} updated)")
+    # DentC curation on top of the raw legacy import: drop obsolete codes
+    # (cascading group assignments), add the DentC-only codes, rename labels.
+    report = access_rights_catalog.apply_curation(db)
+    print(
+        "curation: -{permissions_removed} removed ({group_rights_cascaded} group rights cascaded), "
+        "+{added} added, {reactivated} reactivated, {renamed} renamed".format(**report)
+    )
+    curated = {p.code: p.id for p in db.execute(select(Permission)).scalars()}
+    print(f"catalog now {len(curated)} rights")
+    return curated
 
 
 def seed_groups(db, groups, tenant_id: int, id_by_code: dict[str, int]) -> None:

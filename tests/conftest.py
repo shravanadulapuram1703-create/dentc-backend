@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -79,12 +79,30 @@ settings.SMTP_HOST = None
 
 
 @pytest.fixture
-def db_session():
+def db_session(request):
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    # SQLite does not enforce foreign keys unless asked per connection. Without
+    # this, a unit-of-work ordering bug — an UPDATE that references a row whose
+    # INSERT the session has not flushed yet — passes here and is a 23503 on
+    # Postgres (AppointNow AN-BUG-1 shipped exactly that way). **Opt-in per
+    # module** via ``pytestmark = pytest.mark.enforce_fks``: turning it on
+    # suite-wide surfaced fixtures that insert an operatory before its provider
+    # in one flush and tests that post charges against ids nothing seeded
+    # (lab_tracking, scheduler, reports, restorative, medical_alert_surfacing,
+    # at least). Fix those, then make it the default.
+    if request.node.get_closest_marker("enforce_fks") is not None:
+
+        @event.listens_for(engine, "connect")
+        def _enable_sqlite_fks(dbapi_connection, _record):  # noqa: ANN001
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
     Base.metadata.create_all(engine)
     TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     session = TestingSessionLocal()
@@ -112,6 +130,10 @@ def db_session():
         yield session
     finally:
         session.close()
+        # The schema has FK cycles (users <-> providers, ...), so an ordered DROP
+        # is impossible with enforcement on; the DB is discarded anyway.
+        with engine.begin() as conn:
+            conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
         Base.metadata.drop_all(engine)
 
 

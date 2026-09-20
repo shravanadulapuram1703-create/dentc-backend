@@ -41,7 +41,7 @@ from app.schemas.sms import (
     SmsSendRequest,
     SmsSenderResolution,
 )
-from app.services import sms_service
+from app.services import office_scope_service, sms_service
 
 router = APIRouter(
     prefix="/sms",
@@ -63,8 +63,18 @@ webhook_router = APIRouter(prefix="/sms/webhooks", tags=["Communications"])
                429: {"model": ErrorResponse, "description": "sms_rate_limited"},
                502: {"model": ErrorResponse, "description": "twilio_error (row persisted as failed)"}},
 )
-def send_sms(body: SmsSendRequest, db: DbSession, tenant_id: TenantId, current: CurrentUser):
-    row = sms_service.send(db, tenant_id, current.id, body.model_dump())
+def send_sms(body: SmsSendRequest, db: DbSession, tenant_id: TenantId, current: CurrentUser,
+             office=Depends(office_scope_service.get_office_context)):
+    payload = body.model_dump()
+    # OFF-SCOPE-14: a new outbound message defaults its office to the caller's
+    # working office (X-Office-ID) when the body omits one; an explicit office in
+    # the body wins and is validated against the caller's assignments. (An
+    # existing thread keeps its own office — this only stamps a fresh send.)
+    if payload.get("office_id") is not None:
+        office_scope_service.validate_target_office(office, payload["office_id"])
+    elif office.x_office_id is not None:
+        payload["office_id"] = office.x_office_id
+    row = sms_service.send(db, tenant_id, current.id, payload)
     sms_service.enrich_sms_messages(db, [row], tenant_id)
     return row
 

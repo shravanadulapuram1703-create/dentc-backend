@@ -13,7 +13,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, status
 from pydantic import BaseModel, EmailStr, Field
 
-from app.api.deps import CurrentUser, DbSession, PageParams, TenantId, require_roles
+from app.api.deps import (
+    CurrentUser,
+    DbSession,
+    PageParams,
+    TenantId,
+    get_current_user,
+    require_read_access,
+    require_roles,
+)
 from app.core.security import hash_password
 from app.crud.base import CRUDBase
 from app.db.models import User
@@ -22,10 +30,18 @@ from app.schemas.common import ErrorResponse, PaginatedResponse
 from app.services import user_admin_service
 from app.services import signature_service
 
+# RBAC-1/3: writes stay admin-only; reads open to a caller holding the Security ->
+# Users screen's view (or full) right, so a view-only group can load the grid.
+_admin = Depends(require_roles("admin"))
+_users_read = Depends(require_read_access(
+    "setup_security_users_screen_view_only",
+    "setup_security_users_screen_full_control",
+))
+
 router = APIRouter(
     prefix="/users",
     tags=["Users"],
-    dependencies=[Depends(require_roles("admin"))],
+    dependencies=[Depends(get_current_user)],
     responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
 )
 
@@ -70,7 +86,7 @@ class UserUpdate(BaseModel):
 
 
 @router.get("", response_model=PaginatedResponse[UserRead], operation_id="list_users",
-            summary="List users")
+            summary="List users", dependencies=[_users_read])
 def list_users(
     db: DbSession,
     tenant_id: TenantId,
@@ -95,7 +111,7 @@ def list_users(
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED,
-             operation_id="create_user", summary="Create a user")
+             operation_id="create_user", summary="Create a user", dependencies=[_admin])
 def create_user(db: DbSession, tenant_id: TenantId, body: UserCreate, current: CurrentUser):
     data = body.model_dump(exclude={"password"})
     data["password_hash"] = hash_password(body.password)
@@ -106,7 +122,7 @@ def create_user(db: DbSession, tenant_id: TenantId, body: UserCreate, current: C
 
 
 @router.get("/{user_id}", response_model=UserRead, operation_id="get_user",
-            summary="Get a user by id")
+            summary="Get a user by id", dependencies=[_users_read])
 def get_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()]):
     user = _crud.get(db, user_id, tenant_id=tenant_id)
     user_admin_service.attach_audit_names(db, user)
@@ -114,7 +130,7 @@ def get_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()]
 
 
 @router.patch("/{user_id}", response_model=UserRead, operation_id="update_user",
-              summary="Update a user")
+              summary="Update a user", dependencies=[_admin])
 def update_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
                 body: UserUpdate, current: CurrentUser):
     data = body.model_dump(exclude_unset=True)
@@ -141,6 +157,6 @@ def update_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT,
-               operation_id="deactivate_user", summary="Deactivate a user")
+               operation_id="deactivate_user", summary="Deactivate a user", dependencies=[_admin])
 def deactivate_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()]):
     _crud.delete(db, user_id, tenant_id=tenant_id)

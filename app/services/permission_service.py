@@ -56,6 +56,69 @@ INSURANCE_PLAN_WRITE = (
 #: Required *in addition* when the plan is locked (or to lock / unlock it).
 INSURANCE_PLAN_EDIT_LOCKED = "setup_insurance_plans_screen_edit_locked_plan"
 
+# ── Office-context rights (OFF-SCOPE-13, reconciled to the catalog / FE-OFF-2) ─
+# The office is the user's working context, not a security fence (the tenant is
+# the fence). An office right is what lets a caller *step outside* their own
+# ``user_offices`` — targeting another office by query string, reading tenant-
+# wide lists, opening a chart owned by an office they are not assigned to, and
+# running all-office reports.
+#
+# The curated access-rights catalog (``access_rights_catalog.py``) carries exactly
+# ONE office-scope permission — ``office_scope_view_all_offices`` ("View Data
+# Across All Offices") — plus the legacy Denticon coverage right
+# ``appointments_add_appointment_in_other_office``. The four colon-style codes
+# named in the first response (``offices:view_all`` …) do NOT exist in the
+# catalog, and there is no *distinct* switch-any / cross-office-patient /
+# all-office-reports code: they collapse into the one master right. So the server
+# keys on the real codes, and ``MeFull`` emits the real codes (FE-OFF-2).
+OFFICE_SCOPE_VIEW_ALL = "office_scope_view_all_offices"
+#: Legacy Denticon coverage right ("Add appointment in other office"). It grants
+#: *targeting/switching* to another office (and, being unrestricted coverage, the
+#: view-all narrowing bypass) but not, on its own, cross-office chart reads or
+#: all-office reports.
+CROSS_OFFICE_ALIAS = "appointments_add_appointment_in_other_office"
+#: Every office-scope permission the catalog defines (surfaced on ``MeFull``).
+OFFICE_RIGHTS: tuple[str, ...] = (OFFICE_SCOPE_VIEW_ALL, CROSS_OFFICE_ALIAS)
+
+# Server-internal capability aliases, expressed as the *real* catalog codes so
+# the existing office_scope checks resolve without change. view-all + switch-any
+# both accept the master right OR the legacy coverage alias; cross-office-patient
+# + all-office-reports require the master right (the coverage alias is about
+# writing an appointment elsewhere, not reading another office's charts).
+OFFICES_VIEW_ALL = OFFICE_SCOPE_VIEW_ALL
+OFFICES_SWITCH_ANY = CROSS_OFFICE_ALIAS
+PATIENTS_VIEW_CROSS_OFFICE = OFFICE_SCOPE_VIEW_ALL
+REPORTS_ALL_OFFICES = OFFICE_SCOPE_VIEW_ALL
+
+#: Roles that hold the master office right without any group assignment —
+#: practice leadership. ``admin``/``super_admin`` already hold everything via
+#: :attr:`FULL_ACCESS_ROLES`; ``owner``/``manager`` are added here because the
+#: catalog code cannot be granted to them through a group on a migrated tenant
+#: until the rights model is set up.
+OFFICE_ADMIN_ROLES: frozenset[str] = FULL_ACCESS_ROLES | {"owner", "manager"}
+
+
+def office_rights(db: Session, user: User) -> set[str]:
+    """The office-context permission codes the caller holds (OFF-SCOPE-13),
+    expressed as the **real catalog codes** (``office_scope_view_all_offices`` /
+    ``appointments_add_appointment_in_other_office``).
+
+    Leadership roles hold the master right with no query; otherwise it is the
+    subset of the two office codes present in the caller's effective group codes.
+    """
+    role = (user.role or "").strip().lower()
+    if role in OFFICE_ADMIN_ROLES:
+        return {OFFICE_SCOPE_VIEW_ALL}
+    perms = effective_permissions(db, user)
+    if perms.full_access:
+        return {OFFICE_SCOPE_VIEW_ALL}
+    held: set[str] = set()
+    if OFFICE_SCOPE_VIEW_ALL in perms.codes:
+        held.add(OFFICE_SCOPE_VIEW_ALL)
+    if CROSS_OFFICE_ALIAS in perms.codes:
+        held.add(CROSS_OFFICE_ALIAS)
+    return held
+
 
 @dataclass
 class EffectivePermissions:
@@ -155,12 +218,21 @@ def permissions_for_user_id(db: Session, user_id: int | None) -> EffectivePermis
 
 
 __all__ = [
+    "CROSS_OFFICE_ALIAS",
     "EffectivePermissions",
     "FULL_ACCESS_ROLES",
     "INSURANCE_PLAN_EDIT_LOCKED",
     "INSURANCE_PLAN_WRITE",
+    "OFFICE_ADMIN_ROLES",
+    "OFFICE_RIGHTS",
+    "OFFICE_SCOPE_VIEW_ALL",
+    "OFFICES_SWITCH_ANY",
+    "OFFICES_VIEW_ALL",
+    "PATIENTS_VIEW_CROSS_OFFICE",
+    "REPORTS_ALL_OFFICES",
     "assert_can_edit_locked",
     "assert_permission",
     "effective_permissions",
+    "office_rights",
     "permissions_for_user_id",
 ]

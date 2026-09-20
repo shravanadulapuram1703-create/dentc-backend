@@ -31,6 +31,7 @@ def write_audit(
     resource_type: str | None = None,
     resource_id: str | None = None,
     patient_id: int | None = None,
+    office_id: int | None = None,
     details: dict | None = None,
 ) -> None:
     db = SessionLocal()
@@ -43,6 +44,7 @@ def write_audit(
                 resource_type=resource_type,
                 resource_id=resource_id,
                 patient_id=patient_id,
+                office_id=office_id,
                 method=method,
                 path=path,
                 status_code=status_code,
