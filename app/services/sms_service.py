@@ -1,4 +1,4 @@
-"""Patient SMS (Twilio) — send gateway, webhooks, inbox, templates, reminders.
+"""Patient SMS (RingCentral) — send gateway, webhooks, inbox, templates, reminders.
 
 Backs ``docs/sms/SMS_BACKEND_DEVREPORT.md`` (SMS-1…10). The table keeps its
 legacy shape — **one row per outbound text, with the reply on the same row** —
@@ -6,17 +6,25 @@ because the frontend fans a row out into up to two inbox entries from
 ``sent_text`` / ``reply_text``. A stand-alone inbound text is a row with
 ``sent_text IS NULL`` and ``direction='inbound'``.
 
+Migrated off Twilio to RingCentral (2026-10). The ``twilio_sid`` /
+``reply_twilio_sid`` columns are kept as-is (a rename is a pure cosmetic
+migration, deliberately deferred) but now hold RingCentral's numeric message
+``id`` (as a string), not a Twilio SID.
+
 What lives here:
 
 * :func:`send` — SMS-1. Consent (SMS-8), quiet hours, per-tenant throttle,
   idempotency by ``client_id``, sender resolution per office (SMS-7), the row
-  is persisted **before** Twilio is called, and a Twilio rejection is stored as
-  ``failed`` *and* surfaced as a 502 ``twilio_error`` so the UI can show both.
-* :func:`handle_inbound` / :func:`handle_status` — SMS-2. Idempotent by Twilio
-  sid; a reply within ``SMS_REPLY_WINDOW_HOURS`` of an unanswered outbound text
-  lands on that row (legacy parity), otherwise it is a stand-alone inbound row;
-  confirmation keywords act on the appointment; STOP/START flip
-  ``patients.no_auto_sms`` and are recorded as ``opt_out`` / ``opt_in`` rows.
+  is persisted **before** RingCentral is called, and a rejection is stored as
+  ``failed`` *and* surfaced as a 502 ``ringcentral_error`` so the UI can show both.
+* :func:`handle_inbound` / :func:`handle_status` — SMS-2. Idempotent by the
+  provider message id; a reply within ``SMS_REPLY_WINDOW_HOURS`` of an
+  unanswered outbound text lands on that row (legacy parity), otherwise it is
+  a stand-alone inbound row; confirmation keywords act on the appointment;
+  STOP/START flip ``patients.no_auto_sms`` and are recorded as ``opt_out`` /
+  ``opt_in`` rows. Both are driven by RingCentral's single Subscription
+  notification (one event carries either direction — Twilio instead used two
+  separate webhook URLs); see :func:`route_webhook_event`.
 * :class:`SmsMessageCRUD` + :func:`enrich_sms_messages` — SMS-6 practice-wide
   inbox filters and the denormalised patient/office/actor names.
 * :func:`render` — SMS-5 merge fields (``{{patient_first_name}}`` …), shared by
@@ -54,11 +62,12 @@ from app.db.models import (
     OfficePhoneAssignment,
     Patient,
     Provider,
+    RingCentralSubscription,
     SmsMessage,
     SmsTemplate,
 )
-from app.integrations import redis_store, twilio_client
-from app.integrations.twilio_client import TwilioError, status_rank
+from app.integrations import redis_store, ringcentral_client
+from app.integrations.ringcentral_client import RingCentralError, status_rank
 from app.services import sms_events
 from app.services.sms_phone import normalize_e164, phone_variants
 
@@ -73,7 +82,7 @@ MESSAGE_TYPES = (
 #: inbound webhook only.
 SENDABLE_TYPES = ("manual", "appointment_reminder", "appointment_confirmation",
                   "recall", "balance", "other")
-SEND_STATUSES = twilio_client.SEND_STATUSES
+SEND_STATUSES = ringcentral_client.SEND_STATUSES
 REPLY_INTENTS = ("confirm", "reschedule", "cancel", "stop", "start", "help", "other")
 DIRECTIONS = ("outbound", "inbound")
 MAX_BODY_LENGTH = 1600
@@ -94,8 +103,9 @@ DEFAULT_REMINDER_BODY = (
 )
 DEFAULT_REMINDER_LEAD_HOURS = [48, 2]
 
-# Carrier-level keywords (Twilio's standard STOP / START lists) — matched on the
-# *whole* trimmed body, case-insensitively.
+# Carrier-level keywords (the CTIA-standard STOP / START lists every US SMS
+# provider honors, Twilio and RingCentral alike — not provider-specific) —
+# matched on the *whole* trimmed body, case-insensitively.
 STOP_KEYWORDS = frozenset({"stop", "stopall", "unsubscribe", "cancel", "end", "quit"})
 START_KEYWORDS = frozenset({"start", "unstop"})
 HELP_KEYWORDS = frozenset({"help", "info"})
@@ -243,7 +253,7 @@ def render_for_patient(
 
 
 def _estimate_segments(text: str) -> int:
-    """GSM-7 vs UCS-2 segment estimate (what Twilio will bill)."""
+    """GSM-7 vs UCS-2 segment estimate (what the carrier will bill)."""
     if not text:
         return 0
     is_gsm = all(ord(ch) < 128 for ch in text)
@@ -293,11 +303,15 @@ def _comm_settings(db: Session, tenant_id: int) -> AccountCommunications | None:
 # ── SMS-7: sender resolution ─────────────────────────────────────────────────
 def resolve_sender(db: Session, tenant_id: int, office_id: int | None) -> dict[str, Any]:
     """``OFFICE_SPECIFIC`` assignment → ``MULTI_OFFICE_SHARED`` → tenant default
-    → platform default; Messaging Service SID per assignment → tenant →
-    platform. Returns ``{from_phone, messaging_service_sid, source}``."""
+    → platform default. Returns ``{from_phone, messaging_service_sid, source}``
+    — ``messaging_service_sid`` is always ``None`` now: RingCentral has no
+    Twilio-Messaging-Service-style pool/sticky-sender concept, a send always
+    goes from one specific number. The column/field is kept (not dropped) so
+    this stays a smaller, reviewable diff; ``office_phone_assignments.
+    messaging_service_sid`` / ``account_communications.messaging_service_sid``
+    are simply never read here anymore."""
     comm = _comm_settings(db, tenant_id)
     from_phone: str | None = None
-    service_sid: str | None = None
     source = "none"
     if office_id is not None:
         rows = db.execute(
@@ -309,52 +323,52 @@ def resolve_sender(db: Session, tenant_id: int, office_id: int | None) -> dict[s
         by_type = {(r.assignment_type or "").lower(): r for r in rows}
         for kind in ("office_specific", "multi_office_shared"):
             row = by_type.get(kind)
-            if row is not None and (row.phone_number or row.messaging_service_sid):
+            if row is not None and row.phone_number:
                 from_phone = normalize_e164(row.phone_number) or row.phone_number
-                service_sid = row.messaging_service_sid
                 source = kind
                 break
     if from_phone is None and comm is not None and comm.sms_from_phone:
         from_phone = normalize_e164(comm.sms_from_phone) or comm.sms_from_phone
         source = "tenant_default"
-    if from_phone is None and settings.TWILIO_DEFAULT_FROM:
-        from_phone = settings.TWILIO_DEFAULT_FROM
+    if from_phone is None and settings.RC_DEFAULT_FROM:
+        from_phone = settings.RC_DEFAULT_FROM
         source = "platform_default"
-    if not service_sid and comm is not None and comm.messaging_service_sid:
-        service_sid = comm.messaging_service_sid
-    if not service_sid and settings.TWILIO_MESSAGING_SERVICE_SID:
-        service_sid = settings.TWILIO_MESSAGING_SERVICE_SID
-    return {"from_phone": from_phone, "messaging_service_sid": service_sid, "source": source}
+    return {"from_phone": from_phone, "messaging_service_sid": None, "source": source}
 
 
-def _status_callback_url() -> str | None:
-    if settings.TWILIO_STATUS_CALLBACK_URL:
-        return settings.TWILIO_STATUS_CALLBACK_URL
+def _webhook_url() -> str | None:
+    """The single URL registered as a RingCentral Subscription for
+    message-store events (SMS-2) — both inbound messages and outbound status
+    changes arrive on this one feed, unlike Twilio's separate inbound-webhook
+    / StatusCallback URLs (and unlike Twilio, this isn't passed per-send —
+    RingCentral's send call has no callback-url parameter at all; the
+    subscription is set up once, see ensure_subscription)."""
     base = (settings.PUBLIC_API_BASE_URL or "").rstrip("/")
-    if base:
-        return f"{base}{settings.API_V1_PREFIX}/sms/webhooks/status"
-    return None
+    if not base:
+        return None
+    secret = settings.RC_WEBHOOK_SECRET or ""
+    return f"{base}{settings.API_V1_PREFIX}/sms/webhooks/ringcentral/{secret}"
 
 
 def gateway_status(db: Session | None = None, tenant_id: int | None = None) -> dict[str, Any]:
     """What the Messages screen needs to label itself Live / Log only."""
-    configured = twilio_client.is_configured()
+    configured = ringcentral_client.is_configured()
     out: dict[str, Any] = {
         "configured": configured,
         "mode": "live" if configured else "log_only",
-        "webhook_validation": bool(settings.TWILIO_WEBHOOK_VALIDATE),
-        "webhook_signing_ready": twilio_client.can_validate_webhooks(),
-        "status_callback_url": _status_callback_url(),
-        "messaging_service_configured": bool(settings.TWILIO_MESSAGING_SERVICE_SID),
+        "webhook_validation": bool(settings.RC_WEBHOOK_SECRET),
+        "webhook_signing_ready": bool(settings.RC_WEBHOOK_SECRET),
+        "status_callback_url": _webhook_url(),
+        # Always False: RingCentral has no Messaging-Service-style pool.
+        # Kept (not dropped) so the response shape — and any FE still
+        # reading it — doesn't need a coordinated simultaneous change.
+        "messaging_service_configured": False,
         "quiet_hours": None,
         "reminders_enabled": None,
     }
     if db is not None and tenant_id is not None:
         comm = _comm_settings(db, tenant_id)
         if comm is not None:
-            out["messaging_service_configured"] = bool(
-                comm.messaging_service_sid or settings.TWILIO_MESSAGING_SERVICE_SID
-            )
             out["quiet_hours"] = {
                 "start_hour": comm.sms_quiet_hours_start if comm.sms_quiet_hours_start is not None else 8,
                 "end_hour": comm.sms_quiet_hours_end if comm.sms_quiet_hours_end is not None else 21,
@@ -364,6 +378,78 @@ def gateway_status(db: Session | None = None, tenant_id: int | None = None) -> d
             out["quiet_hours"] = {"start_hour": 8, "end_hour": 21}
             out["reminders_enabled"] = False
     return out
+
+
+def _parse_rc_datetime(value: str) -> datetime:
+    """RingCentral timestamps are ISO 8601 with a trailing 'Z'
+    (``datetime.fromisoformat`` wants '+00:00' instead, pre-3.11 quirk kept
+    for safety even though this project runs 3.14+)."""
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def ensure_subscription(db: Session) -> dict[str, Any]:
+    """Create or renew the platform's single RingCentral SMS-2 webhook
+    Subscription. Call this from the same scheduler that runs the SMS-9
+    reminders job (e.g. once an hour) — RingCentral subscriptions expire
+    (confirmed live max 7 days) and are not renewed automatically.
+
+    No-op when RingCentral isn't configured, when no public webhook URL can
+    be built (PUBLIC_API_BASE_URL unset — same local-dev gate the old
+    Twilio status-callback URL had), or when the existing subscription still
+    has more than RC_SUBSCRIPTION_RENEW_BEFORE_SECONDS left on it.
+
+    NOT yet verified against a real renewal (needs a reachable webhook URL
+    — see ringcentral_client.renew_subscription's own note); the *create*
+    request shape is confirmed live (gets RingCentral's real "WebHook is not
+    reachable" error, not a format error, against a fake URL).
+    """
+    if not ringcentral_client.is_configured():
+        return {"status": "not_configured"}
+    url = _webhook_url()
+    if not url:
+        return {"status": "no_webhook_url"}
+
+    now = _now()
+    renew_cutoff = now + timedelta(seconds=settings.RC_SUBSCRIPTION_RENEW_BEFORE_SECONDS)
+    row = db.execute(select(RingCentralSubscription)).scalars().first()
+    if row is not None and row.webhook_url == url and row.expires_at > renew_cutoff:
+        return {
+            "status": "current",
+            "subscription_id": row.subscription_id,
+            "expires_at": row.expires_at.isoformat(),
+        }
+
+    try:
+        if row is not None and row.webhook_url == url:
+            result = ringcentral_client.renew_subscription(row.subscription_id)
+            action = "renewed"
+        else:
+            result = ringcentral_client.create_subscription(webhook_url=url)
+            action = "created"
+    except RingCentralError as exc:
+        logger.error("RingCentral subscription %s failed: %s",
+                     "renew" if row is not None else "create", exc.message)
+        return {"status": "error", "message": exc.message, "error_code": exc.error_code}
+
+    expiration = result.get("expirationTime")
+    expires_at = (
+        _parse_rc_datetime(expiration) if expiration
+        else now + timedelta(seconds=settings.RC_SUBSCRIPTION_EXPIRES_IN_SECONDS)
+    )
+    subscription_id = str(result.get("id") or (row.subscription_id if row else ""))
+    if row is None:
+        row = RingCentralSubscription(
+            subscription_id=subscription_id, webhook_url=url,
+            expires_at=expires_at, last_renewed_at=now,
+        )
+        db.add(row)
+    else:
+        row.subscription_id = subscription_id
+        row.webhook_url = url
+        row.expires_at = expires_at
+        row.last_renewed_at = now
+    db.commit()
+    return {"status": action, "subscription_id": subscription_id, "expires_at": expires_at.isoformat()}
 
 
 # ── SMS-8: compliance guards ─────────────────────────────────────────────────
@@ -446,9 +532,9 @@ def send(
     *, at: datetime | None = None,
 ) -> SmsMessage:
     """Persist-then-send. Raises 400/404/409/422/429 before anything is written,
-    502 ``twilio_error`` after the row is stored as ``failed``. ``at`` is the
-    moment quiet hours are judged against (the reminder job passes its own
-    clock so a batch is evaluated consistently)."""
+    502 ``ringcentral_error`` after the row is stored as ``failed``. ``at`` is
+    the moment quiet hours are judged against (the reminder job passes its
+    own clock so a batch is evaluated consistently)."""
     patient = _get_patient(db, tenant_id, int(payload["patient_id"]))
     body = (payload.get("body") or "").strip()
     if not body:
@@ -525,38 +611,33 @@ def send(
 
 
 def _dispatch(db: Session, row: SmsMessage, sender: dict[str, Any]) -> SmsMessage:
-    """Hand a persisted ``queued`` row to Twilio and record the outcome."""
-    if not twilio_client.is_configured():
+    """Hand a persisted ``queued`` row to RingCentral and record the outcome."""
+    if not ringcentral_client.is_configured():
         # Log-only mode: the row is the audit trail; nothing reaches a carrier.
         return row
     try:
-        result = twilio_client.send_message(
+        result = ringcentral_client.send_message(
             to=row.sent_phone or "",
             body=row.sent_text or "",
             from_phone=sender.get("from_phone"),
-            messaging_service_sid=sender.get("messaging_service_sid"),
-            status_callback=_status_callback_url(),
         )
-    except TwilioError as exc:
+    except RingCentralError as exc:
         row.send_status = "failed"
-        row.error_code = exc.code
+        row.error_code = exc.error_code
         row.error_message = exc.message
         row.updated_at = _now()
         db.commit()
         db.refresh(row)
         raise AppError(
-            exc.message or "Twilio rejected the message",
-            code="twilio_error", status_code=502,
-            details={"code": exc.code, "message": exc.message, "sms_message": row_dict(row)},
+            exc.message or "RingCentral rejected the message",
+            code="ringcentral_error", status_code=502,
+            details={"code": exc.error_code, "message": exc.message, "sms_message": row_dict(row)},
         ) from exc
-    row.twilio_sid = result.get("sid")
+    row.twilio_sid = str(result["id"]) if result.get("id") is not None else None
     row.send_status = (result.get("status") or "queued").lower()
     row.segments = result.get("num_segments")
     if result.get("error_code") is not None:
-        try:
-            row.error_code = int(result["error_code"])
-        except (TypeError, ValueError):
-            row.error_code = None
+        row.error_code = str(result["error_code"])[:20]
         row.error_message = result.get("error_message")
     row.updated_at = _now()
     db.commit()
@@ -666,22 +747,62 @@ def classify_reply(body: str, *, answers_appointment: bool) -> tuple[str | None,
     return "other", True
 
 
-def _twiml(message: str | None = None) -> str:
-    if not message:
-        return '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
-    safe = (message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
-    return f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{safe}</Message></Response>'
+def _message_text(message: dict[str, Any]) -> str:
+    """RingCentral stores an SMS/Pager message's body in ``subject``, not a
+    ``text``/``body`` field (a documented RC API quirk — unlike Twilio's
+    plain ``Body`` form field). Checks ``text`` first anyway in case a given
+    account/API version differs; unverified against a real payload either
+    way (see module/ringcentral_client.py notes on what's confirmed live
+    vs. documented-only)."""
+    return str(message.get("subject") or message.get("text") or "").strip()
 
 
-def handle_inbound(db: Session, form: dict[str, str], *, raw_body: bytes | None = None) -> str:
-    """Process one Twilio inbound-message webhook. Always returns TwiML; a
-    request we cannot route is acknowledged (200) so Twilio stops retrying."""
-    sid = (form.get("MessageSid") or form.get("SmsSid") or "").strip() or None
-    from_e164 = normalize_e164(form.get("From"))
-    to_e164 = normalize_e164(form.get("To"))
-    body = (form.get("Body") or "").strip()
+def _message_phone(party: dict[str, Any] | None) -> str | None:
+    return normalize_e164((party or {}).get("phoneNumber"))
+
+
+def route_webhook_event(db: Session, body: dict[str, Any], *, raw_body: bytes | None = None) -> None:
+    """Entry point for one RingCentral Subscription notification (SMS-2).
+
+    Unlike Twilio's two separate webhook URLs (inbound-message vs.
+    StatusCallback), RingCentral delivers both inbound messages and
+    outbound status changes through the *same* message-store event feed —
+    this dispatches on each message's own ``direction`` field.
+
+    ``body`` is the notification's ``body`` field, which NOT yet confirmed
+    live (this account has no reachable webhook URL to actually trigger a
+    real delivery against) — written against RingCentral's documented
+    shape: either a single Message object, or ``{"records": [Message, ...]}``
+    for a batch. Both are handled defensively.
+    """
+    records = body.get("records") if isinstance(body.get("records"), list) else [body]
+    for message in records:
+        if not isinstance(message, dict) or not message.get("id"):
+            continue
+        direction = str(message.get("direction") or "").strip().lower()
+        if direction == "inbound":
+            handle_inbound(db, message, raw_body=raw_body)
+        else:
+            # "outbound" (the common case) and anything unrecognized both
+            # fall here — handle_status itself no-ops cleanly (returns
+            # False) on an id it doesn't recognize, so this is safe either
+            # way rather than silently dropping an ambiguous direction.
+            handle_status(db, message, raw_body=raw_body)
+
+
+def handle_inbound(db: Session, message: dict[str, Any], *, raw_body: bytes | None = None) -> None:
+    """Process one RingCentral inbound-message notification (part of the
+    single message-store Subscription feed — see route_webhook_event).
+    Unlike Twilio's synchronous TwiML response, any auto-reply here is a
+    real second outbound API call (RingCentral has no equivalent of a
+    webhook response body triggering a reply)."""
+    sid = str(message.get("id") or "").strip() or None
+    from_e164 = _message_phone(message.get("from"))
+    to_list = message.get("to") or [{}]
+    to_e164 = _message_phone(to_list[0] if to_list else {})
+    body = _message_text(message)
     payload_hash = _sha256(raw_body) if raw_body is not None else _sha256(
-        "&".join(f"{k}={form[k]}" for k in sorted(form)))
+        str(sorted(message.items())))
 
     if sid:
         dup = db.execute(
@@ -690,14 +811,14 @@ def handle_inbound(db: Session, form: dict[str, str], *, raw_body: bytes | None 
             )
         ).scalars().first()
         if dup is not None:
-            return _twiml()
+            return
     if from_e164 is None:
-        logger.warning("Inbound SMS with unparseable From; ignored (sid=%s)", sid)
-        return _twiml()
+        logger.warning("Inbound SMS with unparseable From; ignored (id=%s)", sid)
+        return
     target = _resolve_inbound_target(db, to_e164)
     if target is None:
-        logger.warning("Inbound SMS to unknown number %s; ignored (sid=%s)", to_e164, sid)
-        return _twiml()
+        logger.warning("Inbound SMS to unknown number %s; ignored (id=%s)", to_e164, sid)
+        return
     tenant_id, office_id = target
 
     patient_id, candidates = _match_patient(db, tenant_id, office_id, from_e164)
@@ -783,7 +904,24 @@ def handle_inbound(db: Session, form: dict[str, str], *, raw_body: bytes | None 
     db.commit()
     db.refresh(row)
     sms_events.announce_inbound(row)
-    return _twiml(auto_reply)
+
+    if auto_reply and patient_id is not None:
+        # Unlike Twilio's synchronous TwiML reply (embedded in the webhook
+        # response, never its own API call or DB row), RingCentral has no
+        # equivalent — this is a genuine second outbound send. Persisted as
+        # its own row (now a real tracked attempt, same audit discipline as
+        # any other send) and best-effort: a failure here must never unwind
+        # the inbound classification/opt-in-out work already committed above.
+        try:
+            send(db, tenant_id, None, {
+                "patient_id": patient_id,
+                "office_id": office_id,
+                "to_phone": from_e164,
+                "body": auto_reply,
+                "message_type": "appointment_confirmation",
+            })
+        except Exception as exc:  # noqa: BLE001 — never fail the inbound webhook on this
+            logger.warning("Auto-reply send failed for patient %s: %s", patient_id, exc)
 
 
 def _is_reoptin(body: str, patient: Patient | None) -> bool:
@@ -795,16 +933,26 @@ def _is_reoptin(body: str, patient: Patient | None) -> bool:
 
 
 # ── SMS-2: status webhook ────────────────────────────────────────────────────
-def handle_status(db: Session, form: dict[str, str], *, raw_body: bytes | None = None) -> bool:
-    """Apply one delivery-status callback. Idempotent: a stale/out-of-order
-    callback never regresses the row. Returns False when the sid is unknown."""
-    sid = (form.get("MessageSid") or form.get("SmsSid") or "").strip()
-    status = (form.get("MessageStatus") or form.get("SmsStatus") or "").strip().lower()
+def handle_status(db: Session, message: dict[str, Any], *, raw_body: bytes | None = None) -> bool:
+    """Apply one RingCentral outbound-status notification (the same
+    message-store Subscription feed as handle_inbound — distinguished by
+    ``direction == "Outbound"``, see route_webhook_event). Idempotent: a
+    stale/out-of-order notification never regresses the row. Returns False
+    when the id is unknown.
+
+    RingCentral's terminal-failure statuses ("DeliveryFailed",
+    "SendingFailed") have no confirmed accompanying error-code/message
+    fields the way Twilio's ErrorCode/ErrorMessage form params did — this
+    account has never reached a failed send (TCR-blocked before that point),
+    so that part is unverified; best-effort field names only, re-check once
+    a real failure can be observed."""
+    sid = str(message.get("id") or "").strip()
+    status = str(message.get("messageStatus") or "").strip().lower()
     if not sid or not status:
         return False
     row = db.execute(select(SmsMessage).where(SmsMessage.twilio_sid == sid)).scalar_one_or_none()
     if row is None:
-        logger.info("Status callback for unknown sid %s (%s)", sid, status)
+        logger.info("Status notification for unknown id %s (%s)", sid, status)
         return False
     now = _now()
     incoming, current = status_rank(status), status_rank(row.send_status)
@@ -815,18 +963,16 @@ def handle_status(db: Session, form: dict[str, str], *, raw_body: bytes | None =
     if status == "delivered" and row.delivered_on is None:
         row.delivered_on = now
         changed = True
-    if status in ("undelivered", "failed", "canceled"):
-        code = form.get("ErrorCode")
-        try:
-            row.error_code = int(code) if code not in (None, "") else row.error_code
-        except (TypeError, ValueError):
-            pass
-        msg = form.get("ErrorMessage")
+    if status in ("deliveryfailed", "sendingfailed"):
+        code = message.get("errorCode") or message.get("messageStatusReason")
+        if code:
+            row.error_code = str(code)[:20]
+        msg = message.get("errorMessage") or message.get("statusReason")
         if msg:
-            row.error_message = msg[:1000]
+            row.error_message = str(msg)[:1000]
         changed = True
     row.status_payload_hash = _sha256(raw_body) if raw_body is not None else _sha256(
-        "&".join(f"{k}={form[k]}" for k in sorted(form)))
+        str(sorted(message.items())))
     row.updated_at = now
     db.commit()
     if changed:

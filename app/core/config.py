@@ -292,38 +292,55 @@ class Settings(BaseSettings):
     # Per-call timeout for the outbound Atlassian REST calls.
     JIRA_TIMEOUT_SECONDS: int = 15
 
-    # ── Twilio SMS (Patient -> Messages; SMS-1/2/7/8) ─────────────────────────
-    # The server holds every Twilio secret; the browser never sees one. Sending
-    # authenticates with an API key (preferred — rotatable) or the Auth Token.
-    # The Auth Token is ALSO what signs webhooks (X-Twilio-Signature), so it must
-    # be set for the two public webhook routes to accept traffic. When
-    # TWILIO_ACCOUNT_SID (+ a credential) is unset the gateway runs in "log only"
-    # mode: sends persist as ``queued`` and nothing reaches a carrier.
-    TWILIO_ACCOUNT_SID: str | None = None       # AC…
-    TWILIO_AUTH_TOKEN: str | None = None        # SECRET — webhook signatures (+ fallback auth)
-    TWILIO_API_KEY_SID: str | None = None       # SK…
-    TWILIO_API_KEY_SECRET: str | None = None    # SECRET
+    # ── RingCentral SMS (replaces Twilio; Patient -> Messages; SMS-1/2/7/8) ───
+    # JWT auth flow (verified live 2026-10-01): the server exchanges
+    # RC_USER_JWT for a short-lived (1h) access token at POST
+    # /restapi/oauth/token, cached and re-exchanged on expiry. JWT auth issues
+    # no refresh_token — there is nothing to rotate besides the JWT itself.
+    # When RC_APP_CLIENT_ID/_SECRET/RC_USER_JWT aren't all set, the gateway
+    # runs in "log only" mode: sends persist as ``queued`` and nothing reaches
+    # a carrier.
+    RC_APP_CLIENT_ID: str | None = None
+    RC_APP_CLIENT_SECRET: str | None = None     # SECRET
+    RC_USER_JWT: str | None = None              # SECRET — long-lived; see ringcentral_client.py
+    RC_SERVER_URL: str = "https://platform.ringcentral.com"
+    RC_TIMEOUT_SECONDS: int = 15
     # Tenant/office rows (account_communications / office_phone_assignments)
-    # override these platform defaults (SMS-7 resolution order).
-    TWILIO_MESSAGING_SERVICE_SID: str | None = None  # MG…
-    TWILIO_DEFAULT_FROM: str | None = None           # E.164 fallback sender
-    # Where Twilio posts delivery states. When unset, derived from
-    # PUBLIC_API_BASE_URL + /api/v1/sms/webhooks/status; when neither is set no
-    # status_callback is passed (the Messaging Service's own setting applies).
-    TWILIO_STATUS_CALLBACK_URL: str | None = None
-    # Validate X-Twilio-Signature on the webhooks. Only ever disable for local
-    # tunnel testing — with it off anyone can inject "patient replies".
-    TWILIO_WEBHOOK_VALIDATE: bool = True
-    TWILIO_TIMEOUT_SECONDS: int = 15
-    TWILIO_API_BASE_URL: str = "https://api.twilio.com"
-    # SMS-8: per-tenant outbound throttle (Twilio long codes carry ~1 MPS; a
-    # Messaging Service more). Redis-backed; disabled when Redis is off.
+    # override this platform default (SMS-7 resolution order). Must be a
+    # number with the "SmsSender" feature on this RingCentral account (TCR
+    # campaign registration required — GET .../extension/~/phone-number).
+    # RingCentral has no Messaging-Service-style pool/sticky-sender concept:
+    # a send always goes from one specific number.
+    RC_DEFAULT_FROM: str | None = None
+    # SMS-2 inbound/status delivery: RingCentral uses a Subscription resource
+    # (POST /restapi/v1.0/subscription, eventFilters=[.../message-store]),
+    # not a fixed per-number callback URL like Twilio's StatusCallback.
+    # Subscriptions expire and must be renewed (see sms_service.
+    # ensure_subscription, run from the same scheduler as the SMS-9
+    # reminders job) — RC_SUBSCRIPTION_EXPIRES_IN_SECONDS is the documented
+    # max (7 days); renewal fires once only RC_SUBSCRIPTION_RENEW_BEFORE_
+    # SECONDS of that remains.
+    RC_SUBSCRIPTION_EXPIRES_IN_SECONDS: int = 604800
+    RC_SUBSCRIPTION_RENEW_BEFORE_SECONDS: int = 86400
+    # RingCentral's subscription-creation handshake (a "Validation-Token"
+    # header we must echo back) only proves the URL is reachable and under
+    # our control at creation/renewal time — it is not confirmed to be a
+    # per-delivery signature the way Twilio's X-Twilio-Signature is (nothing
+    # in RC's docs describes one). The real, ongoing trust boundary is this
+    # secret, embedded in the webhook URL we register: a request missing or
+    # mismatching it is rejected before anything is read. Only ever unset
+    # for local tunnel testing.
+    RC_WEBHOOK_SECRET: str | None = None
+    # SMS-8: per-tenant outbound throttle. Redis-backed; disabled when Redis
+    # is off.
     SMS_RATE_LIMIT_PER_MINUTE: int = 60
     # SMS-2: an inbound text within this window of an unanswered outbound one is
     # stored as *its reply* (legacy row shape) rather than a stand-alone row.
     SMS_REPLY_WINDOW_HOURS: int = 72
-    # SMS-2 step 3: optional auto-reply TwiML text on a recognised confirmation
-    # keyword. Empty = respond with an empty <Response/>.
+    # SMS-2 step 3: optional auto-reply text on a recognised confirmation
+    # keyword, sent as its own outbound message (RingCentral has no TwiML-style
+    # synchronous auto-reply — unlike Twilio, this is a real second API call,
+    # not a response body). Empty = no auto-reply sent.
     SMS_CONFIRMATION_AUTO_REPLY: str | None = None
     # SMS-9: a reminder whose send-by moment is older than this is skipped
     # rather than blasted late after an outage.

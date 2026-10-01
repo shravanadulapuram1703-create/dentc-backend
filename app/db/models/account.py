@@ -150,7 +150,10 @@ class AccountSettings(Base, IntPKMixin, TimestampMixin):
 
 
 class AccountCommunications(Base, IntPKMixin, TimestampMixin):
-    """1:1 with tenant. Communications tab — TCR/Twilio toll-free business profile."""
+    """1:1 with tenant. Communications tab — TCR toll-free business profile
+    (the compliance registration a carrier/SMS-provider requires; currently
+    a local data stub, not a live sync to either Twilio or RingCentral — see
+    app/services/communications_service.py)."""
 
     __tablename__ = "account_communications"
     __table_args__ = (UniqueConstraint("tenant_id", name="uq_account_communications_tenant"),)
@@ -183,9 +186,13 @@ class AccountCommunications(Base, IntPKMixin, TimestampMixin):
     telecom_verified_at: Mapped[datetime | None]
     telecom_verified_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
-    # ── SMS-7: tenant-level Twilio sender settings. The Auth Token / API secret
-    # are NOT here — they live only in the server environment (TWILIO_*). A
-    # Messaging Service SID is not a secret (it is the *from* selector).
+    # ── SMS-7: tenant-level sender settings. The RingCentral credentials
+    # are NOT here — they live only in the server environment (RC_*).
+    # messaging_service_sid is a Twilio-only concept (a pool of numbers
+    # Twilio picks from) with no RingCentral equivalent — a send always
+    # goes from one specific number there. Column kept, not dropped (a
+    # rename/removal is a pure cosmetic follow-up); sms_service.
+    # resolve_sender no longer reads it.
     messaging_service_sid: Mapped[str | None] = mapped_column(String(40))
     # Tenant default From number (E.164) when no office assignment matches.
     sms_from_phone: Mapped[str | None] = mapped_column(String(20))
@@ -211,7 +218,9 @@ class OfficePhoneAssignment(Base, IntPKMixin, CreatedAtMixin):
     assignment_type: Mapped[str] = mapped_column(String(30), default="office_specific")  # office_specific | multi_office_shared
     phone_number: Mapped[str | None] = mapped_column(String(20))
     is_model_office: Mapped[bool] = mapped_column(Boolean, default=False)
-    # SMS-7: per-office Messaging Service override (else the tenant's).
+    # SMS-7: per-office Messaging Service override (else the tenant's). A
+    # Twilio-only concept, no RingCentral equivalent — kept, not read by
+    # sms_service.resolve_sender anymore (see AccountCommunications above).
     messaging_service_sid: Mapped[str | None] = mapped_column(String(40))
 
 
