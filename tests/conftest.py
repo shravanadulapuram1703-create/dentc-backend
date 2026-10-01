@@ -45,22 +45,21 @@ settings.GCS_BUCKET_DOCUMENTS = None
 # configured path.
 settings.JIRA_BASE_URL = None
 
-# Same reasoning for Twilio. A developer's ``.env`` legitimately carries a real
-# ``TWILIO_ACCOUNT_SID`` + credential, and with them set
-# ``twilio_client.is_configured()`` is True, so every ``POST /sms/send`` in
-# ``test_sms_module.py`` went to the **live** Twilio REST API — seven tests
-# failed with ``twilio_error`` 502 ("actor doesn't have any assertions") because
-# the test fixtures' phone numbers and Messaging Service are not real. The SMS
-# module's documented zero-config path (persist ``queued``, log-only, no carrier
-# call) is what the tests are meant to exercise; the ``twilio_live`` fixture in
-# ``test_sms_module.py`` patches the SID/token back on with a fake
-# ``send_message``. All four gate ``is_configured()`` (SID + either an API key
-# pair or the Auth Token), and the token alone gates webhook validation, so
-# clear every one — a leftover API key pair would keep the gateway live.
-settings.TWILIO_ACCOUNT_SID = None
-settings.TWILIO_AUTH_TOKEN = None
-settings.TWILIO_API_KEY_SID = None
-settings.TWILIO_API_KEY_SECRET = None
+# Same reasoning, now for RingCentral (migrated off Twilio 2026-10). A
+# developer's ``.env`` legitimately carries real ``RC_APP_CLIENT_ID`` +
+# ``RC_APP_CLIENT_SECRET`` + ``RC_USER_JWT``, and with all three set
+# ``ringcentral_client.is_configured()`` is True, so every ``POST /sms/send``
+# in ``test_sms_module.py`` would go to the **live** RingCentral REST API —
+# same failure mode the Twilio comment above used to describe (this
+# account's own numbers aren't even TCR-approved for SMS yet, so it would
+# just 403 instead of succeeding). The SMS module's documented zero-config
+# path (persist ``queued``, log-only, no carrier call) is what the tests are
+# meant to exercise; the ``ringcentral_live`` fixture in ``test_sms_module.py``
+# patches the credentials back on with a fake ``send_message``. Clear all
+# three — ``is_configured()`` requires every one.
+settings.RC_APP_CLIENT_ID = None
+settings.RC_APP_CLIENT_SECRET = None
+settings.RC_USER_JWT = None
 
 # And for the email transports. ``sendgrid_client.is_configured()`` gates the
 # patient-email path the same way Twilio gates SMS; ``email.graph_is_configured()``

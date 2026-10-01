@@ -1,4 +1,4 @@
-"""Patient SMS (Twilio) routes — SMS-1/2/4/5/6/7/8/9.
+"""Patient SMS (RingCentral) routes — SMS-1/2/4/5/6/7/8/9.
 
 Two routers:
 
@@ -8,11 +8,18 @@ Two routers:
   ``/sms/inbox/summary`` + ``/sms/inbox/mark-read`` (practice-wide inbox),
   ``/sms/sender`` (what number an office sends from), ``/sms/reminders/run``
   (the SMS-9 job, admin) and ``/sms/metadata``.
-* ``webhook_router`` (**unauthenticated**) — ``/sms/webhooks/inbound`` and
-  ``/sms/webhooks/status``. Twilio signs them (``X-Twilio-Signature``); the
-  signature is validated against the Auth Token before anything is read. A
-  request we cannot route is still acknowledged with 200 so Twilio does not
-  retry it forever.
+* ``webhook_router`` (**unauthenticated**) — ``/sms/webhooks/ringcentral/
+  {secret}``, ONE route for both inbound messages and outbound status
+  changes (RingCentral delivers both through the same Subscription feed —
+  unlike Twilio's two separate webhook URLs, see sms_service.
+  route_webhook_event). Guarded by a secret embedded in the URL path
+  (RC_WEBHOOK_SECRET) rather than a per-request signature — RingCentral's
+  docs don't describe an ongoing per-delivery signature the way Twilio's
+  X-Twilio-Signature works; see ringcentral_client.py for the reasoning.
+  Also handles RingCentral's subscription-validation handshake (a
+  "Validation-Token" header that must be echoed back). A request we cannot
+  route is still acknowledged with 200 so RingCentral does not retry it
+  forever.
 
 The generic ``/sms-messages`` and ``/sms-templates`` resources stay in the CRUD
 registry (with ``SmsMessageCRUD`` + ``enrich_sms_messages`` attached).
@@ -25,7 +32,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user, require_roles
 from app.core.exceptions import ForbiddenError
-from app.integrations import twilio_client
+from app.integrations import ringcentral_client
 from app.schemas.common import ErrorResponse
 from app.schemas.sms import (
     SmsGatewayStatus,
@@ -57,11 +64,11 @@ webhook_router = APIRouter(prefix="/sms/webhooks", tags=["Communications"])
 @router.post(
     "/send", response_model=SmsMessageRead, status_code=status.HTTP_201_CREATED,
     operation_id="send_sms",
-    summary="Send a text to a patient via Twilio (SMS-1)",
+    summary="Send a text to a patient via RingCentral (SMS-1)",
     responses={400: {"model": ErrorResponse, "description": "patient_opted_out / consent_override_required"},
                409: {"model": ErrorResponse, "description": "duplicate_client_id (details.sms_message is the existing row)"},
                429: {"model": ErrorResponse, "description": "sms_rate_limited"},
-               502: {"model": ErrorResponse, "description": "twilio_error (row persisted as failed)"}},
+               502: {"model": ErrorResponse, "description": "ringcentral_error (row persisted as failed)"}},
 )
 def send_sms(body: SmsSendRequest, db: DbSession, tenant_id: TenantId, current: CurrentUser,
              office=Depends(office_scope_service.get_office_context)):
@@ -80,7 +87,7 @@ def send_sms(body: SmsSendRequest, db: DbSession, tenant_id: TenantId, current: 
 
 
 @router.get("/gateway", response_model=SmsGatewayStatus, operation_id="get_sms_gateway_status",
-            summary="Is Twilio configured (live) or is the gateway in log-only mode?")
+            summary="Is RingCentral configured (live) or is the gateway in log-only mode?")
 def get_sms_gateway_status(db: DbSession, tenant_id: TenantId):
     return sms_service.gateway_status(db, tenant_id)
 
@@ -128,41 +135,32 @@ def get_sms_metadata():
     return sms_service.metadata()
 
 
-# ── Twilio webhooks (UNAUTH, signed) ─────────────────────────────────────────
-async def _twilio_form(request: Request) -> tuple[dict[str, str], bytes]:
+# ── RingCentral webhook (UNAUTH, secret-in-path) ─────────────────────────────
+@webhook_router.post(
+    "/ringcentral/{secret}", operation_id="ringcentral_webhook", include_in_schema=False,
+    summary="RingCentral SMS-2 Subscription notification (inbound messages + outbound status)",
+)
+async def ringcentral_webhook(secret: str, request: Request, db: DbSession):
+    # RingCentral's subscription-validation handshake: on create/renew (and,
+    # per their docs, potentially again later) it sends a request carrying
+    # this header and expects it echoed back, HTTP 200, within 3000ms — a
+    # different mechanism from (and not a substitute for) the secret check
+    # below, which is this route's actual per-delivery trust boundary.
+    validation_token = request.headers.get("Validation-Token")
+    if validation_token:
+        return Response(status_code=status.HTTP_200_OK,
+                        headers={"Validation-Token": validation_token})
+
+    if not ringcentral_client.validate_webhook_secret(secret):
+        raise ForbiddenError("Invalid webhook secret", code="ringcentral_webhook_secret_invalid")
+
     raw = await request.body()
-    form = await request.form()
-    return {k: str(v) for k, v in form.items()}, raw
-
-
-def _verify(request: Request, params: dict[str, str]) -> None:
-    qs = request.url.query
-    path_qs = request.url.path + (f"?{qs}" if qs else "")
-    ok = twilio_client.validate_signature(
-        signature=request.headers.get("X-Twilio-Signature"),
-        request_url=str(request.url), path_qs=path_qs, params=params,
-    )
-    if not ok:
-        raise ForbiddenError("Invalid or missing X-Twilio-Signature", code="twilio_signature_invalid")
-
-
-@webhook_router.post(
-    "/inbound", operation_id="twilio_inbound_webhook", include_in_schema=False,
-    summary="Twilio inbound-message webhook (SMS-2)",
-)
-async def twilio_inbound_webhook(request: Request, db: DbSession):
-    params, raw = await _twilio_form(request)
-    _verify(request, params)
-    twiml = await run_in_threadpool(sms_service.handle_inbound, db, params, raw_body=raw)
-    return Response(content=twiml, media_type="application/xml")
-
-
-@webhook_router.post(
-    "/status", operation_id="twilio_status_webhook", include_in_schema=False,
-    summary="Twilio delivery-status callback (SMS-2)",
-)
-async def twilio_status_webhook(request: Request, db: DbSession):
-    params, raw = await _twilio_form(request)
-    _verify(request, params)
-    await run_in_threadpool(sms_service.handle_status, db, params, raw_body=raw)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001 — malformed body: ack, don't retry-loop it
+        return Response(status_code=status.HTTP_200_OK)
+    body = payload.get("body") if isinstance(payload, dict) else None
+    if not isinstance(body, dict):
+        return Response(status_code=status.HTTP_200_OK)
+    await run_in_threadpool(sms_service.route_webhook_event, db, body, raw_body=raw)
+    return Response(status_code=status.HTTP_200_OK)

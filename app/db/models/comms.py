@@ -1,7 +1,8 @@
 """Communications domain models.
 
-sms_messages · sms_templates · email_messages · letter_templates ·
-postcard_templates · letter_batch_runs · letter_batch_items · campaigns
+sms_messages · sms_templates · ringcentral_sms_subscriptions · email_messages ·
+letter_templates · postcard_templates · letter_batch_runs · letter_batch_items ·
+campaigns
 """
 
 from __future__ import annotations
@@ -56,15 +57,21 @@ class SmsMessage(Base, IntPKMixin, CreatedAtMixin):
     message_type: Mapped[str | None] = mapped_column(String(50))
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
-    # ── SMS-3: Twilio correlation + delivery detail ──────────────────────────
+    # ── SMS-3: provider correlation + delivery detail ────────────────────────
+    # Column names kept as-is post-RingCentral-migration (a rename is a pure
+    # cosmetic follow-up, deliberately deferred) — they now hold RingCentral's
+    # numeric message id, stringified, not a Twilio SID.
     twilio_sid: Mapped[str | None] = mapped_column(String(34), unique=True)
-    # The reply is stored on the outbound row (legacy parity), so its own Twilio
-    # sid needs a home too — that is what makes the inbound webhook idempotent.
+    # The reply is stored on the outbound row (legacy parity), so its own
+    # provider id needs a home too — that is what makes the inbound webhook
+    # idempotent.
     reply_twilio_sid: Mapped[str | None] = mapped_column(String(34), unique=True)
     from_phone: Mapped[str | None] = mapped_column(String(20))
     direction: Mapped[str | None] = mapped_column(String(10))  # outbound | inbound
     sent_at: Mapped[datetime | None]
-    error_code: Mapped[int | None] = mapped_column(Integer)
+    # String, not Integer: RingCentral's error codes are alphanumeric
+    # ("MSG-242", "SUB-521" — confirmed live), unlike Twilio's numeric ones.
+    error_code: Mapped[str | None] = mapped_column(String(20))
     error_message: Mapped[str | None] = mapped_column(Text)
     segments: Mapped[int | None] = mapped_column(SmallInteger)
     client_id: Mapped[str | None] = mapped_column(String(40))
@@ -85,6 +92,24 @@ class SmsMessage(Base, IntPKMixin, CreatedAtMixin):
     inbound_payload_hash: Mapped[str | None] = mapped_column(String(64))
     status_payload_hash: Mapped[str | None] = mapped_column(String(64))
     updated_at: Mapped[datetime | None]
+
+
+class RingCentralSubscription(Base, IntPKMixin, CreatedAtMixin):
+    """The platform's single active RingCentral Subscription for SMS-2
+    webhook delivery (message-store events). Platform-wide, not
+    tenant-scoped — one RingCentral account (RC_* settings) serves the
+    whole platform, same as Twilio's own account-level settings did.
+    Expected to hold exactly one row; ``sms_service.ensure_subscription``
+    renews it in place (keeping ``subscription_id``) rather than replacing
+    it, since RingCentral subscriptions expire (max 7 days, confirmed live)
+    and must be proactively renewed before that."""
+
+    __tablename__ = "ringcentral_sms_subscriptions"
+
+    subscription_id: Mapped[str] = mapped_column(String(64), unique=True)
+    webhook_url: Mapped[str] = mapped_column(String(500))
+    expires_at: Mapped[datetime]
+    last_renewed_at: Mapped[datetime | None]
 
 
 class SmsTemplate(Base, IntPKMixin, TimestampMixin):

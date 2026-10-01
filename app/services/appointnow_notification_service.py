@@ -2,8 +2,8 @@
 
 Two audiences, both **best-effort** — a notification can never fail or undo the
 request transition that already committed, and with no transport configured
-(no ``SENDGRID_API_KEY``, no ``TWILIO_ACCOUNT_SID``) everything is log-only so
-dev/tests need no credentials:
+(no ``SENDGRID_API_KEY``, no ``RC_APP_CLIENT_ID``/etc.) everything is log-only
+so dev/tests need no credentials:
 
 * **The office**, on a new public request — one e-mail to the office's
   notification address (``offices.email`` → ``account_communications.
@@ -12,7 +12,7 @@ dev/tests need no credentials:
   keep the PMS open.
 * **The contact**, on approve / decline / reschedule — SMS first when the
   patient ticked the contact consent (``consent_accepted`` is exactly "I consent
-  to receive calls and text messages regarding my appointment"), Twilio is
+  to receive calls and text messages regarding my appointment"), RingCentral is
   configured, the number normalises to E.164 and the office is **outside quiet
   hours** (the same window the SMS module applies to automated texts — an
   approval at 22:30 must not wake anyone); otherwise e-mail when the request has
@@ -21,9 +21,10 @@ dev/tests need no credentials:
   the patient was told.
 
 The contact is an *external* person, usually not yet a ``patients`` row, so the
-text is sent through :mod:`twilio_client` directly with the office's resolved
-sender (``sms_service.resolve_sender``) rather than through ``sms_service.send``
-(which is keyed on ``patient_id`` and writes the patient SMS log).
+text is sent through :mod:`ringcentral_client` directly with the office's
+resolved sender (``sms_service.resolve_sender``) rather than through
+``sms_service.send`` (which is keyed on ``patient_id`` and writes the patient
+SMS log).
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.core.logging import get_logger
 from app.db.models import AccountCommunications, AccountSettings, BookingRequest, Office
-from app.integrations import sendgrid_client, twilio_client
+from app.integrations import ringcentral_client, sendgrid_client
 from app.services import sms_service
 from app.services.sms_phone import normalize_e164
 
@@ -164,17 +165,16 @@ def notify_contact(db: Session, office: Office, req: BookingRequest, event: str)
         sms_reason = "no_consent"
     elif to_phone is None:
         sms_reason = "bad_phone"
-    elif not twilio_client.is_configured():
+    elif not ringcentral_client.is_configured():
         sms_reason = "not_configured"
     elif not _sms_allowed_now(db, office):
         sms_reason = "quiet_hours"
     else:
         sender = sms_service.resolve_sender(db, office.tenant_id, office.id)
         try:
-            twilio_client.send_message(
+            ringcentral_client.send_message(
                 to=to_phone, body=body,
                 from_phone=sender.get("from_phone"),
-                messaging_service_sid=sender.get("messaging_service_sid"),
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("AppointNow contact SMS failed req=%s: %s", req.id, exc)
