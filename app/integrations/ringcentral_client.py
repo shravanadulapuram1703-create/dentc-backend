@@ -41,12 +41,17 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 #: RingCentral's own message-status vocabulary (confirmed via the SMS quick
-#: start's polling example and the high-volume SMS guide). Unlike Twilio
-#: there is no single documented terminal/progress ordering published, so
-#: SEND_STATUSES exists for display purposes; status_rank below encodes the
-#: ordering we actually rely on for idempotent webhook handling.
+#: start's polling example and the high-volume SMS guide), lowercased to
+#: match what actually lands in sms_messages.send_status — sms_service
+#: always lowercases RingCentral's raw Title-Case ``messageStatus`` on the
+#: way in (``_dispatch``/``handle_status``), so this must match or a
+#: metadata-driven status filter/dropdown won't line up with real rows.
+#: Unlike Twilio there is no single documented terminal/progress ordering
+#: published, so SEND_STATUSES exists for display purposes; status_rank
+#: below encodes the ordering actually relied on for idempotent webhook
+#: handling.
 SEND_STATUSES = (
-    "Queued", "SendingFailed", "Sent", "Delivered", "DeliveryFailed", "Received",
+    "queued", "sendingfailed", "sent", "delivered", "deliveryfailed", "received",
 )
 
 #: Mirrors twilio_client.status_rank's purpose: a stale/out-of-order
