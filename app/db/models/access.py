@@ -148,9 +148,15 @@ class UserTimeClockConfig(Base, IntPKMixin, TimestampMixin):
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
     pay_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    # TC-BE-7: ``none | weekly | daily | daily_weekly`` (canonicalised on write by
+    # ``time_clock_service.canonical_overtime_method``); NULL = practice default.
     overtime_method: Mapped[str | None] = mapped_column(String(50))
     overtime_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     clock_in_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    # TC-BE-7: per-user overrides of the practice ``time_clock_settings``.
+    daily_threshold_hours: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    weekly_threshold_hours: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    week_start_day: Mapped[str | None] = mapped_column(String(10))
 
 
 class UserLoginRestriction(Base, IntPKMixin, TimestampMixin):

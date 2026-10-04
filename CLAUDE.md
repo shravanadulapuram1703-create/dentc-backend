@@ -1531,6 +1531,19 @@ Diag Date → Edit Treatment; "New Appt"; PLAN-9/11/16/17…20/24…29 + PLAN-AP
   item → plan → patient. The migrated item ↔ line link is not reconstructable
   (`appointment_procedures` kept no legacy id).
 
+**Scheduler PT (pending treatment) badge** (SCHED-PT-1…5 of
+[docs/treatments-PT/pending_treatment_badge_backend_devreport.md](docs/treatments-PT/pending_treatment_badge_backend_devreport.md)
+/ [response](docs/treatments-PT/pending_treatment_badge_backend_response.md); **no
+migration**). One rule, `treatment_service.pending_item_clauses` (not archived, no
+`end_date`, no live charge, status ∉ `PENDING_EXCLUDED_STATUSES` = completed/referred_out/
+external_referral — `internal_referral`/`scheduled`/hold/alternative count), read three
+ways: `pending_tx_count`/`_scheduled_count`/`_fee` on the scheduler feed (one grouped
+statement), `?pending=true` on `/patients/{id}/treatment-plan-items` (`include_completed`
+left as-is, non-breaking), `GET /treatment-plan-items/pending-summary?patient_ids=` (≤200).
+`TreatmentPlanItemRead.status` is the `ItemStatus` enum, legacy codes folded on read via
+`LEGACY_ITEM_STATUS_MAP`; dev DB already canonical, `scripts/normalize_treatment_item_statuses.py`
+for other environments. Rule published on `/metadata/treatment-plan-rules → pending_rule`.
+
 **Patient print module** (Print buttons on Patient Overview · Transactions Entry ·
 Account/Patient Ledger · Insurance Details; PRINT-1…10 of
 `dentc-frontend/docs/print/patient_print_backend_devreport.md` /
@@ -1787,6 +1800,34 @@ kept + 44 added).
   `transactions_treatment_plan_delete` (DELETE /treatment-plans). Deferred (field/
   bespoke-route): prescription strike-off, tx-plan discount/edit-fee/change-status,
   progress-note lock, medical-history, imaging capture, post-adjustments.
+
+**Time Clock module** (Top-bar punch · My Time Clock · Time Clock Report/Editor; TC-BE-1…14 of
+[docs/time-clock/time_clock_backend_devreport.md](docs/time-clock/time_clock_backend_devreport.md)
+/ [response](docs/time-clock/time_clock_backend_response.md); Alembic `1745e318c65a`, **NOT applied** —
+the dev DB is stamped `fc6450e398ee`, a revision in no branch/worktree; verified in a rolled-back txn).
+- `time-clock-entries` **left the registry** for [app/api/v1/time_clock.py](app/api/v1/time_clock.py)
+  (same operation ids) because authorization is by *caller* (TC-BE-5), which the generic engine can't
+  express on list/get/delete. Manager = `owner|admin|manager|super_admin` or
+  `utilities_time_clock_editor_full_control` (`has_strict` — an ungated user is **not** a manager);
+  `…_view_only` reads everyone. Non-managers see own rows only.
+- **TC-BE-1** `/clock-in` / `/clock-out` / `/me/active` stamp the server clock. Transitional path: a
+  non-manager's self `POST` (no clock_out) / `PATCH {clock_out}` on their open shift is *routed to the
+  action*, discarding client times — today's FE keeps working and the hole closes on deploy.
+- **TC-BE-2** open shift = `clock_out IS NULL AND is_active AND NOT auto_closed` (`OPEN_SHIFT_PG`),
+  enforced by a **partial unique index**; the migration first flagged 856/857 open legacy rows (each
+  user's newest survives only if < 20 h old) — that cleanup is *inside* the migration because the index
+  cannot be built without it.
+- **TC-BE-10** a stale open row is a *missing clock-out*: flagged, 0 paid hours, **never a guessed
+  time** unless the practice opts into `auto_close_policy='office_close'`. Applied lazily on the next
+  punch (clock-in proceeds; clock-out 409s `not_clocked_in` with the flagged row) + cron/endpoint sweep.
+- **TC-BE-9** legacy rows are `clock_basis='wall_clock'` (office wall time with a `Z`); every server
+  date computation reads them as local. `scripts/backfill_time_clock_utc.py` converts → `utc_converted`
+  (revertible); not run.
+- **TC-BE-6** soft delete + `time_clock_entry_edits` (before/after times + diff per change);
+  `original_clock_*` keep the *first* pre-edit values. **TC-BE-7** overtime enum (legacy spellings
+  folded, unknown = 422 — it decides pay) + practice `time_clock_settings`. **TC-BE-8/13**
+  `/reports/time-clock` (+csv/pdf): office-local days, weekly OT looks back into the first week, break/
+  lunch never paid, wages owner/admin only. **TC-BE-14** locked `time_clock_periods` → 409 `period_locked`.
 
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))

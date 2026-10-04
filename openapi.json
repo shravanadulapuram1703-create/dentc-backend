@@ -5892,6 +5892,18 @@
             "description": "false = only open items (status != completed)"
           },
           {
+            "name": "pending",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "SCHED-PT-2: true = only pending items \u2014 not archived, no `end_date`, no live charge (`procedure_id` null), status not completed / referred_out / external_referral. The same rule as the scheduler's `pending_tx_count`.",
+              "default": false,
+              "title": "Pending"
+            },
+            "description": "SCHED-PT-2: true = only pending items \u2014 not archived, no `end_date`, no live charge (`procedure_id` null), status not completed / referred_out / external_referral. The same rule as the scheduler's `pending_tx_count`."
+          },
+          {
             "name": "plan_id",
             "in": "query",
             "required": false,
@@ -5990,6 +6002,92 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PaginatedResponse_TreatmentPlanItemRead_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/treatment-plan-items/pending-summary": {
+      "get": {
+        "tags": [
+          "Treatment Plans"
+        ],
+        "summary": "Pending treatment per patient, ``?patient_ids=1,2,3`` (<= 200) (SCHED-PT-3)",
+        "description": "One call for a scheduler day/week/month instead of one items list per patient. Only patients with at least one pending item appear in `items`; patients outside the tenant are silently absent. Same rule as `?pending=true` and the scheduler feed's `pending_tx_count`.",
+        "operationId": "list_pending_treatment_summaries",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated patient ids, at most 200",
+              "title": "Patient Ids"
+            },
+            "description": "Comma-separated patient ids, at most 200"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingTreatmentSummaryBatch"
                 }
               }
             }
@@ -6740,7 +6838,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FeeScheduleOption"
+                    "$ref": "#/components/schemas/app__schemas__procedure_setup__FeeScheduleOption"
                   },
                   "title": "Response List Fee Schedule Options"
                 }
@@ -19287,7 +19385,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScheduleReplace"
+                "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleReplace"
               }
             }
           }
@@ -23102,7 +23200,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__schemas__provider_setup__ScheduleReplace"
+                "$ref": "#/components/schemas/ScheduleReplace"
               }
             }
           }
@@ -39242,6 +39340,3349 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/time-clock-entries/clock-in": {
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Clock in \u2014 the server stamps now() (TC-BE-1/2)",
+        "description": "Opens a shift for the **caller**; the time is the server's clock, never the client's. `office_id` defaults to `X-Office-ID`. **409 `already_clocked_in`** (the open entry in `error.details.entry`) when a shift is already running. A shift left open past the practice's `auto_close_after_hours` is first flagged as a missing clock-out (TC-BE-10), so yesterday's forgotten punch never blocks today's.",
+        "operationId": "clock_in_time_clock",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "name": "X-Office-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-3: the caller's working office",
+              "title": "X-Office-Id"
+            },
+            "description": "OFF-SCOPE-3: the caller's working office"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ClockInRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockEntryRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock-entries/clock-out": {
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Clock out \u2014 closes the caller's open shift at now() (TC-BE-1/2)",
+        "description": "**409 `not_clocked_in`** when the caller has no running shift. A shift past the auto-close threshold is flagged as a missing clock-out instead of paying the elapsed hours (`error.details.auto_closed_entry`).",
+        "operationId": "clock_out_time_clock",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ClockOutRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockEntryRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock-entries/me/active": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "The caller's running shift \u2014 200, or 204 when not clocked in",
+        "operationId": "get_my_active_time_clock_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockEntryRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "204": {
+            "description": "Not clocked in"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock-entries": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "List time clock entries",
+        "description": "A non-manager always gets **their own** rows (another `user_id` is 403 `time_clock_forbidden`); managers follow the usual office scope (`office_id`, `office_ids`, `all_offices`). `clock_in_from` / `clock_in_to` take an ISO date (a whole office-local day, inclusive) or datetime; a bare date is read in `tz`, else the `office_id` office's zone, else the `X-Office-ID` office's. Soft-deleted rows are hidden unless `include_deleted=true` (managers). `search` matches the employee name / username and notes. Sort: clock_in (default), clock_out, created_at, updated_at, total_hours, user_id.",
+        "operationId": "list_time_clock_entries",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by user_id",
+              "title": "User Id"
+            },
+            "description": "Filter by user_id"
+          },
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by office_id",
+              "title": "Office Id"
+            },
+            "description": "Filter by office_id"
+          },
+          {
+            "name": "clock_in_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "clock_in >= (ISO date or datetime)",
+              "title": "Clock In From"
+            },
+            "description": "clock_in >= (ISO date or datetime)"
+          },
+          {
+            "name": "clock_in_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "clock_in <= (ISO date = whole day, or datetime)",
+              "title": "Clock In To"
+            },
+            "description": "clock_in <= (ISO date = whole day, or datetime)"
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IANA zone for bare-date bounds",
+              "title": "Tz"
+            },
+            "description": "IANA zone for bare-date bounds"
+          },
+          {
+            "name": "entry_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "work | break | lunch",
+              "title": "Entry Type"
+            },
+            "description": "work | break | lunch"
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "punch | manual | legacy",
+              "title": "Source"
+            },
+            "description": "punch | manual | legacy"
+          },
+          {
+            "name": "is_open",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Running shifts only (true) / closed (false)",
+              "title": "Is Open"
+            },
+            "description": "Running shifts only (true) / closed (false)"
+          },
+          {
+            "name": "auto_closed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auto Closed"
+            }
+          },
+          {
+            "name": "is_edited",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Edited"
+            }
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "false = deleted rows only (managers)",
+              "title": "Is Active"
+            },
+            "description": "false = deleted rows only (managers)"
+          },
+          {
+            "name": "include_deleted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include soft-deleted rows (managers)",
+              "default": false,
+              "title": "Include Deleted"
+            },
+            "description": "Include soft-deleted rows (managers)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Column to sort by",
+              "title": "Sort"
+            },
+            "description": "Column to sort by"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Free-text search",
+              "title": "Search"
+            },
+            "description": "Free-text search"
+          },
+          {
+            "name": "all_offices",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)",
+              "default": false,
+              "title": "All Offices"
+            },
+            "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)"
+          },
+          {
+            "name": "office_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-8: restrict to these offices (repeatable)",
+              "title": "Office Ids"
+            },
+            "description": "OFF-SCOPE-8: restrict to these offices (repeatable)"
+          },
+          {
+            "name": "office_group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-8: restrict to an office group",
+              "title": "Office Group Id"
+            },
+            "description": "OFF-SCOPE-8: restrict to an office group"
+          },
+          {
+            "name": "include_global",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)",
+              "title": "Include Global"
+            },
+            "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "name": "X-Office-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-3: the caller's working office",
+              "title": "X-Office-Id"
+            },
+            "description": "OFF-SCOPE-3: the caller's working office"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_TimeClockEntryRead_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Create a time clock entry (manager) \u2014 or a self punch (transitional)",
+        "description": "Managers (owner / admin / manager, or the Time Clock Editor right) add any user's entry with explicit times; `total_hours` is computed and the client value ignored. For anyone else, a self entry with no `clock_out` is treated as **clock-in** (server time, the body's `clock_in` discarded) \u2014 the path today's FE uses until it moves to `/clock-in`; any other body is 403 `time_clock_manager_required`.",
+        "operationId": "create_time_clock_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "name": "X-Office-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-3: the caller's working office",
+              "title": "X-Office-Id"
+            },
+            "description": "OFF-SCOPE-3: the caller's working office"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeClockEntryCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockEntryRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock-entries/{entry_id}": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Get time clock entry by id",
+        "operationId": "get_time_clock_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "time clock entry identifier",
+              "title": "Entry Id"
+            },
+            "description": "time clock entry identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockEntryRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Correct a time clock entry (manager)",
+        "description": "Records the change in the entry's history (TC-BE-6) and keeps the first pre-edit times in `original_clock_in` / `original_clock_out`. `reason` is required for another user's entry when the practice sets `require_edit_reason`. 422 `clock_out_before_clock_in`, `punch_in_future`, `shift_too_long`; 409 `period_locked`, `already_clocked_in`. Honours `If-Match` / `If-Unmodified-Since` / `expected_updated_at` (412). A non-manager's `{clock_out}` on their own running shift is treated as **clock-out** at server time.",
+        "operationId": "update_time_clock_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "time clock entry identifier",
+              "title": "Entry Id"
+            },
+            "description": "time clock entry identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "name": "X-Office-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-3: the caller's working office",
+              "title": "X-Office-Id"
+            },
+            "description": "OFF-SCOPE-3: the caller's working office"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeClockEntryUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockEntryRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "412": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Precondition Failed"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Delete a time clock entry (manager, soft)",
+        "description": "Soft delete (TC-BE-6): the row stays, flagged `is_active=false` with who / when / why.",
+        "operationId": "delete_time_clock_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "time clock entry identifier",
+              "title": "Entry Id"
+            },
+            "description": "time clock entry identifier"
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "412": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Precondition Failed"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock-entries/{entry_id}/restore": {
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Restore a soft-deleted time clock entry (manager)",
+        "operationId": "restore_time_clock_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "time clock entry identifier",
+              "title": "Entry Id"
+            },
+            "description": "time clock entry identifier"
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockEntryRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock-entries/{entry_id}/history": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Who changed this punch, when, why, and the times before / after (TC-BE-6)",
+        "operationId": "get_time_clock_entry_history",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "time clock entry identifier",
+              "title": "Entry Id"
+            },
+            "description": "time clock entry identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimeClockEntryEditRead"
+                  },
+                  "title": "Response Get Time Clock Entry History"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock/metadata": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Vocabularies, practice settings, the caller's capabilities and overtime rule",
+        "operationId": "get_time_clock_metadata",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockMetadata"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock/settings": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Practice-level time-clock defaults (TC-BE-7/10)",
+        "operationId": "get_time_clock_settings",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockSettingsRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Update the practice-level time-clock defaults (manager)",
+        "operationId": "update_time_clock_settings",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeClockSettingsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockSettingsRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock/auto-close": {
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Flag / close shifts left open past the threshold (TC-BE-10, manager)",
+        "operationId": "auto_close_time_clock_entries",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dry_run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Dry Run"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoCloseResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock/periods": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Pay periods (TC-BE-14)",
+        "operationId": "list_time_clock_periods",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "locked",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Locked"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimeClockPeriodRead"
+                  },
+                  "title": "Response List Time Clock Periods"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Create a pay period (manager); 409 period_overlap",
+        "operationId": "create_time_clock_period",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeClockPeriodCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockPeriodRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock/periods/{period_id}": {
+      "patch": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Edit a pay period's dates / notes (manager)",
+        "operationId": "update_time_clock_period",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "pay period identifier",
+              "title": "Period Id"
+            },
+            "description": "pay period identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeClockPeriodUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockPeriodRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Delete an unlocked pay period (manager)",
+        "operationId": "delete_time_clock_period",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "pay period identifier",
+              "title": "Period Id"
+            },
+            "description": "pay period identifier"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/time-clock/periods/{period_id}/{action}": {
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "approve | lock | unlock | reopen a pay period (manager)",
+        "description": "A locked period refuses every entry change inside it with 409 `period_locked`.",
+        "operationId": "set_time_clock_period_state",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "pay period identifier",
+              "title": "Period Id"
+            },
+            "description": "pay period identifier"
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "approve",
+                "lock",
+                "unlock",
+                "reopen"
+              ],
+              "type": "string",
+              "title": "Action"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockPeriodRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/time-clock": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Hours report \u2014 per user, per day, regular / overtime / total (TC-BE-8)",
+        "description": "Days are the office-local date of clock-in. Overtime follows each user's configured rule (user config \u2192 practice default) unless `overtime_method` overrides it for the run; weekly overtime counts the part of the first week before `from`. Break / lunch entries are reported as `break_hours`, never paid. Non-managers get their own card only.",
+        "operationId": "get_time_clock_report",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_entries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Entries"
+            }
+          },
+          {
+            "name": "all_offices",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)",
+              "default": false,
+              "title": "All Offices"
+            },
+            "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)"
+          },
+          {
+            "name": "office_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-8: restrict to these offices (repeatable)",
+              "title": "Office Ids"
+            },
+            "description": "OFF-SCOPE-8: restrict to these offices (repeatable)"
+          },
+          {
+            "name": "office_group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-8: restrict to an office group",
+              "title": "Office Group Id"
+            },
+            "description": "OFF-SCOPE-8: restrict to an office group"
+          },
+          {
+            "name": "include_global",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)",
+              "title": "Include Global"
+            },
+            "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "First work date (office-local)",
+              "title": "From"
+            },
+            "description": "First work date (office-local)"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Last work date, inclusive",
+              "title": "To"
+            },
+            "description": "Last work date, inclusive"
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "overtime_method",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Override for this run: none | weekly | daily | daily_weekly",
+              "title": "Overtime Method"
+            },
+            "description": "Override for this run: none | weekly | daily | daily_weekly"
+          },
+          {
+            "name": "include_wages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "TC-BE-13 (owner / admin only)",
+              "default": false,
+              "title": "Include Wages"
+            },
+            "description": "TC-BE-13 (owner / admin only)"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "name": "X-Office-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-3: the caller's working office",
+              "title": "X-Office-Id"
+            },
+            "description": "OFF-SCOPE-3: the caller's working office"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeClockReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/time-clock/report.csv": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Hours report as CSV \u2014 layout=summary | detail",
+        "operationId": "get_time_clock_report_csv",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "layout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "summary",
+                "detail"
+              ],
+              "type": "string",
+              "default": "summary",
+              "title": "Layout"
+            }
+          },
+          {
+            "name": "all_offices",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)",
+              "default": false,
+              "title": "All Offices"
+            },
+            "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)"
+          },
+          {
+            "name": "office_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-8: restrict to these offices (repeatable)",
+              "title": "Office Ids"
+            },
+            "description": "OFF-SCOPE-8: restrict to these offices (repeatable)"
+          },
+          {
+            "name": "office_group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-8: restrict to an office group",
+              "title": "Office Group Id"
+            },
+            "description": "OFF-SCOPE-8: restrict to an office group"
+          },
+          {
+            "name": "include_global",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)",
+              "title": "Include Global"
+            },
+            "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "First work date (office-local)",
+              "title": "From"
+            },
+            "description": "First work date (office-local)"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Last work date, inclusive",
+              "title": "To"
+            },
+            "description": "Last work date, inclusive"
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "overtime_method",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Override for this run: none | weekly | daily | daily_weekly",
+              "title": "Overtime Method"
+            },
+            "description": "Override for this run: none | weekly | daily | daily_weekly"
+          },
+          {
+            "name": "include_wages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "TC-BE-13 (owner / admin only)",
+              "default": false,
+              "title": "Include Wages"
+            },
+            "description": "TC-BE-13 (owner / admin only)"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "name": "X-Office-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-3: the caller's working office",
+              "title": "X-Office-Id"
+            },
+            "description": "OFF-SCOPE-3: the caller's working office"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/csv": {}
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/time-clock/report.pdf": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Hours report as PDF (summary + optional per-employee detail)",
+        "operationId": "get_time_clock_report_pdf",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "detail",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Detail"
+            }
+          },
+          {
+            "name": "all_offices",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)",
+              "default": false,
+              "title": "All Offices"
+            },
+            "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)"
+          },
+          {
+            "name": "office_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-8: restrict to these offices (repeatable)",
+              "title": "Office Ids"
+            },
+            "description": "OFF-SCOPE-8: restrict to these offices (repeatable)"
+          },
+          {
+            "name": "office_group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-8: restrict to an office group",
+              "title": "Office Group Id"
+            },
+            "description": "OFF-SCOPE-8: restrict to an office group"
+          },
+          {
+            "name": "include_global",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)",
+              "title": "Include Global"
+            },
+            "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "First work date (office-local)",
+              "title": "From"
+            },
+            "description": "First work date (office-local)"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Last work date, inclusive",
+              "title": "To"
+            },
+            "description": "Last work date, inclusive"
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "office_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "overtime_method",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Override for this run: none | weekly | daily | daily_weekly",
+              "title": "Overtime Method"
+            },
+            "description": "Override for this run: none | weekly | daily | daily_weekly"
+          },
+          {
+            "name": "include_wages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "TC-BE-13 (owner / admin only)",
+              "default": false,
+              "title": "Include Wages"
+            },
+            "description": "TC-BE-13 (owner / admin only)"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "name": "X-Office-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "OFF-SCOPE-3: the caller's working office",
+              "title": "X-Office-Id"
+            },
+            "description": "OFF-SCOPE-3: the caller's working office"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
       }
     },
     "/api/v1/tenants": {
@@ -100094,718 +103535,6 @@
         }
       }
     },
-    "/api/v1/time-clock-entries": {
-      "get": {
-        "tags": [
-          "Staff"
-        ],
-        "summary": "List time clock entries",
-        "operationId": "list_time_clock_entries",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by user_id",
-              "title": "User Id"
-            },
-            "description": "Filter by user_id"
-          },
-          {
-            "name": "office_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by office_id",
-              "title": "Office Id"
-            },
-            "description": "Filter by office_id"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "title": "Page"
-            }
-          },
-          {
-            "name": "size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 200,
-              "minimum": 1,
-              "default": 20,
-              "title": "Size"
-            }
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Column to sort by",
-              "title": "Sort"
-            },
-            "description": "Column to sort by"
-          },
-          {
-            "name": "order",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string",
-              "default": "desc",
-              "title": "Order"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Free-text search",
-              "title": "Search"
-            },
-            "description": "Free-text search"
-          },
-          {
-            "name": "all_offices",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)",
-              "default": false,
-              "title": "All Offices"
-            },
-            "description": "OFF-SCOPE-2: read across all offices (needs office_scope_view_all_offices)"
-          },
-          {
-            "name": "office_ids",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "OFF-SCOPE-8: restrict to these offices (repeatable)",
-              "title": "Office Ids"
-            },
-            "description": "OFF-SCOPE-8: restrict to these offices (repeatable)"
-          },
-          {
-            "name": "office_group_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "OFF-SCOPE-8: restrict to an office group",
-              "title": "Office Group Id"
-            },
-            "description": "OFF-SCOPE-8: restrict to an office group"
-          },
-          {
-            "name": "include_global",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)",
-              "title": "Include Global"
-            },
-            "description": "OFF-SCOPE-4: include office_id IS NULL (global) rows (default: true for catalogs, false for day-data)"
-          },
-          {
-            "name": "X-Tenant-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Tenant-Id"
-            }
-          },
-          {
-            "name": "X-Office-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "OFF-SCOPE-3: the caller's working office",
-              "title": "X-Office-Id"
-            },
-            "description": "OFF-SCOPE-3: the caller's working office"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaginatedResponse_TimeClockEntryRead_"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Staff"
-        ],
-        "summary": "Create time clock entry",
-        "operationId": "create_time_clock_entry",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "X-Tenant-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Tenant-Id"
-            }
-          },
-          {
-            "name": "X-Office-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "OFF-SCOPE-3: the caller's working office",
-              "title": "X-Office-Id"
-            },
-            "description": "OFF-SCOPE-3: the caller's working office"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TimeClockEntryCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TimeClockEntryRead"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          }
-        }
-      }
-    },
-    "/api/v1/time-clock-entries/{item_id}": {
-      "get": {
-        "tags": [
-          "Staff"
-        ],
-        "summary": "Get time clock entry by id",
-        "operationId": "get_time_clock_entry",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "description": "time_clock_entry identifier",
-              "title": "Item Id"
-            },
-            "description": "time_clock_entry identifier"
-          },
-          {
-            "name": "X-Tenant-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Tenant-Id"
-            }
-          },
-          {
-            "name": "X-Office-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "OFF-SCOPE-3: the caller's working office",
-              "title": "X-Office-Id"
-            },
-            "description": "OFF-SCOPE-3: the caller's working office"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TimeClockEntryRead"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "Staff"
-        ],
-        "summary": "Update time clock entry",
-        "description": "Partial update of one time clock entry.",
-        "operationId": "update_time_clock_entry",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "description": "time_clock_entry identifier",
-              "title": "Item Id"
-            },
-            "description": "time_clock_entry identifier"
-          },
-          {
-            "name": "X-Tenant-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Tenant-Id"
-            }
-          },
-          {
-            "name": "X-Office-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "OFF-SCOPE-3: the caller's working office",
-              "title": "X-Office-Id"
-            },
-            "description": "OFF-SCOPE-3: the caller's working office"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TimeClockEntryUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TimeClockEntryRead"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Staff"
-        ],
-        "summary": "Delete time clock entry",
-        "description": "Delete one time clock entry.",
-        "operationId": "delete_time_clock_entry",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "description": "time_clock_entry identifier",
-              "title": "Item Id"
-            },
-            "description": "time_clock_entry identifier"
-          },
-          {
-            "name": "X-Tenant-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Tenant-Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          }
-        }
-      }
-    },
     "/api/v1/provider-insurance-ids": {
       "get": {
         "tags": [
@@ -115033,6 +117762,22 @@
             ],
             "title": "Account Balance"
           },
+          "pending_tx_count": {
+            "type": "integer",
+            "title": "Pending Tx Count",
+            "default": 0
+          },
+          "pending_tx_scheduled_count": {
+            "type": "integer",
+            "title": "Pending Tx Scheduled Count",
+            "default": 0
+          },
+          "pending_tx_fee": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending Tx Fee",
+            "default": "0.00"
+          },
           "created_by": {
             "anyOf": [
               {
@@ -117965,6 +120710,42 @@
           "created_at"
         ],
         "title": "AuditLogRead"
+      },
+      "AutoCloseResult": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "examined": {
+            "type": "integer",
+            "title": "Examined"
+          },
+          "flagged": {
+            "type": "integer",
+            "title": "Flagged"
+          },
+          "closed_at_office_close": {
+            "type": "integer",
+            "title": "Closed At Office Close"
+          },
+          "entry_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Entry Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dry_run",
+          "examined",
+          "flagged",
+          "closed_at_office_close",
+          "entry_ids"
+        ],
+        "title": "AutoCloseResult"
       },
       "AvailabilityResponse": {
         "properties": {
@@ -129022,6 +131803,68 @@
         ],
         "title": "ClaimSubmitResult"
       },
+      "ClockInRequest": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id",
+            "description": "Defaults to X-Office-ID."
+          },
+          "entry_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Type",
+            "description": "work (default) | break | lunch"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ClockInRequest"
+      },
+      "ClockOutRequest": {
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ClockOutRequest"
+      },
       "CodeBundleCreate": {
         "properties": {
           "name": {
@@ -136295,17 +139138,6 @@
           "name": {
             "type": "string",
             "title": "Name"
-          },
-          "fee_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fee Type"
           }
         },
         "type": "object",
@@ -152191,14 +155023,12 @@
         "properties": {
           "alert_code": {
             "type": "string",
-            "maxLength": 100,
             "title": "Alert Code"
           },
           "alert_label": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 255
+                "type": "string"
               },
               {
                 "type": "null"
@@ -152209,8 +155039,7 @@
           "section": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 100
+                "type": "string"
               },
               {
                 "type": "null"
@@ -152221,7 +155050,12 @@
           "response": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no",
+                  "unknown"
+                ]
               },
               {
                 "type": "null"
@@ -152267,8 +155101,7 @@
         "required": [
           "alert_code"
         ],
-        "title": "MedicalAlertIn",
-        "description": "One alert answer on the composite. Same vocabulary as the generic\nresource (``yes|no|unknown``, MH-5) \u2014 case-folded rather than a strict\n``Literal`` so a ``\"Yes\"`` from a form does not 422 the whole registration."
+        "title": "MedicalAlertIn"
       },
       "MedicalAlertSummary": {
         "properties": {
@@ -153867,7 +156700,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/app__schemas__medical_history__MedicalAlertIn"
+                  "$ref": "#/components/schemas/MedicalAlertIn"
                 },
                 "type": "array"
               },
@@ -157448,7 +160281,7 @@
           },
           "fee_schedules": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__FeeScheduleOption"
+              "$ref": "#/components/schemas/FeeScheduleOption"
             },
             "type": "array",
             "title": "Fee Schedules"
@@ -178342,6 +181175,53 @@
         "type": "object",
         "title": "PaymentAllocationUpdate"
       },
+      "PendingTreatmentSummary": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "scheduled_count": {
+            "type": "integer",
+            "title": "Scheduled Count",
+            "description": "Of ``count``, items booked on an appointment"
+          },
+          "total_fee": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Fee"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "count",
+          "scheduled_count",
+          "total_fee"
+        ],
+        "title": "PendingTreatmentSummary",
+        "description": "SCHED-PT-3: one patient's open (pending) treatment-plan items."
+      },
+      "PendingTreatmentSummaryBatch": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PendingTreatmentSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "PendingTreatmentSummaryBatch"
+      },
       "PerioAutoAdvance": {
         "properties": {
           "ur_facial": {
@@ -194720,7 +197600,7 @@
           },
           "medical_alerts": {
             "items": {
-              "$ref": "#/components/schemas/MedicalAlertIn"
+              "$ref": "#/components/schemas/app__schemas__patient_intake__MedicalAlertIn"
             },
             "type": "array",
             "title": "Medical Alerts"
@@ -195334,6 +198214,141 @@
         ],
         "title": "ReplyRef"
       },
+      "ReportDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "regular": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Regular"
+          },
+          "overtime": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Overtime"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total"
+          },
+          "break_hours": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Break Hours"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ReportEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "regular",
+          "overtime",
+          "total",
+          "break_hours",
+          "issues"
+        ],
+        "title": "ReportDay"
+      },
+      "ReportEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "clock_in": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Clock In"
+          },
+          "clock_out": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Out"
+          },
+          "hours": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hours"
+          },
+          "entry_type": {
+            "type": "string",
+            "title": "Entry Type"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "office_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Name"
+          },
+          "clock_basis": {
+            "type": "string",
+            "title": "Clock Basis"
+          },
+          "is_edited": {
+            "type": "boolean",
+            "title": "Is Edited"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "clock_in",
+          "hours",
+          "entry_type",
+          "clock_basis",
+          "is_edited",
+          "issues"
+        ],
+        "title": "ReportEntry"
+      },
       "ReportSummary": {
         "properties": {
           "production": {
@@ -195413,6 +198428,89 @@
         "title": "ReportSummary",
         "description": "Executive-dashboard KPIs for a tenant/office over [date_from, date_to].\n\n``outstanding_ar`` is cumulative (all-time as of ``date_to``), not bounded by\n``date_from`` \u2014 receivables are a running balance, not a windowed flow."
       },
+      "ReportTotals": {
+        "properties": {
+          "regular": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Regular"
+          },
+          "overtime": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Overtime"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total"
+          },
+          "break_hours": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Break Hours"
+          },
+          "days_worked": {
+            "type": "integer",
+            "title": "Days Worked"
+          },
+          "entry_count": {
+            "type": "integer",
+            "title": "Entry Count"
+          },
+          "issue_count": {
+            "type": "integer",
+            "title": "Issue Count"
+          },
+          "regular_pay": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regular Pay"
+          },
+          "overtime_pay": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overtime Pay"
+          },
+          "total_pay": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Pay"
+          }
+        },
+        "type": "object",
+        "required": [
+          "regular",
+          "overtime",
+          "total",
+          "break_hours",
+          "days_worked",
+          "entry_count",
+          "issue_count"
+        ],
+        "title": "ReportTotals"
+      },
       "ReportTrends": {
         "properties": {
           "interval": {
@@ -195460,6 +198558,77 @@
           "as_of"
         ],
         "title": "ReportTrends"
+      },
+      "ReportUser": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "rule": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Rule"
+          },
+          "pay_rate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pay Rate"
+          },
+          "overtime_rate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overtime Rate"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/ReportDay"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ReportTotals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "user_name",
+          "rule",
+          "days",
+          "totals"
+        ],
+        "title": "ReportUser"
       },
       "RequestListResponse": {
         "properties": {
@@ -197610,18 +200779,14 @@
         "properties": {
           "days": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleDayInput"
+              "$ref": "#/components/schemas/ScheduleDayInput"
             },
             "type": "array",
-            "maxItems": 7,
-            "minItems": 1,
+            "maxItems": 70,
             "title": "Days"
           }
         },
         "type": "object",
-        "required": [
-          "days"
-        ],
         "title": "ScheduleReplace"
       },
       "ScheduleResponse": {
@@ -202233,6 +205398,37 @@
         "type": "object",
         "title": "TenantUpdate"
       },
+      "TimeClockCapabilities": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit",
+            "description": "Add / correct / delete anyone's punches (TC-BE-5)."
+          },
+          "can_view_all": {
+            "type": "boolean",
+            "title": "Can View All",
+            "description": "List and report every employee's punches."
+          },
+          "can_view_wages": {
+            "type": "boolean",
+            "title": "Can View Wages",
+            "description": "Wages in the hours report (TC-BE-13)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "can_edit",
+          "can_view_all",
+          "can_view_wages"
+        ],
+        "title": "TimeClockCapabilities"
+      },
       "TimeClockConfig": {
         "properties": {
           "pay_rate": {
@@ -202259,7 +205455,8 @@
                 "type": "null"
               }
             ],
-            "title": "Overtime Method"
+            "title": "Overtime Method",
+            "description": "TC-BE-7: none | weekly | daily | daily_weekly (legacy weekly_40 / daily_8 / california accepted and folded); null = the practice default."
           },
           "overtime_rate": {
             "anyOf": [
@@ -202274,12 +205471,59 @@
                 "type": "null"
               }
             ],
-            "title": "Overtime Rate"
+            "title": "Overtime Rate",
+            "description": "Overtime multiplier, e.g. 1.5."
           },
           "clock_in_required": {
             "type": "boolean",
             "title": "Clock In Required",
             "default": false
+          },
+          "daily_threshold_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 24.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Threshold Hours"
+          },
+          "weekly_threshold_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 168.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Threshold Hours"
+          },
+          "week_start_day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Week Start Day",
+            "description": "sunday \u2026 saturday; null = practice default"
           }
         },
         "type": "object",
@@ -202330,6 +205574,41 @@
             "type": "boolean",
             "title": "Clock In Required",
             "default": false
+          },
+          "daily_threshold_hours": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Threshold Hours"
+          },
+          "weekly_threshold_hours": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Threshold Hours"
+          },
+          "week_start_day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Week Start Day"
           }
         },
         "type": "object",
@@ -202340,6 +205619,18 @@
       },
       "TimeClockEntryCreate": {
         "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Defaults to the caller."
+          },
           "office_id": {
             "anyOf": [
               {
@@ -202349,16 +205640,21 @@
                 "type": "null"
               }
             ],
-            "title": "Office Id"
-          },
-          "user_id": {
-            "type": "integer",
-            "title": "User Id"
+            "title": "Office Id",
+            "description": "Defaults to X-Office-ID."
           },
           "clock_in": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Clock In"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock In",
+            "description": "Required for a manager entry; ignored on a self punch (server time)."
           },
           "clock_out": {
             "anyOf": [
@@ -202385,21 +205681,186 @@
                 "type": "null"
               }
             ],
-            "title": "Total Hours"
+            "title": "Total Hours",
+            "description": "Ignored \u2014 computed server-side (TC-BE-3)."
+          },
+          "entry_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Type"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "TC-BE-6 edit reason."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TimeClockEntryCreate",
+        "description": "Manager entry (add a missed shift / start someone's shift)."
+      },
+      "TimeClockEntryEditRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "entry_id": {
+            "type": "integer",
+            "title": "Entry Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "edited_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By"
+          },
+          "edited_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By Name"
+          },
+          "edited_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Edited At"
+          },
+          "edit_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edit Reason"
+          },
+          "original_clock_in": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Clock In"
+          },
+          "original_clock_out": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Clock Out"
+          },
+          "new_clock_in": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Clock In"
+          },
+          "new_clock_out": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Clock Out"
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changes"
           }
         },
         "type": "object",
         "required": [
-          "user_id",
-          "clock_in"
+          "id",
+          "entry_id",
+          "action",
+          "edited_at"
         ],
-        "title": "TimeClockEntryCreate"
+        "title": "TimeClockEntryEditRead"
       },
       "TimeClockEntryRead": {
         "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
           "tenant_id": {
             "type": "integer",
             "title": "Tenant Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
           },
           "office_id": {
             "anyOf": [
@@ -202411,10 +205872,6 @@
               }
             ],
             "title": "Office Id"
-          },
-          "user_id": {
-            "type": "integer",
-            "title": "User Id"
           },
           "legacy_id": {
             "anyOf": [
@@ -202454,24 +205911,301 @@
                 "type": "null"
               }
             ],
-            "title": "Total Hours"
+            "title": "Total Hours",
+            "description": "TC-BE-3: server-computed (clock_out - clock_in) in hours, 2dp."
           },
-          "id": {
-            "type": "integer",
-            "title": "Id"
+          "entry_type": {
+            "type": "string",
+            "title": "Entry Type",
+            "description": "TC-BE-12: work | break | lunch",
+            "default": "work"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "punch (server-stamped) | manual | legacy",
+            "default": "manual"
+          },
+          "clock_basis": {
+            "type": "string",
+            "title": "Clock Basis",
+            "description": "TC-BE-9: utc | wall_clock (legacy office wall time stored with a Z \u2014 render in UTC) | utc_converted (legacy row moved to real UTC \u2014 render in office tz)",
+            "default": "utc"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "is_edited": {
+            "type": "boolean",
+            "title": "Is Edited",
+            "default": false
+          },
+          "original_clock_in": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Clock In"
+          },
+          "original_clock_out": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Clock Out"
+          },
+          "edit_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edit Reason"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "deleted_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted By"
+          },
+          "delete_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete Reason"
+          },
+          "auto_closed": {
+            "type": "boolean",
+            "title": "Auto Closed",
+            "default": false
+          },
+          "auto_closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Closed At"
+          },
+          "auto_close_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Close Reason"
+          },
+          "user_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Name"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "office_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Name"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone",
+            "description": "The office's IANA timezone (render zone)."
+          },
+          "work_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Date",
+            "description": "Office-local date of clock_in."
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "updated_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By Name"
+          },
+          "deleted_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted By Name"
+          },
+          "is_open": {
+            "type": "boolean",
+            "title": "Is Open",
+            "description": "A running shift (no clock_out, not auto-closed).",
+            "default": false
+          },
+          "is_stale": {
+            "type": "boolean",
+            "title": "Is Stale",
+            "description": "Open longer than the practice's auto_close_after_hours.",
+            "default": false
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
           }
         },
         "type": "object",
         "required": [
+          "id",
           "tenant_id",
           "user_id",
           "clock_in",
-          "id",
           "created_at"
         ],
         "title": "TimeClockEntryRead"
@@ -202488,17 +206222,6 @@
               }
             ],
             "title": "Office Id"
-          },
-          "user_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Id"
           },
           "clock_in": {
             "anyOf": [
@@ -202537,11 +206260,651 @@
                 "type": "null"
               }
             ],
-            "title": "Total Hours"
+            "title": "Total Hours",
+            "description": "Ignored \u2014 computed server-side (TC-BE-3)."
+          },
+          "entry_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Type"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "TC-BE-6 edit reason."
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At",
+            "description": "Optimistic concurrency (explicit null = never updated)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TimeClockEntryUpdate"
+      },
+      "TimeClockMetadata": {
+        "properties": {
+          "entry_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Entry Types"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "clock_basis": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Clock Basis"
+          },
+          "overtime_methods": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Overtime Methods"
+          },
+          "week_days": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Week Days"
+          },
+          "auto_close_policies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Auto Close Policies"
+          },
+          "issues": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Issues"
+          },
+          "period_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Period Statuses"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/TimeClockSettingsRead"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/TimeClockCapabilities"
+          },
+          "effective_rules": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Effective Rules",
+            "description": "The caller's own resolved overtime rule."
           }
         },
         "type": "object",
-        "title": "TimeClockEntryUpdate"
+        "required": [
+          "entry_types",
+          "sources",
+          "clock_basis",
+          "overtime_methods",
+          "week_days",
+          "auto_close_policies",
+          "issues",
+          "period_statuses",
+          "settings",
+          "capabilities",
+          "effective_rules"
+        ],
+        "title": "TimeClockMetadata"
+      },
+      "TimeClockPeriodCreate": {
+        "properties": {
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id",
+            "description": "NULL = every office."
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "period_start",
+          "period_end"
+        ],
+        "title": "TimeClockPeriodCreate"
+      },
+      "TimeClockPeriodRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "office_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Name"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          },
+          "approved_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By Name"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "locked_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked By"
+          },
+          "locked_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked By Name"
+          },
+          "locked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked At"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "period_start",
+          "period_end",
+          "status",
+          "locked",
+          "created_at"
+        ],
+        "title": "TimeClockPeriodRead"
+      },
+      "TimeClockPeriodUpdate": {
+        "properties": {
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TimeClockPeriodUpdate"
+      },
+      "TimeClockReport": {
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Date From"
+          },
+          "date_to": {
+            "type": "string",
+            "format": "date",
+            "title": "Date To"
+          },
+          "timezone_note": {
+            "type": "string",
+            "title": "Timezone Note"
+          },
+          "overtime_method_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overtime Method Override"
+          },
+          "include_wages": {
+            "type": "boolean",
+            "title": "Include Wages"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/ReportUser"
+            },
+            "type": "array",
+            "title": "Users"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ReportTotals"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_from",
+          "date_to",
+          "timezone_note",
+          "include_wages",
+          "users",
+          "totals",
+          "generated_at"
+        ],
+        "title": "TimeClockReport"
+      },
+      "TimeClockSettingsRead": {
+        "properties": {
+          "overtime_method": {
+            "type": "string",
+            "title": "Overtime Method"
+          },
+          "daily_threshold_hours": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Daily Threshold Hours"
+          },
+          "weekly_threshold_hours": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Weekly Threshold Hours"
+          },
+          "week_start_day": {
+            "type": "string",
+            "title": "Week Start Day"
+          },
+          "overtime_rate": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Overtime Rate"
+          },
+          "auto_close_after_hours": {
+            "type": "integer",
+            "title": "Auto Close After Hours"
+          },
+          "auto_close_policy": {
+            "type": "string",
+            "title": "Auto Close Policy"
+          },
+          "require_edit_reason": {
+            "type": "boolean",
+            "title": "Require Edit Reason"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "overtime_method",
+          "daily_threshold_hours",
+          "weekly_threshold_hours",
+          "week_start_day",
+          "overtime_rate",
+          "auto_close_after_hours",
+          "auto_close_policy",
+          "require_edit_reason"
+        ],
+        "title": "TimeClockSettingsRead"
+      },
+      "TimeClockSettingsUpdate": {
+        "properties": {
+          "overtime_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overtime Method"
+          },
+          "daily_threshold_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 24.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Threshold Hours"
+          },
+          "weekly_threshold_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 168.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Threshold Hours"
+          },
+          "week_start_day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Week Start Day"
+          },
+          "overtime_rate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overtime Rate"
+          },
+          "auto_close_after_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 72.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Close After Hours"
+          },
+          "auto_close_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Close Policy"
+          },
+          "require_edit_reason": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Require Edit Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TimeClockSettingsUpdate"
       },
       "TimeZoneOption": {
         "properties": {
@@ -204057,6 +208420,18 @@
           },
           "status": {
             "type": "string",
+            "enum": [
+              "diagnosed",
+              "accepted",
+              "unaccepted",
+              "hold",
+              "alternative",
+              "referred_out",
+              "scheduled",
+              "completed",
+              "internal_referral",
+              "external_referral"
+            ],
             "title": "Status"
           },
           "diagnosed_by": {
@@ -207779,108 +212154,6 @@
         ],
         "title": "PaymentAllocationRead"
       },
-      "app__schemas__medical_history__MedicalAlertIn": {
-        "properties": {
-          "alert_code": {
-            "type": "string",
-            "title": "Alert Code"
-          },
-          "alert_label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alert Label"
-          },
-          "section": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Section"
-          },
-          "response": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "yes",
-                  "no",
-                  "unknown"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Response"
-          },
-          "comments": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comments"
-          },
-          "is_flash_alert": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Is Flash Alert"
-          },
-          "blocks_charges": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Blocks Charges"
-          }
-        },
-        "type": "object",
-        "required": [
-          "alert_code"
-        ],
-        "title": "MedicalAlertIn"
-      },
-      "app__schemas__office_setup__FeeScheduleOption": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "FeeScheduleOption"
-      },
       "app__schemas__office_setup__ScheduleDayInput": {
         "properties": {
           "day_of_week": {
@@ -207950,19 +212223,135 @@
         ],
         "title": "ScheduleDayInput"
       },
-      "app__schemas__provider_setup__ScheduleReplace": {
+      "app__schemas__office_setup__ScheduleReplace": {
         "properties": {
           "days": {
             "items": {
-              "$ref": "#/components/schemas/ScheduleDayInput"
+              "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleDayInput"
             },
             "type": "array",
-            "maxItems": 70,
+            "maxItems": 7,
+            "minItems": 1,
             "title": "Days"
           }
         },
         "type": "object",
+        "required": [
+          "days"
+        ],
         "title": "ScheduleReplace"
+      },
+      "app__schemas__patient_intake__MedicalAlertIn": {
+        "properties": {
+          "alert_code": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Alert Code"
+          },
+          "alert_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Label"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response"
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
+          "is_flash_alert": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Flash Alert"
+          },
+          "blocks_charges": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks Charges"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alert_code"
+        ],
+        "title": "MedicalAlertIn",
+        "description": "One alert answer on the composite. Same vocabulary as the generic\nresource (``yes|no|unknown``, MH-5) \u2014 case-folded rather than a strict\n``Literal`` so a ``\"Yes\"`` from a form does not 422 the whole registration."
+      },
+      "app__schemas__procedure_setup__FeeScheduleOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "fee_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "FeeScheduleOption"
       }
     },
     "securitySchemes": {

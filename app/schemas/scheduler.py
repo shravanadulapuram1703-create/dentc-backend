@@ -60,6 +60,11 @@ class AppointmentSchedulerRead(BaseModel):
     service_summary: str | None = None
     insurance_eligibility: Literal["eligible", "ineligible", "unknown"] | None = None
     account_balance: Decimal | None = None
+    # SCHED-PT-1: the patient's pending treatment-plan items (the PT badge), same
+    # rule as ``GET /patients/{id}/treatment-plan-items?pending=true``.
+    pending_tx_count: int = 0
+    pending_tx_scheduled_count: int = 0
+    pending_tx_fee: Decimal = Decimal("0.00")
     created_by: int | None = None
     created_by_name: str | None = None
     updated_by: int | None = None

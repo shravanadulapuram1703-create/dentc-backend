@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from app.schemas.common import ORMModel
 from app.core.datetimes import UtcDatetime
@@ -35,12 +35,32 @@ COMPLETED_STATUS = "completed"
 SCHEDULED_STATUS = "scheduled"
 ACCEPTED_STATUS = "accepted"
 
+
+def _canonical_status(value: Any) -> Any:  # noqa: ANN401
+    """SCHED-PT-4 read-side fold (the map lives in ``treatment_service``)."""
+    from app.services.treatment_service import normalise_item_status  # noqa: PLC0415
+
+    return normalise_item_status(value)
+
 # PLAN-27: the Edit Treatment "Referral Type" radio. Same vocabulary as
 # ``referrals.referral_type`` ("in" = referred in by, "out" = referred out to).
 ReferralType = Literal["in", "out"]
 
 # PLAN-9: the PRE AUTH STATUS radios.
 PreauthStatus = Literal["sent", "closed"]
+
+
+class PendingTreatmentSummary(BaseModel):
+    """SCHED-PT-3: one patient's open (pending) treatment-plan items."""
+
+    patient_id: int
+    count: int
+    scheduled_count: int = Field(..., description="Of ``count``, items booked on an appointment")
+    total_fee: Decimal
+
+
+class PendingTreatmentSummaryBatch(BaseModel):
+    items: list[PendingTreatmentSummary]
 
 
 class TreatmentPlanSummary(BaseModel):
@@ -153,7 +173,9 @@ class TreatmentPlanItemRead(ORMModel):
     insurance_estimate: Decimal
     discount: Optional[Decimal] = None
     billing_order: Optional[str] = None
-    status: str
+    # SCHED-PT-4: typed. Legacy codes (``d``/``a``/``planned``/…) are folded to the
+    # canonical value on read; the write schemas already only accept ``ItemStatus``.
+    status: Annotated[ItemStatus, BeforeValidator(_canonical_status)]
     diagnosed_by: Optional[str] = None
     provider_id: Optional[str] = None
     diagnosed_date: Optional[date] = None

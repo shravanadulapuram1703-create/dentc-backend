@@ -47,6 +47,7 @@ from app.api.v1 import (
     statements,
     support,
     supporting_records,
+    time_clock,
     transactions,
     treatment,
     users,
@@ -230,4 +231,9 @@ api_router.include_router(sms.webhook_router)
 # EMAIL-1: the e-mail counterpart (SendGrid) + its signed event webhook.
 api_router.include_router(email.router)
 api_router.include_router(email.webhook_router)
+# Time Clock (TC-BE-1..14): hand-written — authorization is by caller, which the
+# generic engine cannot express. Keeps the registry's operation ids.
+api_router.include_router(time_clock.router)
+api_router.include_router(time_clock.admin_router)
+api_router.include_router(time_clock.report_router)
 api_router.include_router(build_entity_router())
