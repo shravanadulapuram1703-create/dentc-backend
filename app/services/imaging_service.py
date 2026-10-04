@@ -258,6 +258,33 @@ def get_instance_detail(db: Session, sop_instance_uid: str, tenant_id: int) -> d
     return _instance_out(inst, modality, tenant_id)
 
 
+def update_instance_tooth_numbers(
+    db: Session, sop_instance_uid: str, tenant_id: int, tooth_numbers: list[int]
+) -> dict:
+    """Set (replace) the tooth numbers tagged to one instance.
+
+    ``tooth_numbers`` is normally populated only from migrated legacy DICOM
+    metadata; this is the one live write path, mirroring the tooth-association
+    panel already available for patient-document images so a freshly captured
+    scan can be tagged too.
+    """
+    inst = db.execute(
+        select(DicomInstance).where(
+            DicomInstance.sop_instance_uid == sop_instance_uid,
+            DicomInstance.tenant_id == tenant_id,
+            DicomInstance.is_deleted.is_(False),
+        )
+    ).scalar_one_or_none()
+    if inst is None:
+        raise NotFoundError(f"Image '{sop_instance_uid}' was not found")
+    inst.tooth_numbers = sorted(set(tooth_numbers))
+    db.commit()
+    modality = db.execute(
+        select(DicomSeries.modality).where(DicomSeries.id == inst.series_id)
+    ).scalar_one_or_none()
+    return _instance_out(inst, modality, tenant_id)
+
+
 def resolve_asset(
     db: Session, sop_instance_uid: str, kind: str, tenant_id: int
 ) -> tuple[StoredObject, DicomInstance] | None:

@@ -42,6 +42,12 @@ class DicomInstanceOut(BaseModel):
     assets: InstanceAssets
 
 
+class DicomInstanceToothUpdate(BaseModel):
+    """PATCH body: replace the tooth numbers tagged to one instance (empty list clears)."""
+
+    tooth_numbers: list[int] = Field(default_factory=list)
+
+
 class DicomSeriesOut(BaseModel):
     id: int
     series_instance_uid: str

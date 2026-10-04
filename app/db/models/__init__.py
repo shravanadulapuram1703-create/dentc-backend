@@ -119,6 +119,7 @@ from app.db.models.comms import (
     LetterBatchRun,
     LetterTemplate,
     PostcardTemplate,
+    RingCentralSubscription,
     SmsMessage,
     SmsTemplate,
 )
@@ -276,7 +277,8 @@ __all__ = [
     "Definition", "DefinitionGroup", "ImagingTemplate", "QuestionnaireHeader",
     "QuestionnaireOption",
     # communications
-    "SmsMessage", "SmsTemplate", "EmailMessage", "LetterTemplate", "PostcardTemplate",
+    "SmsMessage", "SmsTemplate", "RingCentralSubscription", "EmailMessage",
+    "LetterTemplate", "PostcardTemplate",
     "LetterBatchRun", "LetterBatchItem", "Campaign",
     # direct messaging
     "Conversation", "ConversationParticipant", "Message", "MessageReceipt",

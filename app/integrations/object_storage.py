@@ -107,11 +107,31 @@ def signed_url(
     try:
         blob = client.bucket(bucket).blob(object_key)
         disposition = f'inline; filename="{download_name}"' if download_name else None
+        sign_kwargs: dict[str, Any] = {}
+        if not settings.GCS_CREDENTIALS_PATH:
+            # No service-account key file (the norm on Cloud Run): the ambient
+            # credentials carry only a bearer token, not a private key, so
+            # google-cloud-storage can't sign locally - it raises "you need a
+            # private key to sign credentials" unconditionally, regardless of
+            # IAM grants, unless explicitly handed a token to sign via the IAM
+            # signBlob API instead. Requires the runtime service account to
+            # hold "Service Account Token Creator" on itself (self-impersonation;
+            # see docs/deployment/BACKEND_DEPLOY_GCP.md).
+            import google.auth
+            import google.auth.transport.requests as google_requests
+
+            ambient_credentials, _ = google.auth.default()
+            ambient_credentials.refresh(google_requests.Request())
+            sign_kwargs = {
+                "service_account_email": ambient_credentials.service_account_email,
+                "access_token": ambient_credentials.token,
+            }
         return blob.generate_signed_url(
             version="v4",
             expiration=ttl,
             method="GET",
             response_disposition=disposition,
+            **sign_kwargs,
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Signed-URL generation failed for gs://%s/%s: %s", bucket, object_key, exc)
