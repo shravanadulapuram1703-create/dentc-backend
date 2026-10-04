@@ -192,7 +192,14 @@ from app.db.models.reference import (
     QuestionnaireOption,
 )
 from app.db.models.scheduling import Appointment, AppointmentProcedure, Lab
-from app.db.models.staff import ProviderInsuranceId, ProviderRouteSlip, TimeClockEntry
+from app.db.models.staff import (
+    ProviderInsuranceId,
+    ProviderRouteSlip,
+    TimeClockEntry,
+    TimeClockEntryEdit,
+    TimeClockPeriod,
+    TimeClockSettings,
+)
 from app.db.models.treatment import (
     TreatmentPlan,
     TreatmentPlanInsuranceDetail,
@@ -275,7 +282,8 @@ __all__ = [
     "Conversation", "ConversationParticipant", "Message", "MessageReceipt",
     "MessageRecipientState", "MessageAttachment", "MessageReaction", "UserPresence",
     # staff
-    "TimeClockEntry", "ProviderInsuranceId", "ProviderRouteSlip",
+    "TimeClockEntry", "TimeClockEntryEdit", "TimeClockPeriod", "TimeClockSettings",
+    "ProviderInsuranceId", "ProviderRouteSlip",
     # imaging / misc
     "ImageGroup", "ImageDetail", "CollectionAgency", "ReferralDemogHeader",
     "ReferralDemogDetail",

@@ -12,6 +12,7 @@ from app.schemas.enriched import PatientProcedureRead
 from app.schemas.treatment import (
     BookFromPlanRequest,
     BookFromPlanResult,
+    PendingTreatmentSummaryBatch,
     PostPlanItemRequest,
     ReEstimateResult,
     TreatmentPlanItemRead,
@@ -146,6 +147,14 @@ def patient_treatment_plan_items(
     include_completed: Annotated[
         bool, Query(description="false = only open items (status != completed)")
     ] = True,
+    pending: Annotated[
+        bool,
+        Query(description=(
+            "SCHED-PT-2: true = only pending items — not archived, no `end_date`, no live "
+            "charge (`procedure_id` null), status not completed / referred_out / "
+            "external_referral. The same rule as the scheduler's `pending_tx_count`."
+        )),
+    ] = False,
     plan_id: Annotated[str | None, Query(description="Limit to one plan")] = None,
     status: Annotated[str | None, Query(description="Exact item status")] = None,
     procedure_code: Annotated[str | None, Query()] = None,
@@ -153,13 +162,37 @@ def patient_treatment_plan_items(
     size: Annotated[int, Query(ge=1, le=500)] = 200,
 ):
     items, total = treatment_service.list_patient_items(
-        db, patient_id, tenant_id,
+        db, patient_id, tenant_id, pending=pending,
         include_archived=include_archived, include_completed=include_completed,
         plan_id=plan_id, status=status, procedure_code=procedure_code,
         page=page, size=size,
     )
     treatment_service.enrich_treatment_plan_item(db, items, tenant_id)
     return PaginatedResponse.build(items, total, page, size)
+
+
+@router.get(
+    "/treatment-plan-items/pending-summary",
+    response_model=PendingTreatmentSummaryBatch,
+    operation_id="list_pending_treatment_summaries",
+    summary="Pending treatment per patient, ``?patient_ids=1,2,3`` (<= 200) (SCHED-PT-3)",
+    description=(
+        "One call for a scheduler day/week/month instead of one items list per patient. "
+        "Only patients with at least one pending item appear in `items`; patients outside "
+        "the tenant are silently absent. Same rule as `?pending=true` and the scheduler "
+        "feed's `pending_tx_count`."
+    ),
+)
+def pending_treatment_summaries(
+    db: DbSession,
+    tenant_id: TenantId,
+    patient_ids: Annotated[str, Query(description="Comma-separated patient ids, at most 200")],
+):
+    from app.services.medical_history_service import parse_patient_ids  # noqa: PLC0415
+
+    ids = parse_patient_ids(patient_ids) or []
+    summaries = treatment_service.pending_summary(db, tenant_id, ids)
+    return {"items": [summaries[pid] for pid in ids if pid in summaries]}
 
 
 @router.post(
@@ -238,6 +271,13 @@ def treatment_plan_rules() -> dict:
                          "status_before_scheduled when the appointment is cancelled/deleted",
         },
         "released_status": treatment_service.RELEASED_STATUS,
+        # SCHED-PT-5: what "pending treatment" (the scheduler PT badge) means.
+        "pending_rule": {
+            "excluded_statuses": list(treatment_service.PENDING_EXCLUDED_STATUSES),
+            "requires": ["is_archived = false", "end_date is null", "procedure_id is null"],
+            "scheduled_counts_as_pending": True,
+            "legacy_status_map": treatment_service.LEGACY_ITEM_STATUS_MAP,
+        },
         "referral_types": list(get_args(ReferralType)),
         "preauth_statuses": list(get_args(PreauthStatus)),
         "posting_flags": ["update_end_date_at_posting", "re_estimate_at_posting"],

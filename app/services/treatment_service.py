@@ -38,6 +38,9 @@
 - **PROC-INT-8** every item write runs the tooth/surface/quadrant rules in
   ``procedure_rules_service`` (same engine as ``patient_procedures``).
 - **PROC-INT-3** every item write announces ``procedures.changed``.
+- **SCHED-PT-1..5** :func:`pending_item_clauses` is the one "pending treatment"
+  rule, read by the scheduler feed (``pending_tx_*``), ``?pending=true`` on the
+  patient items list and ``GET /treatment-plan-items/pending-summary``.
 """
 
 from __future__ import annotations
@@ -47,7 +50,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.datetimes import office_today
@@ -812,6 +815,99 @@ def plan_summary(db: Session, plan_id: str, tenant_id: int) -> TreatmentPlanSumm
     )
 
 
+# ── SCHED-PT-1..5: "pending treatment" — one rule for every reader ───────────
+#: SCHED-PT-5: statuses that are *not* pending. ``completed`` is treated;
+#: ``referred_out`` / ``external_referral`` leave the practice. Everything else
+#: is still open on the plan — ``alternative`` / ``hold`` / ``unaccepted`` are
+#: undecided, ``scheduled`` is booked but not done (reported separately as
+#: ``scheduled_count``), and ``internal_referral`` is treatment routed to another
+#: provider *in this practice*, so it is still this practice's pending work.
+PENDING_EXCLUDED_STATUSES = (COMPLETED_STATUS, "referred_out", "external_referral")
+
+#: SCHED-PT-4: legacy Denticon single-letter / long-form codes -> canonical
+#: ``ItemStatus``. Lower-cased lookup; used by the read normaliser and
+#: ``scripts/normalize_treatment_item_statuses.py``.
+LEGACY_ITEM_STATUS_MAP: dict[str, str] = {
+    "d": "diagnosed", "dx": "diagnosed", "planned": "diagnosed", "diagnosed": "diagnosed",
+    "a": "accepted", "accepted": "accepted",
+    "u": "unaccepted", "unaccepted": "unaccepted", "rejected": "unaccepted",
+    "h": "hold", "hold": "hold", "on hold": "hold",
+    "alt": "alternative", "alternative": "alternative", "alternate": "alternative",
+    "ro": "referred_out", "referred out": "referred_out", "referred_out": "referred_out",
+    "s": "scheduled", "sch": "scheduled", "scheduled": "scheduled",
+    "c": "completed", "done": "completed", "complete": "completed", "completed": "completed",
+    "ir": "internal_referral", "internal_referral": "internal_referral",
+    "er": "external_referral", "external_referral": "external_referral",
+}
+
+
+def normalise_item_status(value: Any) -> str | None:  # noqa: ANN401
+    """Canonical status for a stored value; an unrecognised one is returned as
+    stored (trimmed) so a caller can report it rather than guess."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return LEGACY_ITEM_STATUS_MAP.get(text.lower(), text)
+
+
+def _live_charge_exists():  # noqa: ANN202
+    return (
+        select(PatientProcedure.id)
+        .where(
+            PatientProcedure.treatment_plan_item_id == TreatmentPlanItem.id,
+            PatientProcedure.is_void.is_(False),
+        )
+        .exists()
+    )
+
+
+def pending_item_clauses() -> list:
+    """SCHED-PT-2: the server-side twin of the FE's ``isPlanItemOpen`` — not
+    archived, not posted (no ``end_date`` and no live charge, i.e. the derived
+    ``procedure_id`` is null), status not in :data:`PENDING_EXCLUDED_STATUSES`."""
+    return [
+        TreatmentPlanItem.is_archived.is_(False),
+        TreatmentPlanItem.end_date.is_(None),
+        ~_live_charge_exists(),
+        or_(TreatmentPlanItem.status.is_(None),
+            TreatmentPlanItem.status.notin_(PENDING_EXCLUDED_STATUSES)),
+    ]
+
+
+def pending_summary(db: Session, tenant_id: int, patient_ids) -> dict[int, dict]:  # noqa: ANN001
+    """SCHED-PT-1/3: ``{patient_id: {patient_id, count, scheduled_count,
+    total_fee}}`` for every patient with at least one pending item — one grouped
+    statement, tenant-scoped through the patient."""
+    ids = [int(p) for p in (patient_ids or []) if p is not None]
+    if not ids:
+        return {}
+    is_sched = func.sum(
+        case((TreatmentPlanItem.status == SCHEDULED_STATUS, 1), else_=0)
+    )
+    rows = db.execute(
+        select(
+            TreatmentPlan.patient_id,
+            func.count(TreatmentPlanItem.id),
+            is_sched,
+            func.coalesce(func.sum(TreatmentPlanItem.fee), 0),
+        )
+        .join(TreatmentPlan, TreatmentPlan.id == TreatmentPlanItem.plan_id)
+        .join(Patient, Patient.id == TreatmentPlan.patient_id)
+        .where(Patient.tenant_id == tenant_id, TreatmentPlan.patient_id.in_(ids),
+               *pending_item_clauses())
+        .group_by(TreatmentPlan.patient_id)
+    ).all()
+    return {
+        pid: {
+            "patient_id": pid,
+            "count": int(count or 0),
+            "scheduled_count": int(sched or 0),
+            "total_fee": Decimal(str(fee or 0)).quantize(_CENTS),
+        }
+        for pid, count, sched, fee in rows
+    }
+
+
 # ── PLAN-12 / PROC-INT-4: a patient's items across all plans, paged ──────────
 def list_patient_items(
     db: Session,
@@ -823,6 +919,7 @@ def list_patient_items(
     status: str | None = None,
     procedure_code: str | None = None,
     include_completed: bool = True,
+    pending: bool = False,
     page: int = 1,
     size: int = 200,
 ) -> tuple[list[TreatmentPlanItem], int]:
@@ -837,6 +934,8 @@ def list_patient_items(
     )
     if not include_archived:
         stmt = stmt.where(TreatmentPlanItem.is_archived.is_(False))
+    if pending:  # SCHED-PT-2: the full rule (implies not archived / not completed)
+        stmt = stmt.where(*pending_item_clauses())
     if plan_id:
         stmt = stmt.where(TreatmentPlanItem.plan_id == plan_id)
     if status:

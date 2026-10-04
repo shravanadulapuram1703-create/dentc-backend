@@ -183,6 +183,10 @@ def list_scheduler_appointments(
 
     lab_names = lab_svc.vendor_names(db, {a.lab_vendor_id for a, *_ in records if a.lab_vendor_id})
     balances = _batch_balances(db, patient_ids)
+    # SCHED-PT-1: pending treatment in one grouped statement for the whole feed.
+    from app.services import treatment_service  # noqa: PLC0415
+
+    pending_tx = treatment_service.pending_summary(db, tenant_id, patient_ids)
     services = _batch_service_summary(db, appt_ids)
     eligibility = _batch_eligibility(db, patient_ids)
     actor_ids = {a.created_by for a, *_ in records if a.created_by} | {
@@ -230,6 +234,10 @@ def list_scheduler_appointments(
             "service_summary": services.get(appt.id),
             "insurance_eligibility": eligibility.get(appt.patient_id) if appt.patient_id else None,
             "account_balance": bal if bal is not None else None,
+            "pending_tx_count": pending_tx.get(appt.patient_id, {}).get("count", 0),
+            "pending_tx_scheduled_count":
+                pending_tx.get(appt.patient_id, {}).get("scheduled_count", 0),
+            "pending_tx_fee": pending_tx.get(appt.patient_id, {}).get("total_fee", Decimal("0.00")),
             "created_by": appt.created_by,
             "created_by_name": names.get(appt.created_by) if appt.created_by else None,
             "updated_by": appt.updated_by,

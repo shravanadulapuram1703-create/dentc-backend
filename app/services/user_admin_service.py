@@ -36,7 +36,9 @@ from app.services import signature_service as sig_svc
 # Fallback option sets (used when no `definitions` rows are seeded for the group).
 _DEFAULT_ROLES = ["admin", "provider", "front_desk", "staff", "super_admin"]
 _DEFAULT_ACCESS_LEVELS = ["full", "limited", "read_only", "none"]
-_DEFAULT_OVERTIME_METHODS = ["none", "weekly_40", "daily_8", "california"]
+# TC-BE-7: the canonical vocabulary (legacy weekly_40 / daily_8 / california are
+# folded on write by time_clock_service.canonical_overtime_method).
+_DEFAULT_OVERTIME_METHODS = ["none", "weekly", "daily", "daily_weekly"]
 
 # Static schema for the preferences tab (option lists per preference key).
 _PREFERENCES_SCHEMA = {
@@ -130,6 +132,14 @@ def _set_time_clock(db: Session, user: User, tenant_id: int, data: dict) -> User
     if row is None:
         row = UserTimeClockConfig(tenant_id=tenant_id, user_id=user.id)
         db.add(row)
+    # TC-BE-7: the overtime method decides pay, so it is folded onto the enum
+    # (legacy spellings accepted) and anything else is a 422.
+    from app.services import time_clock_service  # noqa: PLC0415 - avoid an import cycle
+
+    if "overtime_method" in data:
+        data["overtime_method"] = time_clock_service.canonical_overtime_method(data["overtime_method"])
+    if "week_start_day" in data:
+        data["week_start_day"] = time_clock_service.canonical_week_day(data["week_start_day"])
     for k, v in data.items():
         setattr(row, k, v)
     return row

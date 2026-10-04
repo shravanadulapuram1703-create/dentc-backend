@@ -1329,9 +1329,8 @@ _COMMS = [
 
 # ── Staff & operations ─────────────────────────────────────────────────────
 _STAFF = [
-    _cfg(m.TimeClockEntry, "TimeClockEntry", "time-clock-entries", "Staff",
-         "time_clock_entry", "time_clock_entries", sortable=("clock_in", "created_at"),
-         filters=("user_id", "office_id"), soft_field=None, office_scope=_POS),
+    # time-clock-entries moved to app/api/v1/time_clock.py (TC-BE-5: caller-based
+    # authorization the generic engine cannot express).
     _cfg(m.ProviderInsuranceId, "ProviderInsuranceId", "provider-insurance-ids", "Staff",
          "provider_insurance_id", "provider_insurance_ids",
          filters=("provider_id", "carrier_id", "in_network"), soft_field=None),

@@ -15,9 +15,16 @@ from app.core.datetimes import UtcDatetime
 # ── Gap 3: time-clock config ─────────────────────────────────────────────────
 class TimeClockConfig(BaseModel):
     pay_rate: Decimal | None = None
-    overtime_method: str | None = None
-    overtime_rate: Decimal | None = None
+    overtime_method: str | None = Field(
+        None,
+        description="TC-BE-7: none | weekly | daily | daily_weekly (legacy weekly_40 / daily_8 / "
+                    "california accepted and folded); null = the practice default.",
+    )
+    overtime_rate: Decimal | None = Field(None, description="Overtime multiplier, e.g. 1.5.")
     clock_in_required: bool = False
+    daily_threshold_hours: Decimal | None = Field(None, gt=0, le=24)
+    weekly_threshold_hours: Decimal | None = Field(None, gt=0, le=168)
+    week_start_day: str | None = Field(None, description="sunday … saturday; null = practice default")
 
 
 class TimeClockConfigRead(ORMModel):
@@ -26,6 +33,9 @@ class TimeClockConfigRead(ORMModel):
     overtime_method: str | None = None
     overtime_rate: Decimal | None = None
     clock_in_required: bool = False
+    daily_threshold_hours: Decimal | None = None
+    weekly_threshold_hours: Decimal | None = None
+    week_start_day: str | None = None
 
 
 # ── Gap 4: login restrictions + patient access level ─────────────────────────
