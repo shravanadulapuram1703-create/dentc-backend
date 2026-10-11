@@ -114,15 +114,54 @@ def office_scope_clause(office_id: int):  # noqa: ANN201
     )
 
 
+def offices_scope_clause(office_ids: list[int]):  # noqa: ANN201
+    """FSW-6: ``Provider`` rows serving ANY of ``office_ids`` (assigned ∪ home).
+    An empty list matches nothing."""
+    return or_(
+        Provider.office_id.in_(office_ids),
+        Provider.id.in_(
+            select(ProviderOffice.provider_id).where(ProviderOffice.office_id.in_(office_ids))
+        ),
+    )
+
+
+def served_office_ids(db: Session, providers: list) -> dict[str, list[int]]:  # noqa: ANN001
+    """``{provider_id: sorted office ids}`` — the home office ∪ every
+    ``provider_offices`` assignment, for a page of providers in one statement.
+    This is what lets a multi-office picker say *which* selected offices each
+    provider serves without one ``/offices/{id}/providers/effective`` per office."""
+    ids = [p.id for p in providers]
+    out: dict[str, set[int]] = {p.id: ({p.office_id} if p.office_id is not None else set())
+                                for p in providers}
+    if ids:
+        rows = db.execute(
+            select(ProviderOffice.provider_id, ProviderOffice.office_id)
+            .where(ProviderOffice.provider_id.in_(ids))
+        ).all()
+        for provider_id, office_id in rows:
+            if office_id is not None:
+                out.setdefault(provider_id, set()).add(office_id)
+    return {pid: sorted(offices) for pid, offices in out.items()}
+
+
 class ProviderCRUD(CRUDBase[Provider]):
     """``?office_id=`` spans the M:N join instead of only the home-office scalar,
-    and ``role`` is canonicalised on write (PROV-3)."""
+    and ``role`` is canonicalised on write (PROV-3). ``?office_ids=1,9`` is the
+    multi-office form of the same union (FSW-6)."""
 
-    custom_filter_fields = ("office_id",)
+    custom_filter_fields = ("office_id", "office_ids")
 
     def _extra_list_clauses(self, filters: dict[str, Any]) -> list:
+        from app.services.fee_schedule_service import id_list  # noqa: PLC0415
+
+        clauses = []
         office_id = filters.get("office_id")
-        return [] if office_id is None else [office_scope_clause(office_id)]
+        if office_id is not None:
+            clauses.append(office_scope_clause(office_id))
+        office_ids = id_list(filters.get("office_ids"), int)
+        if office_ids is not None:
+            clauses.append(offices_scope_clause(office_ids))
+        return clauses
 
     def create(self, db: Session, data: dict, *, tenant_id=None, created_by=None):  # noqa: ANN001, ANN201
         payload = _canonicalise(data)

@@ -67,6 +67,7 @@ from app.db.models import (
     Provider,
 )
 from app.services import fee_vocab
+from app.services.provider_taxonomy_service import canonical_specialty, provider_specialty_code
 
 _CENTS = Decimal("0.01")
 _ZERO = Decimal("0")
@@ -188,7 +189,13 @@ def build_context(
     specialty_id = None
     if provider_id:
         provider = db.get(Provider, provider_id)
-        specialty_id = (provider.specialty or None) if provider is not None else None
+        # FSW-5: the taxonomy code (stored, else keyword-derived from the free
+        # text) — the same canonical form an assignment's specialty_id is folded
+        # onto, so "Orthodontist" and "1223X0400X" are one specialty.
+        specialty_id = (
+            provider_specialty_code(provider.taxonomy_code, provider.specialty)
+            if provider is not None else None
+        )
 
     return PricingContext(
         office_id=office_id,
@@ -226,6 +233,16 @@ def _same(a: Any, b: Any) -> bool:  # noqa: ANN401
     return a == b
 
 
+def _key_matches(attr: str, row_value: Any, ctx_value: Any) -> bool:  # noqa: ANN401
+    """One assignment key against the context. ``specialty_id`` is compared in
+    its canonical (taxonomy-code) form on both sides (FSW-5); every other key is
+    :func:`_same`."""
+    if attr == "specialty_id":
+        canon = canonical_specialty(row_value)
+        return canon is not None and canon == ctx_value
+    return _same(row_value, ctx_value)
+
+
 def _candidates(
     db: Session, tenant_id: int, ctx: PricingContext
 ) -> list[tuple[int, FeeScheduleAssignment]]:
@@ -247,7 +264,7 @@ def _candidates(
             if value is None or value == "":
                 continue
             specificity += 1
-            if not _same(value, getattr(ctx, ctx_attr)):
+            if not _key_matches(attr, value, getattr(ctx, ctx_attr)):
                 ok = False
                 break
         if ok:
@@ -520,7 +537,7 @@ def _v2_candidate_rows(db: Session, tenant_id: int, ctx: PricingContext) -> list
             value = getattr(row, attr, None)
             if value is None or value == "":
                 continue
-            if not _same(value, getattr(ctx, attr, None)):
+            if not _key_matches(attr, value, getattr(ctx, attr, None)):
                 ok = False
                 break
         # A row that sets no payer/provider key is a legacy practice-wide row;

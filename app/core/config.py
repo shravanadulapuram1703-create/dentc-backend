@@ -257,6 +257,30 @@ class Settings(BaseSettings):
     )
     # AN-2: short TTL on the cached availability response (public, cacheable).
     APPOINTNOW_AVAILABILITY_CACHE_SECONDS: int = 30
+    # AN-26: the public Details step's third Yes/No acknowledgement ("Payment").
+    # Required (422 ``acknowledgement_required``) like the other two; the switch
+    # exists only so an embed that predates the payment wording can be kept
+    # booking while it is updated.
+    APPOINTNOW_REQUIRE_PAYMENT_ACK: bool = True
+    # AN-27: payment-required confirmation flow. A link's life (Stripe Checkout
+    # accepts 30 min .. 24 h) is also how long the slot stays soft-held while the
+    # patient pays.
+    APPOINTNOW_PAYMENT_CURRENCY: str = "usd"
+    APPOINTNOW_PAYMENT_LINK_TTL_MINUTES: int = 1440
+    # Where Checkout sends the patient afterwards. ``{office_code}``,
+    # ``{request_id}`` and ``{result}`` (success|cancel) are substituted.
+    APPOINTNOW_PAYMENT_RETURN_URL: str | None = None
+
+    # ── Stripe (AppointNow payment links, AN-27) ─────────────────────────────
+    # Unset => no hosted links: the request still moves to ``awaiting_payment``
+    # with provider ``manual`` and staff record the payment they took by phone /
+    # terminal (``…/mark-paid``). The webhook refuses everything without its
+    # secret — never accepted unsigned.
+    STRIPE_SECRET_KEY: str | None = None           # SECRET
+    STRIPE_WEBHOOK_SECRET: str | None = None       # SECRET (whsec_…)
+    STRIPE_API_BASE_URL: str = "https://api.stripe.com"
+    STRIPE_TIMEOUT_SECONDS: int = 15
+    STRIPE_WEBHOOK_TOLERANCE_SECONDS: int = 300
 
     # ── Jira (Help Center → support tickets, HELP-1/2/3) ─────────────────────
     # The server holds the Jira secret; the browser never sees it. When

@@ -16,7 +16,7 @@ from app.db.models.access import (
     UserTask,
     UserTimeClockConfig,
 )
-from app.db.models.appointnow import AppointNowReason, BookingRequest
+from app.db.models.appointnow import AppointNowReason, BookingAcknowledgementText, BookingRequest
 from app.db.models.platform import SupportTicket, UtilityRun
 from app.db.models.account import (
     AccountCommunications,
@@ -218,7 +218,7 @@ __all__ = [
     # platform (help / utilities)
     "SupportTicket", "UtilityRun",
     # appointnow (external online booking)
-    "AppointNowReason", "BookingRequest",
+    "AppointNowReason", "BookingAcknowledgementText", "BookingRequest",
     # patients module net-new
     "PatientDocument", "PatientEmergencyContact", "PatientAdjustment", "ClaimAttachment",
     "ProgressNoteAttachment", "PatientConsent", "ConsentSignature",

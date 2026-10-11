@@ -7626,6 +7626,291 @@
         }
       }
     },
+    "/api/v1/fee-schedules/wizard": {
+      "post": {
+        "tags": [
+          "Procedures"
+        ],
+        "summary": "Create a fee schedule with its entries, assignments and office defaults atomically",
+        "description": "All or nothing: an invalid entry, assignment or office (422) or an\nassignment conflict under ``on_conflict='error'`` (409) writes nothing, and\n``error.details`` carries the full per-row report. ``dry_run`` returns that\nreport with 200 (``ok`` true/false) without writing.",
+        "operationId": "create_fee_schedule_wizard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeScheduleWizardRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fee-schedules/{schedule_id}/scope": {
+      "get": {
+        "tags": [
+          "Procedures"
+        ],
+        "summary": "Offices, providers, specialties, payers and office pointers a schedule is bound to",
+        "operationId": "get_fee_schedule_scope",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Schedule Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fee-schedules/{schedule_id}/entries/import": {
+      "post": {
+        "tags": [
+          "Procedures"
+        ],
+        "summary": "Import fees from the CSV/XLSX template with a row-level report",
+        "operationId": "import_fee_schedule_entries",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Schedule Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_fee_schedule_entries"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/pricing/quote": {
       "post": {
         "tags": [
@@ -7795,6 +8080,163 @@
               }
             },
             "description": "Forbidden"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fee-schedule-assignments/bulk": {
+      "post": {
+        "tags": [
+          "Procedures"
+        ],
+        "summary": "Create / re-bind many fee-schedule assignments in one transaction",
+        "description": "Per-row outcome: created | rebound | unchanged | skipped | conflict | error.\nAny error (422) or, under ``on_conflict='error'``, any conflict (409) rolls\nthe batch back with the report in ``error.details``. ``dry_run`` is the\nconflict probe: each conflict names the schedule it is currently bound to.",
+        "operationId": "bulk_create_fee_schedule_assignments",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAssignmentsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/provider-specialties": {
+      "get": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Dental taxonomy specialties with the tenant's providers under each",
+        "operationId": "list_provider_specialties",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_inactive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Count inactive providers too",
+              "default": false,
+              "title": "Include Inactive"
+            },
+            "description": "Count inactive providers too"
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "description": "Validation Error",
@@ -19385,7 +19827,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleReplace"
+                "$ref": "#/components/schemas/ScheduleReplace"
               }
             }
           }
@@ -23200,7 +23642,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScheduleReplace"
+                "$ref": "#/components/schemas/app__schemas__provider_setup__ScheduleReplace"
               }
             }
           }
@@ -36994,6 +37436,109 @@
         }
       }
     },
+    "/api/v1/dicom-instances/{sop_instance_uid}/tooth-numbers": {
+      "patch": {
+        "tags": [
+          "Imaging"
+        ],
+        "summary": "Tag (or clear) the teeth associated with one scanned image",
+        "operationId": "update_dicom_instance_tooth_numbers",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sop_instance_uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sop Instance Uid"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DicomInstanceToothUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DicomInstanceOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dicom-instances/{sop_instance_uid}/thumbnail": {
       "get": {
         "tags": [
@@ -37346,6 +37891,24 @@
               ],
               "title": "Duration Minutes"
             }
+          },
+          {
+            "name": "operatory_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AN-28: only this chair",
+              "title": "Operatory Id"
+            },
+            "description": "AN-28: only this chair"
           }
         ],
         "responses": {
@@ -37465,6 +38028,122 @@
         }
       }
     },
+    "/api/v1/appointnow/requests/{request_id}/status": {
+      "get": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Public Request Status",
+        "description": "AN-27.6: the patient checks whether payment / confirmation is still\noutstanding. 404 for an unknown id *or* a wrong token (never 401, AN-12);\nreturns the open payment link while one is payable.",
+        "operationId": "appointnow_public_request_status",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The status_token returned once by the submit call",
+              "title": "Token"
+            },
+            "description": "The status_token returned once by the submit call"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicRequestStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/appointnow/payments/webhooks/stripe": {
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Stripe Webhook",
+        "description": "AN-27.4: Stripe event sink. Verifies ``Stripe-Signature`` against\n``STRIPE_WEBHOOK_SECRET`` (refused outright when the secret is unset).\n``checkout.session.completed`` marks the request paid and books it\natomically; ``checkout.session.expired`` lapses the current link.",
+        "operationId": "appointnow_stripe_webhook",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentWebhookAck"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/appointnow/requests": {
       "get": {
         "tags": [
@@ -37492,10 +38171,10 @@
                   "type": "null"
                 }
               ],
-              "description": "pending|approved|declined|expired",
+              "description": "pending|awaiting_payment|approved|declined|expired",
               "title": "Status"
             },
-            "description": "pending|approved|declined|expired"
+            "description": "pending|awaiting_payment|approved|declined|expired"
           },
           {
             "name": "office_id",
@@ -38405,12 +39084,374 @@
         }
       }
     },
+    "/api/v1/appointnow/requests/{request_id}/request-payment": {
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Request Payment",
+        "description": "AN-27.3: create the secure payment link (Stripe Checkout; provider\n``manual`` when Stripe is not configured), text/e-mail it to the patient,\nmove the request to ``awaiting_payment`` and hold the slot for the link's\nlife. ``booking`` steers the appointment booked when the payment lands.\nCalling it again re-sends a fresh link and kills the old one.",
+        "operationId": "appointnow_request_payment",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPaymentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingRequestRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointnow/requests/{request_id}/mark-paid": {
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Mark Paid",
+        "description": "AN-27: record a payment taken outside the link (phone / terminal) and, by\ndefault, book it. A booking that cannot complete leaves the request paid\nwith ``payment.booking_error`` set \u2014 the payment is never rolled back.",
+        "operationId": "appointnow_mark_paid",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkPaidInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingRequestRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointnow/requests/{request_id}/refund": {
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Refund Payment",
+        "description": "AN-27.7 (admin): refund a recorded payment \u2014 at Stripe for a Stripe\npayment, plus the ledger reversal / refund when it had been posted. An\nunbooked request is declined; a booked appointment is left for staff.",
+        "operationId": "appointnow_refund_payment",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingRequestRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sms/send": {
       "post": {
         "tags": [
           "Communications"
         ],
-        "summary": "Send a text to a patient via Twilio (SMS-1)",
+        "summary": "Send a text to a patient via RingCentral (SMS-1)",
         "operationId": "send_sms",
         "security": [
           {
@@ -38535,7 +39576,7 @@
             }
           },
           "502": {
-            "description": "twilio_error (row persisted as failed)",
+            "description": "ringcentral_error (row persisted as failed)",
             "content": {
               "application/json": {
                 "schema": {
@@ -38552,7 +39593,7 @@
         "tags": [
           "Communications"
         ],
-        "summary": "Is Twilio configured (live) or is the gateway in log-only mode?",
+        "summary": "Is RingCentral configured (live) or is the gateway in log-only mode?",
         "operationId": "get_sms_gateway_status",
         "security": [
           {
@@ -44090,6 +45131,24 @@
               "title": "Role"
             },
             "description": "Filter by role"
+          },
+          {
+            "name": "office_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by office_ids",
+              "title": "Office Ids"
+            },
+            "description": "Filter by office_ids"
           },
           {
             "name": "page",
@@ -96212,6 +97271,114 @@
             "description": "Filter by carrier_id"
           },
           {
+            "name": "specialty_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by specialty_id",
+              "title": "Specialty Id"
+            },
+            "description": "Filter by specialty_id"
+          },
+          {
+            "name": "has_provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by has_provider",
+              "title": "Has Provider"
+            },
+            "description": "Filter by has_provider"
+          },
+          {
+            "name": "has_specialty",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by has_specialty",
+              "title": "Has Specialty"
+            },
+            "description": "Filter by has_specialty"
+          },
+          {
+            "name": "has_payer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by has_payer",
+              "title": "Has Payer"
+            },
+            "description": "Filter by has_payer"
+          },
+          {
+            "name": "provider_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by provider_ids",
+              "title": "Provider Ids"
+            },
+            "description": "Filter by provider_ids"
+          },
+          {
+            "name": "office_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by office_ids",
+              "title": "Office Ids"
+            },
+            "description": "Filter by office_ids"
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -115164,6 +116331,48 @@
         "title": "AccountsReceivable",
         "description": "Practice-wide outstanding balance as of a point in time (FE gap 2)."
       },
+      "AcknowledgementTexts": {
+        "properties": {
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "consent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent"
+          },
+          "payment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment"
+          }
+        },
+        "type": "object",
+        "title": "AcknowledgementTexts"
+      },
       "ActiveMedicalAlert": {
         "properties": {
           "id": {
@@ -115608,7 +116817,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -115868,6 +117077,32 @@
               }
             ],
             "title": "Is Active"
+          },
+          "requires_payment": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Payment"
+          },
+          "payment_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Amount"
           }
         },
         "type": "object",
@@ -115922,6 +117157,29 @@
               }
             ],
             "title": "Updated By"
+          },
+          "requires_payment": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Payment"
+          },
+          "payment_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Amount"
           },
           "id": {
             "type": "integer",
@@ -116040,6 +117298,32 @@
               }
             ],
             "title": "Is Active"
+          },
+          "requires_payment": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Payment"
+          },
+          "payment_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Amount"
           }
         },
         "type": "object",
@@ -117475,6 +118759,23 @@
             "type": "boolean",
             "title": "Requires Provider",
             "default": false
+          },
+          "requires_payment": {
+            "type": "boolean",
+            "title": "Requires Payment",
+            "default": false
+          },
+          "payment_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Amount"
           }
         },
         "type": "object",
@@ -118477,6 +119778,11 @@
               }
             ],
             "title": "Operatory Id"
+          },
+          "waive_payment": {
+            "type": "boolean",
+            "title": "Waive Payment",
+            "default": false
           }
         },
         "type": "object",
@@ -120460,6 +121766,22 @@
             ],
             "title": "Treatment Zip"
           },
+          "appointnow_requires_payment": {
+            "type": "boolean",
+            "title": "Appointnow Requires Payment"
+          },
+          "appointnow_payment_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointnow Payment Amount"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -120494,10 +121816,97 @@
           "is_active",
           "use_billing_license",
           "unpriced_charge_policy",
+          "appointnow_requires_payment",
           "id",
           "created_at"
         ],
         "title": "AssignedReferralOfficeRead"
+      },
+      "AssignmentRow": {
+        "properties": {
+          "fee_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Schedule Id",
+            "description": "Required on /fee-schedule-assignments/bulk; ignored by the wizard"
+          },
+          "ins_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ins Plan Id"
+          },
+          "carrier_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier Id"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "specialty_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialty Id"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          },
+          "office_group_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Group Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AssignmentRow",
+        "description": "One ``fee_schedule_assignments`` row. At least one of ``ins_plan_id`` /\n``carrier_id`` / ``provider_id`` / ``specialty_id`` is required;\n``office_id`` / ``office_group_id`` only narrow it. ``specialty_id`` is a\ntaxonomy code or a specialty name (folded onto the code)."
       },
       "Attachment": {
         "properties": {
@@ -120806,6 +122215,28 @@
               }
             ],
             "title": "Provider Name"
+          },
+          "operatory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatory Id"
+          },
+          "operatory_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatory Name"
           }
         },
         "type": "object",
@@ -120937,6 +122368,43 @@
           "file"
         ],
         "title": "Body_create_patient_imaging_capture"
+      },
+      "Body_import_fee_schedule_entries": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File",
+            "description": ".csv or .xlsx: procedure_code, description, fee, effective_date [, plan_pays, amb_code, no_charge]"
+          },
+          "effective_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Date"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          },
+          "all_or_nothing": {
+            "type": "boolean",
+            "title": "All Or Nothing",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_fee_schedule_entries"
       },
       "Body_logout": {
         "properties": {
@@ -121589,6 +123057,11 @@
           "contact": {
             "$ref": "#/components/schemas/ContactOut"
           },
+          "is_emergency": {
+            "type": "boolean",
+            "title": "Is Emergency",
+            "default": false
+          },
           "appointment_id": {
             "anyOf": [
               {
@@ -121728,6 +123201,20 @@
             ],
             "title": "Contact Notified Via"
           },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentOut"
+          },
+          "status_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Token"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -121756,6 +123243,36 @@
           "created_at"
         ],
         "title": "BookingRequestRead"
+      },
+      "BulkAssignmentsRequest": {
+        "properties": {
+          "on_conflict": {
+            "type": "string",
+            "enum": [
+              "error",
+              "rebind",
+              "skip"
+            ],
+            "title": "On Conflict",
+            "description": "An existing row binding the same target to another schedule: 'error' (409, nothing written), 'rebind' (re-point it), 'skip'",
+            "default": "error"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "description": "Validate and report conflicts; write nothing",
+            "default": false
+          },
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/AssignmentRow"
+            },
+            "type": "array",
+            "title": "Assignments"
+          }
+        },
+        "type": "object",
+        "title": "BulkAssignmentsRequest"
       },
       "BulkChartConditionsRequest": {
         "properties": {
@@ -133818,6 +135335,39 @@
               }
             ],
             "title": "Consent Accepted"
+          },
+          "payment_terms_accepted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Terms Accepted"
+          },
+          "acknowledgement_texts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AcknowledgementTexts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acknowledgement_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledgement Version"
           }
         },
         "type": "object",
@@ -133922,6 +135472,54 @@
             "type": "boolean",
             "title": "Consent Accepted",
             "default": false
+          },
+          "payment_terms_accepted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Terms Accepted"
+          },
+          "acknowledgement_hashes": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledgement Hashes"
+          },
+          "acknowledgement_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledgement Version"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
           }
         },
         "type": "object",
@@ -134162,7 +135760,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__messaging__PageMeta"
           }
         },
         "type": "object",
@@ -135587,6 +137185,20 @@
           "assets"
         ],
         "title": "DicomInstanceOut"
+      },
+      "DicomInstanceToothUpdate": {
+        "properties": {
+          "tooth_numbers": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Tooth Numbers"
+          }
+        },
+        "type": "object",
+        "title": "DicomInstanceToothUpdate",
+        "description": "PATCH body: replace the tooth numbers tagged to one instance (empty list clears)."
       },
       "DicomSeriesOut": {
         "properties": {
@@ -139344,6 +140956,82 @@
         },
         "type": "object",
         "title": "FeeScheduleUpdate"
+      },
+      "FeeScheduleWizardRequest": {
+        "properties": {
+          "schedule": {
+            "$ref": "#/components/schemas/WizardSchedule"
+          },
+          "entries_effective_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entries Effective Date",
+            "description": "Defaults to schedule.effective_date, else today"
+          },
+          "copy_from_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copy From Schedule Id",
+            "description": "Copy From Existing: start from that schedule's current prices"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/BulkEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/AssignmentRow"
+            },
+            "type": "array",
+            "title": "Assignments"
+          },
+          "on_conflict": {
+            "type": "string",
+            "enum": [
+              "error",
+              "rebind",
+              "skip"
+            ],
+            "title": "On Conflict",
+            "default": "error"
+          },
+          "office_defaults": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WizardOfficeDefaults"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule"
+        ],
+        "title": "FeeScheduleWizardRequest"
       },
       "ForgotPasswordRequest": {
         "properties": {
@@ -149033,7 +150721,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           },
           "counts": {
             "$ref": "#/components/schemas/LabStatusCounts"
@@ -152677,6 +154365,22 @@
             ],
             "title": "Treatment Zip"
           },
+          "appointnow_requires_payment": {
+            "type": "boolean",
+            "title": "Appointnow Requires Payment"
+          },
+          "appointnow_payment_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointnow Payment Amount"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -152711,6 +154415,7 @@
           "is_active",
           "use_billing_license",
           "unpriced_charge_policy",
+          "appointnow_requires_payment",
           "id",
           "created_at"
         ],
@@ -154607,6 +156312,69 @@
         "type": "object",
         "title": "LogoResult"
       },
+      "MarkPaidInput": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,11}0*$)\\d{0,8}\\.\\d{0,2}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method",
+            "default": "credit_card"
+          },
+          "book": {
+            "type": "boolean",
+            "title": "Book",
+            "default": true
+          },
+          "booking": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentBookingInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "MarkPaidInput",
+        "description": "Staff record a payment taken outside the link (phone / terminal / cash)."
+      },
       "MeFull": {
         "properties": {
           "user": {
@@ -155023,12 +156791,14 @@
         "properties": {
           "alert_code": {
             "type": "string",
+            "maxLength": 100,
             "title": "Alert Code"
           },
           "alert_label": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 255
               },
               {
                 "type": "null"
@@ -155039,7 +156809,8 @@
           "section": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -155050,12 +156821,7 @@
           "response": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "yes",
-                  "no",
-                  "unknown"
-                ]
+                "type": "string"
               },
               {
                 "type": "null"
@@ -155101,7 +156867,8 @@
         "required": [
           "alert_code"
         ],
-        "title": "MedicalAlertIn"
+        "title": "MedicalAlertIn",
+        "description": "One alert answer on the composite. Same vocabulary as the generic\nresource (``yes|no|unknown``, MH-5) \u2014 case-folded rather than a strict\n``Literal`` so a ``\"Yes\"`` from a form does not 422 the whole registration."
       },
       "MedicalAlertSummary": {
         "properties": {
@@ -156700,7 +158467,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/MedicalAlertIn"
+                  "$ref": "#/components/schemas/app__schemas__medical_history__MedicalAlertIn"
                 },
                 "type": "array"
               },
@@ -159534,6 +161301,32 @@
               }
             ],
             "title": "Treatment Zip"
+          },
+          "appointnow_requires_payment": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointnow Requires Payment"
+          },
+          "appointnow_payment_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointnow Payment Amount"
           }
         },
         "type": "object",
@@ -160696,6 +162489,22 @@
             ],
             "title": "Treatment Zip"
           },
+          "appointnow_requires_payment": {
+            "type": "boolean",
+            "title": "Appointnow Requires Payment"
+          },
+          "appointnow_payment_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointnow Payment Amount"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -160751,6 +162560,7 @@
           "is_active",
           "use_billing_license",
           "unpriced_charge_policy",
+          "appointnow_requires_payment",
           "id",
           "created_at"
         ],
@@ -161735,6 +163545,32 @@
               }
             ],
             "title": "Treatment Zip"
+          },
+          "appointnow_requires_payment": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointnow Requires Payment"
+          },
+          "appointnow_payment_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointnow Payment Amount"
           }
         },
         "type": "object",
@@ -164804,19 +166640,35 @@
         "properties": {
           "page": {
             "type": "integer",
-            "title": "Page"
+            "minimum": 1.0,
+            "title": "Page",
+            "examples": [
+              1
+            ]
           },
           "size": {
             "type": "integer",
-            "title": "Size"
+            "minimum": 1.0,
+            "title": "Size",
+            "examples": [
+              20
+            ]
           },
           "total": {
             "type": "integer",
-            "title": "Total"
+            "minimum": 0.0,
+            "title": "Total",
+            "examples": [
+              137
+            ]
           },
           "pages": {
             "type": "integer",
-            "title": "Pages"
+            "minimum": 0.0,
+            "title": "Pages",
+            "examples": [
+              7
+            ]
           }
         },
         "type": "object",
@@ -164838,7 +166690,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -164858,7 +166710,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -164878,7 +166730,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -164898,7 +166750,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -164918,7 +166770,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -164938,7 +166790,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -164958,7 +166810,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -164978,7 +166830,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -164998,7 +166850,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165018,7 +166870,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165038,7 +166890,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165058,7 +166910,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165078,7 +166930,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165098,7 +166950,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165118,7 +166970,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165138,7 +166990,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165158,7 +167010,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165178,7 +167030,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165198,7 +167050,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165218,7 +167070,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165238,7 +167090,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165258,7 +167110,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165278,7 +167130,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165298,7 +167150,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165318,7 +167170,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165338,7 +167190,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165358,7 +167210,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165378,7 +167230,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165398,7 +167250,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165418,7 +167270,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165438,7 +167290,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165458,7 +167310,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165478,7 +167330,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165498,7 +167350,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165518,7 +167370,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165538,7 +167390,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165558,7 +167410,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165578,7 +167430,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165598,7 +167450,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165618,7 +167470,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165638,7 +167490,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165658,7 +167510,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165678,7 +167530,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165698,7 +167550,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165718,7 +167570,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165738,7 +167590,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165758,7 +167610,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165778,7 +167630,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165798,7 +167650,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165818,7 +167670,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165838,7 +167690,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165858,7 +167710,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165878,7 +167730,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165898,7 +167750,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165918,7 +167770,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165938,7 +167790,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165958,7 +167810,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165978,7 +167830,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -165998,7 +167850,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166018,7 +167870,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166038,7 +167890,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166058,7 +167910,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166078,7 +167930,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166098,7 +167950,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166118,7 +167970,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166138,7 +167990,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166158,7 +168010,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166178,7 +168030,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166198,7 +168050,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166218,7 +168070,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166238,7 +168090,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166258,7 +168110,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166278,7 +168130,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166298,7 +168150,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166318,7 +168170,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166338,7 +168190,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166358,7 +168210,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166378,7 +168230,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166398,7 +168250,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166418,7 +168270,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166438,7 +168290,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166458,7 +168310,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166478,7 +168330,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166498,7 +168350,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166518,7 +168370,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166538,7 +168390,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166558,7 +168410,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166578,7 +168430,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166598,7 +168450,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166618,7 +168470,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166638,7 +168490,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166658,7 +168510,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166678,7 +168530,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166698,7 +168550,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166718,7 +168570,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166738,7 +168590,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166758,7 +168610,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166778,7 +168630,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166798,7 +168650,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166818,7 +168670,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166838,7 +168690,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166858,7 +168710,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166878,7 +168730,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166898,7 +168750,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -166918,7 +168770,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -181175,6 +183027,338 @@
         "type": "object",
         "title": "PaymentAllocationUpdate"
       },
+      "PaymentBookingInput": {
+        "properties": {
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "create_patient": {
+            "type": "boolean",
+            "title": "Create Patient",
+            "default": false
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "operatory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatory Id"
+          }
+        },
+        "type": "object",
+        "title": "PaymentBookingInput",
+        "description": "What to book once the payment lands (the ApproveInput steering fields)."
+      },
+      "PaymentOut": {
+        "properties": {
+          "requires_payment": {
+            "type": "boolean",
+            "title": "Requires Payment",
+            "default": false
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "not_required"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "link_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Url"
+          },
+          "link_sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Sent At"
+          },
+          "link_sent_via": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Sent Via"
+          },
+          "link_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Expires At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "requested_by_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By Id"
+          },
+          "requested_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By Name"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          },
+          "paid_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid Amount"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "ledger_payment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ledger Payment Id"
+          },
+          "posted_to_ledger": {
+            "type": "boolean",
+            "title": "Posted To Ledger",
+            "default": false
+          },
+          "booking_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Error"
+          },
+          "refunded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refunded At"
+          },
+          "refund_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Amount"
+          },
+          "refund_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Reference"
+          },
+          "refund_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Reason"
+          }
+        },
+        "type": "object",
+        "title": "PaymentOut",
+        "description": "AN-27.2: the payment block on a request."
+      },
+      "PaymentWebhookAck": {
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "title": "Received",
+            "default": true
+          },
+          "handled": {
+            "type": "boolean",
+            "title": "Handled",
+            "default": false
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "PaymentWebhookAck"
+      },
       "PendingTreatmentSummary": {
         "properties": {
           "patient_id": {
@@ -186267,7 +188451,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           },
           "created_at": {
             "anyOf": [
@@ -193536,6 +195720,36 @@
               }
             ],
             "title": "Effective Taxonomy Source"
+          },
+          "specialty_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialty Code"
+          },
+          "specialty_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialty Label"
+          },
+          "served_office_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Served Office Ids",
+            "default": []
           }
         },
         "type": "object",
@@ -194861,12 +197075,22 @@
             "type": "array",
             "title": "Providers"
           },
+          "operatories": {
+            "items": {
+              "$ref": "#/components/schemas/PublicOperatory"
+            },
+            "type": "array",
+            "title": "Operatories"
+          },
           "reasons": {
             "items": {
               "$ref": "#/components/schemas/AppointmentReason"
             },
             "type": "array",
             "title": "Reasons"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PublicPaymentInfo"
           }
         },
         "type": "object",
@@ -194877,6 +197101,81 @@
           "timezone"
         ],
         "title": "PublicOfficeInfo"
+      },
+      "PublicOperatory": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "provider_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "PublicOperatory",
+        "description": "AN-28: a chair the patient may book into on the public page. Every active\noperatory of the office is offered; the page always adds its own synthetic\n\"Emergency\" choice on top (never a row here)."
+      },
+      "PublicPaymentInfo": {
+        "properties": {
+          "requires_payment": {
+            "type": "boolean",
+            "title": "Requires Payment",
+            "default": false
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "usd"
+          },
+          "online_payment_available": {
+            "type": "boolean",
+            "title": "Online Payment Available",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PublicPaymentInfo",
+        "description": "AN-27.1: lets the public page say up front whether a visit needs payment\nand how much, instead of only \"if payment is required\"."
       },
       "PublicProvider": {
         "properties": {
@@ -194906,6 +197205,135 @@
           "name"
         ],
         "title": "PublicProvider"
+      },
+      "PublicRequestStatus": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "office_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Name"
+          },
+          "office_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Phone"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed",
+            "default": false
+          },
+          "slot": {
+            "$ref": "#/components/schemas/SlotOut"
+          },
+          "reason_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Label"
+          },
+          "payment_required": {
+            "type": "boolean",
+            "title": "Payment Required",
+            "default": false
+          },
+          "payment_status": {
+            "type": "string",
+            "title": "Payment Status",
+            "default": "not_required"
+          },
+          "payment_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Amount"
+          },
+          "payment_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Currency"
+          },
+          "payment_link_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Link Url"
+          },
+          "payment_link_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Link Expires At"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "slot"
+        ],
+        "title": "PublicRequestStatus",
+        "description": "AN-27.6: what the patient may see about their own request. No contact\ndetails \u2014 the token proves possession of the confirmation, not identity."
       },
       "QuestionnaireAnswer": {
         "properties": {
@@ -197146,6 +199574,40 @@
         ],
         "title": "RefundCreate"
       },
+      "RefundInput": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,11}0*$)\\d{0,8}\\.\\d{0,2}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "title": "RefundInput"
+      },
       "RefundPolicy": {
         "properties": {
           "manager_approval_threshold": {
@@ -197600,7 +200062,7 @@
           },
           "medical_alerts": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__patient_intake__MedicalAlertIn"
+              "$ref": "#/components/schemas/MedicalAlertIn"
             },
             "type": "array",
             "title": "Medical Alerts"
@@ -198664,6 +201126,63 @@
         ],
         "title": "RequestListResponse"
       },
+      "RequestPaymentInput": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,11}0*$)\\d{0,8}\\.\\d{0,2}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "expires_in_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1440.0,
+                "minimum": 30.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In Minutes"
+          },
+          "booking": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentBookingInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "RequestPaymentInput"
+      },
       "RescheduleInput": {
         "properties": {
           "slot": {
@@ -198720,6 +201239,17 @@
               }
             ],
             "title": "Provider Id"
+          },
+          "operatory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatory Id"
           }
         },
         "type": "object",
@@ -200779,14 +203309,18 @@
         "properties": {
           "days": {
             "items": {
-              "$ref": "#/components/schemas/ScheduleDayInput"
+              "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleDayInput"
             },
             "type": "array",
-            "maxItems": 70,
+            "maxItems": 7,
+            "minItems": 1,
             "title": "Days"
           }
         },
         "type": "object",
+        "required": [
+          "days"
+        ],
         "title": "ScheduleReplace"
       },
       "ScheduleResponse": {
@@ -202482,6 +205016,17 @@
               }
             ],
             "title": "Provider Name"
+          },
+          "operatory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatory Id"
           }
         },
         "type": "object",
@@ -202530,6 +205075,28 @@
               }
             ],
             "title": "Provider Name"
+          },
+          "operatory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatory Id"
+          },
+          "operatory_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatory Name"
           }
         },
         "type": "object",
@@ -203026,7 +205593,8 @@
           "error_code": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string",
+                "maxLength": 20
               },
               {
                 "type": "null"
@@ -203340,7 +205908,7 @@
           "error_code": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -203739,7 +206307,8 @@
           "error_code": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string",
+                "maxLength": 20
               },
               {
                 "type": "null"
@@ -204825,6 +207394,11 @@
             "title": "Pending",
             "default": 0
           },
+          "awaiting_payment": {
+            "type": "integer",
+            "title": "Awaiting Payment",
+            "default": 0
+          },
           "approved": {
             "type": "integer",
             "title": "Approved",
@@ -204886,6 +207460,11 @@
           },
           "contact": {
             "$ref": "#/components/schemas/ContactInput"
+          },
+          "is_emergency": {
+            "type": "boolean",
+            "title": "Is Emergency",
+            "default": false
           },
           "turnstile_token": {
             "anyOf": [
@@ -211980,49 +214559,80 @@
         ],
         "title": "ValidationError"
       },
-      "app__schemas__common__PageMeta": {
+      "WizardOfficeDefaults": {
         "properties": {
-          "page": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Page",
-            "examples": [
-              1
-            ]
+          "office_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Office Ids"
           },
-          "size": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Size",
-            "examples": [
-              20
-            ]
+          "set_default_fee_schedule": {
+            "type": "boolean",
+            "title": "Set Default Fee Schedule",
+            "description": "Point offices.default_fee_schedule_id at the new schedule",
+            "default": false
           },
-          "total": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Total",
-            "examples": [
-              137
-            ]
-          },
-          "pages": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Pages",
-            "examples": [
-              7
-            ]
+          "set_ucr_fee_schedule": {
+            "type": "boolean",
+            "title": "Set Ucr Fee Schedule",
+            "description": "Point offices.default_ucr_fee_schedule_id at the new schedule",
+            "default": false
           }
         },
         "type": "object",
+        "title": "WizardOfficeDefaults",
+        "description": "FSW-3: \"Office + All Providers\" = the office's default fee-schedule pointer."
+      },
+      "WizardSchedule": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "fee_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Type",
+            "description": "ucr|standard|plan|carrier, or a legacy radio label (FSW-4) such as 'Ins-PPO', which also sets pricing_model"
+          },
+          "pricing_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pricing Model"
+          },
+          "effective_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
         "required": [
-          "page",
-          "size",
-          "total",
-          "pages"
+          "name"
         ],
-        "title": "PageMeta"
+        "title": "WizardSchedule"
       },
       "app__schemas__factory__PaymentAllocationRead": {
         "properties": {
@@ -212154,6 +214764,118 @@
         ],
         "title": "PaymentAllocationRead"
       },
+      "app__schemas__medical_history__MedicalAlertIn": {
+        "properties": {
+          "alert_code": {
+            "type": "string",
+            "title": "Alert Code"
+          },
+          "alert_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Label"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response"
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
+          "is_flash_alert": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Flash Alert"
+          },
+          "blocks_charges": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks Charges"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alert_code"
+        ],
+        "title": "MedicalAlertIn"
+      },
+      "app__schemas__messaging__PageMeta": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pages": {
+            "type": "integer",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "size",
+          "total",
+          "pages"
+        ],
+        "title": "PageMeta"
+      },
       "app__schemas__office_setup__ScheduleDayInput": {
         "properties": {
           "day_of_week": {
@@ -212223,107 +214945,6 @@
         ],
         "title": "ScheduleDayInput"
       },
-      "app__schemas__office_setup__ScheduleReplace": {
-        "properties": {
-          "days": {
-            "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleDayInput"
-            },
-            "type": "array",
-            "maxItems": 7,
-            "minItems": 1,
-            "title": "Days"
-          }
-        },
-        "type": "object",
-        "required": [
-          "days"
-        ],
-        "title": "ScheduleReplace"
-      },
-      "app__schemas__patient_intake__MedicalAlertIn": {
-        "properties": {
-          "alert_code": {
-            "type": "string",
-            "maxLength": 100,
-            "title": "Alert Code"
-          },
-          "alert_label": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alert Label"
-          },
-          "section": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 100
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Section"
-          },
-          "response": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Response"
-          },
-          "comments": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comments"
-          },
-          "is_flash_alert": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Is Flash Alert"
-          },
-          "blocks_charges": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Blocks Charges"
-          }
-        },
-        "type": "object",
-        "required": [
-          "alert_code"
-        ],
-        "title": "MedicalAlertIn",
-        "description": "One alert answer on the composite. Same vocabulary as the generic\nresource (``yes|no|unknown``, MH-5) \u2014 case-folded rather than a strict\n``Literal`` so a ``\"Yes\"`` from a form does not 422 the whole registration."
-      },
       "app__schemas__procedure_setup__FeeScheduleOption": {
         "properties": {
           "id": {
@@ -212352,6 +214973,20 @@
           "name"
         ],
         "title": "FeeScheduleOption"
+      },
+      "app__schemas__provider_setup__ScheduleReplace": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleDayInput"
+            },
+            "type": "array",
+            "maxItems": 70,
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "title": "ScheduleReplace"
       }
     },
     "securitySchemes": {

@@ -42,7 +42,18 @@ from app.services.sms_phone import normalize_e164
 
 logger = get_logger(__name__)
 
-CONTACT_EVENTS = ("approved", "declined", "rescheduled")
+CONTACT_EVENTS = (
+    "approved", "declined", "rescheduled",
+    # AN-27: the payment flow.
+    "payment_requested", "payment_expired", "refunded",
+)
+
+
+def _fmt_amount(amount, currency: str | None) -> str:  # noqa: ANN001
+    if amount is None:
+        return "the amount due"
+    code = (currency or "usd").upper()
+    return f"${amount:,.2f}" if code == "USD" else f"{amount:,.2f} {code}"
 
 
 # ── formatting ───────────────────────────────────────────────────────────────
@@ -85,6 +96,33 @@ def contact_message(office: Office, req: BookingRequest, event: str) -> tuple[st
             f"{who}: your appointment request has been moved to {when}{with_provider}."
             + (f" Call {phone} if this time does not work." if phone else " Contact us if this time does not work.")
         )
+    elif event == "payment_requested":
+        # AN-27.3: the "secure payment link" the Payment acknowledgement promised.
+        amount = _fmt_amount(req.payment_amount, req.payment_currency)
+        subject = f"{who}: payment needed to confirm your appointment"
+        if req.payment_link_url:
+            body = (
+                f"{who}: to confirm your appointment for {when}{with_provider}, please pay "
+                f"{amount} at this secure link: {req.payment_link_url} . Your appointment is "
+                "confirmed once payment is complete."
+            )
+        else:
+            body = (
+                f"{who}: your appointment for {when}{with_provider} requires a payment of "
+                f"{amount}. We will contact you to take it; your appointment is confirmed once "
+                "payment is complete." + (f" Questions? Call {phone}." if phone else "")
+            )
+    elif event == "payment_expired":
+        subject = f"{who}: your appointment request has expired"
+        body = (
+            f"{who}: the payment for your appointment request for {when} was not completed in "
+            "time, so the time has been released."
+            + (f" Call {phone} to book again." if phone else " Please contact us to book again.")
+        )
+    elif event == "refunded":
+        amount = _fmt_amount(req.refund_amount, req.payment_currency)
+        subject = f"{who}: your payment has been refunded"
+        body = f"{who}: we have refunded {amount} for your appointment request for {when}.{call}"
     else:  # pragma: no cover - guarded by CONTACT_EVENTS
         raise ValueError(f"unknown contact event {event!r}")
     return subject, body

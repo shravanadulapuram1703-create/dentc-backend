@@ -253,6 +253,7 @@ def _cfg(
     create_permissions: tuple[str, ...] = (),
     update_permissions: tuple[str, ...] = (),
     delete_permissions: tuple[str, ...] = (),
+    extra_filters: tuple[tuple[str, type], ...] = (),
 ) -> CrudConfig:
     create_s, update_s, read_s = build_schemas(model, name, read_exclude=read_exclude)
     return CrudConfig(
@@ -281,6 +282,7 @@ def _cfg(
         create_permissions=create_permissions,
         update_permissions=update_permissions,
         delete_permissions=delete_permissions,
+        extra_filters=extra_filters,
     )
 
 
@@ -331,6 +333,9 @@ _ORG = [
         search_fields=("name", "specialty", "npi"),
         sortable_fields=_DEFAULT_SORT,
         filter_fields=("office_id", "is_active", "role"),
+        # FSW-6: ``?office_ids=1,9`` = providers serving ANY of those offices
+        # (assigned ∪ home), each read carrying ``served_office_ids``.
+        extra_filters=(("office_ids", str),),
         default_sort="created_at",
         read_enrich=enrich_provider,
         crud_class=ProviderCRUD,
@@ -1224,6 +1229,9 @@ _REFERENCE = [
          "fee_schedule_assignment", "fee_schedule_assignments",
          filters=("fee_schedule_id", "ins_plan_id", "provider_id", "office_id",
                   "office_group_id", "carrier_id"), soft_field=None,
+         # FSW-7: resolved by FeeScheduleAssignmentCRUD._extra_list_clauses.
+         extra_filters=(("specialty_id", str), ("has_provider", bool), ("has_specialty", bool),
+                        ("has_payer", bool), ("provider_ids", str), ("office_ids", str)),
          crud_class=FeeScheduleAssignmentCRUD),
     # MH-6: the frozen answers of one version; ``answer_type`` says which tab.
     _cfg(m.MedicalHistoryDetail, "MedicalHistoryDetail", "medical-history-details", "Patients",
