@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
@@ -30,7 +30,7 @@ from app.db.models import (
     Office,
     Patient,
 )
-from app.services import fee_vocab
+from app.services import fee_vocab, provider_taxonomy_service
 
 
 def _get_in_tenant(db: Session, schedule_id: int, tenant_id: int) -> FeeSchedule:
@@ -159,18 +159,97 @@ def _validate_entry_amounts(sched, patient_fee, insurance_fee) -> None:  # noqa:
                               details={"code": "insurance_fee_not_allowed", "field": "insurance_fee"})
 
 
+def normalise_assignment_specialty(data: dict, *, current=None) -> None:  # noqa: ANN001
+    """FSW-5: fold ``specialty_id`` onto its taxonomy code, and refuse a specialty
+    nothing can match — an exact-string compare against free text is how a
+    spelling difference used to stop an assignment pricing anything. Only on a
+    *move* (the value is present and differs from the stored one), so a legacy
+    free-text row stays editable."""
+    if "specialty_id" not in data:
+        return
+    raw = data["specialty_id"]
+    if raw is None or str(raw).strip() == "":
+        data["specialty_id"] = None
+        return
+    if current is not None and raw == getattr(current, "specialty_id", None):
+        return
+    if not provider_taxonomy_service.is_known_specialty(raw):
+        raise ValidationError(_err("assignment_specialty_unknown"),
+                              details={"code": "assignment_specialty_unknown",
+                                       "field": "specialty_id", "value": raw})
+    data["specialty_id"] = provider_taxonomy_service.canonical_specialty(raw)
+
+
+def id_list(raw, cast=str) -> list | None:  # noqa: ANN001
+    """``"1, 9,,x"`` -> ``[1, 9]`` (unparseable parts dropped). ``None`` when the
+    parameter was not sent; ``[]`` (matches nothing) when it was sent but empty."""
+    if raw is None:
+        return None
+    out = []
+    for part in str(raw).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.append(cast(part))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _is_set(col):  # noqa: ANN001, ANN202
+    """SQL "this key is set" — NULL and (for string keys) blank count as unset."""
+    if col.type.python_type is str:
+        return and_(col.is_not(None), col != "")
+    return col.is_not(None)
+
+
 class FeeScheduleAssignmentCRUD(CRUDBase):
     """The only binding table. A row must name a payer or person (scope-only rows
     are refused), the bound schedule must be a live schedule of this tenant, and
     the target tuple must be unique. Validators fire on a *move* (create, or a
-    PATCH that changes a key), never on stored state."""
+    PATCH that changes a key), never on stored state.
+
+    FSW-7 list filters: ``specialty_id`` (canonical compare), ``has_provider`` /
+    ``has_specialty`` / ``has_payer``, and the comma lists ``provider_ids`` /
+    ``office_ids`` — so the wizard's "Currently Bound To" column reads the rows
+    for its own providers instead of paging the whole table."""
+
+    custom_filter_fields = ("specialty_id", "has_provider", "has_specialty", "has_payer",
+                            "provider_ids", "office_ids")
+
+    def _extra_list_clauses(self, filters: dict) -> list:
+        A = FeeScheduleAssignment  # noqa: N806
+        clauses: list = []
+        spec = filters.get("specialty_id")
+        if spec not in (None, ""):
+            canon = provider_taxonomy_service.canonical_specialty(spec) or ""
+            clauses.append(or_(A.specialty_id == canon,
+                               func.lower(func.trim(A.specialty_id)) == canon.lower()))
+        for flag, cols in (("has_provider", (A.provider_id,)),
+                           ("has_specialty", (A.specialty_id,)),
+                           ("has_payer", (A.ins_plan_id, A.carrier_id))):
+            value = filters.get(flag)
+            if value is None:
+                continue
+            is_set = or_(*[_is_set(c) for c in cols])
+            clauses.append(is_set if value else ~is_set)
+        provider_ids = id_list(filters.get("provider_ids"))
+        if provider_ids is not None:
+            clauses.append(A.provider_id.in_(provider_ids))
+        office_ids = id_list(filters.get("office_ids"), int)
+        if office_ids is not None:
+            clauses.append(A.office_id.in_(office_ids))
+        return clauses
 
     def create(self, db, data, *, tenant_id=None, created_by=None):  # noqa: ANN001, ANN201
+        normalise_assignment_specialty(data)
         self._guard(db, data, tenant_id, current=None)
         return super().create(db, data, tenant_id=tenant_id, created_by=created_by)
 
     def update(self, db, obj_id, data, *, tenant_id=None, updated_by=None):  # noqa: ANN001, ANN201
         current = self.get(db, obj_id, tenant_id=tenant_id)
+        normalise_assignment_specialty(data, current=current)
         self._guard(db, data, tenant_id, current=current)
         return super().update(db, obj_id, data, tenant_id=tenant_id, updated_by=updated_by)
 
@@ -202,9 +281,11 @@ class FeeScheduleAssignmentCRUD(CRUDBase):
                                 details={"code": "assignment_duplicate_target"})
 
 
-def _duplicate_assignment(db: Session, merged: dict, tenant_id: int | None, *, exclude_id) -> bool:  # noqa: ANN001
-    """True when another assignment already binds this exact key tuple. NULL-aware
-    (a key left blank must match blank, not any value), tenant-scoped, self excluded."""
+def find_assignment(db: Session, merged: dict, tenant_id: int | None, *,
+                    exclude_id=None) -> FeeScheduleAssignment | None:  # noqa: ANN001
+    """The assignment that already binds this exact key tuple, if any. NULL-aware
+    (a key left blank must match blank, not any value), tenant-scoped, self
+    excluded. Shared by the single-row guard and the bulk / wizard writers."""
     conds = [FeeScheduleAssignment.tenant_id == tenant_id]
     for key in fee_vocab.ASSIGNMENT_KEYS:
         col = getattr(FeeScheduleAssignment, key)
@@ -212,7 +293,13 @@ def _duplicate_assignment(db: Session, merged: dict, tenant_id: int | None, *, e
         conds.append(col.is_(None) if val in (None, "") else col == val)
     if exclude_id is not None:
         conds.append(FeeScheduleAssignment.id != exclude_id)
-    return db.execute(select(FeeScheduleAssignment.id).where(and_(*conds)).limit(1)).first() is not None
+    return db.execute(
+        select(FeeScheduleAssignment).where(and_(*conds)).order_by(FeeScheduleAssignment.id).limit(1)
+    ).scalars().first()
+
+
+def _duplicate_assignment(db: Session, merged: dict, tenant_id: int | None, *, exclude_id) -> bool:  # noqa: ANN001
+    return find_assignment(db, merged, tenant_id, exclude_id=exclude_id) is not None
 
 
 class FeeScheduleCRUD(CRUDBase):
@@ -241,6 +328,13 @@ class FeeScheduleCRUD(CRUDBase):
 
     @staticmethod
     def _normalise(data: dict) -> None:
+        # FSW-4: a legacy radio label ("Ins-PPO") sets both columns; an explicit
+        # pricing_model in the same payload still wins.
+        legacy = fee_vocab.legacy_schedule_type(data.get("fee_type")) if data.get("fee_type") else None
+        if legacy is not None:
+            data["fee_type"] = legacy["fee_type"]
+            if data.get("pricing_model") is None:
+                data["pricing_model"] = legacy["pricing_model"]
         if "fee_type" in data and data["fee_type"] is not None:
             data["fee_type"] = fee_vocab.canonical_fee_type(data["fee_type"])
         if "pricing_model" in data and data["pricing_model"] is not None:

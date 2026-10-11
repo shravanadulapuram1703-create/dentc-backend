@@ -132,7 +132,12 @@ def test_availability_past_date_is_empty(client, booking_fixtures):
 
 # ── AN-3 + AN-8: intake soft-holds the slot ──────────────────────────────────
 def _submit(client, iso, start_time="09:00", **contact):
-    payload = {
+    return client.post("/api/v1/appointnow/offices/MAINST/requests",
+                       json=_submit_payload(iso, start_time, **contact))
+
+
+def _submit_payload(iso, start_time="09:00", **contact):
+    return {
         "reason_id": "cleaning",
         "reason_label": "Cleaning",
         "slot": {"date": iso, "start_time": start_time, "duration_minutes": 60,
@@ -148,9 +153,10 @@ def _submit(client, iso, start_time="09:00", **contact):
             # AN-16: both legal acknowledgements are required at intake.
             "disclaimer_accepted": contact.get("disclaimer_accepted", True),
             "consent_accepted": contact.get("consent_accepted", True),
+            # AN-26: the Payment acknowledgement is the third required one.
+            "payment_terms_accepted": contact.get("payment_terms_accepted", True),
         },
     }
-    return client.post("/api/v1/appointnow/offices/MAINST/requests", json=payload)
 
 
 def test_submit_creates_pending_and_holds_slot(client, booking_fixtures):
@@ -290,7 +296,8 @@ def test_intake_persists_acknowledgements_as_columns(client, booking_fixtures, d
     assert row.insurance_info == "Delta Dental #123"
 
 
-@pytest.mark.parametrize("field", ["disclaimer_accepted", "consent_accepted"])
+@pytest.mark.parametrize("field", ["disclaimer_accepted", "consent_accepted",
+                                   "payment_terms_accepted"])
 def test_intake_refuses_a_missing_or_false_acknowledgement(client, booking_fixtures, field):
     iso = booking_fixtures["future"].isoformat()
     for value in (False, None):
@@ -336,7 +343,8 @@ def test_split_contact_extras_is_the_inverse_of_the_frontend_fold():
     out = svc.split_contact_extras("free text\nInsurance: Aetna\nDisclaimer accepted: yes\n"
                                    "Contact consent (calls/texts): No")
     assert out == {"notes": "free text", "insurance_info": "Aetna",
-                   "disclaimer_accepted": True, "consent_accepted": False}
+                   "disclaimer_accepted": True, "consent_accepted": False,
+                   "payment_terms_accepted": None}
     assert svc.split_contact_extras(None)["disclaimer_accepted"] is None
 
 
@@ -419,7 +427,8 @@ def test_reschedule_pending_request(client, booking_fixtures, db_session, events
     assert body["status"] == "pending"
     assert body["slot"] == {"date": later, "start_time": "14:00", "end_time": "14:30",
                             "duration_minutes": 30, "provider_id": "PRV-1",
-                            "provider_name": "Dr. Jane Smith"}
+                            "provider_name": "Dr. Jane Smith",
+                            "operatory_id": None, "operatory_name": None}
     # The patient's first choice is preserved; the contact block is untouched.
     assert body["original_slot"]["date"] == iso
     assert body["original_slot"]["start_time"] == "09:00"
@@ -622,3 +631,350 @@ def test_availability_honours_office_day_row_and_lunch(client, booking_fixtures,
     ).json()["slots"]]
     assert starts and starts[0] == "09:00" and starts[-1] == "12:00"  # 13:00 end cap
     assert "10:30" not in starts and "11:00" not in starts  # lunch honoured
+
+
+# ══ AN-26: payment acknowledgement ══════════════════════════════════════════
+def test_payment_acknowledgement_and_wording_are_recorded(client, booking_fixtures, db_session):
+    from app.db.models import BookingAcknowledgementText
+
+    iso = booking_fixtures["future"].isoformat()
+    texts = {"disclaimer": "I understand this is a request.", "consent": "I consent to texts.",
+             "payment": "If payment is required, the office will send me a secure payment link."}
+    payload = {
+        "reason_id": "cleaning", "slot": {"date": iso, "start_time": "09:00", "provider_id": "PRV-1"},
+        "contact": {"first_name": "Ann", "last_name": "Lee", "phone": "555-111-2222",
+                    "disclaimer_accepted": True, "consent_accepted": True,
+                    "payment_terms_accepted": True, "acknowledgement_version": "2026-10-11",
+                    "acknowledgement_texts": texts},
+    }
+    r = client.post("/api/v1/appointnow/offices/MAINST/requests", json=payload)
+    assert r.status_code == 201, r.text
+    contact = r.json()["contact"]
+    assert contact["payment_terms_accepted"] is True
+    assert contact["acknowledgement_version"] == "2026-10-11"
+    assert set(contact["acknowledgement_hashes"]) == {"disclaimer", "consent", "payment"}
+    assert contact["acknowledged_at"]
+    stored = db_session.get(BookingAcknowledgementText, contact["acknowledgement_hashes"]["payment"])
+    assert stored.kind == "payment" and stored.text == texts["payment"]
+
+    # The same wording again is stored once.
+    payload["slot"]["start_time"] = "11:00"
+    assert client.post("/api/v1/appointnow/offices/MAINST/requests", json=payload).status_code == 201
+    assert db_session.query(BookingAcknowledgementText).count() == 3
+
+
+def test_payment_acknowledgement_interim_marker_and_switch(client, booking_fixtures, monkeypatch):
+    from app.core.config import settings
+
+    iso = booking_fixtures["future"].isoformat()
+    r = _submit(client, iso, "09:00", notes="Running late\nPayment terms accepted: Yes",
+                payment_terms_accepted=None)
+    assert r.status_code == 201, r.text
+    assert r.json()["contact"]["payment_terms_accepted"] is True
+    assert r.json()["contact"]["notes"] == "Running late"
+
+    # An embed predating the question, with the requirement switched off: NULL, not False.
+    monkeypatch.setattr(settings, "APPOINTNOW_REQUIRE_PAYMENT_ACK", False)
+    r2 = _submit(client, iso, "11:00", payment_terms_accepted=None)
+    assert r2.status_code == 201
+    assert r2.json()["contact"]["payment_terms_accepted"] is None
+
+
+# ══ AN-27: payment-required confirmation flow ═══════════════════════════════
+@pytest.fixture
+def paid_office(db_session, booking_fixtures):
+    office = booking_fixtures["office"]
+    office.appointnow_requires_payment = True
+    office.appointnow_payment_amount = 50
+    db_session.commit()
+    return office
+
+
+@pytest.fixture
+def stripe_on(monkeypatch):
+    from app.core.config import settings
+    from app.integrations import stripe_client
+
+    monkeypatch.setattr(settings, "STRIPE_SECRET_KEY", "sk_test_x")
+    monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(settings, "APPOINTNOW_PAYMENT_RETURN_URL",
+                        "https://app.example/book/{office_code}?request={request_id}&payment={result}")
+    created: list[dict] = []
+    counter = iter(range(1, 100))
+
+    def _create(**kwargs):
+        created.append(kwargs)
+        n = next(counter)
+        return {"id": f"cs_test_{n}", "url": f"https://checkout.stripe.test/cs_test_{n}"}
+
+    monkeypatch.setattr(stripe_client, "create_checkout_session", _create)
+    monkeypatch.setattr(stripe_client, "expire_checkout_session", lambda session_id: None)
+    monkeypatch.setattr(stripe_client, "create_refund", lambda **kw: {"id": "re_test_1"})
+    return created
+
+
+def _stripe_event(client, etype, session):
+    import json as _json
+
+    from app.integrations import stripe_client
+
+    body = _json.dumps({"type": etype, "data": {"object": session}}).encode()
+    return client.post(
+        "/api/v1/appointnow/payments/webhooks/stripe", content=body,
+        headers={"Stripe-Signature": stripe_client.sign_payload(body),
+                 "Content-Type": "application/json"},
+    )
+
+
+def test_public_info_publishes_payment_config(client, booking_fixtures, paid_office, db_session):
+    db_session.add(AppointNowReason(
+        tenant_id=paid_office.tenant_id, office_id=paid_office.id, reason_code="checkup",
+        label="Checkup", duration_minutes=30, requires_payment=False,
+    ))
+    db_session.add(AppointNowReason(
+        tenant_id=paid_office.tenant_id, office_id=paid_office.id, reason_code="np",
+        label="New patient", duration_minutes=60, payment_amount=120,
+    ))
+    db_session.commit()
+    body = client.get("/api/v1/appointnow/offices/MAINST").json()
+    assert body["payment"]["requires_payment"] is True
+    assert float(body["payment"]["amount"]) == 50.0
+    assert body["payment"]["online_payment_available"] is False
+    by_id = {r["id"]: r for r in body["reasons"]}
+    assert by_id["checkup"]["requires_payment"] is False and by_id["checkup"]["payment_amount"] is None
+    assert by_id["np"]["requires_payment"] is True and float(by_id["np"]["payment_amount"]) == 120.0
+
+
+def test_approve_refuses_unpaid_payment_required_request(client, booking_fixtures, paid_office):
+    iso = booking_fixtures["future"].isoformat()
+    created = _submit(client, iso, "09:00").json()
+    assert created["payment"]["requires_payment"] is True
+    assert created["payment"]["status"] == "required"
+    assert float(created["payment"]["amount"]) == 50.0
+    r = client.post(f"/api/v1/appointnow/requests/{created['id']}/approve")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "payment_required"
+    ok = client.post(f"/api/v1/appointnow/requests/{created['id']}/approve",
+                     json={"waive_payment": True})
+    assert ok.status_code == 200 and ok.json()["status"] == "approved"
+
+
+def test_manual_request_payment_then_mark_paid_books_and_posts_ledger(
+    client, booking_fixtures, paid_office, db_session, events
+):
+    from app.db.models import PatientPayment
+
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "09:00").json()["id"]
+    r = client.post(f"/api/v1/appointnow/requests/{req_id}/request-payment",
+                    json={"note": "Deposit", "booking": {"create_patient": True}})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "awaiting_payment"
+    pay = body["payment"]
+    assert pay["status"] == "link_sent" and pay["provider"] == "manual" and pay["link_url"] is None
+    assert pay["link_expires_at"] and pay["requested_by_name"]
+    counts = client.get("/api/v1/appointnow/requests").json()["counts"]
+    assert counts["awaiting_payment"] == 1 and counts["pending"] == 0
+    # The slot stays held while the patient pays.
+    starts = [s["start_time"] for s in client.get(
+        f"/api/v1/appointnow/offices/MAINST/availability?date={iso}&duration_minutes=60"
+    ).json()["slots"]]
+    assert "09:00" not in starts
+
+    paid = client.post(f"/api/v1/appointnow/requests/{req_id}/mark-paid",
+                       json={"reference": "TERM-42"})
+    assert paid.status_code == 200, paid.text
+    out = paid.json()
+    assert out["status"] == "approved" and out["appointment_id"] and out["patient_id"]
+    assert out["payment"]["status"] == "paid" and out["payment"]["reference"] == "TERM-42"
+    assert out["payment"]["posted_to_ledger"] is True
+    ledger = db_session.get(PatientPayment, out["payment"]["ledger_payment_id"])
+    assert ledger.patient_id == out["patient_id"] and float(ledger.amount) == 50.0
+    assert ledger.payment_type == "patient"
+    assert client.post(f"/api/v1/appointnow/requests/{req_id}/mark-paid", json={}).status_code == 409
+
+
+def test_request_payment_needs_an_amount(client, booking_fixtures):
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "09:00").json()["id"]
+    r = client.post(f"/api/v1/appointnow/requests/{req_id}/request-payment", json={})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "payment_amount_required"
+    ok = client.post(f"/api/v1/appointnow/requests/{req_id}/request-payment", json={"amount": "25.00"})
+    assert ok.status_code == 200 and float(ok.json()["payment"]["amount"]) == 25.0
+
+
+def test_stripe_link_status_and_webhook_books(client, booking_fixtures, paid_office, stripe_on, events):
+    iso = booking_fixtures["future"].isoformat()
+    submitted = _submit(client, iso, "09:00").json()
+    req_id, token = submitted["id"], submitted["status_token"]
+    assert token
+    # The token is only on the submit response, never on staff reads.
+    assert client.get(f"/api/v1/appointnow/requests/{req_id}").json()["status_token"] is None
+
+    r = client.post(f"/api/v1/appointnow/requests/{req_id}/request-payment", json={})
+    pay = r.json()["payment"]
+    assert pay["provider"] == "stripe" and pay["link_url"] == "https://checkout.stripe.test/cs_test_1"
+    assert stripe_on[0]["metadata"]["appointnow_request_id"] == req_id
+    assert "payment=success" in stripe_on[0]["success_url"]
+
+    status = client.get(f"/api/v1/appointnow/requests/{req_id}/status?token={token}").json()
+    assert status["status"] == "awaiting_payment" and status["payment_status"] == "link_sent"
+    assert status["payment_link_url"] == pay["link_url"] and status["confirmed"] is False
+    assert client.get(f"/api/v1/appointnow/requests/{req_id}/status?token=nope").status_code == 404
+
+    session = {"id": "cs_test_1", "payment_status": "paid", "amount_total": 5000,
+               "payment_intent": "pi_123", "metadata": {"appointnow_request_id": req_id}}
+    bad = client.post("/api/v1/appointnow/payments/webhooks/stripe", content=b"{}",
+                      headers={"Stripe-Signature": "t=1,v1=deadbeef"})
+    assert bad.status_code == 400
+    ack = _stripe_event(client, "checkout.session.completed", session)
+    assert ack.status_code == 200 and ack.json()["handled"] is True, ack.text
+    row = client.get(f"/api/v1/appointnow/requests/{req_id}").json()
+    assert row["status"] == "approved" and row["appointment_id"]
+    assert row["payment"]["status"] == "paid" and row["payment"]["reference"] == "pi_123"
+    assert float(row["payment"]["paid_amount"]) == 50.0
+    # No patient linked → unapplied, not posted.
+    assert row["payment"]["posted_to_ledger"] is False
+    # Stripe retries are idempotent.
+    again = _stripe_event(client, "checkout.session.completed", session)
+    assert again.json()["detail"] == "duplicate delivery"
+    final = client.get(f"/api/v1/appointnow/requests/{req_id}/status?token={token}").json()
+    assert final["confirmed"] is True and final["payment_link_url"] is None
+
+
+def test_paid_but_slot_taken_keeps_money_and_needs_refund(
+    client, booking_fixtures, paid_office, stripe_on, db_session
+):
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "09:00").json()["id"]
+    client.post(f"/api/v1/appointnow/requests/{req_id}/request-payment", json={})
+    db_session.add(Appointment(
+        id="APT-TAKEN", provider_id="PRV-1", operatory_id="OPR-1",
+        office_id=booking_fixtures["office"].id, date=booking_fixtures["future"],
+        start_time=time(9, 0), end_time=time(10, 0), duration=60, status="Scheduled",
+    ))
+    db_session.commit()
+    session = {"id": "cs_test_1", "payment_status": "paid", "amount_total": 5000,
+               "payment_intent": "pi_9", "metadata": {"appointnow_request_id": req_id}}
+    ack = _stripe_event(client, "checkout.session.completed", session).json()
+    assert ack["handled"] is True and ack["detail"] == "paid; booking needs staff"
+    row = client.get(f"/api/v1/appointnow/requests/{req_id}").json()
+    assert row["status"] == "awaiting_payment" and row["payment"]["status"] == "paid"
+    assert row["payment"]["booking_error"].startswith("slot_conflict")
+    # The expiry sweep never strands a paid request.
+    assert svc.expire_all(db_session)["expired"] == 0
+
+    d = client.post(f"/api/v1/appointnow/requests/{req_id}/decline")
+    assert d.status_code == 409 and d.json()["error"]["code"] == "refund_required"
+    rf = client.post(f"/api/v1/appointnow/requests/{req_id}/refund", json={"reason": "Slot gone"})
+    assert rf.status_code == 200, rf.text
+    out = rf.json()
+    assert out["status"] == "declined" and out["payment"]["status"] == "refunded"
+    assert out["payment"]["refund_reference"] == "re_test_1"
+    assert float(out["payment"]["refund_amount"]) == 50.0
+
+
+def test_link_expiry_event_and_sweep(client, booking_fixtures, paid_office, stripe_on, db_session):
+    from datetime import datetime as _dt
+
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "09:00").json()["id"]
+    client.post(f"/api/v1/appointnow/requests/{req_id}/request-payment", json={})
+    client.post(f"/api/v1/appointnow/requests/{req_id}/request-payment", json={})  # re-send → cs_test_2
+    # The superseded link's expiry is noise.
+    old = _stripe_event(client, "checkout.session.expired",
+                        {"id": "cs_test_1", "metadata": {"appointnow_request_id": req_id}}).json()
+    assert old["handled"] is False and old["detail"] == "superseded link"
+    assert client.get(f"/api/v1/appointnow/requests/{req_id}").json()["status"] == "awaiting_payment"
+    cur = _stripe_event(client, "checkout.session.expired",
+                        {"id": "cs_test_2", "metadata": {"appointnow_request_id": req_id}}).json()
+    assert cur["handled"] is True
+    row = client.get(f"/api/v1/appointnow/requests/{req_id}").json()
+    assert row["status"] == "expired" and row["payment"]["status"] == "expired"
+
+    # Sweep path: a manual link whose life has passed lapses on its own.
+    req2 = _submit(client, iso, "11:00").json()["id"]
+    client.post(f"/api/v1/appointnow/requests/{req2}/request-payment", json={})
+    rowdb = db_session.get(BookingRequest, req2)
+    rowdb.payment_link_expires_at = _dt.utcnow() - timedelta(minutes=1)
+    db_session.commit()
+    assert svc.expire_all(db_session)["expired"] == 1
+    db_session.refresh(rowdb)
+    assert rowdb.status == "expired" and rowdb.payment_status == "expired"
+
+
+# ── AN-28: operatory pick on the public page ─────────────────────────────────
+def test_public_info_lists_active_operatories(client, booking_fixtures, db_session):
+    office = booking_fixtures["office"]
+    db_session.add_all([
+        Operatory(id="OPR-2", office_id=office.id, name="Op 2", display_order=2),
+        Operatory(id="OPR-X", office_id=office.id, name="Retired", is_active=False),
+    ])
+    db_session.commit()
+    ops = client.get("/api/v1/appointnow/offices/MAINST").json()["operatories"]
+    assert [o["id"] for o in ops] == ["OPR-1", "OPR-2"]
+    assert ops[0]["provider_name"] == "Dr. Jane Smith"
+
+
+def test_availability_by_operatory_skips_booked_chair_times(client, booking_fixtures, db_session):
+    office, future = booking_fixtures["office"], booking_fixtures["future"]
+    db_session.add(Operatory(id="OPR-2", office_id=office.id, name="Op 2", display_order=2))
+    db_session.add(Appointment(
+        id="APT-OP1", provider_id="PRV-2", operatory_id="OPR-1", office_id=office.id,
+        date=future, start_time=time(9, 0), end_time=time(10, 0), duration=60,
+        status="Scheduled",
+    ))
+    db_session.commit()
+    base = f"/api/v1/appointnow/offices/MAINST/availability?date={future.isoformat()}&duration_minutes=60"
+    op1 = client.get(base + "&operatory_id=OPR-1").json()["slots"]
+    op2 = client.get(base + "&operatory_id=OPR-2").json()["slots"]
+    assert "09:00" not in [s["start_time"] for s in op1]
+    assert "09:00" in [s["start_time"] for s in op2]
+    assert op1[0]["operatory_id"] == "OPR-1" and op1[0]["operatory_name"] == "Op 1"
+    # Unknown chair → no slots (never another office's operatory).
+    assert client.get(base + "&operatory_id=NOPE").json()["slots"] == []
+
+
+def test_submit_with_operatory_holds_that_chair_and_approve_books_it(
+    client, booking_fixtures, db_session
+):
+    iso = booking_fixtures["future"].isoformat()
+    payload = _submit_payload(iso, "11:00")
+    payload["slot"]["operatory_id"] = "OPR-1"
+    r = client.post("/api/v1/appointnow/offices/MAINST/requests", json=payload)
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["slot"]["operatory_id"] == "OPR-1"
+    assert body["slot"]["operatory_name"] == "Op 1"
+    assert body["is_emergency"] is False
+    slots = client.get(
+        f"/api/v1/appointnow/offices/MAINST/availability?date={iso}&duration_minutes=60&operatory_id=OPR-1"
+    ).json()["slots"]
+    assert "11:00" not in [s["start_time"] for s in slots]
+    approved = client.post(f"/api/v1/appointnow/requests/{body['id']}/approve", json={}).json()
+    assert db_session.get(Appointment, approved["appointment_id"]).operatory_id == "OPR-1"
+
+
+# ── AN-29: emergency requests are not slot-enforced ──────────────────────────
+def test_emergency_request_accepts_a_taken_time(client, booking_fixtures):
+    iso = booking_fixtures["future"].isoformat()
+    assert _submit(client, iso, "15:00").status_code == 201
+    # A normal request for the same time is refused…
+    assert _submit(client, iso, "15:00").status_code == 409
+    # …but an emergency may ask for it (and for an off-grid time).
+    payload = _submit_payload(iso, "15:07")
+    payload["is_emergency"] = True
+    payload["reason_id"] = "emergency"
+    r = client.post("/api/v1/appointnow/offices/MAINST/requests", json=payload)
+    assert r.status_code == 201, r.text
+    assert r.json()["is_emergency"] is True
+    assert r.json()["slot"]["start_time"] == "15:07"
+
+
+def test_emergency_request_in_the_past_is_refused(client, booking_fixtures):
+    past = (date.today() - timedelta(days=1)).isoformat()
+    payload = _submit_payload(past, "09:00")
+    payload["is_emergency"] = True
+    r = client.post("/api/v1/appointnow/offices/MAINST/requests", json=payload)
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "slot_in_past"

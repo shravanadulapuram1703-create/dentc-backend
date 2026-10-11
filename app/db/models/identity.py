@@ -7,8 +7,20 @@ user_offices · office_groups
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy import false as sa_false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, LegacyIdMixin, TimestampMixin
@@ -191,6 +203,13 @@ class Office(Base, IntPKMixin, TimestampMixin):
     treatment_city: Mapped[str | None] = mapped_column(String(100))
     treatment_state: Mapped[str | None] = mapped_column(String(50))
     treatment_zip: Mapped[str | None] = mapped_column(String(20))
+    # AN-27: AppointNow payment requirement for this office's public bookings
+    # (an ``appointnow_reasons`` row can override per reason). Amount = deposit
+    # or full fee, in ``APPOINTNOW_PAYMENT_CURRENCY``.
+    appointnow_requires_payment: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=sa_false(), nullable=False
+    )
+    appointnow_payment_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
 
 
 class Provider(Base, CreatedAtMixin):

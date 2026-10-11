@@ -16,6 +16,7 @@ anonymous + tenant-from-code, and approval is a bespoke atomic booking. The reas
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.concurrency import run_in_threadpool
 
 from app.api.deps import (
     CurrentUser,
@@ -30,13 +31,19 @@ from app.schemas.appointnow import (
     AvailabilityResponse,
     BookingRequestRead,
     DeclineInput,
+    MarkPaidInput,
     PatientMatch,
+    PaymentWebhookAck,
     PublicOfficeInfo,
+    PublicRequestStatus,
+    RefundInput,
     RequestListResponse,
+    RequestPaymentInput,
     RescheduleInput,
     SubmitRequestInput,
 )
 from app.schemas.common import ErrorResponse
+from app.services import appointnow_payment_service as payments
 from app.services import appointnow_service as svc
 
 public_router = APIRouter(
@@ -87,6 +94,7 @@ def public_availability(
     date: str = Query(description="Day to check, YYYY-MM-DD"),
     provider_id: str | None = Query(default=None),
     duration_minutes: int | None = Query(default=None, ge=5, le=480),
+    operatory_id: str | None = Query(default=None, description="AN-28: only this chair"),
 ) -> AvailabilityResponse:
     """AN-2: open, bookable start times for the day (office-local, AN-10)."""
     return AvailabilityResponse(
@@ -96,6 +104,7 @@ def public_availability(
             date_str=date,
             provider_id=provider_id,
             duration_minutes=duration_minutes,
+            operatory_id=operatory_id,
         )
     )
 
@@ -114,7 +123,44 @@ def public_submit_request(
     slot soft-held). Does NOT create a patient or appointment — that happens on
     staff approval."""
     req = svc.submit_request(db, office_code, body, source_ip=_client_ip(request))
-    return BookingRequestRead(**svc.read_one(db, req))
+    out = BookingRequestRead(**svc.read_one(db, req))
+    # AN-27.6: the status token rides this one response only.
+    req.__dict__.pop("_status_token", None)
+    return out
+
+
+@public_router.get(
+    "/requests/{request_id}/status",
+    response_model=PublicRequestStatus,
+    operation_id="appointnow_public_request_status",
+)
+def public_request_status(
+    request_id: str,
+    db: DbSession,
+    token: str = Query(description="The status_token returned once by the submit call"),
+) -> PublicRequestStatus:
+    """AN-27.6: the patient checks whether payment / confirmation is still
+    outstanding. 404 for an unknown id *or* a wrong token (never 401, AN-12);
+    returns the open payment link while one is payable."""
+    return PublicRequestStatus(**payments.public_status(db, request_id, token))
+
+
+@public_router.post(
+    "/payments/webhooks/stripe",
+    response_model=PaymentWebhookAck,
+    operation_id="appointnow_stripe_webhook",
+    responses={400: {"model": ErrorResponse}},
+)
+async def stripe_webhook(request: Request, db: DbSession) -> PaymentWebhookAck:
+    """AN-27.4: Stripe event sink. Verifies ``Stripe-Signature`` against
+    ``STRIPE_WEBHOOK_SECRET`` (refused outright when the secret is unset).
+    ``checkout.session.completed`` marks the request paid and books it
+    atomically; ``checkout.session.expired`` lapses the current link."""
+    payload = await request.body()
+    ack = await run_in_threadpool(
+        payments.handle_stripe_webhook, db, payload, request.headers.get("stripe-signature")
+    )
+    return PaymentWebhookAck(**ack)
 
 
 # ── Staff (AUTH) ─────────────────────────────────────────────────────────────
@@ -126,7 +172,9 @@ def public_submit_request(
 def list_requests(
     db: DbSession,
     tenant_id: TenantId,
-    status: str | None = Query(default=None, description="pending|approved|declined|expired"),
+    status: str | None = Query(
+        default=None, description="pending|awaiting_payment|approved|declined|expired"
+    ),
     office_id: int | None = Query(default=None),
     office_ids: list[int] | None = Query(default=None, description="OFF-SCOPE-15: My-offices inbox (repeatable)"),
     q: str | None = Query(default=None, description="name/phone/email/reason/code"),
@@ -274,3 +322,74 @@ def purge_request(
     refused (409 ``request_approved``) without ``force=true``; the booked
     appointment is never touched."""
     return svc.purge_request(db, tenant_id, request_id, force=force)
+
+
+# ── Payment flow (AN-27) ─────────────────────────────────────────────────────
+@staff_router.post(
+    "/requests/{request_id}/request-payment",
+    response_model=BookingRequestRead,
+    operation_id="appointnow_request_payment",
+    responses={409: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
+    # Leads to a booking once paid — same right as approving one.
+    dependencies=[Depends(require_permission(
+        "appointnow_approve_booking", action="request payment for an online booking"))],
+)
+def request_payment(
+    request_id: str,
+    body: RequestPaymentInput,
+    db: DbSession,
+    tenant_id: TenantId,
+    current: CurrentUser,
+) -> BookingRequestRead:
+    """AN-27.3: create the secure payment link (Stripe Checkout; provider
+    ``manual`` when Stripe is not configured), text/e-mail it to the patient,
+    move the request to ``awaiting_payment`` and hold the slot for the link's
+    life. ``booking`` steers the appointment booked when the payment lands.
+    Calling it again re-sends a fresh link and kills the old one."""
+    req = payments.request_payment(db, tenant_id, request_id, body, actor_id=current.id)
+    return BookingRequestRead(**svc.read_one(db, req))
+
+
+@staff_router.post(
+    "/requests/{request_id}/mark-paid",
+    response_model=BookingRequestRead,
+    operation_id="appointnow_mark_paid",
+    responses={409: {"model": ErrorResponse}},
+    dependencies=[Depends(require_permission(
+        "appointnow_approve_booking", action="record a payment for an online booking"))],
+)
+def mark_paid(
+    request_id: str,
+    body: MarkPaidInput,
+    db: DbSession,
+    tenant_id: TenantId,
+    current: CurrentUser,
+) -> BookingRequestRead:
+    """AN-27: record a payment taken outside the link (phone / terminal) and, by
+    default, book it. A booking that cannot complete leaves the request paid
+    with ``payment.booking_error`` set — the payment is never rolled back."""
+    req = payments.mark_paid(db, tenant_id, request_id, body, actor_id=current.id)
+    return BookingRequestRead(**svc.read_one(db, req))
+
+
+@staff_router.post(
+    "/requests/{request_id}/refund",
+    response_model=BookingRequestRead,
+    operation_id="appointnow_refund_payment",
+    dependencies=[Depends(require_roles("admin"))],
+    responses={409: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
+)
+def refund_payment(
+    request_id: str,
+    body: RefundInput,
+    db: DbSession,
+    tenant_id: TenantId,
+    current: CurrentUser,
+) -> BookingRequestRead:
+    """AN-27.7 (admin): refund a recorded payment — at Stripe for a Stripe
+    payment, plus the ledger reversal / refund when it had been posted. An
+    unbooked request is declined; a booked appointment is left for staff."""
+    req = payments.refund(
+        db, tenant_id, request_id, body, actor_id=current.id, actor_role=current.role
+    )
+    return BookingRequestRead(**svc.read_one(db, req))

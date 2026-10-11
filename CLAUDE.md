@@ -391,6 +391,30 @@ AN-11 (per-practice CORS / iframe `frame-ancestors`) is deploy-config, not code.
   **AN-25** `scripts/expire_booking_requests.py`; the premise was wrong — the
   sweep already ran inside availability and holds are TTL-bounded.
 
+**AppointNow round 3 — payment** (AN-26/27 of the same report /
+[response](docs/appointnow/appointnow_backend_response.md) top section; Alembic
+`7cbbcedd2691`, **applied to the dev DB**).
+- **AN-26** `payment_terms_accepted` is the third required acknowledgement (422
+  `acknowledgement_required`; `Payment terms accepted:` notes marker still read;
+  NULL on old rows = "not asked"). `contact.acknowledgement_texts` → per-kind
+  sha256 on the row + each wording once in `booking_acknowledgement_texts`.
+- **AN-27** [app/services/appointnow_payment_service.py](app/services/appointnow_payment_service.py)
+  + [app/integrations/stripe_client.py](app/integrations/stripe_client.py) (raw
+  httpx Checkout Sessions/refunds + `v1` signature). `pending → awaiting_payment
+  → approved | expired`; config on `offices.appointnow_requires_payment/_amount`
+  with per-reason override, **snapshotted at intake**. No `STRIPE_SECRET_KEY` =
+  provider `manual` (no link; staff `mark-paid`). **Money is committed before
+  booking**: the webhook/mark-paid then books through the shared
+  `appointnow_service.book_request` (approve's core, no commit) in a savepoint;
+  a refused booking leaves `payment.status=paid` + `booking_error`, never a
+  rollback of the payment. Ledger credit (`patient_payments`, id `AN-…`) posts
+  once a patient is linked, else unapplied on the request. Approve 409
+  `payment_required` (unless `waive_payment`), decline 409 `refund_required`,
+  sweep never expires a paid request, a superseded link's expiry event is
+  ignored. Public `GET /appointnow/requests/{id}/status?token=` (token shown once
+  on submit, stored as sha256, 404 on mismatch). Refund (admin) = Stripe refund
+  then REF-1/2 ledger counterpart; the refund *policy* is still a product call.
+
 **Help Center support tickets** (Help → Report an Issue → Jira; HELP-1…5 of
 [docs/help/help_module_backend_devreport.md](docs/help/help_module_backend_devreport.md)
 / [response](docs/help/help_module_backend_response.md)). `POST/GET /api/v1/support/tickets`
@@ -1828,6 +1852,38 @@ the dev DB is stamped `fc6450e398ee`, a revision in no branch/worktree; verified
   folded, unknown = 422 — it decides pay) + practice `time_clock_settings`. **TC-BE-8/13**
   `/reports/time-clock` (+csv/pdf): office-local days, weekly OT looks back into the first week, break/
   lunch never paid, wages owner/admin only. **TC-BE-14** locked `time_clock_periods` → 409 `period_locked`.
+
+**New Fee Schedule Wizard** (Setup -> Fee Schedule Setup -> Add New Schedule; FSW-1…9 of
+[docs/pricing/fee_schedule_wizard_backend_devreport.md](docs/pricing/fee_schedule_wizard_backend_devreport.md)
+/ [response](docs/pricing/fee_schedule_wizard_backend_response.md); **no migration**). Logic in
+[app/services/fee_schedule_wizard_service.py](app/services/fee_schedule_wizard_service.py), routes in
+[app/api/v1/fee_schedules.py](app/api/v1/fee_schedules.py).
+- **FSW-1** `POST /fee-schedules/wizard` = schedule + entries (+ `copy_from_schedule_id`) +
+  assignments + office pointers in **one transaction**; any invalid row → 422, a conflict under
+  `on_conflict=error` → 409, both carrying the full per-row report in `details`; `dry_run` → 200.
+  **FSW-2** `POST /fee-schedule-assignments/bulk` (`error|rebind|skip`, `dry_run` = the conflict
+  probe; same target already on the same schedule = `unchanged`, never a conflict). Both run
+  through `apply_assignments`, which reuses the single-row guards (`find_assignment`,
+  `normalise_assignment_specialty`, `_schedule_valid`).
+- **FSW-3 decided by the export**: `FeeScheH.OID` is 0 on all 36 headers and `FeeScheA` has no
+  office-only row, so "Office + All Providers" **is** `offices.default_fee_schedule_id`
+  (Denticon `PATIENTFEEID`). Scope-only assignment rows stay refused; the wizard sets the pointer
+  atomically and reports `previous_default_fee_schedule_id`.
+- **FSW-4** `fee_vocab.LEGACY_SCHEDULE_TYPES` (Office / Ins-Smart Fee / Ins-Managed Care / Ins-PPO /
+  Ins-Pat Co-pay = FEETYPE 0–4) → `(fee_type, pricing_model)`; a legacy label written as
+  `fee_type` sets both. Smart Fee is `provisional` (FEETYPE 1 never occurs).
+- **FSW-5 specialty id = NUCC taxonomy code** — Denticon `Providers.SPECIALTYID`/`FeeScheA.SPECIALTYID`
+  hold it. `provider_taxonomy_service.canonical_specialty` folds names/keywords onto it; assignment
+  writes 422 `assignment_specialty_unknown`; pricing (v1+v2, `_key_matches`) compares canonical
+  forms and the provider side is `provider_specialty_code` (stored code, else derived — **never** the
+  General-Dentist default). `GET /provider-specialties`; `ProviderRead.specialty_code/_label`;
+  `scripts/backfill_provider_specialties.py` fills `providers.taxonomy_code` from `Providers.txt`.
+- **FSW-6** `GET /providers?office_ids=` + `ProviderRead.served_office_ids` (batched).
+  **FSW-7** assignment filters `specialty_id`/`has_provider`/`has_specialty`/`has_payer`/
+  `provider_ids`/`office_ids` (`_cfg` gained `extra_filters`). **FSW-8**
+  `POST /fee-schedules/{id}/entries/import` (csv + native xlsx via openpyxl, header-name matching,
+  row-level report, `dry_run`/`all_or_nothing`). **FSW-9** `GET /fee-schedules/{id}/scope` (+ a
+  `wizard` block; target-less legacy rows never read as "All Offices").
 
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))

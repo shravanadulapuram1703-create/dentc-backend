@@ -84,3 +84,51 @@ def catalog() -> list[dict]:
         {"code": code, "label": label, "keywords": list(keywords)}
         for code, label, keywords in TAXONOMY_CODES
     ]
+
+
+# ── Specialty as a pricing key (FSW-5) ───────────────────────────────────────
+#
+# ``fee_schedule_assignments.specialty_id`` used to be matched *exactly* (trimmed,
+# case-folded) against ``providers.specialty`` — free text that is blank on 96 of
+# 97 migrated providers. A spelling difference ("Orthodontist" vs
+# "Orthodontics") silently stopped an assignment from pricing anything. Denticon
+# never had that problem: its ``Providers.SPECIALTYID`` and ``FeeScheA.SPECIALTYID``
+# both hold the **NUCC taxonomy code** (``1223G0001X`` on 85 of 93 exported
+# providers), which is exactly the catalog above. So the specialty *id* is the
+# taxonomy code, the provider's is ``providers.taxonomy_code`` (else the keyword
+# resolution of ``specialty``), and both sides of the match are folded onto it.
+
+
+def canonical_specialty(value: str | None) -> str | None:
+    """Fold a specialty reference onto its taxonomy code.
+
+    A taxonomy-shaped value is the code itself (upper-cased); a catalog label or
+    a recognised keyword ("Orthodontist") resolves to its code; anything else is
+    returned trimmed + lower-cased so legacy free-text rows still compare equal to
+    themselves. ``None`` for an empty value.
+    """
+    text = (value or "").strip()
+    if not text:
+        return None
+    if is_taxonomy_shaped(text):
+        return text.upper()
+    lowered = " ".join(text.lower().split())
+    for code, label, _ in TAXONOMY_CODES:
+        if label.lower() == lowered:
+            return code
+    return resolve_from_specialty(text) or lowered
+
+
+def is_known_specialty(value: str | None) -> bool:
+    """True when ``value`` resolves to a catalog code or is taxonomy-shaped — the
+    rule an assignment's ``specialty_id`` must pass on write."""
+    canon = canonical_specialty(value)
+    return canon is not None and (canon in _LABELS or is_taxonomy_shaped(canon))
+
+
+def provider_specialty_code(taxonomy_code: str | None, specialty: str | None) -> str | None:
+    """The specialty key a provider is matched on: the stored taxonomy code, else
+    the canonical form of the free-text specialty. **Never** the General-Dentist
+    default ``effective_code`` falls back to — a provider who reports no
+    specialty must not match every "Dentist" specialty assignment."""
+    return canonical_specialty(taxonomy_code) or canonical_specialty(specialty)

@@ -79,6 +79,9 @@ api_router.include_router(fee_schedules.router)
 # Pricing hierarchy step 5: POST /pricing/quote and GET /setup/pricing-health.
 api_router.include_router(fee_schedules.pricing_router)
 api_router.include_router(fee_schedules.setup_router)
+# FSW-2 / FSW-5: literal sub-paths ahead of the generic CRUD routers.
+api_router.include_router(fee_schedules.assignments_router)
+api_router.include_router(fee_schedules.specialties_router)
 api_router.include_router(balances.router)
 api_router.include_router(ledger.router)
 api_router.include_router(patient_reports.router)  # PRINT-1: server-rendered PDFs

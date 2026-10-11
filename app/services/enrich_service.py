@@ -270,16 +270,29 @@ def enrich_treatment_plan(db: Session, items, tenant_id=None) -> None:  # noqa: 
 
 def enrich_provider(db, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
     """PROV-3: the derived ``provider_kind`` (role first, licence title as the
-    fallback). Pure per-row computation — no extra queries."""
+    fallback); FSW-5 ``specialty_code``/``specialty_label``; FSW-6
+    ``served_office_ids`` (one batched ``provider_offices`` read per page)."""
     from app.services.provider_directory_service import provider_kind
 
     from app.services.provider_taxonomy_service import effective_code
 
+    from app.services.provider_directory_service import served_office_ids
+    from app.services.provider_taxonomy_service import label_for, provider_specialty_code
+
+    items = list(items)
+    served = served_office_ids(db, items) if db is not None else {}
     for row in items:
         row.provider_kind = provider_kind(row.role, row.title)
         # ADA-BE-14
         row.effective_taxonomy_code, row.effective_taxonomy_source = effective_code(
             getattr(row, "taxonomy_code", None), getattr(row, "specialty", None))
+        # FSW-5: the key a specialty fee-schedule assignment matches on (never
+        # the General-Dentist default), with its catalog label.
+        row.specialty_code = provider_specialty_code(
+            getattr(row, "taxonomy_code", None), getattr(row, "specialty", None))
+        row.specialty_label = label_for(row.specialty_code)
+        # FSW-6: every office this provider serves (home ∪ provider_offices).
+        row.served_office_ids = served.get(row.id, [])
 
 
 def enrich_office(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001

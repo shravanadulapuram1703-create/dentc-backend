@@ -79,6 +79,49 @@ LEGACY_FEE_TYPE_ALIASES: dict[str, str] = {
 }
 
 
+#: FSW-4 — the five radios of the legacy *New Fee Schedule* wizard, mapped onto
+#: the two orthogonal columns. The radio order is Denticon's ``FEETYPE`` order,
+#: which the export confirms for the three values it contains: ``0`` "UCR -Excel
+#: Dental" / CP-40 / CP-50 (office & patient lists), ``2`` "Medicaid - Assign To
+#: Plan" (the two lists carrying ``INSAMT`` Plan Pays dollars, i.e. copay) and
+#: ``3`` "PPO - Assign To Carrier" (19 contracted PPO lists, percentage).
+#: ``1`` and ``4`` never occur in the export, so Smart Fee and Pat Co-pay are
+#: **inferred** from their names — Smart Fee is ``provisional`` until a practice
+#: that used it confirms the semantics. ``ucr`` has no radio of its own: being
+#: an office's UCR list is a *pointer* (Office Setup), not a schedule type.
+LEGACY_SCHEDULE_TYPES: tuple[dict, ...] = (
+    {"legacy_label": "Office", "legacy_feetype": "0", "fee_type": "standard",
+     "pricing_model": "percentage", "evidence": "export", "provisional": False},
+    {"legacy_label": "Ins-Smart Fee", "legacy_feetype": "1", "fee_type": "carrier",
+     "pricing_model": "percentage", "evidence": "none", "provisional": True},
+    {"legacy_label": "Ins-Managed Care", "legacy_feetype": "2", "fee_type": "plan",
+     "pricing_model": "copay", "evidence": "export", "provisional": False},
+    {"legacy_label": "Ins-PPO", "legacy_feetype": "3", "fee_type": "carrier",
+     "pricing_model": "percentage", "evidence": "export", "provisional": False},
+    {"legacy_label": "Ins-Pat Co-pay", "legacy_feetype": "4", "fee_type": "plan",
+     "pricing_model": "copay", "evidence": "inferred", "provisional": False},
+)
+
+
+def _legacy_key(value: str) -> str:
+    key = "".join(ch for ch in value.lower() if ch.isalnum())
+    return key[3:] if key.startswith("ins") and len(key) > 3 else key
+
+
+_LEGACY_SCHEDULE_TYPE_BY_KEY: dict[str, dict] = {
+    _legacy_key(row["legacy_label"]): row for row in LEGACY_SCHEDULE_TYPES
+}
+
+
+def legacy_schedule_type(value: str | None) -> dict | None:
+    """The legacy-radio mapping for ``value`` ("Ins-PPO", "ins ppo", "PPO" …), or
+    ``None`` when it is not a legacy label. A canonical code is never a legacy
+    label, so this cannot shadow ``ucr``/``standard``/``plan``/``carrier``."""
+    if not value or value.strip().lower() in FEE_TYPE_CODES:
+        return None
+    return _LEGACY_SCHEDULE_TYPE_BY_KEY.get(_legacy_key(value))
+
+
 def canonical_fee_type(value: str | None) -> str:
     """Fold any historical spelling onto the enum. Unknown becomes ``standard``."""
     key = (value or "").strip().lower()
@@ -271,6 +314,13 @@ ERROR_CODES: dict[str, str] = {
     "assignment_needs_target": "An assignment needs a plan, carrier, provider or specialty",
     "assignment_duplicate_target": "Another assignment already binds that exact target",
     "assignment_schedule_invalid": "The fee schedule is inactive or belongs to another tenant",
+    "assignment_specialty_unknown":
+        "The specialty is not a recognised taxonomy code or specialty name",
+    "assignment_provider_invalid": "The provider does not exist in this tenant",
+    "assignment_office_invalid": "The office does not exist in this tenant",
+    "assignment_target_invalid": "The plan or carrier does not exist in this tenant",
+    "assignment_duplicate_in_request": "The same target appears twice in this request",
+    "unknown_procedure_code": "No procedure code with that code exists",
     "fee_schedule_in_use": "The fee schedule is still referenced; re-point those first",
     "fee_type_has_plan_pays": "Entries on this list carry Plan Pays amounts; clear them first",
     "office_schedule_invalid": "The fee schedule is inactive or belongs to another tenant",
@@ -329,7 +379,14 @@ PRECEDENCE_NOTES: tuple[str, ...] = (
 def metadata() -> dict:
     """The whole vocabulary, shaped for ``GET /fee-schedules/metadata``."""
     return {
-        "fee_types": [{"code": c, "label": label} for c, label in FEE_TYPES],
+        "fee_types": [
+            {"code": c, "label": label,
+             "legacy_labels": [r["legacy_label"] for r in LEGACY_SCHEDULE_TYPES if r["fee_type"] == c]}
+            for c, label in FEE_TYPES
+        ],
+        # FSW-4: the legacy wizard radios -> (fee_type, pricing_model). Writing a
+        # legacy label as ``fee_type`` applies both columns.
+        "legacy_schedule_types": [dict(row) for row in LEGACY_SCHEDULE_TYPES],
         "pricing_models": [{"code": c, "label": label} for c, label in PRICING_MODELS],
         "fee_sources": list(FEE_SOURCES),
         "unpriced_policies": [{"code": c, "label": label} for c, label in UNPRICED_POLICIES],

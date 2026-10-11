@@ -22,11 +22,14 @@ disabled office), 409 (slot taken), 422 (bad input), 429 (rate-limited).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import secrets
 import threading
 from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select
@@ -47,6 +50,7 @@ from app.db.models import (
     AccountHoliday,
     Appointment,
     AppointNowReason,
+    BookingAcknowledgementText,
     BookingRequest,
     Office,
     Operatory,
@@ -66,6 +70,9 @@ _patient_crud = PatientCRUD(Patient)
 
 # AN-6: envelope ``type`` on the messaging WebSocket's tenant topic.
 EVENT_TYPE = "appointnow.request"
+
+# AN-27: a request waiting on the patient's payment still owns its slot.
+HOLDING_STATUSES = ("pending", "awaiting_payment")
 
 # Built-in reason catalog served when an office has customised none. Mirrors the
 # frontend ``APPOINTMENT_REASONS`` fallback so a fresh office still books.
@@ -156,6 +163,26 @@ def _visible_providers(db: Session, office: Office) -> list[Provider]:
     )
 
 
+def _public_operatories(db: Session, office: Office) -> list[Operatory]:
+    """AN-28: every active chair of the office, in scheduler column order."""
+    return list(
+        db.execute(
+            select(Operatory)
+            .where(Operatory.office_id == office.id, Operatory.is_active.is_(True))
+            .order_by(Operatory.display_order.asc(), Operatory.name.asc(), Operatory.id.asc())
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _resolve_public_operatory(db: Session, office: Office, operatory_id: str) -> Operatory | None:
+    op = db.get(Operatory, operatory_id)
+    if op is None or op.office_id != office.id or not op.is_active:
+        return None
+    return op
+
+
 def _office_reasons(db: Session, office: Office) -> list[dict]:
     rows = list(
         db.execute(
@@ -170,17 +197,34 @@ def _office_reasons(db: Session, office: Office) -> list[dict]:
         .scalars()
         .all()
     )
+    office_requires, office_amount = office_payment_defaults(office)
     if not rows:
-        return [dict(r, requires_provider=False) for r in _DEFAULT_REASONS]
-    return [
-        {
-            "id": r.reason_code,
-            "label": r.label,
-            "duration_minutes": r.duration_minutes,
-            "requires_provider": r.requires_provider,
-        }
-        for r in rows
-    ]
+        return [
+            dict(r, requires_provider=False, requires_payment=office_requires,
+                 payment_amount=office_amount if office_requires else None)
+            for r in _DEFAULT_REASONS
+        ]
+    out = []
+    for r in rows:
+        requires = office_requires if r.requires_payment is None else bool(r.requires_payment)
+        amount = (r.payment_amount if r.payment_amount is not None else office_amount) if requires else None
+        out.append(
+            {
+                "id": r.reason_code,
+                "label": r.label,
+                "duration_minutes": r.duration_minutes,
+                "requires_provider": r.requires_provider,
+                "requires_payment": requires,
+                "payment_amount": amount,
+            }
+        )
+    return out
+
+
+def office_payment_defaults(office: Office) -> tuple[bool, Decimal | None]:
+    """AN-27.1: the office-level payment requirement (a reason may override)."""
+    requires = bool(getattr(office, "appointnow_requires_payment", False))
+    return requires, (office.appointnow_payment_amount if requires else None)
 
 
 def _reason_duration(reasons: list[dict], reason_id: str | None) -> int | None:
@@ -209,7 +253,40 @@ def get_public_office_info(db: Session, office_code: str) -> dict:
             {"id": p.id, "name": p.name, "title": p.title}
             for p in _visible_providers(db, office)
         ],
+        "operatories": _public_operatory_dicts(db, office),
         "reasons": _office_reasons(db, office),
+        "payment": _public_payment_info(office),
+    }
+
+
+def _public_operatory_dicts(db: Session, office: Office) -> list[dict]:
+    ops = _public_operatories(db, office)
+    provider_ids = {o.provider_id for o in ops if o.provider_id}
+    names: dict[str, str] = {}
+    if provider_ids:
+        names = dict(
+            db.execute(select(Provider.id, Provider.name).where(Provider.id.in_(provider_ids))).all()
+        )
+    return [
+        {
+            "id": o.id,
+            "name": o.name,
+            "provider_id": o.provider_id,
+            "provider_name": names.get(o.provider_id) if o.provider_id else None,
+        }
+        for o in ops
+    ]
+
+
+def _public_payment_info(office: Office) -> dict:
+    from app.integrations import stripe_client
+
+    requires, amount = office_payment_defaults(office)
+    return {
+        "requires_payment": requires,
+        "amount": amount,
+        "currency": settings.APPOINTNOW_PAYMENT_CURRENCY,
+        "online_payment_available": stripe_client.is_configured(),
     }
 
 
@@ -361,6 +438,39 @@ def _booked_ranges(
     return per_provider, every
 
 
+def _operatory_busy_ranges(
+    db: Session, office: Office, day: date, now: datetime, operatory_id: str,
+    exclude_request_id: str | None = None,
+) -> list[tuple[time, time]]:
+    """AN-28: everything occupying one chair on ``day`` - active appointments plus
+    live soft-holds of pending requests that picked that chair."""
+    out: list[tuple[time, time]] = []
+    for s, e in db.execute(
+        select(Appointment.start_time, Appointment.end_time).where(
+            Appointment.office_id == office.id,
+            Appointment.operatory_id == operatory_id,
+            Appointment.date == day,
+            Appointment.is_archived.is_(False),
+            Appointment.is_cancelled.is_(False),
+        )
+    ).all():
+        if s is not None and e is not None:
+            out.append((s, e))
+    for rid, s, e in db.execute(
+        select(BookingRequest.id, BookingRequest.start_time, BookingRequest.end_time).where(
+            BookingRequest.office_id == office.id,
+            BookingRequest.operatory_id == operatory_id,
+            BookingRequest.slot_date == day,
+            BookingRequest.status.in_(HOLDING_STATUSES),
+            BookingRequest.hold_expires_at.isnot(None),
+            BookingRequest.hold_expires_at > now,
+        )
+    ).all():
+        if rid != exclude_request_id and s is not None and e is not None:
+            out.append((s, e))
+    return out
+
+
 def _held_ranges(
     db: Session, office: Office, day: date, now: datetime, exclude_request_id: str | None = None
 ) -> tuple[dict[str, list[tuple[time, time]]], list[tuple[time, time]]]:
@@ -373,7 +483,7 @@ def _held_ranges(
     ).where(
         BookingRequest.office_id == office.id,
         BookingRequest.slot_date == day,
-        BookingRequest.status == "pending",
+        BookingRequest.status.in_(HOLDING_STATUSES),
         BookingRequest.hold_expires_at.isnot(None),
         BookingRequest.hold_expires_at > now,
     )
@@ -395,8 +505,13 @@ def compute_availability(
     day: date,
     provider_id: str | None,
     duration_minutes: int,
+    operatory_id: str | None = None,
 ) -> list[dict]:
-    """Core slot engine. Returns bookable slots as serialisable dicts."""
+    """Core slot engine. Returns bookable slots as serialisable dicts.
+
+    AN-28: with ``operatory_id`` the chair itself must be free (appointments and
+    live holds in that operatory) and the slot carries the operatory; the chair's
+    default provider is preferred when several providers are free."""
     expire_stale_requests(db, [office])
 
     weekday = day.weekday()  # 0=Mon..6=Sun (matches the schedule tables)
@@ -414,6 +529,12 @@ def compute_availability(
     step = max(office.slot_interval_minutes or 15, 5)
     duration = max(duration_minutes, step)
 
+    operatory: Operatory | None = None
+    if operatory_id is not None:
+        operatory = _resolve_public_operatory(db, office, operatory_id)
+        if operatory is None:
+            return []
+
     all_providers = _visible_providers(db, office)
     if provider_id is not None:
         candidates = [p for p in all_providers if p.id == provider_id]
@@ -422,6 +543,13 @@ def compute_availability(
             return []
     else:
         candidates = all_providers
+    if operatory is not None and operatory.provider_id:
+        # Prefer the chair's default provider (stable sort keeps the rest in order).
+        candidates = sorted(candidates, key=lambda p: p.id != operatory.provider_id)
+
+    operatory_busy = (
+        _operatory_busy_ranges(db, office, day, now, operatory.id) if operatory is not None else []
+    )
 
     booked_by_provider, booked_all = _booked_ranges(db, office.id, day)
     held_by_provider, held_all = _held_ranges(db, office, day, now)
@@ -453,6 +581,9 @@ def compute_availability(
         if drop_before is not None and cursor <= drop_before:
             cursor = _add_minutes(cursor, step)
             continue
+        if any(_overlaps(cursor, end, bs, be) for bs, be in operatory_busy):
+            cursor = _add_minutes(cursor, step)
+            continue
 
         chosen = _first_free_provider(
             cursor,
@@ -465,7 +596,11 @@ def compute_availability(
         )
         if candidates:
             if chosen is not None:
-                slots.append(_slot_dict(day, cursor, end, duration, chosen))
+                slots.append(_slot_dict(day, cursor, end, duration, chosen, operatory))
+        elif operatory is not None:
+            # The chosen chair is free (checked above) - that is the capacity.
+            if office_window.fits(cursor, end):
+                slots.append(_slot_dict(day, cursor, end, duration, None, operatory))
         else:
             # No AppointNow providers configured: fall back to office-chair capacity.
             if office_window.fits(cursor, end):
@@ -502,7 +637,10 @@ def _first_free_provider(
     return None
 
 
-def _slot_dict(day: date, s: time, e: time, duration: int, provider: Provider | None) -> dict:
+def _slot_dict(
+    day: date, s: time, e: time, duration: int, provider: Provider | None,
+    operatory: Operatory | None = None,
+) -> dict:
     return {
         "date": day.strftime("%Y-%m-%d"),
         "start_time": _fmt_time(s),
@@ -510,6 +648,8 @@ def _slot_dict(day: date, s: time, e: time, duration: int, provider: Provider | 
         "duration_minutes": duration,
         "provider_id": provider.id if provider else None,
         "provider_name": provider.name if provider else None,
+        "operatory_id": operatory.id if operatory else None,
+        "operatory_name": operatory.name if operatory else None,
     }
 
 
@@ -520,12 +660,15 @@ def get_availability(
     date_str: str,
     provider_id: str | None,
     duration_minutes: int | None,
+    operatory_id: str | None = None,
 ) -> dict:
     office = resolve_public_office(db, office_code)
     day = _parse_date(date_str)
     duration = duration_minutes or _DEFAULT_DURATION
     # Cheap short-TTL cache (AN-2): identical public queries hit Redis, not the DB.
-    cache_key = f"appointnow:avail:{office.id}:{day}:{provider_id or '-'}:{duration}"
+    cache_key = (
+        f"appointnow:avail:{office.id}:{day}:{provider_id or '-'}:{duration}:{operatory_id or '-'}"
+    )
     cached = redis_store.cache_get(cache_key)
     if cached is not None:
         try:
@@ -533,7 +676,8 @@ def get_availability(
         except ValueError:
             pass
     slots = compute_availability(
-        db, office, day=day, provider_id=provider_id, duration_minutes=duration
+        db, office, day=day, provider_id=provider_id, duration_minutes=duration,
+        operatory_id=operatory_id,
     )
     redis_store.cache_set(
         cache_key, json.dumps(slots), settings.APPOINTNOW_AVAILABILITY_CACHE_SECONDS
@@ -588,6 +732,10 @@ def _rate_limit(office_id: int, ip: str | None) -> None:
 MARK_INSURANCE = "Insurance:"
 MARK_DISCLAIMER = "Disclaimer accepted:"
 MARK_CONSENT = "Contact consent (calls/texts):"
+# AN-26: the frontend's interim marker for the Payment acknowledgement
+# (``realTransport.ts`` -> ``MARK_PAYMENT``).
+MARK_PAYMENT = "Payment terms accepted:"
+ACK_KINDS = ("disclaimer", "consent", "payment")
 
 
 def split_contact_extras(notes: str | None) -> dict:
@@ -599,6 +747,7 @@ def split_contact_extras(notes: str | None) -> dict:
         "insurance_info": None,
         "disclaimer_accepted": None,
         "consent_accepted": None,
+        "payment_terms_accepted": None,
     }
     if not notes:
         return out
@@ -611,6 +760,8 @@ def split_contact_extras(notes: str | None) -> dict:
             out["disclaimer_accepted"] = bool(re.search(r"yes", line[len(MARK_DISCLAIMER):], re.I))
         elif line.startswith(MARK_CONSENT):
             out["consent_accepted"] = bool(re.search(r"yes", line[len(MARK_CONSENT):], re.I))
+        elif line.startswith(MARK_PAYMENT):
+            out["payment_terms_accepted"] = bool(re.search(r"yes", line[len(MARK_PAYMENT):], re.I))
         elif line:
             keep.append(raw)
     out["notes"] = "\n".join(keep).strip() or None
@@ -631,10 +782,15 @@ def resolve_acknowledgements(contact) -> dict:
     consent = (
         contact.consent_accepted if contact.consent_accepted is not None else parsed["consent_accepted"]
     )
-    for field, value in (("disclaimer_accepted", disclaimer), ("consent_accepted", consent)):
+    explicit_payment = getattr(contact, "payment_terms_accepted", None)
+    payment = explicit_payment if explicit_payment is not None else parsed["payment_terms_accepted"]
+    required = [("disclaimer_accepted", disclaimer), ("consent_accepted", consent)]
+    if settings.APPOINTNOW_REQUIRE_PAYMENT_ACK:
+        required.append(("payment_terms_accepted", payment))  # AN-26
+    for field, value in required:
         if value is not True:
             raise ValidationError(
-                "Both acknowledgements must be accepted to request an appointment.",
+                "All acknowledgements must be accepted to request an appointment.",
                 code="acknowledgement_required",
                 details={"field": field, "value": value},
             )
@@ -643,7 +799,36 @@ def resolve_acknowledgements(contact) -> dict:
         "insurance_info": (insurance or "").strip()[:500] or None,
         "disclaimer_accepted": True,
         "consent_accepted": True,
+        # Switch off and nothing sent = "not asked" -> NULL, never False.
+        "payment_terms_accepted": payment,
     }
+
+
+def _text_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def record_acknowledgement_texts(db: Session, texts, version: str | None) -> dict | None:
+    """AN-26: hash each acknowledgement wording the patient saw and keep every
+    distinct text once in ``booking_acknowledgement_texts`` (no commit - rides
+    the intake transaction). Returns ``{kind: sha256}``, or None when the client
+    sent no wording."""
+    if texts is None:
+        return None
+    hashes: dict[str, str] = {}
+    for kind in ACK_KINDS:
+        text = getattr(texts, kind, None)
+        if not text or not text.strip():
+            continue
+        digest = _text_hash(text)
+        hashes[kind] = digest
+        if db.get(BookingAcknowledgementText, digest) is None:
+            db.add(BookingAcknowledgementText(
+                text_hash=digest, kind=kind, text=text, version=version,
+                first_seen_at=datetime.utcnow(),
+            ))
+            db.flush()  # the same text twice in one payload must not double-insert
+    return hashes or None
 
 
 def _verify_turnstile(token: str | None, ip: str | None) -> None:
@@ -692,23 +877,54 @@ def submit_request(
     )
     end = _parse_time(payload.slot.end_time) if payload.slot.end_time else _add_minutes(start, duration)
     provider_id = payload.slot.provider_id or None
+    operatory_id = payload.slot.operatory_id or None
+    is_emergency = bool(payload.is_emergency)
 
-    # AN-3: validate the slot is still open at submit time (re-run the engine).
-    open_slots = compute_availability(
-        db, office, day=day, provider_id=provider_id, duration_minutes=duration
-    )
-    start_str = _fmt_time(start)
-    match = next((s for s in open_slots if s["start_time"] == start_str), None)
-    if match is None:
-        raise ConflictError(
-            "That time was just taken. Please pick another slot.", code="slot_unavailable"
+    if is_emergency:
+        # AN-29: an emergency may ask for ANY time - the slot is a preference that
+        # staff triage on approve, so it is NOT re-checked against availability.
+        # Only sanity checks: a real range, not already over.
+        if end <= start:
+            raise ValidationError("end_time must be after start_time", code="bad_slot")
+        if datetime.combine(day, end) <= _office_now(office).replace(tzinfo=None):
+            raise ValidationError(
+                "Please choose a time that has not passed yet.", code="slot_in_past"
+            )
+        if operatory_id is not None and _resolve_public_operatory(db, office, operatory_id) is None:
+            operatory_id = None
+        if provider_id is not None:
+            prov = db.get(Provider, provider_id)
+            if prov is None or prov.office_id != office.id:
+                provider_id = None
+        resolved_provider_id = provider_id
+        resolved_provider_name = payload.slot.provider_name if provider_id else None
+    else:
+        # AN-3: validate the slot is still open at submit time (re-run the engine).
+        open_slots = compute_availability(
+            db, office, day=day, provider_id=provider_id, duration_minutes=duration,
+            operatory_id=operatory_id,
         )
-    # Adopt the provider the engine actually assigned (matters when none was requested).
-    resolved_provider_id = match.get("provider_id") or provider_id
-    resolved_provider_name = match.get("provider_name") or payload.slot.provider_name
+        start_str = _fmt_time(start)
+        match = next((s for s in open_slots if s["start_time"] == start_str), None)
+        if match is None:
+            raise ConflictError(
+                "That time was just taken. Please pick another slot.", code="slot_unavailable"
+            )
+        # Adopt the provider the engine actually assigned (matters when none was requested).
+        resolved_provider_id = match.get("provider_id") or provider_id
+        resolved_provider_name = match.get("provider_name") or payload.slot.provider_name
 
     contact = payload.contact
     extras = resolve_acknowledgements(contact)  # AN-16 (422 before anything is written)
+    reason = next((r for r in reasons if r["id"] == payload.reason_id), None)
+    if reason is not None:
+        requires_payment, payment_amount = reason["requires_payment"], reason["payment_amount"]
+    else:
+        requires_payment, payment_amount = office_payment_defaults(office)
+    status_token = secrets.token_urlsafe(24)
+    ack_hashes = record_acknowledgement_texts(
+        db, contact.acknowledgement_texts, contact.acknowledgement_version
+    )
     req = BookingRequest(
         id=str(uuid7()),
         tenant_id=office.tenant_id,
@@ -719,6 +935,8 @@ def submit_request(
         duration_minutes=duration,
         provider_id=resolved_provider_id,
         provider_name=resolved_provider_name,
+        operatory_id=operatory_id,
+        is_emergency=is_emergency,
         slot_date=day,
         start_time=start,
         end_time=end,
@@ -732,6 +950,15 @@ def submit_request(
         insurance_info=extras["insurance_info"],
         disclaimer_accepted=extras["disclaimer_accepted"],
         consent_accepted=extras["consent_accepted"],
+        payment_terms_accepted=extras["payment_terms_accepted"],
+        acknowledgement_hashes=ack_hashes,
+        acknowledgement_version=contact.acknowledgement_version,
+        acknowledged_at=datetime.utcnow(),
+        requires_payment=bool(requires_payment),
+        payment_status="required" if requires_payment else "not_required",
+        payment_amount=payment_amount,
+        payment_currency=settings.APPOINTNOW_PAYMENT_CURRENCY if requires_payment else None,
+        status_token_hash=_text_hash(status_token),
         hold_expires_at=_office_now(office)
         + timedelta(minutes=settings.APPOINTNOW_HOLD_TTL_MINUTES),
         source_ip=source_ip,
@@ -739,6 +966,8 @@ def submit_request(
     db.add(req)
     db.commit()
     db.refresh(req)
+    # Shown once on the submit response (never stored in clear) - AN-27.6.
+    req._status_token = status_token  # type: ignore[attr-defined]
     _invalidate_availability_cache(office.id, day)
     notify_new_request(db, office, req)
     _notify_office(db, office, req)
@@ -763,7 +992,7 @@ def _reason_label(reasons: list[dict], reason_id: str | None) -> str | None:
 
 
 # ── staff inbox (AN-4 / AN-13) ───────────────────────────────────────────────
-_VALID_STATUSES = {"pending", "approved", "declined", "expired"}
+_VALID_STATUSES = {"pending", "awaiting_payment", "approved", "declined", "expired"}
 _SORTS = {
     "created_desc": (BookingRequest.created_at.desc(), BookingRequest.id.desc()),
     "created_asc": (BookingRequest.created_at.asc(), BookingRequest.id.asc()),
@@ -1081,16 +1310,48 @@ def approve_request(
     db: Session, tenant_id: int, request_id: str, body, *, actor_id: int | None
 ) -> BookingRequest:
     """AN-5: re-check the slot, book the appointment, link it, mark approved — all
-    in one transaction."""
+    in one transaction.
+
+    AN-27: a payment-required request is refused (409 ``payment_required``)
+    until its payment is recorded, unless ``waive_payment`` — staff collected
+    it outside DentC or chose to waive it. A paid request that the webhook
+    could not auto-book (``booking_error``) is approved here by hand."""
     req = get_request(db, tenant_id, request_id)
-    if req.status != "pending":
+    if req.status not in HOLDING_STATUSES:
         raise ConflictError(
             f"Request is already {req.status}", code="request_not_pending"
         )
     office = db.get(Office, req.office_id)
     if office is None or office.tenant_id != tenant_id:
         raise ForbiddenError("Request does not belong to the authenticated tenant")
+    waive = bool(getattr(body, "waive_payment", False))
+    if req.requires_payment and req.payment_status != "paid" and not waive:
+        raise ConflictError(
+            "This booking requires payment before it is confirmed. Request payment, "
+            "record the payment taken, or approve with waive_payment=true.",
+            code="payment_required",
+            details={"payment_status": req.payment_status,
+                     "payment_amount": str(req.payment_amount) if req.payment_amount is not None else None},
+        )
 
+    book_request(db, office, req, body, actor_id=actor_id, payment_waived=waive)
+    db.commit()
+    db.refresh(req)
+    _invalidate_availability_cache(office.id, req.slot_date)
+    notify_updated_request(db, office, req)
+    _notify_contact(db, office, req, "approved")
+    return req
+
+
+def book_request(
+    db: Session, office: Office, req: BookingRequest, body, *, actor_id: int | None,
+    payment_waived: bool = False,
+) -> Appointment:
+    """The atomic booking core shared by approve (AN-5) and the post-payment
+    path (AN-27): resolve provider/operatory/patient, refuse an overlap (409
+    ``slot_conflict``), INSERT the appointment, link it and mark the request
+    approved; a recorded payment is posted to the patient ledger once a
+    patient is linked. **Does not commit** — the caller owns the transaction."""
     provider = _resolve_provider_for_booking(db, office, req, body.provider_id)
     if provider is None:
         # appointments.provider_id is NOT NULL — can't book without one.
@@ -1099,7 +1360,9 @@ def approve_request(
             code="no_provider",
         )
     provider_id = provider.id
-    operatory_id = _resolve_operatory_for_booking(db, office, provider_id, body.operatory_id)
+    operatory_id = _resolve_operatory_for_booking(
+        db, office, provider_id, body.operatory_id or req.operatory_id
+    )
 
     conflicts = appointment_conflicts(
         db, office.id, provider_id, operatory_id, req.slot_date, req.start_time, req.end_time
@@ -1120,6 +1383,13 @@ def approve_request(
         note_lines.append(f"Email: {req.email}")
     if req.notes:
         note_lines.append(f"Notes: {req.notes}")
+    if req.payment_status == "paid" and req.paid_amount is not None:
+        note_lines.append(
+            f"Paid online: {req.paid_amount} {(req.payment_currency or '').upper()}".strip()
+            + (f" (ref {req.payment_reference})" if req.payment_reference else "")
+        )
+    elif req.requires_payment and payment_waived:
+        note_lines.append("Payment required - waived / collected outside DentC at approval")
 
     appt = Appointment(
         id=f"AN{uuid7().hex[:22]}",
@@ -1151,21 +1421,34 @@ def approve_request(
     req.actioned_by = actor_id
     req.actioned_at = datetime.utcnow()
     req.hold_expires_at = None
-    db.commit()
-    db.refresh(req)
-    _invalidate_availability_cache(office.id, req.slot_date)
-    notify_updated_request(db, office, req)
-    _notify_contact(db, office, req, "approved")
-    return req
+    req.booking_error = None
+
+    from app.services import appointnow_payment_service as payments
+
+    if payment_waived and req.payment_status == "link_sent":
+        payments.close_open_link(req)
+    payments.post_payment_to_ledger(db, office, req, actor_id=actor_id)
+    return appt
 
 
 def decline_request(
     db: Session, tenant_id: int, request_id: str, reason: str | None, *, actor_id: int | None
 ) -> BookingRequest:
     req = get_request(db, tenant_id, request_id)
-    if req.status not in {"pending", "expired"}:
+    if req.status not in {"pending", "awaiting_payment", "expired"}:
         raise ConflictError(f"Request is already {req.status}", code="request_not_pending")
+    if req.payment_status == "paid":
+        # AN-27: never decline over money already taken — refund it first.
+        raise ConflictError(
+            "This request has a recorded payment; refund it before declining.",
+            code="refund_required",
+            details={"paid_amount": str(req.paid_amount) if req.paid_amount is not None else None},
+        )
     office = db.get(Office, req.office_id)
+    if req.payment_status == "link_sent":
+        from app.services import appointnow_payment_service as payments
+
+        payments.close_open_link(req)
     req.status = "declined"
     req.decline_reason = reason
     req.actioned_by = actor_id
@@ -1208,7 +1491,7 @@ def reschedule_request(
     appointments on the provider are a 409 ``slot_conflict`` with
     ``details.conflicts[]`` so the red dialog can list them."""
     req = get_request(db, tenant_id, request_id)
-    if req.status != "pending":
+    if req.status not in HOLDING_STATUSES:
         raise ConflictError(f"Request is already {req.status}", code="request_not_pending")
     office = db.get(Office, req.office_id)
     if office is None or office.tenant_id != tenant_id:
@@ -1235,7 +1518,17 @@ def reschedule_request(
         if current is not None:
             provider_name = current.name
 
-    conflicts = appointment_conflicts(db, office.id, provider_id, None, day, start, end)
+    operatory_id = req.operatory_id
+    if slot.operatory_id:
+        op = db.get(Operatory, slot.operatory_id)
+        if op is None or op.office_id != office.id:
+            raise ValidationError(
+                f"Operatory '{slot.operatory_id}' is not valid for this office",
+                code="bad_operatory",
+            )
+        operatory_id = op.id
+
+    conflicts = appointment_conflicts(db, office.id, provider_id, operatory_id, day, start, end)
     if conflicts:
         _raise_slot_conflict(conflicts)
 
@@ -1254,10 +1547,14 @@ def reschedule_request(
     req.duration_minutes = duration
     req.provider_id = provider_id
     req.provider_name = provider_name
+    req.operatory_id = operatory_id
     req.reschedule_count = (req.reschedule_count or 0) + 1
     req.rescheduled_by = actor_id
     req.rescheduled_at = datetime.utcnow()
-    req.hold_expires_at = now + timedelta(minutes=settings.APPOINTNOW_HOLD_TTL_MINUTES)
+    hold = now + timedelta(minutes=settings.APPOINTNOW_HOLD_TTL_MINUTES)
+    if req.status == "awaiting_payment" and req.hold_expires_at and req.hold_expires_at > hold:
+        hold = req.hold_expires_at  # AN-27: keep holding while the link is open
+    req.hold_expires_at = hold
     req.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(req)
@@ -1318,7 +1615,8 @@ def expire_stale_requests(db: Session, offices: list[Office]) -> None:
     inbox and availability stay truthful. Best-effort; never raises."""
     if not offices:
         return
-    expired: list[tuple[Office, BookingRequest]] = []
+    expired: list[tuple[Office, BookingRequest, bool]] = []
+    utc_now = datetime.utcnow()
     try:
         for office in offices:
             now = _office_now(office)
@@ -1326,26 +1624,41 @@ def expire_stale_requests(db: Session, offices: list[Office]) -> None:
                 db.execute(
                     select(BookingRequest).where(
                         BookingRequest.office_id == office.id,
-                        BookingRequest.status == "pending",
+                        BookingRequest.status.in_(HOLDING_STATUSES),
                     )
                 )
                 .scalars()
                 .all()
             )
             for req in pending:
+                if req.payment_status == "paid":
+                    # AN-27: money is held against it — staff resolve it
+                    # (approve or refund); a sweep never strands a payment.
+                    continue
                 slot_dt = datetime.combine(req.slot_date, req.start_time)
-                if slot_dt < now:
+                link_lapsed = (
+                    req.status == "awaiting_payment"
+                    and req.payment_status == "link_sent"
+                    and req.payment_link_expires_at is not None
+                    and req.payment_link_expires_at < utc_now
+                )
+                if slot_dt < now or link_lapsed:
                     req.status = "expired"
                     req.hold_expires_at = None
-                    expired.append((office, req))
+                    if req.payment_status == "link_sent":
+                        req.payment_status = "expired"
+                    expired.append((office, req, link_lapsed))
         if expired:
             db.commit()
     except Exception as exc:  # noqa: BLE001 - a sweep must never break the request
         logger.warning("AppointNow expiry sweep failed: %s", exc)
         db.rollback()
         return
-    for office, req in expired:
+    for office, req, link_lapsed in expired:
         _publish_event(db, office, "expired", req)
+        if link_lapsed:
+            # AN-27.5: tell the patient the unpaid link lapsed and the slot is released.
+            _notify_contact(db, office, req, "payment_expired")
 
 
 def expire_all(db: Session, tenant_id: int | None = None) -> dict:
@@ -1417,12 +1730,44 @@ def _invalidate_availability_cache(office_id: int, day: date) -> None:
 
 
 # ── serialisation (ORM → wire) ───────────────────────────────────────────────
+def _payment_read(req: BookingRequest, names: dict[int, str]) -> dict:
+    return {
+        "requires_payment": bool(req.requires_payment),
+        "status": req.payment_status or "not_required",
+        "amount": req.payment_amount,
+        "currency": req.payment_currency,
+        "provider": req.payment_provider,
+        "link_url": req.payment_link_url,
+        "link_sent_at": req.payment_link_sent_at,
+        "link_sent_via": req.payment_link_sent_via,
+        "link_expires_at": req.payment_link_expires_at,
+        "note": req.payment_note,
+        "requested_by_id": req.payment_requested_by,
+        "requested_by_name": (
+            names.get(req.payment_requested_by) if req.payment_requested_by is not None else None
+        ),
+        "paid_at": req.paid_at,
+        "paid_amount": req.paid_amount,
+        "reference": req.payment_reference,
+        "method": req.payment_method,
+        "ledger_payment_id": req.ledger_payment_id,
+        "posted_to_ledger": req.ledger_payment_id is not None,
+        "booking_error": req.booking_error,
+        "refunded_at": req.refunded_at,
+        "refund_amount": req.refund_amount,
+        "refund_reference": req.refund_reference,
+        "refund_reason": req.refund_reason,
+    }
+
+
 def to_read(
     req: BookingRequest,
     office_code: str | None = None,
     user_names: dict[int, str] | None = None,
+    operatory_names: dict[str, str] | None = None,
 ) -> dict:
     names = user_names or {}
+    op_names = operatory_names or {}
     original_slot = None
     if req.original_slot_date is not None:
         original_slot = {
@@ -1447,7 +1792,10 @@ def to_read(
             "duration_minutes": req.duration_minutes,
             "provider_id": req.provider_id,
             "provider_name": req.provider_name,
+            "operatory_id": req.operatory_id,
+            "operatory_name": op_names.get(req.operatory_id) if req.operatory_id else None,
         },
+        "is_emergency": bool(req.is_emergency),
         "contact": {
             "first_name": req.first_name,
             "last_name": req.last_name,
@@ -1459,6 +1807,10 @@ def to_read(
             "insurance_info": req.insurance_info,
             "disclaimer_accepted": bool(req.disclaimer_accepted),
             "consent_accepted": bool(req.consent_accepted),
+            "payment_terms_accepted": req.payment_terms_accepted,
+            "acknowledgement_hashes": req.acknowledgement_hashes,
+            "acknowledgement_version": req.acknowledgement_version,
+            "acknowledged_at": req.acknowledged_at,
         },
         "appointment_id": req.appointment_id,
         "patient_id": req.patient_id,
@@ -1475,6 +1827,8 @@ def to_read(
         "rescheduled_at": req.rescheduled_at,
         "contact_notified_at": req.contact_notified_at,
         "contact_notified_via": req.contact_notified_via,
+        "payment": _payment_read(req, names),
+        "status_token": getattr(req, "_status_token", None),
         "created_at": req.created_at,
         "updated_at": req.updated_at,
     }
@@ -1495,11 +1849,23 @@ def read_many(db: Session, rows: Iterable[BookingRequest]) -> list[dict]:
                 select(Office.id, Office.office_code).where(Office.id.in_(office_ids))
             ).all()
         }
-    user_ids = {r.actioned_by for r in rows if r.actioned_by is not None} | {
-        r.rescheduled_by for r in rows if r.rescheduled_by is not None
+    user_ids = {
+        uid
+        for r in rows
+        for uid in (r.actioned_by, r.rescheduled_by, r.payment_requested_by)
+        if uid is not None
     }
     names = resolve_user_names(db, user_ids) if user_ids else {}
-    return [to_read(r, office_code=codes.get(r.office_id), user_names=names) for r in rows]
+    op_ids = {r.operatory_id for r in rows if r.operatory_id}
+    op_names: dict[str, str] = {}
+    if op_ids:
+        op_names = dict(
+            db.execute(select(Operatory.id, Operatory.name).where(Operatory.id.in_(op_ids))).all()
+        )
+    return [
+        to_read(r, office_code=codes.get(r.office_id), user_names=names, operatory_names=op_names)
+        for r in rows
+    ]
 
 
 def read_one(db: Session, req: BookingRequest) -> dict:

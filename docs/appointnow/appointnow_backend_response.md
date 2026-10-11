@@ -1,3 +1,86 @@
+# AppointNow — Backend Response (round 3: AN-26 / AN-27)
+
+> **Answers:** §AN-26 / §AN-27 of [appointnow_backend_devreport.md](appointnow_backend_devreport.md) (added 2026-10-11)
+> **Alembic:** `7cbbcedd2691` (on `e4b31c406999`) — **applied on the dev DB** 2026-10-11 (1 existing request → `not_required`, `payment_terms_accepted` NULL)
+> **Code:** [app/services/appointnow_payment_service.py](../../app/services/appointnow_payment_service.py) (new),
+> [app/integrations/stripe_client.py](../../app/integrations/stripe_client.py) (new),
+> [app/services/appointnow_service.py](../../app/services/appointnow_service.py),
+> [app/services/appointnow_notification_service.py](../../app/services/appointnow_notification_service.py),
+> [app/api/v1/appointnow.py](../../app/api/v1/appointnow.py), [app/schemas/appointnow.py](../../app/schemas/appointnow.py),
+> [app/db/models/appointnow.py](../../app/db/models/appointnow.py), `offices` in [identity.py](../../app/db/models/identity.py),
+> [tests/test_appointnow_module.py](../../tests/test_appointnow_module.py)
+> **Date:** 2026-10-11
+
+| # | Item | Status |
+|---|------|--------|
+| AN-26 | Persist the payment acknowledgement | ✅ Shipped |
+| AN-27.1 | Per-office / per-reason payment config on the public info | ✅ Shipped |
+| AN-27.2 | `awaiting_payment` status + payment block on reads | ✅ Shipped |
+| AN-27.3 | `POST …/request-payment` (link + SMS/e-mail + hold extension) | ✅ Shipped (Stripe Checkout, or `manual` without Stripe) |
+| AN-27.4 | Payment webhook → atomic booking + ledger posting | ✅ Shipped (`/appointnow/payments/webhooks/stripe`) |
+| AN-27.5 | Unpaid link expiry | ✅ Shipped (webhook + sweep) |
+| AN-27.6 | Patient-facing status | ✅ Shipped (`GET /appointnow/requests/{id}/status?token=`) |
+| AN-27.7 | Refunds | ✅ Mechanism shipped (admin endpoint). **The cancellation / refund *policy* is still a product call** |
+| AN-15 | Generic overlap guard on `POST /appointments` | ⏸ Still a product call (unchanged) |
+
+### AN-26 — payment acknowledgement
+
+- `ContactInput.payment_terms_accepted` → `booking_requests.payment_terms_accepted`. It is part of the **422 `acknowledgement_required`** check (`details.field = "payment_terms_accepted"`), alongside the other two. The interim marker `Payment terms accepted: Yes` in `notes` is still understood and removed from the stored note, so the FE can drop `MARK_PAYMENT` whenever it likes. Existing rows are **NULL** ("asked before this existed"), never `false`.
+- **Proving the wording (all three acknowledgements):** send `contact.acknowledgement_texts = {disclaimer, consent, payment}` (the exact text shown) and optionally `contact.acknowledgement_version`. The server stores `acknowledgement_hashes = {kind: sha256}` + `acknowledged_at` (server time) on the row, and each distinct text **once** in `booking_acknowledgement_texts` (keyed by hash), so the office can show the exact wording even after the page copy has changed. A client that sends no texts still books; the hashes are just null.
+- `APPOINTNOW_REQUIRE_PAYMENT_ACK` (default **true**) exists only so an old embed can keep booking while it is updated.
+
+### AN-27 — payment-required flow
+
+**Config (27.1).** `offices.appointnow_requires_payment` + `appointnow_payment_amount` (editable through the generic `PATCH /offices/{id}`); an `appointnow_reasons` row overrides with `requires_payment` (null = inherit) / `payment_amount`. `GET /appointnow/offices/{code}` now returns `payment: {requires_payment, amount, currency, online_payment_available}` and `requires_payment` / `payment_amount` on each reason. The requirement and amount are **snapshotted onto the request at intake**, so a later Setup change does not re-price a request the patient already saw.
+
+**State machine (27.2).**
+```
+pending ──request-payment──▶ awaiting_payment ──paid (webhook / mark-paid)──▶ approved
+                                    │
+                                    └── link lapses ──▶ expired
+```
+`BookingRequestRead.payment` = `{requires_payment, status (not_required|required|link_sent|paid|expired|refunded), amount, currency, provider (stripe|manual), link_url, link_sent_at, link_sent_via, link_expires_at, note, requested_by_id/_name, paid_at, paid_amount, reference, method, ledger_payment_id, posted_to_ledger, booking_error, refunded_at, refund_amount, refund_reference, refund_reason}`. `counts.awaiting_payment` is new and `?status=awaiting_payment` filters the inbox. `required` is a sixth value beyond the report's list: the office config says payment is needed but no link has been sent yet.
+
+**Request payment (27.3).** `POST /appointnow/requests/{id}/request-payment {amount?, note?, expires_in_minutes? (30–1440), booking?: {patient_id, create_patient, provider_id, operatory_id}}`. The gate is `appointnow_approve_booking`, because the payment leads to a booking.
+- With `STRIPE_SECRET_KEY` set, the server creates a Stripe **Checkout Session**: `link_url` is the hosted page, and the request id is in the metadata. It sends the link by SMS (contact consented, not quiet hours) and falls back to e-mail.
+- Without Stripe, the provider is **`manual`**: there is no link, and the patient is told the office will take the payment. Staff then record it with `mark-paid` (below).
+- The slot soft-hold is **extended to the link's life**, and `awaiting_payment` holds count in availability.
+- Calling it again re-sends a fresh link and **expires the old one**, so it can't also be paid.
+- `booking` is validated now (bad provider / chair / patient → 422 immediately) and kept for the webhook.
+
+**Paid (27.4).** `POST /api/v1/appointnow/payments/webhooks/stripe` is a public route.
+- The `Stripe-Signature` is verified against `STRIPE_WEBHOOK_SECRET` (HMAC, 5-minute tolerance). A bad signature returns 400, and **with no secret set, every event is refused**.
+- `checkout.session.completed` (when `payment_status=paid`) and `async_payment_succeeded` **commit the payment first**, then book through the same atomic core as approve (`book_request`, now shared). The booking runs inside a savepoint and is attributed to the staff member who requested the payment.
+- If the booking can't complete (for example, the slot was taken meanwhile), the request stays `awaiting_payment` with `payment.status=paid` and `booking_error="slot_conflict: …"`. Staff then approve it by hand (approve accepts `awaiting_payment`), reschedule it, or refund it. **The money is never lost to a rollback.**
+- Stripe retries with the same PaymentIntent are idempotent. A *second, different* payment (an old link paid in a race) is recorded on `booking_error` for refund, never dropped.
+- Once a patient is linked (`booking.patient_id`, `create_patient`, or a later approve that picks one), the payment is posted as a `patient_payments` credit (`payment_type=patient`, positive magnitude per AL-9, `id AN-…`) and shows as `ledger_payment_id`. Until then it is **unapplied**, held on the request (`posted_to_ledger=false`).
+- `POST …/mark-paid {amount?, reference?, method?, book=true, booking?}` records a phone or terminal payment the same way and closes any open link.
+- **Approve** of an unpaid payment-required request returns **409 `payment_required`**. `ApproveInput.waive_payment=true` overrides it, and the appointment note records the waiver.
+
+**Expiry (27.5).** A `checkout.session.expired` event for the **current** link (a superseded link's event is ignored), or the sweep (`expire_stale_requests` / `scripts/expire_booking_requests.py`) once `payment_link_expires_at` passes, moves the request to `expired`, releases the hold, sends `payment_expired` to the patient and emits the `expired` push event. **A paid request is never swept**, because money is held against it.
+
+**Patient status (27.6).** The public submit response carries **`status_token`** exactly once. Only its sha256 is stored, and it never appears on staff reads. `GET /api/v1/appointnow/requests/{id}/status?token=` returns `{status, confirmed, slot, reason_label, payment_required, payment_status, payment_amount/currency, payment_link_url (only while payable), payment_link_expires_at, paid_at, office_name/phone}`. It returns no contact details, and an unknown id and a wrong token are both **404** (never 401, AN-12). Suggested FE use: put `request` + token in the confirmation link, and have the Stripe return URL land there.
+
+**Refund (27.7).** `POST …/refund {amount?, reason?}` (admin):
+- For a Stripe payment, it refunds at Stripe (idempotent key). For a manual one, it records the refund only.
+- If the payment was posted to the ledger, the ledger side follows: a full refund **reverses** the ledger payment with a refund row (REF-2), and a partial refund writes a REF-1 refund against it. The REF-4 policy is checked **before** money moves at Stripe.
+- An unbooked request becomes `declined` and its slot is freed. A booked appointment is **left alone** (cancel it in the scheduler).
+- **Decline** of a paid request returns **409 `refund_required`**.
+- *Who* qualifies for a refund (the 24-hour notice in the consent text) is still a product decision. The endpoint executes whatever staff decide.
+
+**New config / env:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `APPOINTNOW_PAYMENT_RETURN_URL` (template: `{office_code}`, `{request_id}`, `{result}` = success|cancel; required when Stripe is on, else 503 `payment_return_url_missing`), `APPOINTNOW_PAYMENT_CURRENCY` (`usd`), `APPOINTNOW_PAYMENT_LINK_TTL_MINUTES` (1440), `APPOINTNOW_REQUIRE_PAYMENT_ACK` (true). In the Stripe dashboard, point a webhook at `/api/v1/appointnow/payments/webhooks/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`, `checkout.session.async_payment_failed`.
+
+**Breaking / behaviour changes:** intake now also 422s without `payment_terms_accepted` (the FE already sends the marker). Approve 409s `payment_required` only for offices / reasons that turn payment on (default off). Decline 409s `refund_required` on a paid request.
+
+**Frontend to-do:**
+- Send `payment_terms_accepted` + `acknowledgement_texts` / `acknowledgement_version` directly, and drop the marker.
+- Read `payment` from the public office info and show the amount up front.
+- Inbox: an "Awaiting payment" tab (`counts.awaiting_payment`), a **Request payment** action (with the "Book with" pick passed as `booking`), Mark paid, Refund (admin), and `booking_error` on the card.
+- Keep the `status_token` from submit and add a status page.
+- Push events cover every transition, so the card updates live.
+
+---
+
 # AppointNow — Backend Response (round 2)
 
 > **Answers:** [appointnow_backend_devreport.md](appointnow_backend_devreport.md) (status date 2026-09-12)
@@ -160,3 +243,10 @@ Live on the dev DB: Mon 2026-09-14 → 27 slots, last start **22:00** (the 23:04
 3. Cloud Run: `APPOINTNOW_TURNSTILE_SECRET`, `REDIS_ENABLED`, and for AN-21 `SENDGRID_API_KEY` + `SENDGRID_FROM_EMAIL`, `TWILIO_*` (already needed by patient SMS).
 4. Cron: `scripts/expire_booking_requests.py`.
 5. Frontend: send the AN-16 fields directly (drop the notes fold/parse), flip `supportsReschedule`, bind `actioned_by_name` / `original_slot` / `office_code`, subscribe to `appointnow.request` on the messaging socket and flip `supportsPush`.
+
+## AN-28 / AN-29 — operatory pick + emergency requests (2026-10-11)
+
+- **AN-28:** `PublicOfficeInfo.operatories[]` (`id, name, provider_id, provider_name`; active chairs in `display_order`); `GET …/availability?operatory_id=` only returns times that chair is free (appointments + live holds in it) and stamps `operatory_id/operatory_name` on each slot; `SlotInput.operatory_id` is re-checked at intake and stored on `booking_requests.operatory_id`; approve books into it unless overridden; reschedule accepts `slot.operatory_id` and checks operatory conflicts. Reads expose `slot.operatory_id/operatory_name`.
+- **AN-29:** `SubmitRequestInput.is_emergency` skips the open-slot re-check (only `end > start` and not-in-the-past → 422 `slot_in_past`); `BookingRequestRead.is_emergency`.
+- Migration `a28e9c1d0b7f` (after `7cbbcedd2691`): `booking_requests.operatory_id` (FK operatories, nullable), `booking_requests.is_emergency` (bool, default false).
+- Tests: `tests/test_appointnow_module.py` (`test_public_info_lists_active_operatories`, `test_availability_by_operatory_skips_booked_chair_times`, `test_submit_with_operatory_holds_that_chair_and_approve_books_it`, `test_emergency_request_accepts_a_taken_time`, `test_emergency_request_in_the_past_is_refused`).

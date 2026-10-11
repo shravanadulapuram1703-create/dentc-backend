@@ -104,6 +104,12 @@ ProviderRead = create_model(
     # 122300000X (Dentist); ``effective_taxonomy_source`` says which.
     effective_taxonomy_code=(Optional[str], None),
     effective_taxonomy_source=(Optional[str], None),
+    # FSW-5: the specialty key fee-schedule assignments match on (taxonomy code;
+    # stored, else derived from ``specialty`` — never defaulted) + its label.
+    specialty_code=(Optional[str], None),
+    specialty_label=(Optional[str], None),
+    # FSW-6: home office ∪ provider_offices.
+    served_office_ids=(list[int], []),
 )
 
 
