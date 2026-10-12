@@ -8,8 +8,9 @@ handling (AI-assist client secret, EIN).
 from __future__ import annotations
 
 from datetime import date
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from app.db.models.account import (
     AccountCommunications,
@@ -20,6 +21,7 @@ from app.db.models.account import (
 from app.db.models.account import AccountSettings as _AccountSettings
 from app.schemas.common import ORMModel
 from app.schemas.factory import build_schemas
+from app.services import office_rules
 
 # ── Account settings (Basic + Advanced) ─────────────────────────────────────
 _SettingsCreate, _SettingsUpdate, _SettingsRead = build_schemas(
@@ -81,9 +83,27 @@ class PhoneAssignmentsReplace(BaseModel):
 
 # ── Holidays ───────────────────────────────────────────────────────────────
 # office_id is set from the route scope (path), never the body.
-HolidayCreate, HolidayUpdate, HolidayRead = build_schemas(
+_HolidayCreate, _HolidayUpdate, HolidayRead = build_schemas(
     AccountHoliday, "AccountHoliday", create_exclude=("office_id",), update_exclude=("office_id",)
 )
+
+# OFF-QA-2: closed vocabularies, case-folded first (older builds sent
+# ``Custom``/``Federal``), anything else 422.
+HolidayStatus = Annotated[Literal["CLOSED", "OPEN", "HALF_DAY"], BeforeValidator(office_rules.fold_holiday_status)]
+HolidayType = Annotated[Literal["FEDERAL", "CUSTOM"], BeforeValidator(office_rules.fold_upper)]
+
+
+class AccountHolidayCreate(_HolidayCreate):  # type: ignore[valid-type, misc]
+    status: HolidayStatus = "CLOSED"
+    holiday_type: HolidayType = "CUSTOM"
+
+
+class AccountHolidayUpdate(_HolidayUpdate):  # type: ignore[valid-type, misc]
+    status: HolidayStatus | None = None
+    holiday_type: HolidayType | None = None
+
+
+HolidayCreate, HolidayUpdate = AccountHolidayCreate, AccountHolidayUpdate
 
 
 class HolidayBulkDelete(BaseModel):
@@ -92,15 +112,18 @@ class HolidayBulkDelete(BaseModel):
 
 class FederalHolidaysImport(BaseModel):
     year: int = Field(..., ge=1900, le=2200)
-    status: str = Field("CLOSED")
+    status: HolidayStatus = "CLOSED"
+    # OFF-QA-12: offices close on the *observed* day (OPM rule: Saturday ->
+    # Friday, Sunday -> Monday). False stores the calendar dates.
+    observed: bool = True
 
 
 class HolidayRangeCreate(BaseModel):
     from_date: date
     to_date: date
     name: str = Field(..., max_length=255)
-    status: str = Field("CLOSED")
-    holiday_type: str = Field("CUSTOM")
+    status: HolidayStatus = "CLOSED"
+    holiday_type: HolidayType = "CUSTOM"
 
 
 # ── Consents ───────────────────────────────────────────────────────────────

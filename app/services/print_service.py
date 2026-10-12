@@ -198,7 +198,16 @@ def resolve_letterhead(db: Session, office: Office | None, tenant_id: int) -> di
     ``account_settings.logo_url``) | custom (its own upload) | none, and
     ``address_source`` = office | custom (the statement address block). That is
     the practice's stated print branding, so it drives every report header —
-    not only statements. A blank custom field falls back to the office row.
+    not only statements.
+
+    OFF-QA-1: a custom address is used **as a block** — a blank custom line 2
+    stays blank. Falling back per field printed "PO Box 55, Suite 2, Wexford",
+    the custom box with the office's suite, which is no real address. Only an
+    entirely empty custom block falls back to the office address. The phone is
+    not part of the postal block: a blank custom phone still prints the office's.
+
+    ``logo_source``: ``custom`` (the office's Statement-tab upload) |
+    ``account`` (the practice logo from Account Info) | ``none``.
     """
     stmt_row = None
     if office is not None:
@@ -216,22 +225,34 @@ def resolve_letterhead(db: Session, office: Office | None, tenant_id: int) -> di
     logo_url: str | None = None
     logo_source = "none"
     if logo_option == "custom" and stmt_row and stmt_row.logo_url:
-        logo_url, logo_source = stmt_row.logo_url, "office"
+        logo_url, logo_source = stmt_row.logo_url, "custom"
     elif logo_option != "none" and account is not None and account.logo_url:
-        logo_url, logo_source = account.logo_url, "tenant"
+        logo_url, logo_source = account.logo_url, "account"
 
-    custom_address = bool(stmt_row and (stmt_row.address_source or "office").lower() == "custom")
-    pick = (lambda custom, base: (custom or base)) if custom_address else (lambda custom, base: base)  # noqa: E731
     o = office
+    office_block = (
+        (o.address_line1, o.address_line2, o.city, o.state, o.zip) if o else (None,) * 5
+    )
+    block = office_block
+    if stmt_row and (stmt_row.address_source or "office").lower() == "custom":
+        custom_block = tuple(
+            (v or "").strip() or None
+            for v in (stmt_row.statement_address_1, stmt_row.statement_address_2,
+                      stmt_row.statement_city, stmt_row.statement_state, stmt_row.statement_zip)
+        )
+        if any(custom_block):
+            block = custom_block
+    office_phone = (o.phone or o.phone_2) if o else None
     return {
         "name": (stmt_row.correspondence_name if stmt_row and stmt_row.correspondence_name else None)
         or (o.name if o else None),
-        "address_line1": pick(stmt_row.statement_address_1 if stmt_row else None, o.address_line1 if o else None),
-        "address_line2": pick(stmt_row.statement_address_2 if stmt_row else None, o.address_line2 if o else None),
-        "city": pick(stmt_row.statement_city if stmt_row else None, o.city if o else None),
-        "state": pick(stmt_row.statement_state if stmt_row else None, o.state if o else None),
-        "zip": pick(stmt_row.statement_zip if stmt_row else None, o.zip if o else None),
-        "phone": pick(stmt_row.statement_phone if stmt_row else None, (o.phone or o.phone_2) if o else None),
+        "address_line1": block[0],
+        "address_line2": block[1],
+        "city": block[2],
+        "state": block[3],
+        "zip": block[4],
+        "phone": (stmt_row.statement_phone if stmt_row and stmt_row.statement_phone
+                  and (stmt_row.address_source or "office").lower() == "custom" else None) or office_phone,
         "logo_url": logo_url,
         "logo_source": logo_source,
         "logo_path": _local_path(logo_url),

@@ -14,7 +14,7 @@ only after verifying the office belongs to the authenticated tenant.
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -68,6 +68,15 @@ class OfficeIntegrations(Base, IntPKMixin, TimestampMixin):
     office_id: Mapped[int] = mapped_column(Integer, ForeignKey("offices.id"), index=True)
     service_email: Mapped[str | None] = mapped_column(String(255))
     service_email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # OFF-QA-5: the verify-email round trip. Only the code's sha256 is kept; a
+    # change of ``service_email`` clears all of it (and ``verified``).
+    service_email_verified_at: Mapped[datetime | None]
+    service_email_verification_hash: Mapped[str | None] = mapped_column(String(64))
+    service_email_verification_sent_at: Mapped[datetime | None]
+    service_email_verification_expires_at: Mapped[datetime | None]
+    service_email_verification_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     ai_assist_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     patient_comm_url: Mapped[str | None] = mapped_column(String(500))
     patient_portal_url: Mapped[str | None] = mapped_column(String(500))

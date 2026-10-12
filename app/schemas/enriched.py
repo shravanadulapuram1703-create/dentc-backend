@@ -126,4 +126,6 @@ OfficeRead = create_model(
     "OfficeRead", __base__=_office_base,
     logo_url=(Optional[str], None),
     letterhead=(Optional[OfficeLetterhead], None),
+    # OFF-QA-16: who deleted the office (``deleted_by`` resolved).
+    deleted_by_name=(Optional[str], None),
 )

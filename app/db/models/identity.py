@@ -13,6 +13,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    JSON,
     Integer,
     Numeric,
     SmallInteger,
@@ -210,6 +211,13 @@ class Office(Base, IntPKMixin, TimestampMixin):
         Boolean, default=False, server_default=sa_false(), nullable=False
     )
     appointnow_payment_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    # OFF-QA-16: a *deleted* office (``DELETE /offices/{id}``) as opposed to one
+    # set Inactive on the Info tab — both are ``is_active=false``, only a delete
+    # stamps these. Cleared on reactivate. ``deleted_operatory_ids`` are the
+    # chairs the delete switched off, restored by the reactivate (OFF-QA-15).
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
+    deleted_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    deleted_operatory_ids: Mapped[list | None] = mapped_column(JSON)
 
 
 class Provider(Base, CreatedAtMixin):

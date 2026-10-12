@@ -298,14 +298,14 @@ def test_office_read_letterhead_resolution(client, db_session, office, patient, 
         "state": "TX", "zip": "78701", "phone": "512-555-0100", "logo_url": None, "logo_source": "none",
     }
 
-    # Practice logo (Account Info) → logo_source=tenant.
+    # Practice logo (Account Info) → logo_source=account.
     (tmp_path / "logos").mkdir()
     (tmp_path / "logos" / f"tenant_{tid}.png").write_bytes(_PNG)
     db_session.add(AccountSettings(tenant_id=tid, logo_url=f"/uploads/logos/tenant_{tid}.png"))
     db_session.commit()
     body = client.get(f"{PREFIX}/offices/{office.id}").json()
     assert body["logo_url"] == f"/uploads/logos/tenant_{tid}.png"
-    assert body["letterhead"]["logo_source"] == "tenant"
+    assert body["letterhead"]["logo_source"] == "account"
 
     # Statement tab: custom logo + custom address + correspondence name win.
     (tmp_path / "office_logos").mkdir()
@@ -320,7 +320,7 @@ def test_office_read_letterhead_resolution(client, db_session, office, patient, 
     body = client.get(f"{PREFIX}/offices/{office.id}").json()
     assert body["logo_url"] == f"/uploads/office_logos/office_{office.id}.png"
     lh = body["letterhead"]
-    assert lh["logo_source"] == "office"
+    assert lh["logo_source"] == "custom"
     assert lh["name"] == "Print Office Billing"
     assert (lh["address_line1"], lh["city"], lh["state"], lh["zip"], lh["phone"]) == (
         "PO Box 9", "Dallas", "TX", "75201", "214-555-0100")
@@ -350,7 +350,7 @@ def test_letterhead_never_resolves_remote_logo_to_disk(db_session, office):
     db_session.commit()
     lh = resolve_letterhead(db_session, office, db_session._tenant_id)
     assert lh["logo_url"] == "https://cdn.example/logo.png"
-    assert lh["logo_source"] == "tenant"
+    assert lh["logo_source"] == "account"
     assert lh["logo_path"] is None
 
 

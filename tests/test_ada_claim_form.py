@@ -443,9 +443,9 @@ def test_provider_taxonomy_and_office_entity_fields(client, provider, office):
     assert r.status_code == 200 and r.json()["taxonomy_code"] == "1223G0001X"
     assert r.json()["effective_taxonomy_code"] == "1223G0001X" and r.json()["effective_taxonomy_source"] == "stored"
     r = client.patch(f"{PREFIX}/offices/{office.id}", json={
-        "npi": "1112223334", "taxonomy_code": "122300000X", "treatment_address_line1": "500 Clinic Blvd"})
+        "npi": "1112223338", "taxonomy_code": "122300000X", "treatment_address_line1": "500 Clinic Blvd"})
     assert r.status_code == 200, r.text
-    assert r.json()["npi"] == "1112223334" and r.json()["treatment_address_line1"] == "500 Clinic Blvd"
+    assert r.json()["npi"] == "1112223338" and r.json()["treatment_address_line1"] == "500 Clinic Blvd"
     r = client.get(f"{PREFIX}/metadata/provider-taxonomy-codes")
     assert r.status_code == 200 and any(c["code"] == "1223E0200X" for c in r.json())
 

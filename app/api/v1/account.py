@@ -166,7 +166,7 @@ def bulk_delete_account_holidays(db: DbSession, tenant_id: AccountTenant, body: 
 
 @router.post("/holidays/federal", response_model=list[HolidayRead], operation_id="import_federal_holidays")
 def import_federal_holidays(db: DbSession, tenant_id: AccountTenant, body: FederalHolidaysImport, current: CurrentUser):
-    return holiday_service.import_federal(db, tenant_id, body.year, body.status, current.id)
+    return holiday_service.import_federal(db, tenant_id, body.year, body.status, current.id, observed=body.observed)
 
 
 @router.post("/holidays/range", response_model=list[HolidayRead], operation_id="create_holiday_range")

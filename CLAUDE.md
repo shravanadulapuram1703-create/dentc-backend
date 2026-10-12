@@ -1772,6 +1772,55 @@ editing a query string.
   prescription-library}/effective` (unassigned = all). `scripts/backfill_user_offices.py`
   seeds the data-hygiene assignments.
 
+**Office Setup new-office QA pass** (Setup → Offices, all 8 tabs; OFF-QA-1…13 of
+[docs/office-scope/office_setup_new_office_qa_backend_devreport.md](docs/office-scope/office_setup_new_office_qa_backend_devreport.md)
+/ [response](docs/office-scope/office_setup_new_office_qa_backend_response.md); Alembic
+`8d1ef924bb92`, **applied to the dev DB**). Rules live once in
+[app/services/office_rules.py](app/services/office_rules.py) (published at
+`GET /offices/setup-rules`); office-row guards in `office_setup_service.validate_office_write`,
+run by `OfficeCRUD`.
+- **Letterhead** custom address is a *block* (blank line 2 stays blank); `logo_source` =
+  `custom|account|none` (**breaking**, was `office|tenant`).
+- Statement/holiday vocabularies are case-folded `Literal`s (422 otherwise); stored rows
+  normalised. `short_id` 409 `duplicate_short_id` per tenant **on a move only** (the dev
+  DB's `MOON` pair, offices 1+4, stays editable; no DB constraint until it is resolved).
+  **`office_code` stays globally unique** — AppointNow resolves the public page from it
+  with no tenant; 409 `duplicate_office_code` case-insensitively.
+- Schedule PUT **upserts only the days sent** + per-day time validation; schedule and
+  SmartAssist GETs write nothing (defaults with `id: null`); singletons use
+  `INSERT … ON CONFLICT DO NOTHING`.
+- [app/services/office_calendar_service.py](app/services/office_calendar_service.py):
+  `GET /offices/{id}/calendar` + staff appointment create/**move** → 409 `office_closed`
+  (`allow_outside_office_hours` overrides; `OFFICE_HOURS_ENFORCED` kill switch). **Hours
+  bind only a weekday with a saved row** — the 8–5 default is reported, never enforced;
+  a `CLOSED` holiday always binds, `HALF_DAY` never does.
+- Integrations: `EmailStr`, http(s)-only URLs, server-owned `service_email_verified` +
+  `…/integrations/verify-email(/confirm)` (sha256 code, 24 h, 5 tries). SmartAssist
+  serves a 12-item catalog until saved; `sms_template_id` validated against
+  `…/smart-assist/sms-templates`; **nothing executes SmartAssist**.
+- Advanced-tab ranges/formats, POS words → CMS codes; ADA Item 38 = claim → office
+  `place_of_service` → `11`. Office NPI Luhn + NUCC taxonomy; FK pointers 422 field-level.
+  **API-wide**: `app_error_from_db` no longer returns `db_message` (logged), adds
+  `field`/`loc`. `OperatoryCreate.id` optional (`op-{office}-{n}` minted,
+  `operatory_service.OperatoryCRUD`). Federal import `observed` (default true, OPM rule).
+- **OFF-QA-14**: `POST /offices` with `X-Office-ID` was a 500 — the create route stamped the
+  header into `office_id`, which `Office` lacks. `create_item` now skips `list_scope_only`
+  resources and `apply_write_office(model=)` stamps only columns the model has.
+- **OFF-QA-15…18 delete office** (Alembic `81e09d9576e9`, applied):
+  [app/services/office_lifecycle_service.py](app/services/office_lifecycle_service.py).
+  `GET /offices/{id}/delete-impact`; `DELETE /offices/{id}` is a bespoke route
+  (`CrudConfig.generate_delete=False`, same `delete_office` op id): 409 `office_in_use`
+  on future appointments / stranded users unless `?force`, deactivates the operatories
+  and remembers them in `offices.deleted_operatory_ids` (a reactivate restores exactly
+  those), stamps `deleted_at`/`deleted_by` (cleared on `PATCH is_active:true` via
+  `OfficeCRUD.update`). `?hard=true` (admin/owner/super_admin) walks **every FK into
+  `offices`** from metadata — any hit is 409 — then removes the `OWNED_TABLES` config.
+  New writes into an inactive office (body office, `X-Office-ID` stamp, a move,
+  appointment create/move, AppointNow `book_request`) are 409 `office_inactive`
+  (`office_scope_service.assert_office_active`); records already there stay editable.
+  `me-full` already had `offices[].is_active`; `current_office_id` now never resolves
+  to an inactive office.
+
 **Access Rights catalog curation + RBAC enforcement** (Security -> Groups rights
 picker; A1/A2/A3/C2 + B1/B2 + C1 of
 [docs/setup/implement/ACCESS_RIGHTS_BACKEND_HANDOVER.md](docs/setup/implement/ACCESS_RIGHTS_BACKEND_HANDOVER.md)

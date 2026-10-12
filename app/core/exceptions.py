@@ -149,15 +149,31 @@ def app_error_from_db(exc: Exception, *, resource: str | None = None) -> AppErro
 
     Works from the Postgres SQLSTATE + ``diag`` block when the driver supplies
     them and from the message text otherwise (SQLite in the test suite), so the
-    contract is the same on both. ``details`` always carries ``sqlstate`` and
-    the driver's first message line so a support log can be matched to it.
+    contract is the same on both. ``details`` carries ``sqlstate`` plus the
+    structured names; OFF-QA-10: the driver's raw message text is **logged, never
+    returned** (it quoted SQL and values), and a single offending column is
+    reported as ``field`` + ``loc: ["body", <column>]`` like a request-validation
+    error, so a form can mark the box.
     """
     orig = getattr(exc, "orig", None)
     sqlstate = getattr(orig, "pgcode", None)
     diag = getattr(orig, "diag", None)
     raw = _first_line(str(orig or exc))
+    logger.warning("Database rejected write%s: sqlstate=%s %s",
+                   f" ({resource})" if resource else "", sqlstate, raw)
     subject = f"{resource}: " if resource else ""
-    details: dict[str, Any] = {"sqlstate": sqlstate, "db_message": raw}
+    details: dict[str, Any] = {"sqlstate": sqlstate}
+    err = _classify_db_error(exc, raw, sqlstate, diag, subject, details)
+    column = details.get("column") or (
+        details["columns"][0] if len(details.get("columns") or []) == 1 else None
+    )
+    if column:
+        details.setdefault("field", column)
+        details.setdefault("loc", ["body", column])
+    return err
+
+
+def _classify_db_error(exc, raw, sqlstate, diag, subject, details) -> AppError:  # noqa: ANN001, C901
     if diag is not None:
         for attr in ("table_name", "column_name", "constraint_name"):
             value = getattr(diag, attr, None)

@@ -667,6 +667,16 @@ def _additional_ids(db: Session, provider_ids: set[str], carrier_id: int | None)
     return out
 
 
+def _office_place_of_service(db: Session, office_id: int) -> str | None:
+    from app.db.models.office_setup import OfficeAdvancedSettings  # noqa: PLC0415
+
+    value = db.execute(
+        select(OfficeAdvancedSettings.place_of_service).where(OfficeAdvancedSettings.office_id == office_id)
+    ).scalar_one_or_none()
+    value = _clean(value)
+    return value if value and re.fullmatch(r"\d{2}", value) else None
+
+
 def assemble(db: Session, claim_id: str, tenant_id: int, *,
              include_signature_images: bool = False) -> dict[str, Any]:
     """The whole 2024 form for one claim — see the module doc for the rules.
@@ -792,6 +802,15 @@ def assemble(db: Session, claim_id: str, tenant_id: int, *,
     if billing is None:
         billing = treating
         billing_source = "treating" if treating else "none"
+
+    # OFF-QA-8: Item 38 = the claim's own POS, else the office's Advanced-tab
+    # ``place_of_service``, else 11 (office). It used to skip the office.
+    pot, pot_source = _clean(claim.place_of_treatment), "claim"
+    if not pot and office is not None:
+        pot = _office_place_of_service(db, office.id)
+        pot_source = "office"
+    if not pot:
+        pot, pot_source = DEFAULT_PLACE_OF_TREATMENT, "default"
 
     carrier_id = payer["carrier_id"]
     add_ids = _additional_ids(db, {p.id for p in (treating, billing) if p}, carrier_id)
@@ -939,8 +958,8 @@ def assemble(db: Session, claim_id: str, tenant_id: int, *,
             "signatures": signatures,
         },
         "ancillary": {
-            "place_of_treatment": _clean(claim.place_of_treatment) or DEFAULT_PLACE_OF_TREATMENT,
-            "place_of_treatment_source": "claim" if _clean(claim.place_of_treatment) else "default",
+            "place_of_treatment": pot,
+            "place_of_treatment_source": pot_source,
             "enclosures": _enclosures(db, claim, flags_on_claim),
             "date_last_srp": last_srp,
             "date_last_srp_source": srp_source,

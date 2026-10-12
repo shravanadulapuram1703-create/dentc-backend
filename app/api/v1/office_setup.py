@@ -7,9 +7,10 @@ tenant before any read/write.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Path, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Path, Query, Request, Response, UploadFile, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
@@ -37,12 +38,18 @@ from app.schemas.office_setup import (
     OfficeMetadata,
     ScheduleDayRead,
     ScheduleReplace,
+    ServiceEmailConfirm,
+    ServiceEmailVerifyResult,
+    SmartAssistCatalogItem,
     SmartAssistRead,
+    SmartAssistSmsTemplate,
     SmartAssistUpdate,
     StatementSettingsRead,
     StatementSettingsUpdate,
 )
-from app.services import holiday_service, office_setup_service as svc
+from app.core import concurrency
+from app.services import holiday_service, office_calendar_service, office_lifecycle_service, office_rules
+from app.services import office_setup_service as svc
 
 router = APIRouter(
     prefix="/offices",
@@ -86,6 +93,56 @@ def update_office_fee_defaults(
 @router.get("/metadata", response_model=OfficeMetadata, operation_id="get_office_metadata")
 def get_office_metadata(db: DbSession, tenant_id: TenantId):
     return svc.metadata(db, tenant_id)
+
+
+@router.get("/setup-rules", operation_id="get_office_setup_rules",
+            summary="Office Setup vocabularies + format rules the server enforces")
+def get_office_setup_rules() -> dict:
+    """OFF-QA-2/4/5/8/9: the same table the write paths validate against."""
+    return office_rules.rules_metadata()
+
+
+@router.get("/smart-assist/catalog", response_model=list[SmartAssistCatalogItem],
+            operation_id="get_smart_assist_catalog")
+def get_smart_assist_catalog():
+    """OFF-QA-6: the default SmartAssist item set (an unconfigured office reads it
+    as its grid until the first save)."""
+    return svc.smart_assist_catalog()
+
+
+# ── OFF-QA-15/16/17 delete / impact ──────────────────────────────────────────
+@router.get("/{office_id}/delete-impact", operation_id="get_office_delete_impact",
+            summary="What still depends on this office (the Delete dialog's counts)")
+def get_office_delete_impact(db: DbSession, office_id: OfficeScope, tenant_id: TenantId) -> dict:
+    """``blocking`` names the counts that make a plain DELETE a 409
+    (``future_appointments``, ``users_with_no_other_office``)."""
+    return office_lifecycle_service.delete_impact(db, svc.get_office_in_tenant(db, office_id, tenant_id))
+
+
+@router.delete(
+    "/{office_id}", status_code=status.HTTP_204_NO_CONTENT, operation_id="delete_office",
+    tags=["Organization"], summary="Delete office",
+    responses={409: {"model": ErrorResponse}, 412: {"model": ErrorResponse}},
+)
+def delete_office(
+    db: DbSession, office_id: OfficeScope, tenant_id: TenantId, current: CurrentUser, request: Request,
+    force: Annotated[bool, Query(description="Delete despite upcoming appointments / users left "
+                                             "with no office (OFF-QA-15).")] = False,
+    hard: Annotated[bool, Query(description="Admin only: permanently remove an office nothing "
+                                            "references, with its own settings (OFF-QA-17).")] = False,
+):
+    """Soft delete (default): 409 ``office_in_use`` while upcoming appointments or
+    stranded users remain, unless ``force``; deactivates the office's operatories
+    and stamps ``deleted_at``/``deleted_by``. Honours ``If-Match``."""
+    concurrency.reset()
+    concurrency.from_headers(request.headers)
+    office = svc.get_office_in_tenant(db, office_id, tenant_id)
+    concurrency.check(office, concurrency.snapshot(), db=db, resource="offices")
+    if hard:
+        office_lifecycle_service.hard_delete(db, office, current)
+    else:
+        office_lifecycle_service.soft_delete(db, office, current.id, force=force)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ── #12 Statement settings + logo ────────────────────────────────────────────
@@ -132,6 +189,21 @@ def update_integrations(db: DbSession, office_id: OfficeScope, tenant_id: Tenant
     return _integrations_read(svc.update_integrations(db, office_id, tenant_id, body.model_dump(exclude_unset=True), current.id))
 
 
+@router.post("/{office_id}/integrations/verify-email", response_model=ServiceEmailVerifyResult,
+             operation_id="send_office_service_email_verification")
+def send_service_email_verification(db: DbSession, office_id: OfficeScope, tenant_id: TenantId, current: CurrentUser):
+    """OFF-QA-5: mail a 6-digit code to the saved ``service_email`` (24 h)."""
+    return svc.send_service_email_verification(db, office_id, tenant_id, current.id)
+
+
+@router.post("/{office_id}/integrations/verify-email/confirm", response_model=OfficeIntegrationsRead,
+             operation_id="confirm_office_service_email_verification")
+def confirm_service_email_verification(db: DbSession, office_id: OfficeScope, tenant_id: TenantId,
+                                       body: ServiceEmailConfirm, current: CurrentUser):
+    """OFF-QA-5: sets ``service_email_verified`` when the code matches."""
+    return _integrations_read(svc.confirm_service_email_verification(db, office_id, tenant_id, body.code, current.id))
+
+
 # ── #14 Schedule (weekly grid) ───────────────────────────────────────────────
 @router.get("/{office_id}/schedule", response_model=list[ScheduleDayRead], operation_id="get_office_schedule")
 def get_schedule(db: DbSession, office_id: OfficeScope, tenant_id: TenantId):
@@ -141,6 +213,16 @@ def get_schedule(db: DbSession, office_id: OfficeScope, tenant_id: TenantId):
 @router.put("/{office_id}/schedule", response_model=list[ScheduleDayRead], operation_id="set_office_schedule")
 def set_schedule(db: DbSession, office_id: OfficeScope, tenant_id: TenantId, body: ScheduleReplace):
     return svc.replace_schedule(db, office_id, tenant_id, [d.model_dump() for d in body.days])
+
+
+@router.get("/{office_id}/calendar", operation_id="get_office_calendar",
+            summary="Open windows, lunch and holidays per date")
+def get_office_calendar(db: DbSession, office_id: OfficeScope, tenant_id: TenantId,
+                        from_date: Annotated[date, Query()], to_date: Annotated[date, Query()]) -> dict:
+    """OFF-QA-7: the calendar the appointment write path enforces (``409
+    office_closed``), so the scheduler can grey out the same slots."""
+    office = svc.get_office_in_tenant(db, office_id, tenant_id)
+    return office_calendar_service.calendar(db, office, from_date, to_date)
 
 
 # ── #15 Office-scoped holidays (reuse holiday_service) ───────────────────────
@@ -177,7 +259,8 @@ def bulk_delete_office_holidays(db: DbSession, office_id: OfficeScope, tenant_id
 
 @router.post("/{office_id}/holidays/federal", response_model=list[HolidayRead], operation_id="import_office_federal_holidays")
 def import_office_federal_holidays(db: DbSession, office_id: OfficeScope, tenant_id: TenantId, body: FederalHolidaysImport, current: CurrentUser):
-    return holiday_service.import_federal(db, tenant_id, body.year, body.status, current.id, office_id=office_id)
+    return holiday_service.import_federal(db, tenant_id, body.year, body.status, current.id, office_id=office_id,
+                                         observed=body.observed)
 
 
 @router.post("/{office_id}/holidays/range", response_model=list[HolidayRead], operation_id="create_office_holiday_range")
@@ -202,6 +285,14 @@ def update_advanced_settings(db: DbSession, office_id: OfficeScope, tenant_id: T
 @router.get("/{office_id}/smart-assist", response_model=SmartAssistRead, operation_id="get_office_smart_assist")
 def get_smart_assist(db: DbSession, office_id: OfficeScope, tenant_id: TenantId):
     return svc.get_smart_assist(db, office_id, tenant_id)
+
+
+@router.get("/{office_id}/smart-assist/sms-templates", response_model=list[SmartAssistSmsTemplate],
+            operation_id="list_office_smart_assist_sms_templates")
+def list_smart_assist_sms_templates(db: DbSession, office_id: OfficeScope, tenant_id: TenantId):
+    """OFF-QA-6: the SMS templates a SmartAssist row may point at (this office's
+    + the tenant-shared ones); ``sms_template_id`` is validated against it."""
+    return svc.smart_assist_sms_templates(db, office_id, tenant_id)
 
 
 @router.patch("/{office_id}/smart-assist", response_model=SmartAssistRead, operation_id="update_office_smart_assist")
