@@ -132,11 +132,19 @@ def me_full(db: DbSession, current_user: CurrentUser, tenant_id: TenantId) -> Me
     # OFF-SCOPE-3: the remembered working office, validated against the current
     # assignments; falls back to the primary (else first) assignment so a fresh
     # session always resolves *some* office to work in.
+    # OFF-QA-18: each assignment carries ``is_active`` (an inactive / deleted
+    # office stays listed so the switcher can show it greyed). It is never
+    # *resolved* as the working office while an active assignment exists — writes
+    # stamped with an inactive office are 409 ``office_inactive``.
     assigned_ids = {o.office_id for o in offices}
+    active = [o for o in offices if o.is_active]
+    active_ids = {o.office_id for o in active}
     current_office_id = current_user.current_office_id
-    if current_office_id is None or (assigned_ids and current_office_id not in assigned_ids):
-        primary = next((o.office_id for o in offices if o.is_primary), None)
-        current_office_id = primary or (offices[0].office_id if offices else None)
+    if (current_office_id is None or (assigned_ids and current_office_id not in assigned_ids)
+            or (active and current_office_id not in active_ids)):
+        pool = active or offices
+        primary = next((o.office_id for o in pool if o.is_primary), None)
+        current_office_id = primary or (pool[0].office_id if pool else None)
     # EDIT-PLAN-5: effective rights. A full-access role lists the whole active
     # catalog so a client can key on codes without special-casing the role.
     perms = permission_service.effective_permissions(db, current_user)

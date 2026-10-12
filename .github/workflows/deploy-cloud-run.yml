@@ -36,8 +36,8 @@ env:
   # for DICOM imaging (GCS_BUCKET_ORIGINALS) — already IAM-authorized, and
   # document_store.py keys documents under a separate documents/ prefix so
   # there's no collision.
-  GCS_BUCKET_DOCUMENTS: rd-phi-dicom-originals
-
+  # GCS_BUCKET_DOCUMENTS: rd-phi-dicom-originals
+  GCS_BUCKET_DOCUMENTS: tdg-dicom-originals
 jobs:
   deploy:
     runs-on: ubuntu-latest

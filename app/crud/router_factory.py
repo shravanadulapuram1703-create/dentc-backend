@@ -28,6 +28,7 @@ from app.services.office_scope_service import (
     OfficeScopeDep,
     OfficeScopeSpec,
     apply_write_office,
+    assert_office_active,
     assert_patient_visible,
     get_office_context,
     resolve_list_office_filter,
@@ -99,6 +100,9 @@ class CrudConfig:
     # validated), and create/update validate + default-stamp the office. None =
     # no office scoping (the historical behaviour).
     office_scope: Optional[OfficeScopeSpec] = None
+    # OFF-QA-15: False = do not emit the generic DELETE; the resource provides its
+    # own (same path + operation id) on a router included ahead of the registry.
+    generate_delete: bool = True
 
 
 def _col_pytype(columns, name: str) -> type | None:  # noqa: ANN001
@@ -372,8 +376,12 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         # OFF-SCOPE-1/3/11: validate a body office against the caller's
         # assignments, default-stamp the working office when omitted, and (when
         # configured + enabled) require an office on a point-of-service create.
-        if cfg.office_scope is not None and office is not None:
-            resolved = apply_write_office(office, data, cfg.office_scope)
+        # OFF-QA-14: a ``list_scope_only`` resource (``offices``) is not an
+        # office-owned record — stamping X-Office-ID into it put ``office_id``
+        # into ``Office(**payload)`` and 500'd every create from a client with a
+        # working office selected.
+        if cfg.office_scope is not None and office is not None and not cfg.office_scope.list_scope_only:
+            resolved = apply_write_office(office, data, cfg.office_scope, model=cfg.model)
             if (
                 cfg.office_scope.require_on_create
                 and settings.OFFICE_REQUIRE_POS_OFFICE
@@ -446,6 +454,12 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         # non-null office in the payload is validated.
         if cfg.office_scope is not None and office is not None and data.get(cfg.office_scope.field) is not None:
             validate_target_office(office, data[cfg.office_scope.field], field=cfg.office_scope.field)
+            # OFF-QA-15: *moving* a record onto an inactive office is refused; a
+            # record already there (a form re-sending its own office) stays editable.
+            if not cfg.office_scope.list_scope_only:
+                stored = getattr(crud.get(db, item_id, tenant_id=tenant_id), cfg.office_scope.field, None)
+                if stored != data[cfg.office_scope.field]:
+                    assert_office_active(db, data[cfg.office_scope.field], field=cfg.office_scope.field)
         obj = crud.update(db, item_id, data, tenant_id=tenant_id, updated_by=current.id)
         if cfg.read_enrich is not None:
             cfg.read_enrich(db, [obj], tenant_id)
@@ -453,6 +467,9 @@ def register_crud(cfg: CrudConfig) -> APIRouter:
         if etag:
             response.headers["ETag"] = etag
         return obj
+
+    if not cfg.generate_delete:
+        return router
 
     @router.delete(
         "/{item_id}",

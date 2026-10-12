@@ -3852,7 +3852,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PaymentAllocationRead"
+                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
                   },
                   "title": "Response Allocate Payment"
                 }
@@ -3949,7 +3949,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PaymentAllocationRead"
+                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
                   },
                   "title": "Response Allocate Adjustment"
                 }
@@ -4036,7 +4036,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PaymentAllocationRead"
+                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
                   },
                   "title": "Response List Adjustment Allocations"
                 }
@@ -19113,6 +19113,354 @@
         }
       }
     },
+    "/api/v1/offices/setup-rules": {
+      "get": {
+        "tags": [
+          "Office Setup"
+        ],
+        "summary": "Office Setup vocabularies + format rules the server enforces",
+        "description": "OFF-QA-2/4/5/8/9: the same table the write paths validate against.",
+        "operationId": "get_office_setup_rules",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Office Setup Rules"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/offices/smart-assist/catalog": {
+      "get": {
+        "tags": [
+          "Office Setup"
+        ],
+        "summary": "Get Smart Assist Catalog",
+        "description": "OFF-QA-6: the default SmartAssist item set (an unconfigured office reads it\nas its grid until the first save).",
+        "operationId": "get_smart_assist_catalog",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SmartAssistCatalogItem"
+                  },
+                  "type": "array",
+                  "title": "Response Get Smart Assist Catalog"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/offices/{office_id}/delete-impact": {
+      "get": {
+        "tags": [
+          "Office Setup"
+        ],
+        "summary": "What still depends on this office (the Delete dialog's counts)",
+        "description": "``blocking`` names the counts that make a plain DELETE a 409\n(``future_appointments``, ``users_with_no_other_office``).",
+        "operationId": "get_office_delete_impact",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Office Delete Impact"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/offices/{office_id}": {
+      "delete": {
+        "tags": [
+          "Office Setup",
+          "Organization"
+        ],
+        "summary": "Delete office",
+        "description": "Soft delete (default): 409 ``office_in_use`` while upcoming appointments or\nstranded users remain, unless ``force``; deactivates the office's operatories\nand stamps ``deleted_at``/``deleted_by``. Honours ``If-Match``.",
+        "operationId": "delete_office",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Delete despite upcoming appointments / users left with no office (OFF-QA-15).",
+              "default": false,
+              "title": "Force"
+            },
+            "description": "Delete despite upcoming appointments / users left with no office (OFF-QA-15)."
+          },
+          {
+            "name": "hard",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Admin only: permanently remove an office nothing references, with its own settings (OFF-QA-17).",
+              "default": false,
+              "title": "Hard"
+            },
+            "description": "Admin only: permanently remove an office nothing references, with its own settings (OFF-QA-17)."
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "412": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Precondition Failed"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/offices/{office_id}/statement-settings": {
       "get": {
         "tags": [
@@ -19688,6 +20036,204 @@
         }
       }
     },
+    "/api/v1/offices/{office_id}/integrations/verify-email": {
+      "post": {
+        "tags": [
+          "Office Setup"
+        ],
+        "summary": "Send Service Email Verification",
+        "description": "OFF-QA-5: mail a 6-digit code to the saved ``service_email`` (24 h).",
+        "operationId": "send_office_service_email_verification",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceEmailVerifyResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/offices/{office_id}/integrations/verify-email/confirm": {
+      "post": {
+        "tags": [
+          "Office Setup"
+        ],
+        "summary": "Confirm Service Email Verification",
+        "description": "OFF-QA-5: sets ``service_email_verified`` when the code matches.",
+        "operationId": "confirm_office_service_email_verification",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceEmailConfirm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfficeIntegrationsRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/offices/{office_id}/schedule": {
       "get": {
         "tags": [
@@ -19827,7 +20373,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScheduleReplace"
+                "$ref": "#/components/schemas/OfficeScheduleReplace"
               }
             }
           }
@@ -19843,6 +20389,122 @@
                     "$ref": "#/components/schemas/OfficeScheduleDayRead"
                   },
                   "title": "Response Set Office Schedule"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/offices/{office_id}/calendar": {
+      "get": {
+        "tags": [
+          "Office Setup"
+        ],
+        "summary": "Open windows, lunch and holidays per date",
+        "description": "OFF-QA-7: the calendar the appointment write path enforces (``409\noffice_closed``), so the scheduler can grey out the same slots.",
+        "operationId": "get_office_calendar",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "from_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "From Date"
+            }
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "To Date"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Office Calendar"
                 }
               }
             }
@@ -20985,6 +21647,104 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SmartAssistRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/offices/{office_id}/smart-assist/sms-templates": {
+      "get": {
+        "tags": [
+          "Office Setup"
+        ],
+        "summary": "List Smart Assist Sms Templates",
+        "description": "OFF-QA-6: the SMS templates a SmartAssist row may point at (this office's\n+ the tenant-shared ones); ``sms_template_id`` is validated against it.",
+        "operationId": "list_office_smart_assist_sms_templates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "office_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Office Id"
+            }
+          },
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SmartAssistSmsTemplate"
+                  },
+                  "title": "Response List Office Smart Assist Sms Templates"
                 }
               }
             }
@@ -23642,7 +24402,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__schemas__provider_setup__ScheduleReplace"
+                "$ref": "#/components/schemas/ScheduleReplace"
               }
             }
           }
@@ -44914,103 +45674,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "412": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Precondition Failed"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Organization"
-        ],
-        "summary": "Delete office",
-        "description": "Delete one office. Honours `If-Match` (the ETag from GET) and `If-Unmodified-Since`; a stale precondition is **412 precondition_failed** with the current version.",
-        "operationId": "delete_office",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "description": "office identifier",
-              "title": "Item Id"
-            },
-            "description": "office identifier"
-          },
-          {
-            "name": "X-Tenant-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Tenant-Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
           },
           "401": {
             "content": {
@@ -87294,7 +87957,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+                  "$ref": "#/components/schemas/PaymentAllocationRead"
                 }
               }
             }
@@ -87407,7 +88070,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+                  "$ref": "#/components/schemas/PaymentAllocationRead"
                 }
               }
             }
@@ -87529,7 +88192,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+                  "$ref": "#/components/schemas/PaymentAllocationRead"
                 }
               }
             }
@@ -113533,28 +114196,23 @@
             "title": "Holiday Name"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 20
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "CLOSED",
+              "OPEN",
+              "HALF_DAY"
             ],
-            "title": "Status"
+            "title": "Status",
+            "default": "CLOSED"
           },
           "holiday_type": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 20
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "FEDERAL",
+              "CUSTOM"
             ],
-            "title": "Holiday Type"
+            "title": "Holiday Type",
+            "default": "CUSTOM"
           },
           "is_recurring": {
             "anyOf": [
@@ -113701,7 +114359,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 20
+                "enum": [
+                  "CLOSED",
+                  "OPEN",
+                  "HALF_DAY"
+                ]
               },
               {
                 "type": "null"
@@ -113713,7 +114375,10 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 20
+                "enum": [
+                  "FEDERAL",
+                  "CUSTOM"
+                ]
               },
               {
                 "type": "null"
@@ -117690,6 +118355,12 @@
               }
             ],
             "title": "Add To Call List"
+          },
+          "allow_outside_office_hours": {
+            "type": "boolean",
+            "title": "Allow Outside Office Hours",
+            "description": "OFF-QA-7: book into a slot the office calendar marks closed (closed day, outside hours, lunch, closing holiday). Not a column; without it such a booking is 409 ``office_closed``.",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -119722,6 +120393,12 @@
               }
             ],
             "title": "Add To Call List"
+          },
+          "allow_outside_office_hours": {
+            "type": "boolean",
+            "title": "Allow Outside Office Hours",
+            "description": "OFF-QA-7: book into a slot the office calendar marks closed (closed day, outside hours, lunch, closing holiday). Not a column; without it such a booking is 409 ``office_closed``.",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -121781,6 +122458,38 @@
               }
             ],
             "title": "Appointnow Payment Amount"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "deleted_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted By"
+          },
+          "deleted_operatory_ids": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Operatory Ids"
           },
           "id": {
             "type": "integer",
@@ -139812,8 +140521,18 @@
           },
           "status": {
             "type": "string",
+            "enum": [
+              "CLOSED",
+              "OPEN",
+              "HALF_DAY"
+            ],
             "title": "Status",
             "default": "CLOSED"
+          },
+          "observed": {
+            "type": "boolean",
+            "title": "Observed",
+            "default": true
           }
         },
         "type": "object",
@@ -141506,11 +142225,20 @@
           },
           "status": {
             "type": "string",
+            "enum": [
+              "CLOSED",
+              "OPEN",
+              "HALF_DAY"
+            ],
             "title": "Status",
             "default": "CLOSED"
           },
           "holiday_type": {
             "type": "string",
+            "enum": [
+              "FEDERAL",
+              "CUSTOM"
+            ],
             "title": "Holiday Type",
             "default": "CUSTOM"
           }
@@ -154381,6 +155109,38 @@
             ],
             "title": "Appointnow Payment Amount"
           },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "deleted_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted By"
+          },
+          "deleted_operatory_ids": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Operatory Ids"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -156791,14 +157551,12 @@
         "properties": {
           "alert_code": {
             "type": "string",
-            "maxLength": 100,
             "title": "Alert Code"
           },
           "alert_label": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 255
+                "type": "string"
               },
               {
                 "type": "null"
@@ -156809,8 +157567,7 @@
           "section": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 100
+                "type": "string"
               },
               {
                 "type": "null"
@@ -156821,7 +157578,12 @@
           "response": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no",
+                  "unknown"
+                ]
               },
               {
                 "type": "null"
@@ -156867,8 +157629,7 @@
         "required": [
           "alert_code"
         ],
-        "title": "MedicalAlertIn",
-        "description": "One alert answer on the composite. Same vocabulary as the generic\nresource (``yes|no|unknown``, MH-5) \u2014 case-folded rather than a strict\n``Literal`` so a ``\"Yes\"`` from a form does not 422 the whole registration."
+        "title": "MedicalAlertIn"
       },
       "MedicalAlertSummary": {
         "properties": {
@@ -158467,7 +159228,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/app__schemas__medical_history__MedicalAlertIn"
+                  "$ref": "#/components/schemas/MedicalAlertIn"
                 },
                 "type": "array"
               },
@@ -160613,11 +161374,13 @@
           "finance_charge_pct": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
               },
               {
                 "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)"
               },
               {
                 "type": "null"
@@ -160628,11 +161391,12 @@
           "min_balance": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0
               },
               {
                 "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
               },
               {
                 "type": "null"
@@ -160643,11 +161407,12 @@
           "min_charge": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0
               },
               {
                 "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
               },
               {
                 "type": "null"
@@ -160658,7 +161423,9 @@
           "days_before_charge": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -160669,11 +161436,13 @@
           "sales_tax_pct": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
               },
               {
                 "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)"
               },
               {
                 "type": "null"
@@ -160684,7 +161453,9 @@
           "default_appt_duration": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 720.0,
+                "minimum": 5.0
               },
               {
                 "type": "null"
@@ -160707,8 +161478,7 @@
           "place_of_service": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 50
+                "type": "string"
               },
               {
                 "type": "null"
@@ -160719,8 +161489,7 @@
           "area_code": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 10
+                "type": "string"
               },
               {
                 "type": "null"
@@ -160743,8 +161512,7 @@
           "default_state": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 50
+                "type": "string"
               },
               {
                 "type": "null"
@@ -160834,7 +161602,8 @@
           }
         },
         "type": "object",
-        "title": "OfficeAdvancedSettingsUpdate"
+        "title": "OfficeAdvancedSettingsUpdate",
+        "description": "OFF-QA-8: ranges and formats the database cannot express."
       },
       "OfficeAssignment": {
         "properties": {
@@ -161706,6 +162475,42 @@
             "type": "boolean",
             "title": "Service Email Verified"
           },
+          "service_email_verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Email Verified At"
+          },
+          "service_email_verification_sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Email Verification Sent At"
+          },
+          "service_email_verification_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Email Verification Expires At"
+          },
           "ai_assist_enabled": {
             "type": "boolean",
             "title": "Ai Assist Enabled"
@@ -161838,24 +162643,14 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 255
+                "maxLength": 255,
+                "format": "email"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Service Email"
-          },
-          "service_email_verified": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Service Email Verified"
           },
           "ai_assist_enabled": {
             "anyOf": [
@@ -162048,13 +162843,18 @@
           },
           "logo_source": {
             "type": "string",
+            "enum": [
+              "custom",
+              "account",
+              "none"
+            ],
             "title": "Logo Source",
             "default": "none"
           }
         },
         "type": "object",
         "title": "OfficeLetterhead",
-        "description": "PRINT-2: what prints at the top of every report for this office \u2014 the\nsame resolution ``print_service.resolve_letterhead`` uses for the PDFs.\n\n``logo_source`` says where the logo came from: ``office`` (the office's own\nStatement-tab upload), ``tenant`` (the practice logo from Account Info) or\n``none`` (the office opted out, or nothing is uploaded)."
+        "description": "PRINT-2: what prints at the top of every report for this office \u2014 the\nsame resolution ``print_service.resolve_letterhead`` uses for the PDFs.\n\n``logo_source`` says where the logo came from: ``custom`` (the office's own\nStatement-tab upload), ``account`` (the practice logo from Account Info) or\n``none`` (the office opted out, or nothing is uploaded). OFF-QA-1: renamed\nfrom ``office``/``tenant``, which read backwards (the \"office\" logo was the\ncustom one). A custom address prints as a whole block \u2014 a blank custom line\nnever borrows the office's."
       },
       "OfficeMetadata": {
         "properties": {
@@ -162505,6 +163305,38 @@
             ],
             "title": "Appointnow Payment Amount"
           },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "deleted_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted By"
+          },
+          "deleted_operatory_ids": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Operatory Ids"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -162546,6 +163378,17 @@
                 "type": "null"
               }
             ]
+          },
+          "deleted_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted By Name"
           }
         },
         "type": "object",
@@ -162565,6 +163408,75 @@
           "created_at"
         ],
         "title": "OfficeRead"
+      },
+      "OfficeScheduleDayInput": {
+        "properties": {
+          "day_of_week": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Day Of Week",
+            "description": "0=Mon \u2026 6=Sun"
+          },
+          "is_closed": {
+            "type": "boolean",
+            "title": "Is Closed",
+            "default": false
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
+          "lunch_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lunch Start"
+          },
+          "lunch_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lunch End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day_of_week"
+        ],
+        "title": "OfficeScheduleDayInput"
       },
       "OfficeScheduleDayRead": {
         "properties": {
@@ -162633,12 +163545,26 @@
             "title": "Lunch End"
           },
           "id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Id"
           },
           "created_at": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Created At"
           }
         },
@@ -162647,11 +163573,29 @@
           "tenant_id",
           "office_id",
           "day_of_week",
-          "is_closed",
-          "id",
-          "created_at"
+          "is_closed"
         ],
-        "title": "OfficeScheduleDayRead"
+        "title": "OfficeScheduleDayRead",
+        "description": "OFF-QA-13: an office that never saved its week reads the default grid\nwithout a row being written, so ``id``/``created_at`` are null until saved."
+      },
+      "OfficeScheduleReplace": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/OfficeScheduleDayInput"
+            },
+            "type": "array",
+            "maxItems": 7,
+            "minItems": 1,
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days"
+        ],
+        "title": "OfficeScheduleReplace",
+        "description": "OFF-QA-4: only the days sent are written (upsert by ``day_of_week``); an\nomitted day keeps its stored row. Send all seven to set the whole week."
       },
       "OfficeSmartAssistItemRead": {
         "properties": {
@@ -162709,13 +163653,38 @@
             "title": "Is Enabled"
           },
           "id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Id"
           },
           "created_at": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Created At"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -162724,11 +163693,10 @@
           "office_id",
           "item_code",
           "include_unpaid_balance",
-          "is_enabled",
-          "id",
-          "created_at"
+          "is_enabled"
         ],
-        "title": "OfficeSmartAssistItemRead"
+        "title": "OfficeSmartAssistItemRead",
+        "description": "OFF-QA-6: an office that never saved its grid reads the catalog defaults;\nthose rows are not stored yet, so ``id``/``created_at`` are null (the first\nPATCH persists them). ``label`` is the catalog's display name."
       },
       "OfficeStatementSettingsRead": {
         "properties": {
@@ -163036,7 +164004,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 20
+                "enum": [
+                  "office",
+                  "custom",
+                  "none"
+                ]
               },
               {
                 "type": "null"
@@ -163060,7 +164032,10 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 20
+                "enum": [
+                  "office",
+                  "custom"
+                ]
               },
               {
                 "type": "null"
@@ -163713,9 +164688,17 @@
       "OperatoryCreate": {
         "properties": {
           "id": {
-            "type": "string",
-            "maxLength": 50,
-            "title": "Id"
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "OFF-QA-11: omit to let the server mint op-{office_id}-{n}; an explicit id (e.g. an imported legacy id) is kept."
           },
           "office_id": {
             "type": "integer",
@@ -163763,7 +164746,6 @@
         },
         "type": "object",
         "required": [
-          "id",
           "office_id",
           "name"
         ],
@@ -168024,7 +169006,7 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+              "$ref": "#/components/schemas/PaymentAllocationRead"
             },
             "type": "array",
             "title": "Items"
@@ -182801,13 +183783,31 @@
       },
       "PaymentAllocationRead": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
+          },
+          "legacy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Id"
+          },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -182831,17 +183831,6 @@
             ],
             "title": "Adjustment Id"
           },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
-          },
           "claim_id": {
             "anyOf": [
               {
@@ -182853,6 +183842,17 @@
             ],
             "title": "Claim Id"
           },
+          "ins_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ins Plan Id"
+          },
           "provider_id": {
             "anyOf": [
               {
@@ -182863,6 +183863,18 @@
               }
             ],
             "title": "Provider Id"
+          },
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -182880,24 +183892,22 @@
             ],
             "title": "Alloc Type"
           },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
           }
         },
         "type": "object",
         "required": [
-          "id",
           "patient_id",
-          "amount"
+          "amount",
+          "id",
+          "created_at"
         ],
         "title": "PaymentAllocationRead"
       },
@@ -191068,7 +192078,7 @@
           },
           "allocations": {
             "items": {
-              "$ref": "#/components/schemas/PaymentAllocationRead"
+              "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
             },
             "type": "array",
             "title": "Allocations"
@@ -200062,7 +201072,7 @@
           },
           "medical_alerts": {
             "items": {
-              "$ref": "#/components/schemas/MedicalAlertIn"
+              "$ref": "#/components/schemas/app__schemas__patient_intake__MedicalAlertIn"
             },
             "type": "array",
             "title": "Medical Alerts"
@@ -203309,18 +204319,14 @@
         "properties": {
           "days": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__office_setup__ScheduleDayInput"
+              "$ref": "#/components/schemas/ScheduleDayInput"
             },
             "type": "array",
-            "maxItems": 7,
-            "minItems": 1,
+            "maxItems": 70,
             "title": "Days"
           }
         },
         "type": "object",
-        "required": [
-          "days"
-        ],
         "title": "ScheduleReplace"
       },
       "ScheduleResponse": {
@@ -204283,6 +205289,51 @@
         ],
         "title": "SecuritySettingsRead"
       },
+      "ServiceEmailConfirm": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "ServiceEmailConfirm"
+      },
+      "ServiceEmailVerifyResult": {
+        "properties": {
+          "service_email": {
+            "type": "string",
+            "title": "Service Email"
+          },
+          "sent": {
+            "type": "boolean",
+            "title": "Sent"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "transport": {
+            "type": "string",
+            "title": "Transport",
+            "description": "graph | smtp | log (log = no mail transport configured)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service_email",
+          "sent",
+          "expires_at",
+          "transport"
+        ],
+        "title": "ServiceEmailVerifyResult"
+      },
       "SignatureAuditEventRead": {
         "properties": {
           "tenant_id": {
@@ -205108,16 +206159,51 @@
         ],
         "title": "SlotOut"
       },
-      "SmartAssistItemInput": {
+      "SmartAssistCatalogItem": {
         "properties": {
           "item_code": {
             "type": "string",
             "title": "Item Code"
           },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "frequency": {
+            "type": "string",
+            "title": "Frequency"
+          },
+          "include_unpaid_balance": {
+            "type": "boolean",
+            "title": "Include Unpaid Balance",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_code",
+          "label",
+          "description",
+          "frequency"
+        ],
+        "title": "SmartAssistCatalogItem"
+      },
+      "SmartAssistItemInput": {
+        "properties": {
+          "item_code": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Item Code"
+          },
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 500
               },
               {
                 "type": "null"
@@ -205128,7 +206214,8 @@
           "frequency": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 30
               },
               {
                 "type": "null"
@@ -205139,7 +206226,8 @@
           "sms_template_id": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 50
               },
               {
                 "type": "null"
@@ -205170,6 +206258,15 @@
             "type": "boolean",
             "title": "Enabled"
           },
+          "items_source": {
+            "type": "string",
+            "enum": [
+              "stored",
+              "catalog"
+            ],
+            "title": "Items Source",
+            "default": "stored"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/OfficeSmartAssistItemRead"
@@ -205184,6 +206281,40 @@
           "items"
         ],
         "title": "SmartAssistRead"
+      },
+      "SmartAssistSmsTemplate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "message_type": {
+            "type": "string",
+            "title": "Message Type"
+          },
+          "office_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "message_type"
+        ],
+        "title": "SmartAssistSmsTemplate"
       },
       "SmartAssistUpdate": {
         "properties": {
@@ -214634,33 +215765,15 @@
         ],
         "title": "WizardSchedule"
       },
-      "app__schemas__factory__PaymentAllocationRead": {
+      "app__schemas__billing__PaymentAllocationRead": {
         "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
-          },
-          "legacy_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Id"
-          },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -214684,6 +215797,17 @@
             ],
             "title": "Adjustment Id"
           },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
+          },
           "claim_id": {
             "anyOf": [
               {
@@ -214695,17 +215819,6 @@
             ],
             "title": "Claim Id"
           },
-          "ins_plan_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ins Plan Id"
-          },
           "provider_id": {
             "anyOf": [
               {
@@ -214716,18 +215829,6 @@
               }
             ],
             "title": "Provider Id"
-          },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -214745,35 +215846,67 @@
             ],
             "title": "Alloc Type"
           },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           }
         },
         "type": "object",
         "required": [
-          "patient_id",
-          "amount",
           "id",
-          "created_at"
+          "patient_id",
+          "amount"
         ],
         "title": "PaymentAllocationRead"
       },
-      "app__schemas__medical_history__MedicalAlertIn": {
+      "app__schemas__messaging__PageMeta": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pages": {
+            "type": "integer",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "size",
+          "total",
+          "pages"
+        ],
+        "title": "PageMeta"
+      },
+      "app__schemas__patient_intake__MedicalAlertIn": {
         "properties": {
           "alert_code": {
             "type": "string",
+            "maxLength": 100,
             "title": "Alert Code"
           },
           "alert_label": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 255
               },
               {
                 "type": "null"
@@ -214784,7 +215917,8 @@
           "section": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -214795,12 +215929,7 @@
           "response": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "yes",
-                  "no",
-                  "unknown"
-                ]
+                "type": "string"
               },
               {
                 "type": "null"
@@ -214846,104 +215975,8 @@
         "required": [
           "alert_code"
         ],
-        "title": "MedicalAlertIn"
-      },
-      "app__schemas__messaging__PageMeta": {
-        "properties": {
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "pages": {
-            "type": "integer",
-            "title": "Pages"
-          }
-        },
-        "type": "object",
-        "required": [
-          "page",
-          "size",
-          "total",
-          "pages"
-        ],
-        "title": "PageMeta"
-      },
-      "app__schemas__office_setup__ScheduleDayInput": {
-        "properties": {
-          "day_of_week": {
-            "type": "integer",
-            "maximum": 6.0,
-            "minimum": 0.0,
-            "title": "Day Of Week",
-            "description": "0=Mon \u2026 6=Sun"
-          },
-          "is_closed": {
-            "type": "boolean",
-            "title": "Is Closed",
-            "default": false
-          },
-          "start_time": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Start Time"
-          },
-          "end_time": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End Time"
-          },
-          "lunch_start": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lunch Start"
-          },
-          "lunch_end": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lunch End"
-          }
-        },
-        "type": "object",
-        "required": [
-          "day_of_week"
-        ],
-        "title": "ScheduleDayInput"
+        "title": "MedicalAlertIn",
+        "description": "One alert answer on the composite. Same vocabulary as the generic\nresource (``yes|no|unknown``, MH-5) \u2014 case-folded rather than a strict\n``Literal`` so a ``\"Yes\"`` from a form does not 422 the whole registration."
       },
       "app__schemas__procedure_setup__FeeScheduleOption": {
         "properties": {
@@ -214973,20 +216006,6 @@
           "name"
         ],
         "title": "FeeScheduleOption"
-      },
-      "app__schemas__provider_setup__ScheduleReplace": {
-        "properties": {
-          "days": {
-            "items": {
-              "$ref": "#/components/schemas/ScheduleDayInput"
-            },
-            "type": "array",
-            "maxItems": 70,
-            "title": "Days"
-          }
-        },
-        "type": "object",
-        "title": "ScheduleReplace"
       }
     },
     "securitySchemes": {

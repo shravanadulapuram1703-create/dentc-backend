@@ -54,7 +54,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentUser, DbSession, TenantId
 from app.core import audit_context
 from app.core.config import settings
-from app.core.exceptions import ForbiddenError
+from app.core.exceptions import ConflictError, ForbiddenError
 from app.core.logging import office_id_ctx, user_id_ctx
 from app.crud.base import CRUDBase
 from app.db.models import Office, User, UserOffice
@@ -83,6 +83,27 @@ class OfficeCRUD(CRUDBase[Office]):
             return []
         sub = select(UserOffice.office_id).where(UserOffice.user_id == uid)
         return [Office.id.in_(sub)]
+
+    # OFF-QA-3/9/10: Short ID / office code uniqueness, NPI + taxonomy format and
+    # named FK checks on every office write (office_setup_service owns the rules).
+    def create(self, db: Session, data: dict, *, tenant_id=None, created_by=None):  # noqa: ANN001, ANN201
+        from app.services.office_setup_service import validate_office_write  # noqa: PLC0415
+
+        payload = validate_office_write(db, dict(data), None, tenant_id)
+        return super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
+
+    def update(self, db: Session, obj_id, data: dict, *, tenant_id=None, updated_by=None):  # noqa: ANN001, ANN201
+        from app.services.office_setup_service import validate_office_write  # noqa: PLC0415
+
+        current = self.get(db, obj_id, tenant_id=tenant_id)
+        payload = validate_office_write(db, dict(data), current, tenant_id)
+        if payload.get("is_active") is True and (not current.is_active or current.deleted_at is not None):
+            # OFF-QA-16: reactivating clears the delete stamp and restores the
+            # operatories the delete switched off (OFF-QA-15).
+            from app.services.office_lifecycle_service import on_reactivate  # noqa: PLC0415
+
+            on_reactivate(db, current)
+        return super().update(db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by)
 
 
 def assigned_office_ids(db: Session, user_id: int, tenant_id: int) -> set[int]:
@@ -229,6 +250,22 @@ def validate_target_office(
     raise _office_not_assigned(int(office_id), field, scope.assigned_ids)
 
 
+def assert_office_active(db: Session, office_id: int | None, *, field: str = "office_id") -> None:
+    """OFF-QA-15: 409 ``office_inactive`` when a write would stamp or move a
+    record onto an inactive (deactivated / deleted) office. Existing records
+    already at that office stay editable; only *new* placement is refused."""
+    if office_id is None or db is None:
+        return
+    active = db.execute(select(Office.is_active).where(Office.id == int(office_id))).scalar_one_or_none()
+    if active is False:
+        raise ConflictError(
+            "This office is inactive; new records cannot be placed in it",
+            code="office_inactive",
+            details={"code": "office_inactive", "field": field, "loc": ["body", field] if field != "X-Office-ID"
+                     else ["header", "X-Office-ID"], "office_id": int(office_id)},
+        )
+
+
 def assert_office_path_access(db: Session, user: User, tenant_id: int, office_id: int) -> None:
     """OFF-SCOPE-1 for ``/offices/{office_id}/*`` routes: 403 ``office_not_assigned``
     when the caller targets an office they are not assigned to (privileged /
@@ -368,7 +405,7 @@ def assert_patient_visible(scope: OfficeScope, patient) -> None:  # noqa: ANN001
 
 
 def apply_write_office(
-    scope: OfficeScope, data: dict, spec: OfficeScopeSpec
+    scope: OfficeScope, data: dict, spec: OfficeScopeSpec, *, model: type | None = None
 ) -> int | None:
     """OFF-SCOPE-1/3/11 write path, mutating ``data`` in place:
 
@@ -379,15 +416,26 @@ def apply_write_office(
       office regardless of the operational office in the body.
 
     Returns the resolved operational office (for the require-on-create check).
+
+    OFF-QA-14: with ``model`` given, a field is only ever *stamped* when the
+    model has that column — the header is sent on every request, and a stamp
+    into a column that does not exist is a ``TypeError`` (500) at construction.
     """
+    def has_column(name: str) -> bool:
+        return model is None or name in model.__table__.columns
+
     field = spec.field
     value = data.get(field)
     if value is not None:
         validate_target_office(scope, value, field=field)
-    elif scope.x_office_id is not None:
+        assert_office_active(getattr(scope, "_db", None), value, field=field)
+    elif scope.x_office_id is not None and has_column(field):
+        assert_office_active(getattr(scope, "_db", None), scope.x_office_id, field="X-Office-ID")
         data[field] = scope.x_office_id
         value = scope.x_office_id
-    if spec.created_office_field and scope.x_office_id is not None:
+    if spec.created_office_field and scope.x_office_id is not None and has_column(spec.created_office_field):
+        if spec.created_office_field not in data:
+            assert_office_active(getattr(scope, "_db", None), scope.x_office_id, field="X-Office-ID")
         data.setdefault(spec.created_office_field, scope.x_office_id)
     return value
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -13,9 +13,12 @@ class OfficeLetterhead(BaseModel):
     """PRINT-2: what prints at the top of every report for this office — the
     same resolution ``print_service.resolve_letterhead`` uses for the PDFs.
 
-    ``logo_source`` says where the logo came from: ``office`` (the office's own
-    Statement-tab upload), ``tenant`` (the practice logo from Account Info) or
-    ``none`` (the office opted out, or nothing is uploaded)."""
+    ``logo_source`` says where the logo came from: ``custom`` (the office's own
+    Statement-tab upload), ``account`` (the practice logo from Account Info) or
+    ``none`` (the office opted out, or nothing is uploaded). OFF-QA-1: renamed
+    from ``office``/``tenant``, which read backwards (the "office" logo was the
+    custom one). A custom address prints as a whole block — a blank custom line
+    never borrows the office's."""
 
     name: Optional[str] = None
     address_line1: Optional[str] = None
@@ -25,7 +28,7 @@ class OfficeLetterhead(BaseModel):
     zip: Optional[str] = None
     phone: Optional[str] = None
     logo_url: Optional[str] = None
-    logo_source: str = "none"
+    logo_source: Literal["custom", "account", "none"] = "none"
 
 
 class DayTotals(BaseModel):

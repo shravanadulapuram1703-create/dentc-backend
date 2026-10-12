@@ -11,11 +11,15 @@ always narrows by patient/office within the authenticated tenant.
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import date as _date
+from typing import Optional
 
 from fastapi import APIRouter
+from pydantic import Field
 
 from app.crud.base import CRUDBase
+from app.services.operatory_service import OperatoryCRUD
 from app.crud.router_factory import CrudConfig, register_crud
 from app.db import models as m
 from app.schemas.factory import build_schemas
@@ -289,7 +293,21 @@ def _cfg(
 # PROV-3: built once so the OpenAPI components ``ProviderCreate``/``ProviderUpdate``
 # are defined exactly once (the read is the enriched one from schemas.enriched).
 _PROVIDER_CREATE, _PROVIDER_UPDATE, _ = build_schemas(m.Provider, "Provider")
-_OFFICE_CREATE, _OFFICE_UPDATE, _ = build_schemas(m.Office, "Office")
+# OFF-QA-16: the delete stamp is server-owned (DELETE /offices/{id} sets it,
+# reactivating clears it), so it is never writable.
+_OFFICE_SERVER_FIELDS = ("deleted_at", "deleted_by", "deleted_operatory_ids")
+_OFFICE_CREATE, _OFFICE_UPDATE, _ = build_schemas(
+    m.Office, "Office", create_exclude=_OFFICE_SERVER_FIELDS, update_exclude=_OFFICE_SERVER_FIELDS,
+)
+_OPERATORY_CREATE, _, _ = build_schemas(m.Operatory, "Operatory")
+
+
+class OperatoryCreate(_OPERATORY_CREATE):  # type: ignore[valid-type, misc]
+    id: Optional[str] = Field(
+        None, max_length=50,
+        description="OFF-QA-11: omit to let the server mint op-{office_id}-{n}; "
+                    "an explicit id (e.g. an imported legacy id) is kept.",
+    )
 
 # ── Organisation ───────────────────────────────────────────────────────────
 _ORG = [
@@ -314,6 +332,9 @@ _ORG = [
         read_enrich=enrich_office,
         crud_class=OfficeScopeOfficeCRUD,
         office_scope=OfficeScopeSpec(list_scope_only=True),
+        # OFF-QA-15/17: DELETE is the bespoke route in api/v1/office_setup.py
+        # (dependency check, ?force, ?hard) under the same operation id.
+        generate_delete=False,
     ),
     # PROV-1: ProviderCRUD widens ``?office_id=`` to the provider_offices join ∪ the
     # legacy home-office scalar — a provider serves many offices, so the scalar
@@ -340,8 +361,13 @@ _ORG = [
         read_enrich=enrich_provider,
         crud_class=ProviderCRUD,
     ),
-    _cfg(m.Operatory, "Operatory", "operatories", "Organization", "operatory", "operatories",
-         pk_type=str, search=("name",), filters=("office_id", "is_active"), office_scope=_DAY),
+    # OFF-QA-11: ``id`` is optional on create — the server mints ``op-{office}-{n}``.
+    dataclasses.replace(
+        _cfg(m.Operatory, "Operatory", "operatories", "Organization", "operatory", "operatories",
+             pk_type=str, search=("name",), filters=("office_id", "is_active"), office_scope=_DAY,
+             crud_class=OperatoryCRUD),
+        create_schema=OperatoryCreate,
+    ),
     _cfg(m.UserOffice, "UserOffice", "user-offices", "Organization", "user_office", "user_offices",
          filters=("user_id", "office_id"), soft_field=None),
     _cfg(m.OfficeGroup, "OfficeGroup", "office-groups", "Organization", "office_group", "office_groups",

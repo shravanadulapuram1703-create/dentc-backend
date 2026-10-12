@@ -40,6 +40,28 @@ def federal_holidays(year: int) -> list[tuple[date, str]]:
     ]
 
 
+def observed_date(d: date) -> date:
+    """OFF-QA-12: the OPM observance rule — a holiday on a Saturday is observed
+    the Friday before, one on a Sunday the Monday after."""
+    if d.weekday() == 5:
+        return d - timedelta(days=1)
+    if d.weekday() == 6:
+        return d + timedelta(days=1)
+    return d
+
+
+def federal_holidays_observed(year: int) -> list[tuple[date, str]]:
+    """The federal list as offices close for it. A shifted date is labelled
+    ``(observed)``. New Year's Day falling on a Saturday is observed on Dec 31 of
+    the *previous* year — that row belongs to this year's holiday, so it is
+    returned here (OPM does the same)."""
+    out = []
+    for d, name in federal_holidays(year):
+        obs = observed_date(d)
+        out.append((obs, name if obs == d else f"{name} (observed)"))
+    return out
+
+
 def _scope(stmt, tenant_id: int, office_id: int | None):  # noqa: ANN001
     """Scope to a tenant and either account-level (office_id IS NULL) or one office."""
     stmt = stmt.where(AccountHoliday.tenant_id == tenant_id)
@@ -115,9 +137,9 @@ def _existing_dates(db: Session, tenant_id: int, dates: list[date], office_id: i
 
 def import_federal(
     db: Session, tenant_id: int, year: int, status: str, user_id: int | None,
-    office_id: int | None = None,
+    office_id: int | None = None, *, observed: bool = True,
 ) -> list[AccountHoliday]:
-    holidays = federal_holidays(year)
+    holidays = federal_holidays_observed(year) if observed else federal_holidays(year)
     existing = _existing_dates(db, tenant_id, [d for d, _ in holidays], office_id)
     created = [
         AccountHoliday(

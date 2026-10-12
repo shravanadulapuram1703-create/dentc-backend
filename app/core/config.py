@@ -430,6 +430,11 @@ class Settings(BaseSettings):
     # would 422 legitimate creates. The default write-stamp from ``X-Office-ID``
     # applies whether or not this is on.
     OFFICE_REQUIRE_POS_OFFICE: bool = False
+    # OFF-QA-7: staff appointment create/move into a closed slot (office closed
+    # that weekday, outside hours, over lunch, closing holiday) is a 409
+    # ``office_closed`` unless ``allow_outside_office_hours``. Hours only bind an
+    # office that has *saved* its weekly schedule. Kill switch for ops.
+    OFFICE_HOURS_ENFORCED: bool = True
 
     # ── Logging ────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"

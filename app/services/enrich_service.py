@@ -303,7 +303,13 @@ def enrich_office(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001
     the office's print branding is what actually prints."""
     from app.services.print_service import resolve_letterhead  # noqa: PLC0415 (import cycle)
 
+    from app.services.user_admin_service import resolve_user_names  # noqa: PLC0415
+
+    items = list(items)
+    # OFF-QA-16: who deleted it, batched over the page.
+    names = resolve_user_names(db, {o.deleted_by for o in items if getattr(o, "deleted_by", None)})
     for office in items:
         lh = resolve_letterhead(db, office, tenant_id if tenant_id is not None else office.tenant_id)
         office.logo_url = lh["logo_url"]
         office.letterhead = {k: v for k, v in lh.items() if k != "logo_path"}
+        office.deleted_by_name = names.get(office.deleted_by) if getattr(office, "deleted_by", None) else None

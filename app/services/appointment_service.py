@@ -26,7 +26,8 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationError
 from app.crud.base import CRUDBase
 from app.db.models import Appointment, AppointmentProcedure, Office, Operatory
-from app.services import lab_tracking_service, treatment_service
+from app.services import lab_tracking_service, office_calendar_service, treatment_service
+from app.services.office_scope_service import assert_office_active
 
 
 def apply_operatory_rules(
@@ -230,16 +231,42 @@ class AppointmentCRUD(CRUDBase[Appointment]):
         return [lab_tracking_service.lab_status_clause(status, lab_tracking_service.utc_today())]
 
     def create(self, db: Session, data: dict, *, tenant_id=None, created_by=None):  # noqa: ANN001, ANN201
-        payload = apply_operatory_rules(db, dict(data), None, tenant_id=tenant_id)
+        payload = dict(data)
+        allow = bool(payload.pop("allow_outside_office_hours", False))
+        payload = apply_operatory_rules(db, payload, None, tenant_id=tenant_id)
         payload = lab_tracking_service.apply_lab_rules(db, payload, None, tenant_id=tenant_id)
+        # OFF-QA-15: never book into an inactive (deleted) office — including
+        # one derived from the operatory, which the router's check cannot see.
+        assert_office_active(db, payload.get("office_id"))
+        if not payload.get("is_archived"):
+            office_calendar_service.enforce_booking(
+                db, payload.get("office_id"), payload.get("date"),
+                payload.get("start_time"), payload.get("end_time"), allow=allow,
+            )
         return super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
 
     def update(self, db: Session, obj_id, data: dict, *, tenant_id=None, updated_by=None):  # noqa: ANN001, ANN201
         current = self.get(db, obj_id, tenant_id=tenant_id)
         was_live = treatment_service.appointment_is_live(current)
         old_date = current.date
-        data = apply_operatory_rules(db, dict(data), current, tenant_id=tenant_id)
+        data = dict(data)
+        allow = bool(data.pop("allow_outside_office_hours", False))
+        data = apply_operatory_rules(db, data, current, tenant_id=tenant_id)
         data = lab_tracking_service.apply_lab_rules(db, data, current, tenant_id=tenant_id)
+        # OFF-QA-7: judged only on a *move* (date / time / office actually
+        # changes) — editing the notes of an appointment already sitting in a
+        # now-closed slot must not 409.
+        moved = any(
+            k in data and data[k] != getattr(current, k)
+            for k in ("date", "start_time", "end_time", "office_id")
+        )
+        if "office_id" in data and data["office_id"] != current.office_id:
+            assert_office_active(db, data["office_id"])
+        if moved and not current.is_archived:
+            merged = {k: data.get(k, getattr(current, k)) for k in ("office_id", "date", "start_time", "end_time")}
+            office_calendar_service.enforce_booking(
+                db, merged["office_id"], merged["date"], merged["start_time"], merged["end_time"], allow=allow,
+            )
         obj = super().update(db, obj_id, data, tenant_id=tenant_id, updated_by=updated_by)
         now_live = treatment_service.appointment_is_live(obj)
         if was_live != now_live:

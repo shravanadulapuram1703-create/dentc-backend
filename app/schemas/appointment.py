@@ -36,11 +36,19 @@ LabStatusFilter = Literal["not_sent", "sent", "overdue", "received", "not_receiv
 _appt_create, _appt_update, _ = build_schemas(m.Appointment, "AppointmentBase")
 
 
+_ALLOW_OUTSIDE_HOURS_DESC = (
+    "OFF-QA-7: book into a slot the office calendar marks closed (closed day, outside "
+    "hours, lunch, closing holiday). Not a column; without it such a booking is 409 "
+    "``office_closed``."
+)
+
+
 class AppointmentCreate(_appt_create):  # type: ignore[valid-type, misc]
     model_config = ConfigDict(extra="forbid")
 
     lab_dds: Optional[str] = Field(None, max_length=100)
     lab_cost: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+    allow_outside_office_hours: bool = Field(False, description=_ALLOW_OUTSIDE_HOURS_DESC)
 
 
 class AppointmentUpdate(_appt_update):  # type: ignore[valid-type, misc]
@@ -48,6 +56,7 @@ class AppointmentUpdate(_appt_update):  # type: ignore[valid-type, misc]
 
     lab_dds: Optional[str] = Field(None, max_length=100)
     lab_cost: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+    allow_outside_office_hours: bool = Field(False, description=_ALLOW_OUTSIDE_HOURS_DESC)
 
 
 _appt_read_base = build_schemas(m.Appointment, "AppointmentFull")[2]

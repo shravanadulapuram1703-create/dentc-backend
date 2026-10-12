@@ -1352,6 +1352,12 @@ def book_request(
     ``slot_conflict``), INSERT the appointment, link it and mark the request
     approved; a recorded payment is posted to the patient ledger once a
     patient is linked. **Does not commit** — the caller owns the transaction."""
+    if not office.is_active:
+        # OFF-QA-15: a request still pending at an office deleted since it was
+        # submitted cannot be booked (the public page already 404s new ones).
+        raise ConflictError("This office is inactive; the request cannot be booked",
+                            code="office_inactive",
+                            details={"code": "office_inactive", "office_id": office.id})
     provider = _resolve_provider_for_booking(db, office, req, body.provider_id)
     if provider is None:
         # appointments.provider_id is NOT NULL — can't book without one.
