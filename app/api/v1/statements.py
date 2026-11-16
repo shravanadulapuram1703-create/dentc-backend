@@ -138,4 +138,9 @@ def generate_batch(
     current=Depends(get_current_user),
 ):
     payload = (body or StatementBatchRequest()).model_dump(exclude_unset=True)
+    if payload.pop("scope", "patient") == "account":
+        from app.services import family_account_service  # noqa: PLC0415
+
+        return family_account_service.generate_account_batch(
+            db, tenant_id, office_id, payload, actor_id=current.id)
     return statement_service.generate_batch(db, office_id, tenant_id, payload, actor_id=current.id)

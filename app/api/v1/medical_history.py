@@ -10,7 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 
-from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user
+from app.api.deps import CurrentUser, DbSession, TenantId, get_current_user, require_permission
 from app.schemas.common import ErrorResponse
 from app.schemas.medical_alerts import MedicalAlertSummary, MedicalAlertSummaryBatch
 from app.schemas.patient_catalog import (
@@ -35,6 +35,13 @@ from app.schemas.medical_history import (
 from app.services import medical_alert_summary_service as summary_svc
 from app.services import medical_history_rules as rules_svc
 from app.services import medical_history_service as svc
+from app.services.permission_service import MEDICAL_HISTORY_WRITE
+
+#: RBAC-6: every write on the Medical History screen needs its full-control
+#: right (reads stay open; ``patient_medical_history_view_only`` never writes).
+#: ``POST /patients/register`` writes answers through the service, not these
+#: routes, so registering a patient is not gated here.
+_mh_write = [Depends(require_permission(*MEDICAL_HISTORY_WRITE, action="edit the medical history"))]
 
 _errs = {
     401: {"model": ErrorResponse},
@@ -73,6 +80,7 @@ PatientPath = Annotated[int, Path(description="patient identifier")]
     "/bulk",
     response_model=MedicalAlertBulkResponse,
     operation_id="bulk_upsert_patient_medical_alerts",
+    dependencies=_mh_write,
     summary="Create/update many medical-alert answers for one patient in one transaction (GAP-AP-22)",
 )
 def bulk_upsert_medical_alerts(
@@ -95,6 +103,7 @@ def bulk_upsert_medical_alerts(
     "/bulk",
     response_model=QuestionnaireResponseBulkResponse,
     operation_id="bulk_upsert_patient_questionnaire_responses",
+    dependencies=_mh_write,
     summary="Create/update many questionnaire answers for one patient in one transaction (GAP-AP-22)",
 )
 def bulk_upsert_questionnaire_responses(
@@ -132,6 +141,7 @@ def get_medical_history(db: DbSession, tenant_id: TenantId, patient_id: PatientP
     "/{patient_id}/medical-history",
     response_model=MedicalHistoryDocument,
     operation_id="save_patient_medical_history",
+    dependencies=_mh_write,
     summary="Save the whole medical-history document in one transaction (MH-3)",
     responses={
         422: {
@@ -164,6 +174,7 @@ def save_medical_history(
     "/{patient_id}/medical-history/copy-from/{source_patient_id}",
     response_model=MedicalHistoryDocument,
     operation_id="copy_patient_medical_history",
+    dependencies=_mh_write,
     summary="Copy another chart's medical history onto this patient (MH-4)",
 )
 def copy_medical_history(
@@ -191,6 +202,7 @@ def copy_medical_history(
     response_model=MedicalHistoryDocument,
     status_code=status.HTTP_201_CREATED,
     operation_id="sign_patient_medical_history",
+    dependencies=_mh_write,
     summary="Capture a signature over a frozen version of this medical history (MH-6)",
 )
 def sign_medical_history(

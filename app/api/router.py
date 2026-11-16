@@ -27,6 +27,7 @@ from app.api.v1 import (
     messaging_ws,
     office_assignment,
     office_setup,
+    accounts,
     patient_intake,
     patient_reports,
     patients_extra,
@@ -166,6 +167,9 @@ api_router.include_router(letters.consent_forms_router)
 # Add-Patient intake extras: /patients/register (composite) + /patients/{id}/opening-balance
 # + /patients/{id}/account-plans (LEG-5), and /responsible-parties/{id}/patients roster (LEG-14).
 # Before generic CRUD so these literal sub-paths win over /{item_id}.
+api_router.include_router(accounts.router)
+api_router.include_router(accounts.patient_router)
+api_router.include_router(accounts.metadata_router)
 api_router.include_router(patient_intake.router)
 # Patient Medical History: the composite document (MH-2/3), server-side copy
 # (MH-4), the signed-version + signature surface (MH-6/7), the change log (MH-8)

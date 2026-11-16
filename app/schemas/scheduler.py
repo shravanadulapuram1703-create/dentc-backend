@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from app.core.datetimes import UtcDatetime
 from app.db.models import Patient
 from app.schemas.factory import build_schemas
+from app.schemas.guarantor import Guarantor, GuarantorSummary
 from app.schemas.medical_alerts import MedicalAlertSummary
 
 # Reuse the patient field set under a distinct component name for the context aggregate.
@@ -56,10 +57,15 @@ class AppointmentSchedulerRead(BaseModel):
     alert_count: int = 0
     patient_age: int | None = None
     patient_gender: str | None = None
-    responsible_party_id: str | None = None
+    responsible_party_id: str | None = None  # RP-1: deprecated alias
+    # RP-11: typed account + guarantor summary.
+    account_id: int | None = None
+    guarantor: GuarantorSummary | None = None
     service_summary: str | None = None
     insurance_eligibility: Literal["eligible", "ineligible", "unknown"] | None = None
+    # RP-10: the account total; ``patient_balance`` is the patient's own figure.
     account_balance: Decimal | None = None
+    patient_balance: Decimal | None = None
     # SCHED-PT-1: the patient's pending treatment-plan items (the PT badge), same
     # rule as ``GET /patients/{id}/treatment-plan-items?pending=true``.
     pending_tx_count: int = 0
@@ -110,6 +116,8 @@ class PatientContextResponsibleParty(BaseModel):
     """AL-12: "Responsible: <name>" in the ledger title row."""
 
     id: int
+    # RP-2: which table ``id`` belongs to (``self``/``patient`` → patients.id).
+    kind: str | None = None
     legacy_id: str | None = None
     name: str | None = None
     relationship: str | None = None
@@ -132,6 +140,9 @@ class PatientContext(BaseModel):
     primary_insurance: PatientContextInsurance | None = None
     responsible_party: PatientContextResponsibleParty | None = None
     responsible_party_id: str | None = None
+    # RP-2/RP-11: the typed account + guarantor.
+    account_id: int | None = None
+    guarantor: Guarantor | None = None
     visit: PatientContextVisit
     # PE-3: opening A/R buckets folded in so the Edit form hydrates from one call.
     opening_balance: dict = {}

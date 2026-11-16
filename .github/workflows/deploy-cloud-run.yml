@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/phase_data_migration
+      - feature/uat-realse
 
 permissions:
   contents: read
@@ -119,6 +120,11 @@ jobs:
           # them, breaking the service. --update-env-vars merges, touching only the
           # Redis keys.
           #
+          # DATABASE_URL is bound to the Secret Manager secret of the same name (the
+          # one the migration step reads), so the service and the migrations always
+          # target the same DB. Before this it was a plain env var set in the console,
+          # which a secret change never reached.
+          #
           # --network/--subnet/--vpc-egress enable Direct VPC egress so the service
           # can reach Memorystore's private IP. private-ranges-only keeps internet
           # traffic (Gemini, Stripe, …) on the normal path — only RFC-1918 ranges
@@ -130,7 +136,7 @@ jobs:
             --network "$VPC_NETWORK" \
             --subnet "$VPC_SUBNET" \
             --vpc-egress private-ranges-only \
-            --update-env-vars "REDIS_ENABLED=true,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,GCS_BUCKET_DOCUMENTS=$GCS_BUCKET_DOCUMENTS"
+            --update-env-vars "REDIS_ENABLED=true,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,GCS_BUCKET_DOCUMENTS=$GCS_BUCKET_DOCUMENTS"             --update-secrets "DATABASE_URL=DATABASE_URL:latest"
 
           # Force 100% traffic onto the revision we just built. Without this, a
           # service whose traffic was ever pinned to a specific revision (e.g. a

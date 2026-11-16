@@ -55,6 +55,7 @@ from app.db.models import (
     Office,
     Operatory,
     Patient,
+    PatientNote,
     Provider,
     ProviderHoliday,
     ProviderScheduleDay,
@@ -1100,53 +1101,54 @@ def get_request(db: Session, tenant_id: int, request_id: str) -> BookingRequest:
     return req
 
 
-# ── duplicate-patient matching (AN-9) ────────────────────────────────────────
+# ── duplicate-patient matching (AN-9 / AN-31 / AN-35) ────────────────────────
+def _contact_patient_payload(req: BookingRequest) -> dict:
+    """The request contact as a registration payload — the same shape the
+    Scheduler's Quick Save sends to ``/patients/register``. The number goes to
+    ``cell_phone`` (AN-31b): the public consent text names it as the textable
+    one, and ``phone`` is the home line."""
+    cell = (req.phone or "").strip() or None
+    if cell and len(cell) > 20:  # booking_requests.phone is 30 wide, cell_phone 20
+        cell = _digits(cell)[:20] or None
+    return {
+        "first_name": (req.first_name or "").strip() or None,
+        "last_name": (req.last_name or "").strip() or None,
+        "dob": req.date_of_birth,
+        "email": (req.email or "").strip() or None,
+        "cell_phone": cell,
+    }
+
+
+def _candidates(db: Session, tenant_id: int, req: BookingRequest) -> list[dict]:
+    from app.services.patient_extra_service import check_duplicate
+
+    payload = _contact_patient_payload(req)
+    return check_duplicate(db, tenant_id, {**payload, "phone": payload["cell_phone"]})
+
+
 def find_patient_matches(db: Session, tenant_id: int, req: BookingRequest) -> list[dict]:
-    """Match the request contact against existing patients by phone/email/DOB."""
-    clauses = []
-    if req.phone:
-        digits = _digits(req.phone)
-        if digits:
-            clauses.append(func.replace(func.replace(func.replace(func.replace(
-                Patient.phone, "-", ""), " ", ""), "(", ""), ")", "").ilike(f"%{digits}%"))
-    if req.email:
-        clauses.append(func.lower(Patient.email) == req.email.strip().lower())
-    if not clauses:
-        return []
-    rows = list(
-        db.execute(
-            select(Patient)
-            .where(Patient.tenant_id == tenant_id, or_(*clauses))
-            .limit(25)
-        )
-        .scalars()
-        .all()
-    )
-    matches: list[dict] = []
-    for p in rows:
-        match_on: list[str] = []
-        if req.phone and p.phone and _digits(p.phone) and _digits(req.phone) in _digits(p.phone):
-            match_on.append("phone")
-        if req.email and p.email and p.email.strip().lower() == req.email.strip().lower():
-            match_on.append("email")
-        if req.date_of_birth and p.dob == req.date_of_birth:
-            match_on.append("dob")
-        if not match_on:
-            continue
-        matches.append(
+    """Possible existing patients for the request contact, ranked with the
+    registration scorer (AN-35: same ``match_on``/``match_score``/``is_strong``
+    as ``POST /patients/check-duplicate``). Weak hits (a shared household phone)
+    are listed for staff to pick from but never linked automatically."""
+    out = []
+    for c in _candidates(db, tenant_id, req):
+        out.append(
             {
-                "patient_id": p.id,
-                "chart_no": p.chart_no,
-                "name": ", ".join(x for x in (p.last_name, p.first_name) if x) or None,
-                "phone": p.phone,
-                "email": p.email,
-                "dob": p.dob,
-                "match_on": match_on,
+                "patient_id": c["id"],
+                "chart_no": c["chart_no"],
+                "name": ", ".join(x for x in (c["last_name"], c["first_name"]) if x) or None,
+                "first_name": c["first_name"],
+                "last_name": c["last_name"],
+                "phone": c["phone"],
+                "email": c["email"],
+                "dob": c["dob"],
+                "match_on": c["match_on"],
+                "match_score": c["match_score"],
+                "is_strong": c["is_strong"],
             }
         )
-    # Strongest matches first (more corroborating fields = higher confidence).
-    matches.sort(key=lambda m: len(m["match_on"]), reverse=True)
-    return matches
+    return out
 
 
 def _digits(value: str | None) -> str:
@@ -1277,33 +1279,156 @@ def _resolve_operatory_for_booking(
     return op.id if op is not None else None
 
 
-def _resolve_patient_for_booking(
-    db: Session, office: Office, req: BookingRequest, body, actor_id: int | None
-) -> int | None:
-    if body.patient_id is not None:
-        p = db.get(Patient, body.patient_id)
+def resolve_patient(
+    db: Session,
+    office: Office,
+    req: BookingRequest,
+    *,
+    patient_id: int | None,
+    create_patient: bool,
+    force_create: bool = False,
+    link_existing_match: bool = False,
+    actor_id: int | None,
+) -> int:
+    """The patient a request is booked for. **Never returns None** (AN-32).
+
+    - ``patient_id`` → that patient (tenant-checked).
+    - ``create_patient`` → the registration identity rule (AN-31a): a *strong*
+      duplicate (full name + DOB/phone/e-mail) is 409 ``duplicate_patient`` with
+      ``details.candidates[]`` (the ``/patients/register`` body) unless
+      ``force_create``; ``link_existing_match`` links a single strong match
+      instead. A phone- or e-mail-only hit no longer links anyone.
+    - neither → 422 ``patient_required``.
+
+    The patient is created without committing (AN-31d / AN-34) — the caller's
+    transaction decides whether it survives."""
+    if patient_id is not None:
+        p = db.get(Patient, patient_id)
         if p is None or p.tenant_id != office.tenant_id:
             raise ValidationError("Selected patient is not valid", code="bad_patient")
         return p.id
-    if not body.create_patient:
-        return None  # book with patient_id=null; contact carried in the label/notes
-    matches = find_patient_matches(db, office.tenant_id, req)
-    if len(matches) == 1:
-        return matches[0]["patient_id"]  # single confident match → link it (AN-9)
+    if not create_patient:
+        raise ValidationError(
+            "An online booking must be linked to a patient: pass patient_id, or "
+            "create_patient=true to register the request contact.",
+            code="patient_required",
+            details={"code": "patient_required"},
+        )
+    if not force_create:
+        strong = [c for c in _candidates(db, office.tenant_id, req) if c["is_strong"]]
+        if len(strong) == 1 and link_existing_match:
+            return strong[0]["id"]
+        if strong:
+            from app.services.patient_extra_service import DuplicateCandidate
+
+            raise ConflictError(
+                "A patient matching these details already exists.",
+                code="duplicate_patient",
+                details={
+                    "candidates": [DuplicateCandidate(**c).model_dump(mode="json") for c in strong],
+                    "override_field": "force_create",
+                    "link_field": "patient_id",
+                },
+            )
+    payload = {**_contact_patient_payload(req), "home_office_id": office.id, "force_create": True}
     patient = _patient_crud.create(
-        db,
-        {
-            "home_office_id": office.id,
-            "first_name": req.first_name,
-            "last_name": req.last_name,
-            "phone": req.phone,
-            "email": req.email,
-            "dob": req.date_of_birth,
-        },
-        tenant_id=office.tenant_id,
-        created_by=actor_id,
+        db, payload, tenant_id=office.tenant_id, created_by=actor_id, commit=False
     )
+    if req.insurance_info and req.insurance_info.strip():
+        # AN-35: the free-text insurance the patient typed on the public page
+        # would otherwise live only on the request row.
+        db.add(
+            PatientNote(
+                patient_id=patient.id,
+                office_id=office.id,
+                note_date=_office_now(office).date(),
+                note_type="General",
+                notes=f"AppointNow request {req.id} - insurance provided by patient: "
+                f"{req.insurance_info.strip()}",
+                created_by=actor_id,
+            )
+        )
+        db.flush()
     return patient.id
+
+
+def _resolve_patient_for_booking(
+    db: Session, office: Office, req: BookingRequest, body, actor_id: int | None
+) -> int:
+    return resolve_patient(
+        db,
+        office,
+        req,
+        patient_id=body.patient_id,
+        create_patient=bool(getattr(body, "create_patient", True)),
+        force_create=bool(getattr(body, "force_create", False)),
+        link_existing_match=bool(getattr(body, "link_existing_match", False)),
+        actor_id=actor_id,
+    )
+
+
+def link_patient(
+    db: Session, tenant_id: int, request_id: str, body, *, actor_id: int | None
+) -> BookingRequest:
+    """AN-30: attach a patient to an **approved** request after the fact —
+    ``booking_requests.patient_id`` and ``appointments.patient_id`` in one
+    transaction. Idempotent for the same patient; 409
+    ``patient_already_linked`` when either row already names a different one.
+    With neither ``patient_id`` nor ``create_patient``, a half-linked pair is
+    repaired from whichever side has the patient. A paid request's unapplied
+    online payment is posted to that patient's ledger now (AN-27)."""
+    req = get_request(db, tenant_id, request_id)
+    if req.status != "approved" or not req.appointment_id:
+        raise ConflictError(
+            f"Only an approved request can be linked to a patient (it is {req.status})",
+            code="request_not_approved",
+        )
+    office = db.get(Office, req.office_id)
+    if office is None or office.tenant_id != tenant_id:
+        raise ForbiddenError("Request does not belong to the authenticated tenant")
+    appt = db.get(Appointment, req.appointment_id)
+    if appt is None:
+        raise NotFoundError(f"Appointment '{req.appointment_id}' was not found")
+
+    linked = {pid for pid in (req.patient_id, appt.patient_id) if pid is not None}
+    if len(linked) > 1:
+        raise ConflictError(
+            "The request and its appointment name different patients.",
+            code="patient_already_linked",
+            details={"request_patient_id": req.patient_id,
+                     "appointment_patient_id": appt.patient_id},
+        )
+    if body.patient_id is None and linked:
+        # Already (half-)linked: re-use that patient — never create a second one.
+        target = next(iter(linked))
+    else:
+        target = resolve_patient(
+            db, office, req,
+            patient_id=body.patient_id,
+            create_patient=bool(body.create_patient),
+            force_create=bool(body.force_create),
+            link_existing_match=bool(body.link_existing_match),
+            actor_id=actor_id,
+        )
+        if linked and target not in linked:
+            raise ConflictError(
+                "This booking is already linked to a different patient.",
+                code="patient_already_linked",
+                details={"request_patient_id": req.patient_id,
+                         "appointment_patient_id": appt.patient_id,
+                         "patient_id": target},
+            )
+    appt.patient_id = target
+    req.patient_id = target
+    req.updated_at = datetime.utcnow()
+
+    from app.services import appointnow_payment_service as payments
+
+    payments.post_payment_to_ledger(db, office, req, actor_id=actor_id)
+    db.commit()
+    db.refresh(req)
+    notify_updated_request(db, office, req)
+    return req
 
 
 def approve_request(

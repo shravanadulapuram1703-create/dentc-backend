@@ -456,6 +456,11 @@ class StatementCreate(BaseModel):
 class StatementRead(ORMModel):
     id: int
     patient_id: int
+    # RP-9: ``account`` statements are addressed to the account (``patient_id`` =
+    # the addressee member); the member sections live in ``snapshot``.
+    account_id: int | None = None
+    statement_scope: str = "patient"
+    snapshot: dict | None = None
     office_id: int | None = None
     statement_date: date
     period_start: date | None = None
@@ -484,11 +489,15 @@ class StatementBatchRequest(BaseModel):
     date_to: date | None = None
     min_balance: Decimal = Field(Decimal("0.01"), description="Only patients whose balance exceeds this")
     only_aged: bool = Field(False, description="Only patients with a 30+ day aged balance")
+    # RP-9: ``account`` = one statement per account (homed at the office, sending
+    # statements), addressed to the guarantor, member sections inside.
+    scope: Literal["patient", "account"] = "patient"
 
 
 class StatementBatchResult(BaseModel):
     office_id: int
     batch_id: str
+    scope: str = "patient"
     generated: int
     statements: list[StatementRead]
 

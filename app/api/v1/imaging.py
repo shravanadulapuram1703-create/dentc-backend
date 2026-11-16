@@ -20,7 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.api.deps import DbSession, TenantId, get_current_user
+from app.api.deps import DbSession, TenantId, get_current_user, require_permission
 from app.core.config import settings
 from app.core.exceptions import NotFoundError, UnauthorizedError
 from app.core.logging import get_logger
@@ -35,6 +35,7 @@ from app.schemas.imaging import (
 from app.services import audit_service
 from app.services import dicom_capture_service as capture_svc
 from app.services import imaging_service as svc
+from app.services.permission_service import IMAGING_CAPTURE
 
 logger = get_logger(__name__)
 
@@ -73,6 +74,8 @@ def get_patient_imaging(
     "/{patient_id}/imaging/captures",
     response_model=DicomInstanceOut,
     operation_id="create_patient_imaging_capture",
+    # RBAC-6: Scan & Capture.
+    dependencies=[Depends(require_permission(*IMAGING_CAPTURE, action="capture images"))],
     status_code=status.HTTP_201_CREATED,
     summary="Ingest a freshly captured image/DICOM file (GCS + Postgres, matched to this patient's imaging history)",
 )

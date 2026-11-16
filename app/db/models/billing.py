@@ -33,6 +33,13 @@ class PatientPayment(Base, CreatedAtMixin):
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    # RP-9: the account the payment was posted against — **stamped** at posting
+    # (from the patient's account, by the hook in ``models/accounts.py``) so a
+    # later move between accounts does not rewrite where the money landed.
+    account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("accounts.id"), index=True)
+    # RP-9: shared id of one guarantor payment split across members
+    # (``POST /accounts/{id}/payments``) or of a balance-transfer pair (RP-6).
+    account_payment_id: Mapped[str | None] = mapped_column(String(50), index=True)
     # ``office_id`` is the payment's operational office (which office the money was
     # applied at). OFF-SCOPE-11: ``created_office_id`` records the *posting* office
     # — the office the user was working in when the payment was entered, stamped
@@ -564,7 +571,13 @@ class PatientStatement(Base, IntPKMixin, CreatedAtMixin):
     __tablename__ = "patient_statements"
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
+    # For an account statement (RP-9) this is the addressee member: the primary
+    # guarantor when they are a patient on the account, else the first member.
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), index=True)
+    # RP-9: ``patient`` (one patient, STMT-1) | ``account`` (one per account,
+    # addressed to the guarantor, member sections in ``snapshot``).
+    account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("accounts.id"), index=True)
+    statement_scope: Mapped[str] = mapped_column(String(10), default="patient")
     office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"))
     statement_date: Mapped[date] = mapped_column()
     period_start: Mapped[date | None]

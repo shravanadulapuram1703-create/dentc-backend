@@ -87,7 +87,7 @@ def refund_policy(db: Session, tenant_id: int, office_id: int | None = None) -> 
 def refundable_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
     _get_patient(db, patient_id, tenant_id)
     balance = balance_service.get_patient_balance(db, patient_id, tenant_id)
-    account_balance = _d(balance["account_balance"])
+    account_balance = _d(balance["balance"])
     credit = -account_balance if account_balance < _ZERO else _ZERO
 
     # AL-9: the credit actually taken in, not the raw signed `amount`.

@@ -173,6 +173,26 @@ def upload_bytes(
         pass  # already there — same sha256, same bytes, dedup success
 
 
+def copy_object(bucket: str, source_key: str, dest_key: str) -> None:
+    """Server-side copy inside one bucket (IMG-DOC-5 relocation). Raises on failure."""
+    client = _get_client()
+    if client is None or not bucket:
+        raise RuntimeError("GCS is not configured (client unavailable or bucket unset)")
+    b = client.bucket(bucket)
+    src = b.get_blob(source_key)
+    if src is None:
+        raise FileNotFoundError(f"gs://{bucket}/{source_key}")
+    b.copy_blob(src, b, dest_key)
+
+
+def delete_object(bucket: str, object_key: str) -> None:
+    """Remove one object. Raises on failure (a retention policy refuses it)."""
+    client = _get_client()
+    if client is None or not bucket:
+        raise RuntimeError("GCS is not configured (client unavailable or bucket unset)")
+    client.bucket(bucket).blob(object_key).delete()
+
+
 def stream(bucket: str, object_key: str) -> tuple[Iterator[bytes], str | None, int | None]:
     """Proxy-mode download: yield the object's bytes plus (content_type, size).
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
+from app.schemas.guarantor import Guarantor
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
@@ -249,7 +250,14 @@ class PatientBalance(BaseModel):
     total_charged: float = Field(..., examples=[2450.00])
     total_paid: float = Field(..., examples=[1800.00])
     balance: float = Field(..., examples=[650.00])
-    account_balance: float = Field(..., description="Alias of balance for the FE", examples=[650.00])
+    # RP-10: the *account* total (every member of ``account_id``); the patient's
+    # own figure is ``balance`` / ``patient_balance_total``.
+    account_balance: float = Field(..., description="RP-10: true account total (all members)",
+                                   examples=[650.00])
+    patient_balance_total: float | None = Field(
+        None, description="RP-10: this patient's own balance (== balance)")
+    account_id: int | None = None
+    account_member_count: int | None = None
     estimated_insurance: float = Field(0, examples=[400.00])
     estimated_patient: float = Field(0, examples=[250.00])
     patient_balance: float = Field(0, description="Charges − payments − estimated insurance")
@@ -277,7 +285,11 @@ class AccountBalance(BaseModel):
     """AL-11: the legacy BALANCES table — the aggregate row plus one row per member."""
 
     patient_id: int
-    responsible_party_id: str | None = None
+    responsible_party_id: str | None = None  # RP-1: deprecated alias
+    # RP-10: so the panel heading needs no second lookup.
+    account_id: int | None = None
+    account_no: str | None = None
+    guarantor: Guarantor | None = None
     member_count: int
     total_charged: float
     total_paid: float

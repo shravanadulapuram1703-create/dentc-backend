@@ -398,11 +398,15 @@ _PATIENTS = [
         filter_fields=("home_office_id", "is_active", "preferred_provider_id", "chart_no",
                        "dob", "ssn", "medicaid_id", "email", "phone", "gender",
                        "patient_type", "responsible_party_id", "preferred_hygienist_id",
-                       "fee_schedule_id", "legacy_id", "id"),
+                       "fee_schedule_id", "legacy_id", "id",
+                       # RP-12: typed account / guarantor filters.
+                       "account_id", "guarantor_patient_id", "guarantor_party_id"),
         range_fields=("created_at", "dob"),
         # OFF-SCOPE-5: seen_at_office_id (join appointments/procedures) and
         # search_scope (current|all|group) — resolved by PatientCRUD.
-        extra_filters=(("seen_at_office_id", int), ("search_scope", str)),
+        # RP-12: account_no (or migrated RPID) and guarantor_name, resolved by PatientCRUD.
+        extra_filters=(("seen_at_office_id", int), ("search_scope", str),
+                       ("account_no", str), ("guarantor_name", str)),
         default_sort="created_at",
         id_in_param=True,
         crud_class=PatientCRUD,
@@ -545,6 +549,8 @@ _PATIENTS = [
         default_sort="created_at",
         crud_class=PatientMedicalAlertCRUD,
         read_enrich=enrich_medical_alerts,
+        # RBAC-6: a per-row answer write is a medical-history edit.
+        write_permissions=permission_service.MEDICAL_HISTORY_WRITE,
     ),
     # GAP-AP-17: per-patient Dental/Medical questionnaire answers.
     # MH-8: updated_by / answered_at + the resolved "Modified By" name.
@@ -560,6 +566,8 @@ _PATIENTS = [
         default_sort="created_at",
         crud_class=PatientQuestionnaireResponseCRUD,
         read_enrich=enrich_questionnaire_responses,
+        # RBAC-6: a per-row answer write is a medical-history edit.
+        write_permissions=permission_service.MEDICAL_HISTORY_WRITE,
     ),
     _cfg(m.PatientEmergencyContact, "PatientEmergencyContact", "patient-emergency-contacts",
          "Patients", "patient_emergency_contact", "patient_emergency_contacts",
@@ -577,7 +585,9 @@ _PATIENTS = [
          "patient_adjustment", "patient_adjustments",
          sortable=("adjustment_date", "created_at"), ranges=("adjustment_date",),
          filters=("patient_id", "office_id", "provider_id", "procedure_id"),
-         soft_field="is_void", soft_value=True, office_scope=_POS),
+         soft_field="is_void", soft_value=True, office_scope=_POS,
+         # RBAC-6: POST = posting an adjustment.
+         create_permissions=(permission_service.ADJUSTMENT_POST,)),
 ]
 
 # ── Insurance ──────────────────────────────────────────────────────────────
@@ -1005,6 +1015,11 @@ _CLINICAL = [
         read_enrich=enrich_progress_notes,
         crud_class=ProgressNoteCRUD,
         office_scope=_POS,
+        # RBAC-6: Add / Edit Progress Notes. There is no lock *override* to gate
+        # — a locked note refuses text edits for everyone (PN-7) — so the edit
+        # right covers what is still editable (DOS, strike-off, unlocked text).
+        create_permissions=(permission_service.PROGRESS_NOTE_ADD,),
+        update_permissions=(permission_service.PROGRESS_NOTE_EDIT,),
     ),
     # Perio exam header. Custom Read embeds resolved actor + provider names
     # (PERIO-BE-6/14); is_voided soft-delete (PERIO-BE-3) + is_voided filter so
@@ -1069,6 +1084,9 @@ _CLINICAL = [
         filter_fields=("patient_id", "provider_id", "is_active", "office_id"),
         crud_class=PrescriptionCRUD,
         office_scope=_POS,
+        # RBAC-6: the soft DELETE *is* a strike-off (is_active -> false); the
+        # PATCH form is field-scoped inside PrescriptionCRUD.update.
+        delete_permissions=(permission_service.PRESCRIPTION_STRIKE_OFF,),
     ),
     # Per-user perio prefs. See /perio-chart-settings/me (PERIO-BE-11) for the
     # token-resolved, self-seeding convenience accessor.

@@ -20,6 +20,7 @@ from app.db.models import (
 )
 from app.schemas.common import ORMModel
 from app.schemas.factory import build_schemas
+from app.schemas.guarantor import Guarantor
 from app.schemas.patient import PatientRead
 from app.schemas.signature import SignatureCaptureFields
 
@@ -159,6 +160,8 @@ class LetterContextResponse(ORMModel):
     office: _LetterOfficeRead | None = None  # type: ignore[valid-type]
     provider: _LetterProviderRead | None = None  # type: ignore[valid-type]
     responsible_party: _LetterRpRead | None = None  # type: ignore[valid-type]
+    # RP-2: the typed guarantor (self / patient / responsible_party / unresolved).
+    guarantor: Guarantor | None = None
     referred_by: _LetterReferralRead | None = None  # type: ignore[valid-type]
     next_appointment: _LetterAppointmentRead | None = None  # type: ignore[valid-type]
     next_appointment_provider: _LetterProviderRead | None = None  # type: ignore[valid-type]

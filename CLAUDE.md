@@ -415,6 +415,19 @@ AN-11 (per-practice CORS / iframe `frame-ancestors`) is deploy-config, not code.
   on submit, stored as sha256, 404 on mismatch). Refund (admin) = Stripe refund
   then REF-1/2 ledger counterpart; the refund *policy* is still a product call.
 
+**AppointNow round 4 — approve always has a patient** (AN-30…35, §0b of the same report /
+[response](docs/appointnow/appointnow_backend_response.md) top section; **no migration**).
+Every approval had booked `appointments.patient_id = NULL` because `create_patient`
+defaulted false. Now `appointnow_service.resolve_patient` is the one rule (approve,
+post-payment booking, `POST …/requests/{id}/link-patient`, `scripts/backfill_appointnow_patients.py`):
+`patient_id`, else register the contact with the **registration** `_is_strong` rule
+(phone/e-mail alone never links) → 409 `duplicate_patient` + `candidates[]` unless
+`force_create` (`link_existing_match` links a lone strong hit — on for the unattended
+webhook path); explicit `create_patient=false` → 422 `patient_required`. Patient created via
+`PatientCRUD.create(commit=False)` so a failed approve rolls it back; number →
+`cell_phone`; `insurance_info` → a patient note. `check_duplicate` now matches `cell_phone`.
+Backfill **not applied** (8 dev-DB rows).
+
 **Help Center support tickets** (Help → Report an Issue → Jira; HELP-1…5 of
 [docs/help/help_module_backend_devreport.md](docs/help/help_module_backend_devreport.md)
 / [response](docs/help/help_module_backend_response.md)). `POST/GET /api/v1/support/tickets`
@@ -1870,9 +1883,25 @@ kept + 44 added).
   wired — `transactions_add_post_patient_payments` (POST /patient-payments),
   `transactions_add_post_insurance_payments` (`/ledger-insurance-details/payment(-batch)`),
   `charting_perio_full_control` (perio writes + bulk chart save),
-  `transactions_treatment_plan_delete` (DELETE /treatment-plans). Deferred (field/
-  bespoke-route): prescription strike-off, tx-plan discount/edit-fee/change-status,
-  progress-note lock, medical-history, imaging capture, post-adjustments.
+  `transactions_treatment_plan_delete` (DELETE /treatment-plans).
+- **Round 3 (RBAC-6 remainder + PWD-RBAC-1..3,
+  [response](docs/setup/security/RBAC_REMAINDER_AND_PASSWORD_RBAC_RESPONSE.md); no
+  migration).** Field-scoped on a *move* (the RBAC-4 shape): Rx strike-off
+  (`is_active` true→false in `PrescriptionCRUD.update`; the soft DELETE via
+  `delete_permissions`), tx-plan item discount/fee/status-or-ids
+  (`treatment_service.enforce_item_rights`). Route gates: medical-history writes
+  (composite PUT/copy/sign/bulk + the two answer resources; `/patients/register`
+  is deliberately *not* gated), imaging capture, `POST /patient-adjustments`,
+  progress-note add/edit. **There is no progress-note lock override** (no catalog
+  code, no override path) — nothing to gate. Passwords: an admin user write
+  carrying `password` is a reset of *another* user — 403 `own_password_self_service`
+  for self, `password_reset_not_permitted` for non-admins
+  (`user_admin_service.assert_can_set_password`); `MeFull.can_reset_user_passwords`
+  (= `admin|super_admin`, the set the Users routes admit — FE also lists `owner`,
+  which those routes 403); complexity policy in
+  [app/core/password_policy.py](app/core/password_policy.py) on every password
+  write (422 `password_too_weak` + `failed_rules`, `GET /auth/password-policy`,
+  `PASSWORD_POLICY_ENFORCED` kill switch; login never checks it).
 
 **Time Clock module** (Top-bar punch · My Time Clock · Time Clock Report/Editor; TC-BE-1…14 of
 [docs/time-clock/time_clock_backend_devreport.md](docs/time-clock/time_clock_backend_devreport.md)
@@ -1933,6 +1962,72 @@ the dev DB is stamped `fc6450e398ee`, a revision in no branch/worktree; verified
   `POST /fee-schedules/{id}/entries/import` (csv + native xlsx via openpyxl, header-name matching,
   row-level report, `dry_run`/`all_or_nothing`). **FSW-9** `GET /fee-schedules/{id}/scope` (+ a
   `wizard` block; target-less legacy rows never read as "All Offices").
+
+**Imaging <-> Documents separation** (IMG-DOC-1..6 of
+`dentc-frontend/docs/imaging/imaging_documents_separation_backend_devreport.md` /
+[response](docs/imaging/imaging_documents_separation_backend_response.md); Alembic
+`03bbb54c0b12`, **applied to the dev DB** 2026-11-16 alongside the RP accounts revision). An insurance-card
+JPG showed in the X-ray gallery because eight screens share `patient_documents` and
+nothing said which owned a row. Vocabulary lives once in
+[app/services/document_vocabulary.py](app/services/document_vocabulary.py).
+- **IMG-DOC-1** `patient_documents.context` (closed set: documents/imaging/note/
+  patient_photo/letter/consent/progress_note/restorative/treatment_plan; NOT NULL default
+  `documents`). Declared on upload, else **inferred from `document_type`** (`infer_context`)
+  so un-cut-over clients still file right; `XR`/`X-Ray / Radiograph` are never inferred
+  Imaging (Notes + Documents send them). Each context = its own prefix
+  (`GCS_CONTEXT_PREFIXES`); existing objects untouched (rows store their key).
+- **IMG-DOC-3** backfill runs **inside** the migration via `backfill_case()` - the same
+  CASE `scripts/backfill_document_context.py` counts in its dry run (path -> tile_id link
+  -> photo pointer -> type). UAT: consent 3 / documents 3 / note 4 / imaging 0.
+- **IMG-DOC-2** `?context=`/`?exclude_context=` (repeated or comma, validated);
+  `document_type` comma list, case-insensitive, matches all spellings of a code (still a
+  string param in OpenAPI). **IMG-DOC-6** `reject_unknown_query_params` dependency
+  (`app/api/deps.py`, opt-in per route; allowed set read from the route's flat dependant)
+  -> 422 `unknown_query_parameter`; kill switch `DOCUMENT_LIST_REJECT_UNKNOWN_PARAMS`.
+- **IMG-DOC-4** groups `document_type` + new `imaging_document_type`
+  (`BUILTIN_CATALOGS` = seed = fallback), published on `/patient-documents/limits`,
+  `document_type_label` on reads. **`DOCUMENT_TYPE_VOCABULARY_ENFORCED` off by default**:
+  folding `Bitewing`->`BW` now would empty today's label-matching Imaging gallery. Flip
+  with the FE release + `--fold-types --apply`.
+- **IMG-DOC-5** `PATCH /patient-documents/{id}` (`extra="forbid"`): only documents <->
+  imaging (else 422 `context_not_movable`), bytes relocated (`document_store.relocate`,
+  copy-then-delete; failure -> `relocated:false`, owner still changes), audited via
+  `audit_context.record`, stamps `updated_at/by`.
+
+**Responsible Party / Family Accounts** (RP-1…16 of
+`dentc-frontend/docs/patients/responsible_party_backend_devreport.md` /
+[response](docs/patients/responsible_party_backend_response.md); Alembic `9435491c1d19`, **applied to the dev DB** together with the pending IMG-DOC `03bbb54c0b12`).
+- **RP-1/2 root cause**: `patients.responsible_party_id` was one string holding an RP id, the
+  patient's own id (self) or a Denticon RPID — the id spaces collide, so a self-guarantor
+  resolved to whatever RP row shared the number. Canonical now: `patients.account_id` +
+  **exactly one** of `guarantor_patient_id` (`= id` is Self) / `guarantor_party_id` (CHECK is
+  *at most one*: Self's id does not exist at INSERT and PG CHECKs are not deferrable; both-NULL
+  = migrated *unresolved* RPID). The string is a **computed alias** (`sync_alias`).
+- Tables in [app/db/models/accounts.py](app/db/models/accounts.py): `accounts` (primary guarantor
+  *on the account* — "exactly one primary" is structural), `account_parties` (≤2 more,
+  `secondary|billing_contact`), `account_change_events` (RP-16). **ORM hooks there give every
+  inserted patient an account** (explicit → legacy-key resolution → new Self account) and stamp
+  `account_id` on `patient_payments`/`patient_statements`. `account_id` stays nullable in the DB
+  only because the Denticon importer writes by raw SQL → `scripts/backfill_patient_accounts.py`
+  re-runs the migration's backfill ([app/services/account_backfill.py](app/services/account_backfill.py)).
+- **The service is `family_account_service`**, *not* `account_service` — that name is the Account
+  Info settings module (it was overwritten once by mistake).
+  [app/services/family_account_service.py](app/services/family_account_service.py): `guarantors_for`
+  (batched `{kind: self|patient|responsible_party|unresolved}`), `resolve_spec` (precedence
+  `is_self > guarantor_patient_id > account_id > person > responsible_party_id`), `apply_target`,
+  `change_guarantor` (409 `guarantor_has_dependents` unless `include_dependents`;
+  `move_open_balance=false` = a `balance_transfer` adjustment pair), merge, parties, account
+  payments (`oldest_first|by_member`, shared `account_payment_id`), account statements, insurance,
+  change log. Routes: [app/api/v1/accounts.py](app/api/v1/accounts.py).
+- **Breaking**: `PatientBalance.account_balance` is now the true account total (`balance` /
+  `patient_balance_total` = the patient's own; `balance_service.patient_balance_core` is the
+  cached per-patient figure); same on the scheduler feed (+ `patient_balance`). PATCH
+  `responsible_party_id: null` → 422 `guarantor_required`, unknown key → 422
+  `responsible_party_not_found`; re-sending the current alias is a no-op. Account membership
+  everywhere (`account_scope`, roster, family appts, account plans) is `account_id`, never the string.
+- RP-14 `scripts/import_legacy_responsible_parties.py` (RespParty.txt → `responsible_parties`,
+  RELTORESP → relationship, resolves unresolved legacy accounts) — dry-run default, **not applied**
+  (Test_Dental_Group has no migrated patients).
 
 **Phase 3 specifics:**
 - **Audit logging (HIPAA):** `AuditMiddleware` ([app/middleware/audit.py](app/middleware/audit.py))

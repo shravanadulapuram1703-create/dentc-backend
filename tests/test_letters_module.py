@@ -222,6 +222,9 @@ def test_letter_context_is_one_round_trip(client, db_session, patient, office, p
     db_session.add(rp)
     db_session.commit()
     db_session.refresh(rp)
+    # RP-1: the guarantor link is the typed column (the string is only an alias).
+    patient.guarantor_patient_id = None
+    patient.guarantor_party_id = rp.id
     patient.responsible_party_id = str(rp.id)
     db_session.add(Appointment(
         id="APPT-T1", patient_id=patient.id, provider_id=provider.id,

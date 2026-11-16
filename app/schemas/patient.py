@@ -23,6 +23,7 @@ from typing import Optional
 from pydantic import Field, create_model
 
 from app.db.models import Patient
+from app.schemas.guarantor import Guarantor
 from app.schemas.factory import build_schemas
 
 # Create/Update keep the canonical component names; the read is enriched below.
@@ -55,4 +56,8 @@ PatientRead = create_model(
     # ADA-BE-7: an active ``claim_consent`` signature exists (ADA Item 36 /
     # 837D CLM09), set by enrich_service.enrich_patient_office.
     has_claim_consent=(bool, False),
+    # RP-11: typed guarantor + account number (set by enrich_patient_office);
+    # ``account_id`` / ``guarantor_*_id`` are columns.
+    guarantor=(Optional[Guarantor], None),
+    account_no=(Optional[str], None),
 )

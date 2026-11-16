@@ -122,6 +122,10 @@ class MeFull(BaseModel):
     permissions: list[str] = Field(default_factory=list)
     permissions_enforced: bool = False
     groups: list[str] = Field(default_factory=list)
+    # PWD-RBAC-2: may this caller reset *another* user's password (Security ->
+    # Users -> Edit -> Reset Password)? Server-owned so the FE stops hard-coding
+    # the role list. Their own password is always My Page -> change-password.
+    can_reset_user_passwords: bool = False
 
 
 # ── Persistent default patient (PDP-1/2) ─────────────────────────────────────
@@ -175,3 +179,16 @@ class LegacyCreatePasswordRequest(BaseModel):
     username_or_email: str
     new_password: str = Field(..., min_length=8)
     activation_token: str
+
+
+class PasswordPolicyRule(BaseModel):
+    code: str
+    label: str
+
+
+class PasswordPolicy(BaseModel):
+    """PWD-RBAC-3: the complexity policy every password write enforces."""
+
+    enforced: bool
+    min_length: int
+    rules: list[PasswordPolicyRule]

@@ -186,6 +186,39 @@ def _refunds_total(db: Session, patient_id: int) -> Decimal:
 
 
 def get_patient_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
+    """The patient's own figures (:func:`patient_balance_core`) plus the RP-10
+    account block.
+
+    RP-10: ``account_balance`` used to be documented as "Alias of balance for the
+    FE" — the *patient's* figure under an *account* name, which the Overview and
+    the print duly labelled "Account Balance". It is now the true account total
+    (every member of ``patients.account_id``); the patient's own figure is
+    ``balance`` and, unambiguously, ``patient_balance_total``.
+    """
+    result = dict(patient_balance_core(db, patient_id, tenant_id))
+    result["patient_balance_total"] = result["balance"]
+    account_id = db.execute(select(Patient.account_id).where(Patient.id == patient_id)).scalar_one_or_none()
+    result["account_id"] = account_id
+    member_ids = [patient_id]
+    if account_id is not None:
+        member_ids = list(db.execute(
+            select(Patient.id).where(Patient.tenant_id == tenant_id, Patient.account_id == account_id)
+        ).scalars()) or [patient_id]
+    if member_ids == [patient_id]:
+        result["account_balance"] = result["balance"]
+    else:
+        result["account_balance"] = round(sum(
+            (result["balance"] if pid == patient_id else patient_balance_core(db, pid, tenant_id)["balance"])
+            for pid in member_ids
+        ), 2)
+    result["account_member_count"] = len(member_ids)
+    return result
+
+
+def patient_balance_core(db: Session, patient_id: int, tenant_id: int) -> dict:
+    """The patient's own balance (cached 30 s per patient). ``account_balance``
+    inside the cached payload is the patient's figure; callers wanting the
+    account total use :func:`get_patient_balance`."""
     cached = redis_store.cache_get(_cache_key(tenant_id, patient_id))
     if cached:
         return json.loads(cached)
@@ -260,12 +293,19 @@ def get_account_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
     """
     from app.services import account_scope
 
+    from app.db.models import Account
+    from app.services import family_account_service
+
     patient = account_scope.load_patient(db, patient_id, tenant_id)
     members = account_scope.account_members(db, patient, tenant_id)
+    guarantor = family_account_service.guarantor_payload(db, patient)
+    acc = db.get(Account, patient.account_id) if patient.account_id else None
+    account_no = acc.account_no if acc else None
 
     entries = []
     for member in members:
-        entry = get_patient_balance(db, member.id, tenant_id)
+        entry = dict(patient_balance_core(db, member.id, tenant_id))
+        entry["patient_balance_total"] = entry["balance"]
         entry["patient_name"] = account_scope.patient_name(member)
         entry["chart_no"] = member.chart_no
         entries.append(entry)
@@ -280,6 +320,10 @@ def get_account_balance(db: Session, patient_id: int, tenant_id: int) -> dict:
     return {
         "patient_id": patient_id,
         "responsible_party_id": patient.responsible_party_id,
+        # RP-10: the panel heading needs no second lookup.
+        "account_id": patient.account_id,
+        "account_no": account_no,
+        "guarantor": guarantor,
         "member_count": len(entries),
         "total_charged": _total("total_charged"),
         "total_paid": _total("total_paid"),

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import ValidationError
 from app.core.security import hash_password
+from app.core.password_policy import validate_password
 from app.db.models import AuthActionToken, User
 from app.integrations import email as email_integration
 
@@ -134,6 +135,7 @@ def reset_password(db: Session, token: str, new_password: str) -> dict:
         raise ValidationError(
             "This reset link is invalid or has expired", code="invalid_reset_token"
         )
+    validate_password(new_password, field="new_password")  # PWD-RBAC-3
     action_token, user = result
     user.password_hash = hash_password(new_password)
     user.must_change_password = False
@@ -195,6 +197,7 @@ def legacy_create_password(
             "This account has already been activated. Use Forgot Password instead.",
             code="already_activated",
         )
+    validate_password(new_password, field="new_password")  # PWD-RBAC-3
     user.password_hash = hash_password(new_password)
     user.must_change_password = False
     user.password_created_at = _now()

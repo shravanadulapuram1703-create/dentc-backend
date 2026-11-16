@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, Numeric, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
@@ -44,8 +44,22 @@ class PatientDocument(Base, IntPKMixin, CreatedAtMixin):
     claim_id: Mapped[str | None] = mapped_column(
         String(50), ForeignKey("insurance_claims.id"), index=True
     )
+    # IMG-DOC-1: the owning module (``document_vocabulary.DOCUMENT_CONTEXTS``).
+    # Eight screens share this table; before this column nothing said which one
+    # a row belonged to, so the Imaging gallery guessed from the MIME type and
+    # showed insurance cards among the radiographs. Declared on upload, else
+    # inferred from ``document_type``; backfilled by Alembic ``03bbb54c0b12``.
+    context: Mapped[str] = mapped_column(
+        String(30), default="documents", server_default="documents", nullable=False
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+
+    __table_args__ = (
+        Index("ix_patient_documents_patient_context", "patient_id", "context"),
+    )
 
 
 class PatientEmergencyContact(Base, IntPKMixin, TimestampMixin):

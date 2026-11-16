@@ -59,7 +59,6 @@ from app.db.models import (
     TreatmentPlanItem,
 )
 from app.services import balance_service
-from app.services.patient_overview_service import resolve_responsible_party
 
 # ── Merge-field catalog ──────────────────────────────────────────────────────
 # (token, group, label) — the group is what the Setup UI can render as a section.
@@ -320,7 +319,14 @@ def build_context(
         select(AccountSettings).where(AccountSettings.tenant_id == tenant_id)
     ).scalar_one_or_none()
 
-    rp = resolve_responsible_party(db, tenant_id, patient.responsible_party_id)
+    # RP-2: the typed guarantor (a Patient for self / head of household, a
+    # ResponsibleParty for a non-patient) — same demographic attribute names.
+    from app.services.family_account_service import (  # noqa: PLC0415
+        guarantor_payload,
+        guarantor_person,
+    )
+
+    rp = guarantor_person(db, patient)
     referred_by = _referred_by(db, tenant_id, patient)
     next_appt, last_appt = _appointments(db, patient_id, today)
     # LTR-13: resolve BOTH appointment providers. The merge falls back from the
@@ -341,7 +347,12 @@ def build_context(
         "office": office,
         "provider": provider,
         "account": account,
-        "responsible_party": rp,
+        # RP-2: ``responsible_party`` on the wire is the RP row only (a non-patient
+        # guarantor); the merge reads ``guarantor_person`` (a Patient for self /
+        # head of household), and ``guarantor`` is the typed payload.
+        "responsible_party": rp if isinstance(rp, ResponsibleParty) else None,
+        "guarantor_person": rp,
+        "guarantor": guarantor_payload(db, patient),
         "referred_by": referred_by,
         "next_appointment": next_appt,
         "next_appointment_provider": next_appt_provider,
@@ -418,7 +429,7 @@ def resolve_merge_fields(ctx: dict[str, Any]) -> dict[str, str]:
     office: Office | None = ctx.get("office")
     provider: Provider | None = ctx.get("provider")
     account: AccountSettings | None = ctx.get("account")
-    rp: ResponsibleParty | None = ctx.get("responsible_party")
+    rp = ctx.get("guarantor_person") or ctx.get("responsible_party")
     ref: Referral | None = ctx.get("referred_by")
     balance: dict | None = ctx.get("balance")
     teeth: list[str] = ctx.get("treatment_plan_teeth") or []

@@ -217,7 +217,57 @@ def permissions_for_user_id(db: Session, user_id: int | None) -> EffectivePermis
     return effective_permissions(db, user)
 
 
+def assert_actor_permission(db: Session, actor_id: int | None, *codes: str,
+                            action: str | None = None) -> None:
+    """RBAC-4/RBAC-6 field-scoped guards: the CRUD write paths only carry the
+    actor id. An actorless (internal / trusted) write is never gated; a
+    full-access or ungated caller passes as everywhere else."""
+    perms = permissions_for_user_id(db, actor_id)
+    if perms is None:
+        return
+    assert_permission(perms, *codes, action=action)
+
+
+# ── RBAC-6 remainder: the itemised write rights ──────────────────────────────
+#: Strike-off on the Prescriptions screen = ``is_active`` true -> false (PATCH)
+#: or the soft DELETE (which does the same thing).
+PRESCRIPTION_STRIKE_OFF = "patient_prescription_strike_off"
+#: Treatment-plan item fields guarded on a *move* (TreatmentPlanItemCRUD).
+TREATMENT_PLAN_DISCOUNT = "transactions_treatment_plan_discount"
+TREATMENT_PLAN_EDIT_FEE = "transactions_treatment_plan_edit_fee"
+TREATMENT_PLAN_CHANGE_STATUS = "transactions_treatment_plan_change_status_or_ids"
+#: Every write on the Medical History screen (composite save, copy, sign, bulk
+#: and the per-row answer resources).
+MEDICAL_HISTORY_WRITE = ("patient_medical_history_full_control",)
+IMAGING_CAPTURE = ("imaging_capture_acquire", "imaging_full_control")
+ADJUSTMENT_POST = "transactions_add_post_adjustments"
+PROGRESS_NOTE_ADD = "patient_add_progress_notes"
+PROGRESS_NOTE_EDIT = "patient_edit_progress_notes"
+
+#: PWD-RBAC-1/2: who may set *another* user's password (Security -> Users ->
+#: Edit -> Reset Password). Same set that passes the Users write gate
+#: (``require_roles("admin")`` also admits super_admin), so ``MeFull.
+#: can_reset_user_passwords`` never promises a button the server refuses.
+PASSWORD_RESET_ROLES: frozenset[str] = FULL_ACCESS_ROLES
+
+
+def can_reset_user_passwords(user: User) -> bool:
+    return (user.role or "") in PASSWORD_RESET_ROLES
+
+
 __all__ = [
+    "ADJUSTMENT_POST",
+    "IMAGING_CAPTURE",
+    "MEDICAL_HISTORY_WRITE",
+    "PASSWORD_RESET_ROLES",
+    "PRESCRIPTION_STRIKE_OFF",
+    "PROGRESS_NOTE_ADD",
+    "PROGRESS_NOTE_EDIT",
+    "TREATMENT_PLAN_CHANGE_STATUS",
+    "TREATMENT_PLAN_DISCOUNT",
+    "TREATMENT_PLAN_EDIT_FEE",
+    "assert_actor_permission",
+    "can_reset_user_passwords",
     "CROSS_OFFICE_ALIAS",
     "EffectivePermissions",
     "FULL_ACCESS_ROLES",

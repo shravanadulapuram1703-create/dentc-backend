@@ -1,8 +1,8 @@
 """Who is on the account (AL-11).
 
 The legacy **Account Ledger** and the legacy **BALANCES** table are scoped to the
-*account* — every patient sharing the anchor patient's ``responsible_party_id`` —
-not to the single patient. ``patients.responsible_party_id`` is a free-form string
+*account* — every patient on the anchor's ``account_id`` (RP-3) — not to the single
+patient. ``patients.responsible_party_id`` is a free-form string
 (migrated guarantor keys are legacy ids, app-created ones are the numeric
 ``responsible_parties.id``), so members are matched on the **raw string**, exactly
 as ``patient_overview_service`` / ``patient_intake_service`` already do.
@@ -39,15 +39,17 @@ def account_members(db: Session, patient: Patient, tenant_id: int) -> list[Patie
     Ordered deterministically so a server-paginated merged feed is stable across
     calls (the running balance is recomputed per page request).
     """
-    rp_key = (patient.responsible_party_id or "").strip()
-    if not rp_key:
+    # RP-3: membership is ``patients.account_id`` — no longer "everyone holding
+    # the same responsible_party_id string", which merged unrelated families
+    # whenever a self-guarantor's patient id equalled an RP row id (RP-1).
+    if patient.account_id is None:
         return [patient]
-    rows = db.execute(
+    rows = list(db.execute(
         select(Patient).where(
             Patient.tenant_id == tenant_id,
-            Patient.responsible_party_id == rp_key,
+            Patient.account_id == patient.account_id,
         )
-    ).scalars().all()
+    ).scalars().all())
     if not any(p.id == patient.id for p in rows):
         rows.append(patient)
     rows.sort(key=lambda p: (p.id != patient.id, (p.last_name or ""), (p.first_name or ""), p.id))

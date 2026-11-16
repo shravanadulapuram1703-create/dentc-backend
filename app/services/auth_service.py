@@ -13,6 +13,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.password_policy import validate_password
 from app.core.exceptions import (
     ConflictError,
     ForbiddenError,
@@ -117,6 +118,7 @@ def signup(db: Session, data: SignupRequest) -> TokenResponse:
     is invite-only via ``POST /users``), which avoids the tenant-assignment
     security gate of injecting unauthenticated callers into an existing tenant.
     """
+    validate_password(data.password)  # PWD-RBAC-3
     if db.execute(select(Tenant.id).where(Tenant.code == data.practice_code)).scalar_one_or_none():
         raise ConflictError("A practice with this code already exists", code="tenant_exists")
     if db.execute(

@@ -152,3 +152,37 @@ def get_pagination(
 
 
 PageParams = Annotated[Pagination, Depends(get_pagination)]
+
+
+def reject_unknown_query_params(request: Request) -> None:
+    """IMG-DOC-6: 422 a query param the route does not declare.
+
+    ``GET /patient-documents?context=note`` used to return every row with a 200
+    because FastAPI ignores undeclared params — that is how the Imaging/Documents
+    mix-up went unnoticed. Opt-in per route (``dependencies=[...]``), not
+    API-wide: older clients send stray params to many generic lists. The
+    allowed set is read off the route itself, so it cannot drift from the
+    signature (and therefore from OpenAPI).
+    """
+    from fastapi.dependencies.utils import get_flat_dependant  # noqa: PLC0415
+
+    from app.core.config import settings  # noqa: PLC0415
+    from app.core.exceptions import ValidationError  # noqa: PLC0415
+
+    if not settings.DOCUMENT_LIST_REJECT_UNKNOWN_PARAMS:
+        return
+    route = request.scope.get("route")
+    dependant = getattr(route, "dependant", None)
+    if dependant is None:
+        return
+    allowed = {p.alias for p in get_flat_dependant(dependant).query_params}
+    unknown = sorted(k for k in request.query_params.keys() if k not in allowed)
+    if unknown:
+        raise ValidationError(
+            f"Unknown query parameter(s): {', '.join(unknown)}",
+            code="unknown_query_parameter",
+            details={"unknown": unknown, "allowed": sorted(allowed)},
+        )
+
+
+RejectUnknownQuery = Depends(reject_unknown_query_params)

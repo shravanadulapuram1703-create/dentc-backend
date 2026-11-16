@@ -11,9 +11,15 @@ Routing
 Every patient file lives under one ``documents/`` root, so the bucket has a single
 shape instead of several top-level branches::
 
-    context=note    -> gs://{BUCKET}/{GCS_NOTES_PREFIX}/{tenant}/{patient}/{uuid}{ext}
-    consent type    -> gs://{BUCKET}/{GCS_CONSENT_FORMS_PREFIX}/{tenant}/{patient}/{uuid}.pdf
-    everything else -> gs://{BUCKET}/{GCS_DOCUMENTS_PREFIX}/{tenant}/{patient}/{uuid}{ext}
+    context=note       -> gs://{BUCKET}/{GCS_NOTES_PREFIX}/{tenant}/{patient}/{uuid}{ext}
+    context=consent    -> gs://{BUCKET}/{GCS_CONSENT_FORMS_PREFIX}/{tenant}/{patient}/{uuid}.pdf
+    context=documents  -> gs://{BUCKET}/{GCS_DOCUMENTS_PREFIX}/{tenant}/{patient}/{uuid}{ext}
+    any other context  -> gs://{BUCKET}/{GCS_CONTEXT_PREFIXES[context]}/...  (IMG-DOC-1)
+
+A caller that declares no context gets one *inferred* from ``document_type``
+(``document_vocabulary.infer_context`` — a consent type is ``consent``, the
+Imaging labels are ``imaging``, …), so a client that has not cut over still
+files correctly and the row records the same owner the backfill would give it.
 
 **Context wins over document type.** A consent form uploaded from the Notes
 screen is filed with the note, not with the practice's consent library — the note
@@ -48,9 +54,9 @@ from pathlib import Path
 
 from app.core import filestore
 from app.core.config import settings
-from app.core.exceptions import ValidationError
 from app.core.logging import get_logger
 from app.integrations import object_storage as obj
+from app.services import document_vocabulary as vocab
 
 logger = get_logger(__name__)
 
@@ -78,23 +84,26 @@ def is_consent_type(document_type: str | None) -> bool:
     }
 
 
-# Upload contexts — "which screen is this file attached to". Deliberately a short
-# closed set: each one is a folder in a real bucket, so a free-text value would
-# let a typo create a new folder nobody knows to look in.
-CONTEXT_NOTE = "note"
-DOCUMENT_CONTEXTS = (CONTEXT_NOTE,)
+# Upload contexts — "which screen owns this file" (IMG-DOC-1). The vocabulary
+# lives once in ``document_vocabulary``; re-exported here for existing callers.
+CONTEXT_NOTE = vocab.CONTEXT_NOTE
+DOCUMENT_CONTEXTS = vocab.DOCUMENT_CONTEXTS
+normalize_context = vocab.normalize_context
 
 
-def normalize_context(context: str | None) -> str | None:
-    """Validate and canonicalise an upload ``context``; None when not supplied."""
-    value = (context or "").strip().lower() or None
-    if value is not None and value not in DOCUMENT_CONTEXTS:
-        raise ValidationError(
-            f"context must be one of {', '.join(DOCUMENT_CONTEXTS)}",
-            code="invalid_document_context",
-            details={"allowed_contexts": list(DOCUMENT_CONTEXTS)},
-        )
-    return value
+def resolve_context(document_type: str | None = None, context: str | None = None) -> str:
+    """The owning module: the declared ``context`` (validated), else inferred."""
+    return vocab.normalize_context(context) or vocab.infer_context(document_type)
+
+
+def prefix_for_context(context: str) -> str:
+    if context == vocab.CONTEXT_NOTE:
+        return settings.GCS_NOTES_PREFIX
+    if context == vocab.CONTEXT_CONSENT:
+        return settings.GCS_CONSENT_FORMS_PREFIX
+    if context == vocab.CONTEXT_DOCUMENTS:
+        return settings.GCS_DOCUMENTS_PREFIX
+    return (settings.GCS_CONTEXT_PREFIXES or {}).get(context) or settings.GCS_DOCUMENTS_PREFIX
 
 
 def prefix_for(document_type: str | None = None, context: str | None = None) -> str:
@@ -103,11 +112,7 @@ def prefix_for(document_type: str | None = None, context: str | None = None) -> 
     Context first, then document type. See the module docstring for why a
     consent form uploaded from a note goes to the notes prefix.
     """
-    if normalize_context(context) == CONTEXT_NOTE:
-        return settings.GCS_NOTES_PREFIX
-    if is_consent_type(document_type):
-        return settings.GCS_CONSENT_FORMS_PREFIX
-    return settings.GCS_DOCUMENTS_PREFIX
+    return prefix_for_context(resolve_context(document_type, context))
 
 
 def object_key(
@@ -179,6 +184,47 @@ def store(
 
     rel, url = filestore.save_file(f"{prefix}/{tenant_id}/{patient_id}", file_name, data)
     return StoredObject(backend=LOCAL, bucket=None, path=rel, url=url)
+
+
+def relocate(doc, context: str) -> bool:  # noqa: ANN001 - PatientDocument
+    """IMG-DOC-5: move ``doc``'s bytes under ``context``'s prefix, in place.
+
+    Copy first, re-point the row, then remove the source (best effort — a
+    bucket retention policy may refuse the delete, which leaves a stray copy,
+    never a row pointing at nothing). Returns False (row untouched) when the
+    copy fails; the caller still changes the owning context, because the row,
+    not the folder, is what the screens read.
+    """
+    old_path = doc.storage_path or doc.file_path
+    if not old_path:
+        return False
+    tail = old_path.split("/")
+    # {prefix...}/{tenant}/{patient}/{file}: keep the last three segments.
+    suffix = "/".join(tail[-3:]) if len(tail) >= 3 else old_path
+    new_path = f"{prefix_for_context(context)}/{suffix}"
+    if new_path == old_path:
+        return True
+    try:
+        if getattr(doc, "storage_backend", LOCAL) == GCS and doc.storage_bucket:
+            obj.copy_object(doc.storage_bucket, old_path, new_path)
+            try:
+                obj.delete_object(doc.storage_bucket, old_path)
+            except Exception as exc:  # noqa: BLE001 - retention lock, IAM
+                logger.warning("Relocated gs://%s/%s but could not remove the source: %s",
+                               doc.storage_bucket, old_path, exc)
+        else:
+            src = Path(settings.UPLOAD_DIR) / old_path
+            if not src.is_file():
+                return False
+            dst = Path(settings.UPLOAD_DIR) / new_path
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            src.replace(dst)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Relocating document %s to %s failed: %s", doc.id, new_path, exc)
+        return False
+    doc.storage_path = new_path
+    doc.file_path = new_path
+    return True
 
 
 def public_url(doc) -> str:  # noqa: ANN001 - PatientDocument (import cycle otherwise)

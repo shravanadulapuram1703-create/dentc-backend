@@ -100,6 +100,13 @@ _ZERO = Decimal("0")
 
 
 # ── small helpers ─────────────────────────────────────────────────────────────
+def _guarantor_person(db, patient):  # noqa: ANN001, ANN202
+    """RP-2: the typed guarantor (Patient or ResponsibleParty)."""
+    from app.services.family_account_service import guarantor_person  # noqa: PLC0415
+
+    return guarantor_person(db, patient)
+
+
 def _f(value: Any) -> float:  # noqa: ANN401
     return float(value or 0)
 
@@ -433,15 +440,19 @@ def render_overview(db: Session, patient_id: int, tenant_id: int) -> bytes:
     report.paragraph("Medical Alerts", alert_text, red=True)
 
     # ---- Responsible Party --------------------------------------------------
-    rp = patient_overview_service.resolve_responsible_party(db, tenant_id, patient.responsible_party_id)
-    legacy_rp = (rp.legacy_id if rp and rp.legacy_id else None) or (patient.responsible_party_id or "")
+    rp = _guarantor_person(db, patient)
+    legacy_rp = (rp.legacy_id if rp and rp.legacy_id else None) or (
+        patient.responsible_party_id or "" if rp is None else "")
     report.section_title("Responsible Party")
     report.key_value_table([
         ["Name", _last_first(rp.last_name, rp.first_name) if rp else _last_first(patient.last_name, patient.first_name),
          "Cell", cell((rp.cell_phone if rp else None) or patient.cell_phone)],
-        ["Resp ID", f"{rp.id if rp else '-'}{f' (Legacy ID {legacy_rp})' if legacy_rp else ''}",
+        ["Resp ID", (f"{rp.id if rp else '-'}"
+                     + (" (Patient ID)" if rp is not None and patient.guarantor_party_id is None else "")
+                     + (f" (Legacy ID {legacy_rp})" if legacy_rp and patient.guarantor_party_id else "")),
          "Email", cell((rp.email if rp else None) or patient.email)],
-        ["Type", _label(rptype, rp.resp_party_type) if rp and rp.resp_party_type else _label(pattype, patient.patient_type),
+        ["Type", _label(rptype, rp.resp_party_type) if getattr(rp, "resp_party_type", None)
+         else _label(pattype, patient.patient_type),
          "Home Office", office.name if office else "-"],
     ])
 
@@ -561,7 +572,7 @@ def render_overview(db: Session, patient_id: int, tenant_id: int) -> bytes:
         mb = member_balances.get(m.id) or {}
         aging = mb.get("aging") or {}
         vals = [_f(aging.get("current")), _f(aging.get("b30")), _f(aging.get("b60")), _f(aging.get("b90")),
-                _f(aging.get("b120")), _f(mb.get("account_balance", mb.get("balance"))),
+                _f(aging.get("b120")), _f(mb.get("balance")),
                 _f(mb.get("estimated_patient")), _f(mb.get("estimated_insurance"))]
         for k, v in zip(totals, vals, strict=True):
             totals[k] += v
@@ -934,7 +945,7 @@ def render_transactions(db: Session, patient_id: int, tenant_id: int, day: date 
     except Exception:  # noqa: BLE001
         balance = {}
     totals = day_totals(db, patient.id, tenant_id, day)
-    rp = patient_overview_service.resolve_responsible_party(db, tenant_id, patient.responsible_party_id)
+    rp = _guarantor_person(db, patient)
     slots = _insurance_slots(db, patient.id)
     prim = _pick_slot(slots, "D", "primary") or next(iter(slots), None)
     sec = _pick_slot(slots, "D", "secondary")

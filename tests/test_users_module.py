@@ -43,7 +43,7 @@ def test_roles_catalog(client):
 def test_create_user_complete_persists_all_sections(client, db_session, office_and_group):
     office, group = office_and_group
     body = {
-        "email": "newdoc@x.com", "username": "newdoc", "password": "secret12",
+        "email": "newdoc@x.com", "username": "newdoc", "password": "Secret12!",
         "first_name": "New", "last_name": "Doc", "role": "provider",
         "patient_access_level": "full",
         "home_office_id": office.id, "assigned_offices": [office.id],
@@ -73,7 +73,7 @@ def test_create_user_complete_persists_all_sections(client, db_session, office_a
 def test_update_user_complete_reconciles(client, db_session, office_and_group):
     office, group = office_and_group
     created = client.post("/api/v1/users/complete", json={
-        "email": "u@x.com", "username": "u_complete", "password": "secret12",
+        "email": "u@x.com", "username": "u_complete", "password": "Secret12!",
         "assigned_offices": [office.id], "group_ids": [group.id],
     }).json()
     uid = created["id"]
@@ -117,18 +117,18 @@ def test_security_settings_upsert(client, db_session):
 def test_change_my_password(client):
     # Wrong current password -> 401.
     bad = client.post("/api/v1/users/me/change-password",
-                      json={"current_password": "wrong", "new_password": "brandnew123"})
+                      json={"current_password": "wrong", "new_password": "Brandnew123!"})
     assert bad.status_code == 401
     # Correct current password -> 204.
     ok = client.post("/api/v1/users/me/change-password",
-                     json={"current_password": TEST_PASSWORD, "new_password": "brandnew123"})
+                     json={"current_password": TEST_PASSWORD, "new_password": "Brandnew123!"})
     assert ok.status_code == 204
 
 
 def test_create_user_complete_persists_structural_fields(client, db_session):
     """users_missing_fields dev-report gaps 1-4 round-trip through /complete."""
     body = {
-        "email": "kri@x.com", "username": "kriuda", "password": "secret12",
+        "email": "kri@x.com", "username": "kriuda", "password": "Secret12!",
         "short_id": "KRIUDA", "custom_1": "C1", "custom_2": "C2",
         "signature_data": "data:image/png;base64,AAAA",
     }
@@ -145,7 +145,7 @@ def test_audit_fields_created_and_updated(client, db_session):
     """Gap #8: created/updated *_by ids + resolved names on UserRead."""
     admin_id = db_session._admin.id
     created = client.post("/api/v1/users", json={
-        "email": "audit@x.com", "username": "audituser", "password": "secret12",
+        "email": "audit@x.com", "username": "audituser", "password": "Secret12!",
     }).json()
     uid = created["id"]
     # On create: created_by + name set; updated_* still empty.
@@ -173,7 +173,7 @@ def test_audit_updated_by_via_complete(client, db_session):
     """Gap #8: PUT /users/{id}/complete records the editing actor."""
     admin_id = db_session._admin.id
     uid = client.post("/api/v1/users/complete", json={
-        "email": "ac@x.com", "username": "ac_complete", "password": "secret12",
+        "email": "ac@x.com", "username": "ac_complete", "password": "Secret12!",
     }).json()["id"]
     r = client.put(f"/api/v1/users/{uid}/complete", json={"first_name": "Edited"})
     assert r.status_code == 200, r.text
@@ -183,7 +183,7 @@ def test_audit_updated_by_via_complete(client, db_session):
 
 def test_short_id_unique_per_tenant(client):
     """Gap #1: short_id must be unique within a tenant -> 409 on collision."""
-    base = {"password": "secret12", "short_id": "ABC123"}
+    base = {"password": "Secret12!", "short_id": "ABC123"}
     assert client.post("/api/v1/users/complete",
                        json={**base, "email": "a@x.com", "username": "alpha"}).status_code == 201
     dup = client.post("/api/v1/users/complete",
@@ -232,7 +232,7 @@ def test_user_image_upload_and_delete(client, db_session):
 def test_list_users_office_and_role_filter(client, db_session, office_and_group):
     office, _ = office_and_group
     client.post("/api/v1/users/complete", json={
-        "email": "f@x.com", "username": "filtered", "password": "secret12",
+        "email": "f@x.com", "username": "filtered", "password": "Secret12!",
         "role": "provider", "assigned_offices": [office.id],
     })
     # office_id filter (join via user_offices).

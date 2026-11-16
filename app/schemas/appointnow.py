@@ -263,7 +263,19 @@ class ApproveInput(BaseModel):
     # The server books atomically; these only steer that booking.
     appointment_id: str | None = None  # honoured only if the server can't book itself
     patient_id: int | None = None  # link to an existing patient (AN-9 match chosen by staff)
-    create_patient: bool = False  # create/match a patient from the contact details (AN-9)
+    # AN-32: defaults to true — an approve with no patient used to book
+    # ``appointments.patient_id = NULL``. Explicit ``false`` with no
+    # ``patient_id`` is 422 ``patient_required``; a patient-less booking is no
+    # longer representable.
+    create_patient: bool = True
+    # AN-31: a *strong* duplicate (full name + DOB/phone/e-mail, the
+    # registration rule) is 409 ``duplicate_patient`` with
+    # ``details.candidates[]`` — staff answer with ``patient_id`` (book for that
+    # patient) or ``force_create`` (create a separate one).
+    force_create: bool = False
+    # AN-31: link the candidate instead of 409 when exactly ONE strong match
+    # exists (used by the unattended post-payment booking).
+    link_existing_match: bool = False
     provider_id: str | None = None  # override the requested provider
     operatory_id: str | None = None  # place into a specific chair
     # AN-27: approve a payment-required request with no recorded payment
@@ -317,6 +329,23 @@ class PatientMatch(BaseModel):
     email: str | None = None
     dob: date | None = None
     match_on: list[str] = Field(default_factory=list)  # e.g. ["phone", "dob"]
+    # AN-35: the same scoring as ``POST /patients/check-duplicate``.
+    first_name: str | None = None
+    last_name: str | None = None
+    match_score: int = 0
+    is_strong: bool = False  # would refuse a create (409 duplicate_patient)
+
+
+class LinkPatientInput(BaseModel):
+    """AN-30: attach a patient to an already-approved request + its appointment.
+
+    Either ``patient_id`` (an existing patient), or ``create_patient`` to
+    register/match the request contact with the same rules as approve."""
+
+    patient_id: int | None = None
+    create_patient: bool = False
+    force_create: bool = False
+    link_existing_match: bool = False
 
 
 # ── Payment flow (AN-27) ─────────────────────────────────────────────────────
@@ -324,7 +353,10 @@ class PaymentBookingInput(BaseModel):
     """What to book once the payment lands (the ApproveInput steering fields)."""
 
     patient_id: int | None = None
-    create_patient: bool = False
+    # AN-32: the post-payment booking runs with no staff present, so it always
+    # creates/matches a patient and links a single strong match (AN-31).
+    create_patient: bool = True
+    force_create: bool = False
     provider_id: str | None = None
     operatory_id: str | None = None
 

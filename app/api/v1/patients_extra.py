@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, Path, Query, Response, Uploa
 from starlette.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import CurrentUser, DbSession, PageParams, TenantId, get_current_user
+from app.api.deps import CurrentUser, DbSession, PageParams, RejectUnknownQuery, TenantId, get_current_user
 from app.core import filestore
 from app.schemas.common import ErrorResponse, PaginatedResponse
 from app.schemas.letters import ConsentSignRequest, ConsentCountersignRequest, ConsentCountersignVoidRequest
@@ -22,9 +22,11 @@ from app.schemas.patient_extra import (
     DuplicateCheckResponse,
     PatientConsentSignedRead,
     PatientDocumentRead,
+    PatientDocumentUpdate,
     UploadLimits,
 )
 from app.services import document_store
+from app.services import document_vocabulary as doc_vocab
 from app.schemas.signature import ConsentSignatureRead
 from app.services import patient_extra_service as svc
 from app.services import signature_service as sig_svc
@@ -40,24 +42,37 @@ documents_router = APIRouter(prefix="/patient-documents", tags=["Patients"], dep
     "",
     response_model=PaginatedResponse[PatientDocumentRead],
     operation_id="list_patient_documents",
-    summary="Patient documents, filtered and paged (LTR-12)",
+    summary="Patient documents, filtered and paged (LTR-12, IMG-DOC-2)",
+    dependencies=[RejectUnknownQuery],
 )
 def list_documents(
     db: DbSession,
     tenant_id: TenantId,
     page: PageParams,
     patient_id: Annotated[int | None, Query(description="Scope to one patient")] = None,
-    document_type: Annotated[str | None, Query(description="e.g. consent-form")] = None,
+    document_type: Annotated[str | None, Query(
+        description="One type, or a comma list (e.g. 'consent-form' or 'IC,ID'). "
+                    "Case-insensitive; a code also matches its catalog label and "
+                    "known spellings ('XR' ~ 'X-Ray / Image').")] = None,
+    context: Annotated[list[str] | None, Query(
+        description="IMG-DOC-2: owning module(s) - repeat the param or comma-separate "
+                    "(context=documents&context=note). See /patient-documents/limits.")] = None,
+    exclude_context: Annotated[list[str] | None, Query(
+        description="IMG-DOC-2: owning module(s) to leave out")] = None,
     office_id: Annotated[int | None, Query()] = None,
     procedure_id: Annotated[str | None, Query(
         description="PROC-7c: documents linked to one posted procedure")] = None,
     claim_id: Annotated[str | None, Query(
         description="PROC-7c: documents linked to one insurance claim")] = None,
 ):
+    """IMG-DOC-6: an undeclared query param is a 422 ``unknown_query_parameter``
+    here, so a filter the server does not support can never come back as an
+    unfiltered 200."""
     items, total = svc.list_documents(
         db, tenant_id, patient_id,
         document_type=document_type, office_id=office_id,
         procedure_id=procedure_id, claim_id=claim_id,
+        context=context, exclude_context=exclude_context,
         search=page.search, page=page.page, size=page.size,
     )
     return PaginatedResponse.build(items, total, page.page, page.size)
@@ -73,8 +88,10 @@ async def upload_document(
     document_type: Annotated[str | None, Form()] = None,
     description: Annotated[str | None, Form()] = None,
     context: Annotated[str | None, Form(
-        description="Which screen the file is attached to, e.g. 'note'. Decides the "
-                    "storage folder; see GET /patient-documents/limits for the list.",
+        description="IMG-DOC-1: the owning module (documents, imaging, note, patient_photo, "
+                    "letter, consent, progress_note, restorative, treatment_plan). Stored on "
+                    "the row and decides the storage folder; inferred from document_type "
+                    "when omitted. See GET /patient-documents/limits.",
     )] = None,
     procedure_id: Annotated[str | None, Form(
         description="PROC-7c: the posted procedure this document supports (must belong to "
@@ -111,16 +128,21 @@ async def upload_document(
     operation_id="get_patient_document_limits",
     summary="The upload size cap and content-type allow-list the API enforces (NOTE-DOC-5)",
 )
-def get_document_limits():
+def get_document_limits(db: DbSession, tenant_id: TenantId):
     """Published so the file picker states exactly the limits the API enforces,
-    and knows which ``context`` values the upload accepts.
+    knows which ``context`` values the upload accepts, and (IMG-DOC-4) reads its
+    type options from the same catalog the server validates against.
 
     Declared before ``/{document_id}`` so the literal path wins over the int
     parameter.
     """
+    vocabulary = doc_vocab.vocabulary(db, tenant_id)
     return {
         **filestore.upload_limits(),
         "allowed_contexts": list(document_store.DOCUMENT_CONTEXTS),
+        "movable_contexts": vocabulary["movable_contexts"],
+        "document_type_enforced": vocabulary["document_type_enforced"],
+        "document_types": vocabulary["document_types"],
     }
 
 
@@ -148,6 +170,24 @@ def get_document_content(db: DbSession, tenant_id: TenantId, document_id: Annota
         headers["Content-Length"] = str(size)
     return StreamingResponse(
         body, media_type=content_type or "application/octet-stream", headers=headers
+    )
+
+
+@documents_router.patch(
+    "/{document_id}",
+    response_model=PatientDocumentRead,
+    operation_id="update_patient_document",
+    summary="Re-file (Documents <-> Imaging), re-type or re-describe a document (IMG-DOC-5)",
+)
+def update_document(
+    db: DbSession, tenant_id: TenantId, current: CurrentUser,
+    document_id: Annotated[int, Path()], body: PatientDocumentUpdate,
+):
+    """Moves the file without delete + re-upload. Only ``documents`` <->
+    ``imaging``; any other owner is 422 ``context_not_movable``. The change is
+    audited (before/after incl. the storage path)."""
+    return svc.update_document(
+        db, tenant_id, document_id, body.model_dump(exclude_unset=True), current.id,
     )
 
 
