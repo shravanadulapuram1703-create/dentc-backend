@@ -321,7 +321,10 @@ def build_context(
 
     # RP-2: the typed guarantor (a Patient for self / head of household, a
     # ResponsibleParty for a non-patient) — same demographic attribute names.
-    from app.services.family_account_service import guarantor_person  # noqa: PLC0415
+    from app.services.family_account_service import (  # noqa: PLC0415
+        guarantor_payload,
+        guarantor_person,
+    )
 
     rp = guarantor_person(db, patient)
     referred_by = _referred_by(db, tenant_id, patient)
@@ -344,7 +347,12 @@ def build_context(
         "office": office,
         "provider": provider,
         "account": account,
-        "responsible_party": rp,
+        # RP-2: ``responsible_party`` on the wire is the RP row only (a non-patient
+        # guarantor); the merge reads ``guarantor_person`` (a Patient for self /
+        # head of household), and ``guarantor`` is the typed payload.
+        "responsible_party": rp if isinstance(rp, ResponsibleParty) else None,
+        "guarantor_person": rp,
+        "guarantor": guarantor_payload(db, patient),
         "referred_by": referred_by,
         "next_appointment": next_appt,
         "next_appointment_provider": next_appt_provider,
@@ -421,7 +429,7 @@ def resolve_merge_fields(ctx: dict[str, Any]) -> dict[str, str]:
     office: Office | None = ctx.get("office")
     provider: Provider | None = ctx.get("provider")
     account: AccountSettings | None = ctx.get("account")
-    rp: ResponsibleParty | None = ctx.get("responsible_party")
+    rp = ctx.get("guarantor_person") or ctx.get("responsible_party")
     ref: Referral | None = ctx.get("referred_by")
     balance: dict | None = ctx.get("balance")
     teeth: list[str] = ctx.get("treatment_plan_teeth") or []

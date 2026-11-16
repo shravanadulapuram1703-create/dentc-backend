@@ -395,7 +395,7 @@ def get_patient_context(db: Session, patient_id: int, tenant_id: int) -> dict:
 
     guarantor = family_account_service.guarantor_payload(db, patient)
     responsible_party = None
-    if guarantor["kind"] != "unresolved":
+    if guarantor["kind"] != "unresolved" and guarantor["id"] is not None:
         responsible_party = {
             "id": guarantor["id"],
             "kind": guarantor["kind"],

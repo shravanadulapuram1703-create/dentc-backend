@@ -178,13 +178,40 @@ def guarantors_for(db: Session, patients) -> dict[int, dict]:  # noqa: ANN001
     rpids = {p.guarantor_party_id for p in rows if p.guarantor_party_id is not None}
     by_rp = {r.id: r for r in db.execute(
         select(ResponsibleParty).where(ResponsibleParty.id.in_(rpids))).scalars()} if rpids else {}
+    late = _late_imported_parties(db, [p for p in rows if guarantor_kind(p) == "unresolved"])
     out = {}
     for p in rows:
         kind = guarantor_kind(p)
         person = (by_pid.get(p.guarantor_patient_id) if kind in ("self", "patient")
                   else by_rp.get(p.guarantor_party_id) if kind == "responsible_party" else None)
+        if kind == "unresolved" and p.id in late:
+            person = late[p.id]
+            payload = _payload(p, person, "responsible_party")
+            payload.update(id=person.id, responsible_party_id=person.id)
+            out[p.id] = payload
+            continue
         out[p.id] = _payload(p, person, kind)
     return out
+
+
+def _late_imported_parties(db: Session, unresolved) -> dict[int, ResponsibleParty]:  # noqa: ANN001
+    """A migrated, unresolved RPID whose guarantor was imported *after* the
+    backfill (RP-14) is resolved at read time by ``legacy_id`` — the pre-RP
+    behaviour — until ``import_legacy_responsible_parties`` links it."""
+    keys = {(p.tenant_id, (p.responsible_party_id or "").strip()) for p in unresolved}
+    keys = {k for k in keys if k[1]}
+    if not keys:
+        return {}
+    rows = db.execute(select(ResponsibleParty).where(
+        ResponsibleParty.legacy_id.in_({k for _, k in keys}),
+        ResponsibleParty.tenant_id.in_({t for t, _ in keys}),
+    ).order_by(ResponsibleParty.id)).scalars().all()
+    by_key: dict[tuple, ResponsibleParty] = {}
+    for r in rows:
+        by_key.setdefault((r.tenant_id, r.legacy_id), r)
+    return {p.id: by_key[(p.tenant_id, (p.responsible_party_id or "").strip())]
+            for p in unresolved
+            if (p.tenant_id, (p.responsible_party_id or "").strip()) in by_key}
 
 
 def guarantor_payload(db: Session, patient: Patient) -> dict:
@@ -202,7 +229,7 @@ def guarantor_person(db: Session, patient: Patient):  # noqa: ANN201
             Patient, patient.guarantor_patient_id)
     if patient.guarantor_party_id is not None:
         return db.get(ResponsibleParty, patient.guarantor_party_id)
-    return None
+    return _late_imported_parties(db, [patient]).get(patient.id)
 
 
 def sync_alias(patient: Patient) -> None:
