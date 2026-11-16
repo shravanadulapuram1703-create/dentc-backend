@@ -34,6 +34,7 @@ from app.core.exceptions import ConflictError, NotFoundError
 from app.crud.base import CRUDBase
 from app.db.models import Patient, Prescription, PrescriptionLibrary
 from app.services import medical_alert_summary_service as summary_svc
+from app.services import permission_service
 from app.services.medical_history_catalog import to_code
 
 #: A label shorter than this is never matched by substring against the drug
@@ -210,6 +211,21 @@ class PrescriptionCRUD(CRUDBase[Prescription]):
         obj = super().create(db, payload, tenant_id=tenant_id, created_by=created_by)
         obj.warnings = warnings  # transient echo on the 201 (PrescriptionRead.warnings)
         return obj
+
+    def update(self, db: Session, obj_id: Any, data: dict[str, Any], *,  # noqa: ANN401
+               tenant_id: int | None = None, updated_by: int | None = None) -> Prescription:
+        """RBAC-6: Strike-off is ``is_active`` true -> false (a prescription is
+        otherwise immutable on the screen), gated on
+        ``patient_prescription_strike_off`` only when the PATCH actually strikes
+        the row off — re-sending ``false`` on a struck row is not a 403."""
+        if data.get("is_active") is False:
+            current = self.get(db, obj_id, tenant_id=tenant_id)
+            if current.is_active is not False:
+                permission_service.assert_actor_permission(
+                    db, updated_by, permission_service.PRESCRIPTION_STRIKE_OFF,
+                    action="strike off a prescription",
+                )
+        return super().update(db, obj_id, data, tenant_id=tenant_id, updated_by=updated_by)
 
 
 __all__ = ["PrescriptionCRUD", "check_alerts", "match_warnings"]

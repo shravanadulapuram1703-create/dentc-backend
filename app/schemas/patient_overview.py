@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from app.schemas.guarantor import Guarantor
 from app.schemas.billing import PatientBalance
 from app.schemas.patient import PatientRead
 from app.schemas.patient_intake import RosterPatientRead
@@ -19,7 +20,10 @@ class PatientOverviewResponse(BaseModel):
     patient: PatientRead
     balance: PatientBalance
     visit: dict[str, Any] = Field(default_factory=dict)
+    # RP-2: the RP row only when the guarantor is a non-patient party.
     responsible_party: Optional[dict[str, Any]] = None
+    guarantor: Optional[Guarantor] = None
+    account_id: Optional[int] = None
     account_members: list[RosterPatientRead] = Field(default_factory=list)
     appointments: list[dict[str, Any]] = Field(default_factory=list)
     recalls: list[dict[str, Any]] = Field(default_factory=list)

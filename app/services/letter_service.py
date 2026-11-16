@@ -59,7 +59,6 @@ from app.db.models import (
     TreatmentPlanItem,
 )
 from app.services import balance_service
-from app.services.patient_overview_service import resolve_responsible_party
 
 # ── Merge-field catalog ──────────────────────────────────────────────────────
 # (token, group, label) — the group is what the Setup UI can render as a section.
@@ -320,7 +319,11 @@ def build_context(
         select(AccountSettings).where(AccountSettings.tenant_id == tenant_id)
     ).scalar_one_or_none()
 
-    rp = resolve_responsible_party(db, tenant_id, patient.responsible_party_id)
+    # RP-2: the typed guarantor (a Patient for self / head of household, a
+    # ResponsibleParty for a non-patient) — same demographic attribute names.
+    from app.services.family_account_service import guarantor_person  # noqa: PLC0415
+
+    rp = guarantor_person(db, patient)
     referred_by = _referred_by(db, tenant_id, patient)
     next_appt, last_appt = _appointments(db, patient_id, today)
     # LTR-13: resolve BOTH appointment providers. The merge falls back from the

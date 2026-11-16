@@ -1,3 +1,96 @@
+# AppointNow — Backend Response (round 4: AN-30 … AN-35)
+
+> **Answers:** §0b of [appointnow_backend_devreport.md](appointnow_backend_devreport.md) (2026-11-16)
+> **Alembic:** none — no schema change.
+> **Code:** [app/services/appointnow_service.py](../../app/services/appointnow_service.py)
+> (`resolve_patient`, `link_patient`, `find_patient_matches`),
+> [app/api/v1/appointnow.py](../../app/api/v1/appointnow.py), [app/schemas/appointnow.py](../../app/schemas/appointnow.py),
+> [app/services/appointnow_payment_service.py](../../app/services/appointnow_payment_service.py) (`_Booking`),
+> [app/services/patient_service.py](../../app/services/patient_service.py) (`PatientCRUD.create(commit=False)`),
+> [app/services/patient_extra_service.py](../../app/services/patient_extra_service.py) (`check_duplicate` matches `cell_phone`),
+> [scripts/backfill_appointnow_patients.py](../../scripts/backfill_appointnow_patients.py),
+> [tests/test_appointnow_module.py](../../tests/test_appointnow_module.py)
+
+| # | Item | Status |
+|---|------|--------|
+| AN-30 | Link a patient after approval | ✅ `POST /appointnow/requests/{id}/link-patient` |
+| AN-31 | `create_patient` identity rule / cell phone / `force_create` / no intermediate commit | ✅ all four |
+| AN-32 | No patient-less booking | ✅ `create_patient` defaults **true**; explicit `false` without `patient_id` → 422 `patient_required` |
+| AN-33 | Backfill | ✅ script shipped, **dry run only** (8 rows on the dev DB, all tenant 1 / office 2) |
+| AN-34 | Two-call approve not atomic | ✅ closed by AN-31d — send `create_patient` (or nothing) and drop the register call |
+| AN-35 | Insurance info / match ranking | ✅ insurance → patient note on create; `patient-matches` uses the `/patients/check-duplicate` scorer |
+
+### Approve — the contract now (`POST /appointnow/requests/{id}/approve`)
+
+`ApproveInput` = `{patient_id?, create_patient = true, force_create = false, link_existing_match = false, provider_id?, operatory_id?, waive_payment}`.
+
+1. `patient_id` → books for that patient (tenant-checked, 422 `bad_patient`).
+2. Otherwise the contact is registered with the **registration identity rule** (`_is_strong`:
+   full name + DOB / phone / e-mail). A phone- or e-mail-only hit (a parent's number on a
+   child's request) **never links anyone**.
+   - strong duplicate(s) → **409 `duplicate_patient`**, `error.details = {candidates[], override_field: "force_create", link_field: "patient_id"}` — the same `candidates[]` shape as `/patients/register`. Staff answer with a re-approve carrying `patient_id` (book for that patient) or `force_create: true` (create a separate one).
+   - `link_existing_match: true` links when there is exactly **one** strong candidate instead of 409ing.
+   - no strong duplicate → patient created with first/last name, DOB, e-mail, **`cell_phone`** (not `phone`), `home_office_id` = request office.
+3. `create_patient: false` with no `patient_id` → **422 `patient_required`**.
+
+The patient is created **without an intermediate commit** — a later `slot_conflict` / `no_provider`
+rolls it back with the appointment, so the frontend can drop its two-call flow and in-session cache.
+
+**Unattended post-payment booking** (Stripe webhook / `mark-paid`) always creates/matches a
+patient with `link_existing_match` on — a stored pre-AN-32 `booking.create_patient: false` is ignored.
+Several strong candidates → the booking is refused and lands as `booking_error`
+(`duplicate_patient: …`) for staff to approve by hand, the money stays recorded. A paid
+online booking now normally has a patient, so the payment posts to the ledger instead of
+sitting unapplied.
+
+### Link after approval (AN-30) — `POST /appointnow/requests/{id}/link-patient`
+
+Body `{patient_id?, create_patient = false, force_create, link_existing_match}`; gated by
+`appointnow_approve_booking` (same as approve). Sets `booking_requests.patient_id` **and**
+`appointments.patient_id` in one transaction and returns `BookingRequestRead`.
+
+- 409 `request_not_approved` before approval; 409 `patient_already_linked` when the request or the appointment already names a **different** patient (or they disagree with each other).
+- Same patient again → 200 (idempotent). Body with neither field on a half-linked pair → repairs from the side that has the patient; with `create_patient` on a half-linked pair → re-uses that patient, never creates a second.
+- `create_patient` follows the approve rules above (409 `duplicate_patient` + candidates).
+- A paid request's unapplied online payment is posted to the newly linked patient's ledger.
+- Publishes the `appointnow.request` `updated` event.
+
+Frontend repair button: call this instead of `PATCH /appointments/{id}` — it keeps the request row
+linked (AN-UI-3 goes away).
+
+### Matching (AN-35)
+
+`GET /appointnow/requests/{id}/patient-matches` now runs `check_duplicate` (the
+`/patients/check-duplicate` scorer). Each row keeps the old fields and adds `first_name`,
+`last_name`, `match_score`, `is_strong`; sorted strong-first then score. `check_duplicate` now
+matches the phone against `cell_phone` too — Quick Save and AppointNow write the number there,
+so neither path used to recognise a patient it had created by phone.
+
+`insurance_info` becomes a `patient_notes` row (`note_type="General"`, "AppointNow request … —
+insurance provided by patient: …") when approve **creates** the patient; a linked existing
+patient is left alone.
+
+### Backfill (AN-33)
+
+```
+python -m scripts.backfill_appointnow_patients            # dry run (lists rows)
+python -m scripts.backfill_appointnow_patients --apply    # repair via link_patient
+```
+
+Rows = `status='approved'` with the request **or** the appointment unlinked. `--apply` re-uses
+`link_patient` with `create_patient` + `link_existing_match` (one strong match linked, none →
+created, several → skipped and reported); each row commits on its own. Dry run on the dev DB:
+**8 rows**, mostly `test test` contacts — review before applying, the spam ones may be better
+purged (`DELETE …/requests/{id}?force=true`).
+
+### Breaking
+
+- `ApproveInput.create_patient` default `false → true`. An empty approve body now **creates a patient** (or 409s on a strong duplicate) where it used to book patient-less.
+- `create_patient: false` alone is now 422 `patient_required`.
+- Approve-created patients store the number in `cell_phone`, not `phone`.
+
+---
+
 # AppointNow — Backend Response (round 3: AN-26 / AN-27)
 
 > **Answers:** §AN-26 / §AN-27 of [appointnow_backend_devreport.md](appointnow_backend_devreport.md) (added 2026-10-11)

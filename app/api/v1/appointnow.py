@@ -31,6 +31,7 @@ from app.schemas.appointnow import (
     AvailabilityResponse,
     BookingRequestRead,
     DeclineInput,
+    LinkPatientInput,
     MarkPaidInput,
     PatientMatch,
     PaymentWebhookAck,
@@ -255,10 +256,40 @@ def approve_request(
     body: ApproveInput | None = None,
 ) -> BookingRequestRead:
     """AN-5: atomically re-check the slot, book the appointment, link it, mark
-    approved. Optionally matches/creates a patient (AN-9)."""
+    approved. The booking always has a patient (AN-32): ``patient_id``, or the
+    default ``create_patient`` which registers the contact inside the same
+    transaction (AN-31/34) — a strong duplicate is 409 ``duplicate_patient``
+    with ``details.candidates[]`` unless ``force_create``; explicit
+    ``create_patient=false`` without ``patient_id`` is 422 ``patient_required``."""
     req = svc.approve_request(
         db, tenant_id, request_id, body or ApproveInput(), actor_id=current.id
     )
+    return BookingRequestRead(**svc.read_one(db, req))
+
+
+@staff_router.post(
+    "/requests/{request_id}/link-patient",
+    response_model=BookingRequestRead,
+    operation_id="appointnow_link_request_patient",
+    responses={409: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+    dependencies=[Depends(require_permission(
+        "appointnow_approve_booking", action="link a patient to an online booking"))],
+)
+def link_request_patient(
+    request_id: str,
+    body: LinkPatientInput,
+    db: DbSession,
+    tenant_id: TenantId,
+    current: CurrentUser,
+) -> BookingRequestRead:
+    """AN-30: link a patient to an *approved* request after the fact — sets
+    ``booking_requests.patient_id`` **and** the booked appointment's
+    ``patient_id`` in one transaction. ``patient_id`` links an existing patient;
+    ``create_patient`` registers/matches the request contact (409
+    ``duplicate_patient`` + ``details.candidates[]`` unless ``force_create``).
+    409 ``patient_already_linked`` when either row already names a different
+    patient; 409 ``request_not_approved`` before approval."""
+    req = svc.link_patient(db, tenant_id, request_id, body, actor_id=current.id)
     return BookingRequestRead(**svc.read_one(db, req))
 
 

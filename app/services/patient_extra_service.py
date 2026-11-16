@@ -26,7 +26,9 @@ from app.db.models import (
     Provider,
 )
 from app.schemas.patient_extra import DuplicateCandidate
+from app.core import audit_context
 from app.services import document_store
+from app.services import document_vocabulary as vocab
 from app.services import signature_service as sig_svc
 
 # NOTE-DOC-5: the size cap and the type allow-list live in ``filestore`` so every
@@ -82,8 +84,9 @@ def _require_patient(db: Session, patient_id: int, tenant_id: int) -> Patient:
 # ── Patient documents ────────────────────────────────────────────────────────
 def list_documents(
     db: Session, tenant_id: int, patient_id: int | None = None, *,
-    document_type: str | None = None, office_id: int | None = None,
+    document_type: str | list[str] | None = None, office_id: int | None = None,
     procedure_id: str | None = None, claim_id: str | None = None,
+    context: list[str] | None = None, exclude_context: list[str] | None = None,
     search: str | None = None, page: int = 1, size: int = 20,
 ) -> tuple[list[PatientDocument], int]:
     """LTR-12: filtered + paged, matching the rest of the API.
@@ -99,8 +102,23 @@ def list_documents(
     ]
     if patient_id is not None:
         clauses.append(PatientDocument.patient_id == patient_id)
-    if document_type:
-        clauses.append(PatientDocument.document_type == document_type)
+    # IMG-DOC-2: owner filter. Repeated or comma-separated; each value is
+    # validated, so a typo is a 422 instead of an unfiltered list.
+    contexts = vocab.parse_context_list(context)
+    if contexts:
+        clauses.append(PatientDocument.context.in_(contexts))
+    excluded = vocab.parse_context_list(exclude_context)
+    if excluded:
+        clauses.append(PatientDocument.context.not_in(excluded))
+    # Was a single exact, case-sensitive match (and a repeated param silently
+    # kept only the last value). Now any number of values, matched across every
+    # known spelling of the same code (``XR`` ~ ``X-Ray / Image``).
+    types = [document_type] if isinstance(document_type, str) else list(document_type or [])
+    types = [t.strip() for raw in types for t in str(raw).split(",") if t.strip()]
+    if types:
+        clauses.append(vocab.type_filter_clause(
+            PatientDocument.document_type, vocab.type_spellings(db, tenant_id, types),
+        ))
     if office_id is not None:
         clauses.append(PatientDocument.office_id == office_id)
     if procedure_id:
@@ -122,9 +140,20 @@ def list_documents(
         .order_by(PatientDocument.created_at.desc(), PatientDocument.id.desc())
         .offset((max(page, 1) - 1) * size).limit(size)
     ).scalars().all())
+    _stamp_labels(db, tenant_id, rows)
     for row in rows:
         _stamp_url(row)
     return rows, total
+
+
+def _stamp_labels(db: Session, tenant_id: int, rows: list[PatientDocument]) -> None:
+    """``document_type_label`` on the read: the catalog label for a code (so a
+    folded ``IC`` still renders "Insurance Card"), else the stored text."""
+    if not rows:
+        return
+    groups = {g: vocab.catalog(db, tenant_id, g) for g in vocab.BUILTIN_CATALOGS}
+    for row in rows:
+        row.document_type_label = vocab.label_for(groups, row.context, row.document_type)
 
 
 def _stamp_url(doc: PatientDocument) -> PatientDocument:
@@ -152,6 +181,7 @@ def get_document(db: Session, tenant_id: int, doc_id: int) -> PatientDocument:
     ).scalar_one_or_none()
     if doc is None or doc.is_deleted:
         raise NotFoundError(f"Document '{doc_id}' was not found")
+    _stamp_labels(db, tenant_id, [doc])
     return _stamp_url(doc)
 
 
@@ -163,17 +193,23 @@ def create_document(
 ) -> PatientDocument:
     _require_patient(db, patient_id, tenant_id)
     procedure_id, claim_id = _validate_document_links(db, patient_id, procedure_id, claim_id)
+    # IMG-DOC-1: the owning module — declared, else inferred from the type —
+    # is resolved (and validated) before a byte is written.
+    resolved_context = document_store.resolve_context(document_type, context)
+    document_type = vocab.normalize_document_type(db, tenant_id, resolved_context, document_type)
     filestore.validate_upload(file_name, content_type, data)
-    # LTR-1 / NOTE-DOC-2: everything lands under the bucket's ``documents/`` root
-    # — ``documents/notes/`` when the caller declares ``context=note``, else
-    # ``documents/consent-forms/`` for a consent type, else ``documents/general/``.
+    # LTR-1 / NOTE-DOC-2 / IMG-DOC-1: everything lands under the bucket's
+    # ``documents/`` root, one folder per owning module (``documents/notes/``,
+    # ``documents/imaging/``, ``documents/consent-forms/``, ``documents/general/``...).
     # Local disk (same layout) when no bucket is configured.
     stored = document_store.store(
         tenant_id=tenant_id, patient_id=patient_id, document_type=document_type,
-        file_name=file_name, content_type=content_type, data=data, context=context,
+        file_name=file_name, content_type=content_type, data=data,
+        context=resolved_context,
     )
     doc = PatientDocument(
         tenant_id=tenant_id, patient_id=patient_id, office_id=office_id,
+        context=resolved_context,
         document_type=document_type, description=description, file_name=file_name,
         content_type=content_type, file_size=len(data),
         file_path=stored.path, file_url=stored.url,
@@ -185,6 +221,75 @@ def create_document(
     db.add(doc)
     db.commit()
     db.refresh(doc)
+    _stamp_labels(db, tenant_id, [doc])
+    return _stamp_url(doc)
+
+
+def update_document(
+    db: Session, tenant_id: int, doc_id: int, data: dict, user_id: int | None,
+) -> PatientDocument:
+    """IMG-DOC-5: re-file a document (``context``), re-type it, or edit its
+    description, without delete + re-upload.
+
+    Only a Documents <-> Imaging move is allowed: every other context is owned
+    by a record (note, consent, progress note, chart photo...) that points at
+    the file, and re-homing it would orphan that record. On a move the bytes
+    follow the row into the new context's folder; if the storage move fails the
+    row still changes owner (the screens read the row, not the folder) and the
+    response says ``relocated: false``. Before/after lands in ``audit_logs``.
+    """
+    doc = get_document(db, tenant_id, doc_id)
+    changes: dict = {}
+
+    new_context = doc.context
+    if "context" in data:
+        new_context = vocab.normalize_context(data["context"])
+        if new_context is None:
+            raise ValidationError(
+                "context cannot be blank",
+                code="invalid_document_context",
+                details={"field": "context", "allowed_contexts": list(vocab.MOVABLE_CONTEXTS)},
+            )
+        if new_context != doc.context and (
+            doc.context not in vocab.MOVABLE_CONTEXTS or new_context not in vocab.MOVABLE_CONTEXTS
+        ):
+            raise ValidationError(
+                f"a document can only be moved between {' and '.join(vocab.MOVABLE_CONTEXTS)}",
+                code="context_not_movable",
+                details={"field": "context", "from": doc.context, "to": new_context,
+                         "movable_contexts": list(vocab.MOVABLE_CONTEXTS)},
+            )
+        if new_context != doc.context:
+            changes["context"] = new_context
+
+    if "document_type" in data:
+        new_type = vocab.normalize_document_type(db, tenant_id, new_context, data["document_type"])
+        if new_type != doc.document_type:
+            changes["document_type"] = new_type
+    if "description" in data:
+        new_desc = (data["description"] or "").strip() or None
+        if new_desc != doc.description:
+            changes["description"] = new_desc
+
+    relocated: bool | None = None
+    if changes:
+        before, after = audit_context.diff_fields(doc, changes)
+        old_path = doc.storage_path
+        for key, value in changes.items():
+            setattr(doc, key, value)
+        if "context" in changes:
+            relocated = document_store.relocate(doc, new_context)
+            if relocated and doc.storage_path != old_path:
+                before["storage_path"] = old_path
+                after["storage_path"] = doc.storage_path
+        doc.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        doc.updated_by = user_id
+        audit_context.record(resource_id=str(doc.id), patient_id=doc.patient_id,
+                             before=before, after=after)
+        db.commit()
+        db.refresh(doc)
+    _stamp_labels(db, tenant_id, [doc])
+    doc.relocated = relocated
     return _stamp_url(doc)
 
 
@@ -674,9 +779,10 @@ def is_synthetic_identifier(value: str | None) -> bool:
 # Normalised phone comparison. Patient.phone is free-form ("(555) 123-4567",
 # "555-123-4567", …) so a literal compare misses; strip the separators in SQL the
 # same way appointnow_service does.
-def _phone_expr():
+def _phone_expr(column=None):
+    column = Patient.phone if column is None else column
     return func.replace(func.replace(func.replace(func.replace(
-        Patient.phone, "-", ""), " ", ""), "(", ""), ")", "")
+        column, "-", ""), " ", ""), "(", ""), ")", "")
 
 
 def check_duplicate(db: Session, tenant_id: int, req: dict) -> list[dict]:
@@ -712,7 +818,11 @@ def check_duplicate(db: Session, tenant_id: int, req: dict) -> list[dict]:
     if dob:
         conds.append(Patient.dob == dob)
     if phone_digits:
+        # AN-31: Quick Save / AppointNow write the textable number to
+        # ``cell_phone``, so a phone-only compare against ``phone`` (home) never
+        # recognised a patient they had created.
         conds.append(_phone_expr().ilike(f"%{phone_digits}%"))
+        conds.append(_phone_expr(Patient.cell_phone).ilike(f"%{phone_digits}%"))
     if email:
         conds.append(func.lower(Patient.email) == email.lower())
     rows = db.execute(
@@ -747,7 +857,9 @@ def check_duplicate(db: Session, tenant_id: int, req: dict) -> list[dict]:
         if chart_no and p.chart_no == chart_no:
             score += 40
             match_on.append("chart_no")
-        if phone_digits and _digits(p.phone) and phone_digits in _digits(p.phone):
+        if phone_digits and any(
+            _digits(v) and phone_digits in _digits(v) for v in (p.phone, p.cell_phone)
+        ):
             score += 25
             match_on.append("phone")
         if email and (p.email or "").strip().lower() == email.lower():

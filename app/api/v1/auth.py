@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession, TenantId, get_token_payload
+from app.core import password_policy
 from app.db.models import Office, Permission, Tenant, UserOffice
 from app.schemas.auth import (
     ForgotPasswordRequest,
@@ -17,6 +18,7 @@ from app.schemas.auth import (
     LegacyVerifyResponse,
     LoginRequest,
     MeFull,
+    PasswordPolicy,
     MessageResponse,
     OfficeAssignment,
     RefreshRequest,
@@ -166,7 +168,16 @@ def me_full(db: DbSession, current_user: CurrentUser, tenant_id: TenantId) -> Me
                   provider_id=provider_id,
                   permissions=codes,
                   permissions_enforced=perms.enforced or perms.full_access,
-                  groups=perms.groups)
+                  groups=perms.groups,
+                  can_reset_user_passwords=permission_service.can_reset_user_passwords(current_user))
+
+
+@router.get("/password-policy", response_model=PasswordPolicy, operation_id="get_password_policy",
+            summary="The password complexity policy enforced on every password write (PWD-RBAC-3)")
+def get_password_policy() -> PasswordPolicy:
+    """Unauthenticated on purpose: the forgot-password reset and legacy
+    activation pages render the checklist before anyone is signed in."""
+    return PasswordPolicy(**password_policy.describe())
 
 
 # ── Forgot / reset password (login dev-report §2.1–2.3) ──────────────────────

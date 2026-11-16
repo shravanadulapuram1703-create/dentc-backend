@@ -140,6 +140,8 @@ def _period_lines(
 def _statement_out(row: PatientStatement) -> dict:
     return {
         "id": row.id, "patient_id": row.patient_id, "office_id": row.office_id,
+        "account_id": row.account_id, "statement_scope": row.statement_scope or "patient",
+        "snapshot": row.snapshot,
         "statement_date": row.statement_date, "period_start": row.period_start,
         "period_end": row.period_end, "opening_balance": row.opening_balance,
         "total_charges": row.total_charges, "total_payments": row.total_payments,
@@ -182,7 +184,7 @@ def generate_statement(
         snapshot={
             "patient_name": ", ".join(x for x in (patient.last_name, patient.first_name) if x),
             "chart_no": patient.chart_no,
-            "account_balance": balance["account_balance"],
+            "account_balance": balance["balance"],
         },
         created_by=actor_id,
     )
@@ -218,7 +220,7 @@ def generate_batch(
     generated: list[dict] = []
     for pid in patients:
         balance = balance_service.get_patient_balance(db, pid, tenant_id)
-        if _d(balance["account_balance"]) < min_balance:
+        if _d(balance["balance"]) < min_balance:
             continue
         if only_aged:
             aging = balance["aging"]
@@ -339,6 +341,33 @@ def render_pdf(db: Session, patient_id: int, statement_id: int, tenant_id: int) 
         pdf.drawString(54, y, f"{label}:")
         pdf.drawString(180, y, str(value))
         y -= 14
+
+    if snapshot.get("scope") == "account":
+        # RP-9: one statement per account — addressed to the guarantor, one line
+        # per member.
+        y -= 6
+        pdf.drawString(54, y, "Account #:")
+        pdf.drawString(180, y, str(snapshot.get("account_no") or snapshot.get("account_id") or "-"))
+        y -= 14
+        for party in snapshot.get("addressed_to") or []:
+            addr = ", ".join(x for x in (party.get("address_line1"), party.get("city"),
+                                         party.get("state"), party.get("zip")) if x)
+            pdf.drawString(54, y, f"{(party.get('role') or '').title()}:")
+            pdf.drawString(180, y, f"{party.get('name') or '-'}{(' - ' + addr) if addr else ''}"[:80])
+            y -= 14
+        y -= 6
+        pdf.setFont("Helvetica-Bold", 11)
+        pdf.drawString(54, y, "Members")
+        y -= 16
+        pdf.setFont("Helvetica", 10)
+        for m in snapshot.get("members") or []:
+            pdf.drawString(70, y, f"{m.get('patient_name') or m.get('patient_id')} ({m.get('chart_no') or '-'})")
+            pdf.drawRightString(width - 70, y, _fmt(m.get("closing_balance")))
+            y -= 14
+            if y < 200:
+                pdf.showPage()
+                y = height - 60
+                pdf.setFont("Helvetica", 10)
 
     y -= 12
     pdf.setFont("Helvetica-Bold", 11)

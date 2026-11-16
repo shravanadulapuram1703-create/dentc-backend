@@ -70,13 +70,13 @@ def test_reset_password_flow(client, db_session):
     assert valid.json() == {"valid": True, "email": "reset@x.local"}
 
     done = client.post(
-        f"{PREFIX}/auth/reset-password", json={"token": raw, "new_password": "brandnew123"}
+        f"{PREFIX}/auth/reset-password", json={"token": raw, "new_password": "Brandnew123!"}
     )
     assert done.status_code == 200, done.text
 
     # New password works; old one no longer does.
     assert client.post(
-        f"{PREFIX}/auth/login", json={"username": "resetme", "password": "brandnew123"}
+        f"{PREFIX}/auth/login", json={"username": "resetme", "password": "Brandnew123!"}
     ).status_code == 200
     assert client.post(
         f"{PREFIX}/auth/login", json={"username": "resetme", "password": "orig1234"}
@@ -91,7 +91,7 @@ def test_reset_password_flow(client, db_session):
 def test_reset_password_invalid_token(client):
     _clear_auth_overrides()
     r = client.post(
-        f"{PREFIX}/auth/reset-password", json={"token": "garbage", "new_password": "whatever123"}
+        f"{PREFIX}/auth/reset-password", json={"token": "garbage", "new_password": "Whatever123!"}
     )
     assert r.status_code == 422
     assert r.json()["error"]["code"] == "invalid_reset_token"
@@ -117,13 +117,13 @@ def test_legacy_activation_flow(client, db_session):
 
     created = client.post(
         f"{PREFIX}/auth/legacy-user/create-password",
-        json={"username_or_email": "legacy", "new_password": "newsecret1", "activation_token": token},
+        json={"username_or_email": "legacy", "new_password": "Newsecret1!", "activation_token": token},
     )
     assert created.status_code == 200, created.text
 
     # Can now log in with the new password.
     assert client.post(
-        f"{PREFIX}/auth/login", json={"username": "legacy", "password": "newsecret1"}
+        f"{PREFIX}/auth/login", json={"username": "legacy", "password": "Newsecret1!"}
     ).status_code == 200
 
     # Re-verify → blocked as already activated (Business Rule 2).
@@ -134,7 +134,7 @@ def test_legacy_activation_flow(client, db_session):
     # Old activation token is consumed → reuse rejected (Rule 3).
     reuse = client.post(
         f"{PREFIX}/auth/legacy-user/create-password",
-        json={"username_or_email": "legacy", "new_password": "another12", "activation_token": token},
+        json={"username_or_email": "legacy", "new_password": "Another12!", "activation_token": token},
     )
     assert reuse.status_code == 422
 

@@ -75,7 +75,12 @@ class _Booking:
     def __init__(self, options: dict | None) -> None:
         options = options or {}
         self.patient_id = options.get("patient_id")
-        self.create_patient = bool(options.get("create_patient"))
+        # AN-32: nobody is present to answer a duplicate prompt, and a stored
+        # pre-AN-32 ``create_patient: false`` must not book a phantom — always
+        # register/match, linking a single strong match (AN-31).
+        self.create_patient = True
+        self.force_create = bool(options.get("force_create"))
+        self.link_existing_match = True
         self.provider_id = options.get("provider_id")
         self.operatory_id = options.get("operatory_id")
         self.appointment_id = None

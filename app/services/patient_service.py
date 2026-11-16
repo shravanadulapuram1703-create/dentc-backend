@@ -65,6 +65,37 @@ def _validate_fee_schedule_pointer(db: Session, payload: dict, tenant_id: int | 
         )
 
 
+def _resolve_create_guarantor(db: Session, tenant_id: int, payload: dict,
+                              user_id: int | None) -> None:
+    """RP-5/RP-7 on ``POST /patients``: typed keys are validated and resolved to
+    an account before the insert; none at all -> Self in a new account (RP-4,
+    done by the insert hook)."""
+    from app.services import family_account_service  # noqa: PLC0415
+
+    spec: dict[str, Any] = {}
+    if payload.get("guarantor_patient_id") is not None:
+        spec["guarantor_patient_id"] = payload["guarantor_patient_id"]
+        if payload.get("account_id") is not None:
+            spec["account_id"] = payload["account_id"]
+    elif payload.get("guarantor_party_id") is not None:
+        spec["responsible_party_id"] = int(payload["guarantor_party_id"])
+    elif payload.get("account_id") is not None:
+        spec["account_id"] = payload["account_id"]
+    elif (payload.get("responsible_party_id") or "").strip():
+        spec["responsible_party_id"] = payload["responsible_party_id"]
+    for k in ("guarantor_patient_id", "guarantor_party_id", "account_id", "responsible_party_id"):
+        payload.pop(k, None)
+    if not spec:
+        return
+    target = family_account_service.resolve_spec(db, tenant_id, spec, user_id=user_id)
+    payload["account_id"] = target.get("account_id")
+    if target["kind"] == "unresolved":
+        payload["responsible_party_id"] = str(spec["responsible_party_id"]).strip()
+        return
+    payload["guarantor_patient_id"] = target.get("guarantor_patient_id")
+    payload["guarantor_party_id"] = target.get("guarantor_party_id")
+
+
 def assign_chart_no(db: Session, obj: Patient) -> None:
     """Assign a chart number if the row has none. Called after the id is known
     (post-flush). ``chart_no`` is globally unique; the patient id is a safe
@@ -85,6 +116,33 @@ def assign_chart_no(db: Session, obj: Patient) -> None:
         suffix += 1
         candidate = f"{base}-{suffix}"
     obj.chart_no = candidate
+
+
+def _guarantor_name_clause(term: str):  # noqa: ANN202
+    """Patients whose guarantor (a *different* patient, or a party) matches a
+    name: ``"Last, First"`` or a single prefix of either name."""
+    from app.db.models import ResponsibleParty  # noqa: PLC0415
+
+    last, sep, first = term.partition(",")
+    last, first = last.strip().lower(), first.strip().lower()
+
+    def _match(cols):  # noqa: ANN001, ANN202
+        if sep and last:
+            clause = func.lower(cols.last_name).like(f"{last}%")
+            if first:
+                clause = and_(clause, func.lower(cols.first_name).like(f"{first}%"))
+            return clause
+        lowered = term.strip().lower()
+        return or_(func.lower(cols.last_name).like(f"{lowered}%"),
+                   func.lower(cols.first_name).like(f"{lowered}%"))
+
+    guarantor = Patient.__table__.alias("guarantor_p")
+    return or_(
+        and_(Patient.guarantor_patient_id.isnot(None),
+             Patient.guarantor_patient_id != Patient.id,
+             Patient.guarantor_patient_id.in_(select(guarantor.c.id).where(_match(guarantor.c)))),
+        Patient.guarantor_party_id.in_(select(ResponsibleParty.id).where(_match(ResponsibleParty))),
+    )
 
 
 class PatientCRUD(CRUDBase[Patient]):
@@ -145,6 +203,18 @@ class PatientCRUD(CRUDBase[Patient]):
                 # the FE detects an ignored filter by rows that do not carry the
                 # requested value, and a random page is the bug being fixed.
                 clauses.append(false())
+        # RP-12: by account number (or the migrated RPID it was grouped by) and
+        # by guarantor name (a patient guarantor or a non-patient party).
+        if filters.get("account_no") is not None:
+            from app.db.models import Account  # noqa: PLC0415
+
+            account_no = str(filters.get("account_no")).strip()
+            clauses.append(Patient.account_id.in_(select(Account.id).where(
+                or_(Account.account_no == account_no, Account.legacy_key == account_no)))
+                if account_no else false())
+        gname = (filters.get("guarantor_name") or "").strip()
+        if gname:
+            clauses.append(_guarantor_name_clause(gname))
         raw = (filters.get("phone") or "").strip()
         if not raw:
             return clauses
@@ -173,6 +243,9 @@ class PatientCRUD(CRUDBase[Patient]):
         # name search in unrelated ids.
         if term:
             clauses.append(Patient.legacy_id == term)
+            # RP-12: a guarantor's name finds the members they are responsible for.
+            if len(term) >= 2:
+                clauses.append(_guarantor_name_clause(term))
         if "," not in term:
             return clauses
         last, _, first = term.partition(",")
@@ -221,7 +294,11 @@ class PatientCRUD(CRUDBase[Patient]):
         *,
         tenant_id: int | None = None,
         created_by: int | None = None,
+        commit: bool = True,
     ) -> Patient:
+        """``commit=False`` flushes only (the id and ``chart_no`` are assigned)
+        so a composite caller — AppointNow approve (AN-31d) — owns the
+        transaction and a later failure rolls the patient back with it."""
         # Contradictory Patient Status / Patient Type selections are resolved or
         # rejected before anything is written.
         payload = rules.normalize_patient_payload(data)
@@ -233,6 +310,8 @@ class PatientCRUD(CRUDBase[Patient]):
 
             raise_if_duplicate(db, tenant_id, payload, force_create=force_create)
         _validate_fee_schedule_pointer(db, payload, tenant_id)
+        if tenant_id is not None:
+            _resolve_create_guarantor(db, tenant_id, payload, created_by)
         if tenant_id is not None and hasattr(self.model, "tenant_id"):
             payload.setdefault("tenant_id", tenant_id)
         if created_by is not None and self._is_int_col("created_by"):
@@ -241,6 +320,9 @@ class PatientCRUD(CRUDBase[Patient]):
         db.add(obj)
         self._flush(db)  # obtain the SERIAL id before deriving chart_no
         assign_chart_no(db, obj)
+        if not commit:
+            self._flush(db)
+            return obj
         self._commit(db)
         db.refresh(obj)
         return obj
@@ -262,6 +344,17 @@ class PatientCRUD(CRUDBase[Patient]):
         payload = rules.normalize_patient_payload(data, existing=existing)
         payload.pop("force_create", None)  # create-only; never a column
         _validate_fee_schedule_pointer(db, payload, tenant_id, existing=existing)
+        # RP-4/RP-7: guarantor/account keys are validated and applied by the
+        # account service (never written raw); a null is refused.
+        if tenant_id is not None:
+            from app.services import family_account_service  # noqa: PLC0415
+
+            moved = family_account_service.apply_patch_guarantor(
+                db, tenant_id, existing, payload, user_id=updated_by)
+            if moved is not None and not payload:
+                self._commit(db)
+                db.refresh(existing)
+                return existing
         return super().update(
             db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by
         )

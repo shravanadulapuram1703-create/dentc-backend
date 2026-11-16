@@ -47,7 +47,6 @@ from app.db.models import (
     Provider,
 )
 from app.integrations import redis_store
-from app.services.patient_overview_service import resolve_responsible_party
 from app.services.user_admin_service import resolve_user_names
 
 _CENTS = Decimal("0.01")
@@ -726,7 +725,9 @@ def build_contract(db: Session, plan_kind: str, plan_id: int, tenant_id: int) ->
     provider_id = getattr(plan, "pref_provider_id", None) or patient.preferred_provider_id
     provider = db.get(Provider, provider_id) if provider_id else None
 
-    rp = resolve_responsible_party(db, tenant_id, patient.responsible_party_id)
+    from app.services.family_account_service import guarantor_person  # noqa: PLC0415
+
+    rp = guarantor_person(db, patient)  # RP-2
     rp_name = ", ".join(x for x in (rp.last_name, rp.first_name) if x) or None if rp else None
 
     actor_names = resolve_user_names(

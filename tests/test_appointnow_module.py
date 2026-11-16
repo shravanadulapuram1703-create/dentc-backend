@@ -237,6 +237,118 @@ def test_approve_with_create_patient(client, booking_fixtures, db_session):
     assert patient.first_name == "New"
     assert patient.tenant_id == db_session._tenant_id
     assert patient.chart_no  # auto-generated
+    # AN-31b: the number is the textable one.
+    assert patient.cell_phone == "555-222-3333" and patient.phone is None
+
+
+# ── AN-30..35: approve never books a patient-less appointment ────────────────
+def test_approve_default_creates_patient_and_links_appointment(client, booking_fixtures, db_session):
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "13:00", first_name="Dana", last_name="Default").json()["id"]
+    body = client.post(f"/api/v1/appointnow/requests/{req_id}/approve").json()
+    assert body["patient_id"] is not None
+    appt = db_session.get(Appointment, body["appointment_id"])
+    assert appt.patient_id == body["patient_id"]
+
+
+def test_approve_explicit_no_patient_is_422(client, booking_fixtures):
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "13:00").json()["id"]
+    r = client.post(f"/api/v1/appointnow/requests/{req_id}/approve", json={"create_patient": False})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "patient_required"
+    # Nothing booked: still pending.
+    assert client.get(f"/api/v1/appointnow/requests/{req_id}").json()["status"] == "pending"
+
+
+def test_approve_phone_only_match_does_not_link_parent(client, booking_fixtures, db_session):
+    parent = Patient(tenant_id=db_session._tenant_id, first_name="Pat", last_name="Parent",
+                     phone="555-777-8888", email="family@example.com")
+    db_session.add(parent)
+    db_session.commit()
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "14:00", first_name="Kid", last_name="Parent",
+                     phone="555-777-8888", email="family@example.com").json()["id"]
+    matches = client.get(f"/api/v1/appointnow/requests/{req_id}/patient-matches").json()
+    assert matches and matches[0]["patient_id"] == parent.id
+    assert matches[0]["is_strong"] is False and matches[0]["match_score"] > 0
+    body = client.post(f"/api/v1/appointnow/requests/{req_id}/approve").json()
+    assert body["patient_id"] not in (None, parent.id)
+
+
+def test_approve_strong_duplicate_409_then_force_or_pick(client, booking_fixtures, db_session):
+    existing = Patient(tenant_id=db_session._tenant_id, first_name="Alex", last_name="Twin",
+                       cell_phone="555-444-1212")
+    db_session.add(existing)
+    db_session.commit()
+    n_before = db_session.query(Patient).count()
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "14:00", first_name="Alex", last_name="Twin",
+                     phone="555-444-1212").json()["id"]
+    r = client.post(f"/api/v1/appointnow/requests/{req_id}/approve")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "duplicate_patient"
+    cands = r.json()["error"]["details"]["candidates"]
+    assert [c["id"] for c in cands] == [existing.id]
+    # AN-31d: the refused approve left nothing behind.
+    assert db_session.query(Patient).count() == n_before
+    picked = client.post(f"/api/v1/appointnow/requests/{req_id}/approve",
+                         json={"patient_id": existing.id}).json()
+    assert picked["patient_id"] == existing.id
+
+
+def test_approve_force_create_makes_separate_patient(client, booking_fixtures, db_session):
+    existing = Patient(tenant_id=db_session._tenant_id, first_name="Alex", last_name="Twin",
+                       email="twin@example.com")
+    db_session.add(existing)
+    db_session.commit()
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "14:00", first_name="Alex", last_name="Twin",
+                     email="twin@example.com", insurance_info="Cigna - ID 4242").json()["id"]
+    body = client.post(f"/api/v1/appointnow/requests/{req_id}/approve",
+                       json={"force_create": True}).json()
+    assert body["patient_id"] not in (None, existing.id)
+    from app.db.models import PatientNote
+
+    note = db_session.query(PatientNote).filter_by(patient_id=body["patient_id"]).one()
+    assert "Cigna - ID 4242" in note.notes  # AN-35
+
+
+def test_link_patient_after_legacy_patientless_approve(client, booking_fixtures, db_session):
+    from app.db.models import BookingRequest
+
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "13:00", first_name="Late", last_name="Link").json()["id"]
+    body = client.post(f"/api/v1/appointnow/requests/{req_id}/approve").json()
+    # Simulate a pre-AN-32 row: approved, no patient on either side.
+    req = db_session.get(BookingRequest, req_id)
+    appt = db_session.get(Appointment, body["appointment_id"])
+    req.patient_id = None
+    appt.patient_id = None
+    db_session.commit()
+
+    other = Patient(tenant_id=db_session._tenant_id, first_name="Some", last_name="One")
+    db_session.add(other)
+    db_session.commit()
+    r = client.post(f"/api/v1/appointnow/requests/{req_id}/link-patient",
+                    json={"patient_id": other.id})
+    assert r.status_code == 200 and r.json()["patient_id"] == other.id
+    db_session.expire_all()
+    assert db_session.get(Appointment, body["appointment_id"]).patient_id == other.id
+    # Idempotent for the same patient; 409 for a different one.
+    assert client.post(f"/api/v1/appointnow/requests/{req_id}/link-patient",
+                       json={"patient_id": other.id}).status_code == 200
+    third = Patient(tenant_id=db_session._tenant_id, first_name="Third", last_name="Person")
+    db_session.add(third)
+    db_session.commit()
+    clash = client.post(f"/api/v1/appointnow/requests/{req_id}/link-patient",
+                        json={"patient_id": third.id})
+    assert clash.status_code == 409 and clash.json()["error"]["code"] == "patient_already_linked"
+
+
+def test_link_patient_requires_approved(client, booking_fixtures):
+    iso = booking_fixtures["future"].isoformat()
+    req_id = _submit(client, iso, "13:00").json()["id"]
+    r = client.post(f"/api/v1/appointnow/requests/{req_id}/link-patient", json={"create_patient": True})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "request_not_approved"
 
 
 # ── AN-5: decline ────────────────────────────────────────────────────────────
@@ -833,8 +945,10 @@ def test_stripe_link_status_and_webhook_books(client, booking_fixtures, paid_off
     assert row["status"] == "approved" and row["appointment_id"]
     assert row["payment"]["status"] == "paid" and row["payment"]["reference"] == "pi_123"
     assert float(row["payment"]["paid_amount"]) == 50.0
-    # No patient linked → unapplied, not posted.
-    assert row["payment"]["posted_to_ledger"] is False
+    # AN-32: the unattended booking always registers the contact as a patient,
+    # so the online payment lands on that patient's ledger.
+    assert row["patient_id"] is not None
+    assert row["payment"]["posted_to_ledger"] is True
     # Stripe retries are idempotent.
     again = _stripe_event(client, "checkout.session.completed", session)
     assert again.json()["detail"] == "duplicate delivery"

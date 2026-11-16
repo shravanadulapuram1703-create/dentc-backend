@@ -14,6 +14,7 @@ from decimal import Decimal
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -32,6 +33,15 @@ from app.db.base import Base, CreatedAtMixin, IntPKMixin, TimestampMixin
 
 class Patient(Base, IntPKMixin, TimestampMixin):
     __tablename__ = "patients"
+    # RP-1: at most one guarantor kind. "Exactly one" cannot be a CHECK — a
+    # self-guarantor's own id does not exist at INSERT time and Postgres CHECKs
+    # are not deferrable — so Self is stamped in the same flush (after_insert).
+    __table_args__ = (
+        CheckConstraint(
+            "guarantor_patient_id IS NULL OR guarantor_party_id IS NULL",
+            name="ck_patients_single_guarantor",
+        ),
+    )
 
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), index=True)
     home_office_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("offices.id"), index=True)
@@ -92,7 +102,30 @@ class Patient(Base, IntPKMixin, TimestampMixin):
     # GAP-AP-11: HIPAA Information-Sharing free text (separate from patient_notes).
     hipaa_sharing_notes: Mapped[str | None] = mapped_column(Text)
     # Scheduler gap #8: responsible-party link + patient type (general/ortho).
+    # RP-1: **deprecated legacy alias**. It used to be the only link and was
+    # overloaded (a ``responsible_parties.id``, the patient's own id for a
+    # self-guarantor, or a migrated Denticon RPID — the id spaces collide). The
+    # typed columns below are canonical; this string is kept in step by
+    # ``family_account_service.sync_alias`` (= the guarantor's key) for one release.
     responsible_party_id: Mapped[str | None] = mapped_column(String(50))
+    # RP-1/RP-3: the account this patient belongs to (``accounts``) and exactly
+    # one guarantor — a patient (``guarantor_patient_id``; ``= id`` is Self) or
+    # a non-patient party (``guarantor_party_id``). Both NULL is the migrated
+    # *unresolved* shape (a legacy RPID whose guarantor was never imported,
+    # RP-14). ``account_id`` is nullable at the DB level only because the
+    # Denticon importer writes patients by raw SQL; every ORM insert is given an
+    # account by the ``before_insert`` hook in ``app/db/models/accounts.py`` and
+    # ``scripts/backfill_patient_accounts.py`` re-runs the migration backfill.
+    account_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("accounts.id", name="fk_patients_account_id"), index=True
+    )
+    guarantor_patient_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("patients.id", name="fk_patients_guarantor_patient_id"), index=True
+    )
+    guarantor_party_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("responsible_parties.id", name="fk_patients_guarantor_party_id"),
+        index=True,
+    )
     # GAP-AP-7/15: the patient's relationship to their responsible party
     # (self/spouse/parent/guardian/child/other), set at registration.
     responsible_party_relationship: Mapped[str | None] = mapped_column(String(50))

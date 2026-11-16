@@ -95,7 +95,7 @@ from app.schemas.treatment import (
     TreatmentPlanSummary,
 )
 from app.services import coverage_category_service as covcat
-from app.services import pricing_service, procedure_events
+from app.services import permission_service, pricing_service, procedure_events
 from app.services.estimate_service import match_coverage_rule
 from app.services.procedure_rules_service import apply_entry_rules
 from app.services.user_admin_service import resolve_user_names
@@ -652,6 +652,61 @@ def set_item_icd_codes(db: Session, item_id: str, tenant_id: int, icd_ids: list[
 
 
 # ── PLAN-13/14 + PROC-INT-2/3/8 + Edit Treatment: item CRUD ─────────────────
+def _enum_value(value: Any) -> Any:  # noqa: ANN401
+    return getattr(value, "value", value)
+
+
+def _money(value: Any) -> Decimal:  # noqa: ANN401
+    return Decimal(str(value)) if value not in (None, "") else Decimal("0")
+
+
+def enforce_item_rights(db: Session, data: dict, current: TreatmentPlanItem | None,
+                        actor_id: int | None) -> None:
+    """RBAC-6: the Edit Treatment window's guarded fields, checked only when the
+    payload *moves* them (the RBAC-4 shape), so re-sending the stored value —
+    which the form does on every save — is never a 403.
+
+    * ``discount``  -> ``transactions_treatment_plan_discount`` (on create too,
+      when a non-zero discount is applied).
+    * ``fee``       -> ``transactions_treatment_plan_edit_fee`` (update only — a
+      new item's fee is pricing, not an edit).
+    * ``status`` / ``plan_id`` / ``phase_id`` -> ``..._change_status_or_ids``
+      ("Change Status or IDs", which is also how an item moves plan/phase).
+
+    Server-driven transitions (``scheduled`` / ``completed`` via the charge and
+    appointment links) do not go through here.
+    """
+    if actor_id is None:
+        return
+    needed: list[tuple[str, str]] = []
+    if "discount" in data:
+        new = _money(data["discount"])
+        old = _money(current.discount) if current is not None else Decimal("0")
+        if new != old:
+            needed.append((permission_service.TREATMENT_PLAN_DISCOUNT,
+                           "apply a treatment-plan discount"))
+    if current is not None:
+        if "fee" in data and data["fee"] is not None and _money(data["fee"]) != _money(current.fee):
+            needed.append((permission_service.TREATMENT_PLAN_EDIT_FEE,
+                           "edit a treatment-plan fee"))
+        moved = (
+            ("status" in data and data["status"] is not None
+             and str(_enum_value(data["status"])) != str(_enum_value(current.status) or ""))
+            or ("plan_id" in data and data["plan_id"] and data["plan_id"] != current.plan_id)
+            or ("phase_id" in data and data["phase_id"] != current.phase_id)
+        )
+        if moved:
+            needed.append((permission_service.TREATMENT_PLAN_CHANGE_STATUS,
+                           "change a treatment-plan item's status or IDs"))
+    if not needed:
+        return
+    perms = permission_service.permissions_for_user_id(db, actor_id)
+    if perms is None:
+        return
+    for code, action in needed:
+        permission_service.assert_permission(perms, code, action=action)
+
+
 class TreatmentPlanItemCRUD(CRUDBase):
     def _scope_tenant(self, stmt, tenant_id: int | None):  # noqa: ANN001
         if tenant_id is None:
@@ -660,6 +715,7 @@ class TreatmentPlanItemCRUD(CRUDBase):
 
     def create(self, db: Session, data: dict, *, tenant_id=None, created_by=None):  # noqa: ANN001, ANN201
         payload = apply_entry_rules(db, data)
+        enforce_item_rights(db, payload, None, created_by)
         icd_ids = payload.pop("icd_code_ids", None)
         plan = _require_plan(db, payload["plan_id"], tenant_id) if tenant_id is not None \
             else db.get(TreatmentPlan, payload["plan_id"])
@@ -699,6 +755,7 @@ class TreatmentPlanItemCRUD(CRUDBase):
     def update(self, db: Session, obj_id, data: dict, *, tenant_id=None, updated_by=None):  # noqa: ANN001, ANN201
         current = self.get(db, obj_id, tenant_id=tenant_id)
         payload = apply_entry_rules(db, data, current)
+        enforce_item_rights(db, payload, current, updated_by)
         icd_ids = payload.pop("icd_code_ids", None)
         if "status" in payload and payload["status"] is not None:
             _reject_status_change(db, current, payload["status"])

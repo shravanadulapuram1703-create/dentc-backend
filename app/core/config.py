@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     LOGIN_LOCKOUT_MINUTES: int = 15
 
     # ── Password reset / legacy activation tokens ────────────────────────────
+    # PWD-RBAC-3: complexity policy on every password write (app/core/password_policy.py).
+    PASSWORD_POLICY_ENFORCED: bool = True
     PASSWORD_RESET_TOKEN_TTL_MINUTES: int = 60
     LEGACY_ACTIVATION_TOKEN_TTL_MINUTES: int = 1440  # 24h
     # Base URL the emailed reset link points at (frontend route).
@@ -183,6 +185,33 @@ class Settings(BaseSettings):
     GCS_NOTES_PREFIX: str = "documents/notes"
     GCS_CONSENT_FORMS_PREFIX: str = "documents/consent-forms"
     GCS_DOCUMENTS_PREFIX: str = "documents/general"
+    # IMG-DOC-1: every owning module (``patient_documents.context``) gets its own
+    # folder under the same root, so radiographs are physically apart from
+    # insurance cards (retention, a later DICOM lift, access audits). ``note``,
+    # ``consent`` and ``documents`` keep the three prefixes above; this maps the
+    # rest. Override per environment as JSON, e.g.
+    # GCS_CONTEXT_PREFIXES='{"imaging": "documents/imaging"}'.
+    GCS_CONTEXT_PREFIXES: dict[str, str] = Field(
+        default_factory=lambda: {
+            "imaging": "documents/imaging",
+            "patient_photo": "documents/patient-photos",
+            "letter": "documents/letters",
+            "progress_note": "documents/progress-notes",
+            "restorative": "documents/restorative",
+            "treatment_plan": "documents/treatment-plans",
+        }
+    )
+    # IMG-DOC-4 cut-over switch. Off: ``document_type`` is stored as written
+    # (today's Imaging gallery and Documents tab match on the free-text label,
+    # so folding to codes before they read ``/definitions`` would break them).
+    # On: picker contexts fold code/label/alias to the definitions code and 422
+    # ``invalid_document_type`` on anything else. Flip it together with the FE
+    # release and ``scripts/backfill_document_context.py --fold-types --apply``.
+    DOCUMENT_TYPE_VOCABULARY_ENFORCED: bool = False
+    # IMG-DOC-6: unknown query params on ``GET /patient-documents`` are a 422
+    # (``?context=note`` returning everything with a 200 is how IMG-DOC hid).
+    # Kill switch in case an older client sends a stray param.
+    DOCUMENT_LIST_REJECT_UNKNOWN_PARAMS: bool = True
     # The document_type values routed to the consent-forms prefix. ``CF`` is the
     # code the Notes screen sends for "Consent Form" (NOTE-DOC-4). Note this only
     # applies when there is no upload context — a consent uploaded *from a note*

@@ -66,7 +66,17 @@ def enrich_patient_office(db: Session, items, tenant_id=None) -> None:  # noqa: 
     from app.services.claim_form_service import claim_consent_patient_ids
 
     consented = claim_consent_patient_ids(db, {r.id for r in rows if getattr(r, "id", None) is not None})
+    # RP-11: typed guarantor + account number, batched.
+    from app.db.models import Account
+    from app.services.family_account_service import guarantors_for
+
+    guarantors = guarantors_for(db, rows)
+    acc_ids = {r.account_id for r in rows if getattr(r, "account_id", None) is not None}
+    account_nos = dict(db.execute(
+        select(Account.id, Account.account_no).where(Account.id.in_(acc_ids))).all()) if acc_ids else {}
     for r in rows:
+        r.guarantor = guarantors.get(r.id)
+        r.account_no = account_nos.get(r.account_id)
         office = offices.get(r.home_office_id)
         r.home_office_name = office.name if office else None
         r.home_office_code = (office.short_id or office.office_code) if office else None

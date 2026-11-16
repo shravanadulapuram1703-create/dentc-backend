@@ -22,6 +22,7 @@ from app.api.deps import (
     require_read_access,
     require_roles,
 )
+from app.core.password_policy import validate_password
 from app.core.security import hash_password
 from app.crud.base import CRUDBase
 from app.db.models import User
@@ -113,6 +114,7 @@ def list_users(
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED,
              operation_id="create_user", summary="Create a user", dependencies=[_admin])
 def create_user(db: DbSession, tenant_id: TenantId, body: UserCreate, current: CurrentUser):
+    validate_password(body.password)  # PWD-RBAC-3
     data = body.model_dump(exclude={"password"})
     data["password_hash"] = hash_password(body.password)
     data["created_by"] = current.id  # gap #8: record the creating actor
@@ -134,7 +136,12 @@ def get_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()]
 def update_user(db: DbSession, tenant_id: TenantId, user_id: Annotated[int, Path()],
                 body: UserUpdate, current: CurrentUser):
     data = body.model_dump(exclude_unset=True)
+    if "password" in data and data["password"] is None:
+        data.pop("password")
     if "password" in data:
+        # PWD-RBAC-1/3: an admin reset of *another* user's password, policy-checked.
+        user_admin_service.assert_can_set_password(db, current.id, user_id)
+        validate_password(data["password"])
         data["password_hash"] = hash_password(data.pop("password"))
     data["updated_by"] = current.id  # gap #8: record the editing actor
     if "signature_data" in data:

@@ -19,7 +19,14 @@ from sqlalchemy.orm import Session
 
 from app.core import filestore
 from app.core.config import settings
-from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError, ValidationError
+from app.core.exceptions import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    UnauthorizedError,
+    ValidationError,
+)
+from app.core.password_policy import validate_password
 from app.core.security import hash_password, verify_password
 from app.db.models import (
     Definition,
@@ -185,7 +192,37 @@ def _flush(db: Session) -> None:
                             details=str(getattr(exc, "orig", exc))) from exc
 
 
+def assert_can_set_password(db: Session, actor_id: int | None, target_user_id: int | None) -> None:
+    """PWD-RBAC-1: a password arriving on an *admin* user write is a reset of
+    someone else's password. Only an administrator may do that, and never for
+    their own account — their own password goes through
+    ``POST /users/me/change-password``, which verifies the current one. (The
+    routes are already admin-gated; this is the rule itself, so a future caller
+    cannot route around it.) An actorless (internal / script) write passes."""
+    if actor_id is None:
+        return
+    from app.services.permission_service import PASSWORD_RESET_ROLES
+
+    actor = db.get(User, actor_id)
+    if actor is None:
+        return
+    if target_user_id is not None and target_user_id == actor.id:
+        raise ForbiddenError(
+            "Change your own password from My Page -> Account & Settings "
+            "(POST /users/me/change-password), which verifies your current password",
+            code="own_password_self_service",
+            details={"field": "password", "endpoint": "/api/v1/users/me/change-password"},
+        )
+    if (actor.role or "") not in PASSWORD_RESET_ROLES:
+        raise ForbiddenError(
+            "Only an administrator can reset another user's password",
+            code="password_reset_not_permitted",
+            details={"field": "password", "required_roles": sorted(PASSWORD_RESET_ROLES)},
+        )
+
+
 def create_complete(db: Session, tenant_id: int, payload: dict, created_by: int | None) -> User:
+    validate_password(payload["password"])  # PWD-RBAC-3
     user = User(
         tenant_id=tenant_id,
         email=payload["email"],
@@ -224,6 +261,8 @@ def update_complete(db: Session, tenant_id: int, user_id: int, payload: dict,
         setattr(user, field, payload[field])
     _patch_signature_image(user, payload)  # SIG-6
     if "password" in payload and payload["password"]:
+        assert_can_set_password(db, updated_by, user.id)  # PWD-RBAC-1
+        validate_password(payload["password"])  # PWD-RBAC-3
         user.password_hash = hash_password(payload["password"])
     user.updated_by = updated_by  # gap #8: record the editing actor
     _apply_related(db, user, tenant_id, payload, is_create=False)
@@ -308,6 +347,7 @@ def set_security_settings(db: Session, user_id: int, tenant_id: int, payload: di
 def change_password(db: Session, user: User, current_password: str, new_password: str) -> None:
     if not verify_password(current_password, user.password_hash):
         raise UnauthorizedError("Current password is incorrect", code="invalid_password")
+    validate_password(new_password, field="new_password")  # PWD-RBAC-3
     user.password_hash = hash_password(new_password)
     user.must_change_password = False
     db.commit()

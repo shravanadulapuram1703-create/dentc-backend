@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from app.db.models import Definition, Tenant
 from app.db.session import SessionLocal
+from app.services.document_vocabulary import BUILTIN_CATALOGS as _DOC_CATALOGS
 from app.services.patient_extra_service import CLAIM_ATTACHMENT_TYPES
 from scripts.seed_insurance_plan_definitions import seed_for_tenant as seed_plan_defs
 from scripts.seed_transaction_definitions import seed_for_tenant as seed_transaction_defs
@@ -172,22 +173,11 @@ GROUPS: dict[str, list[tuple[str, str]]] = {
     # the frontend and so could not be maintained by the practice. key1 is the
     # stored code; practices extend the list through the /definitions CRUD.
     # ``CF`` also routes to the consent-forms bucket prefix (CONSENT_DOCUMENT_TYPES).
-    "document_type": [
-        ("CF", "Consent Form"),
-        ("IC", "Insurance Card"),
-        ("ID", "Photo ID"),
-        ("XR", "X-Ray / Image"),
-        ("RX", "Prescription"),
-        ("RF", "Referral Letter"),
-        ("LB", "Lab Report"),
-        ("MH", "Medical History"),
-        ("TP", "Treatment Plan"),
-        ("FA", "Financial Agreement"),
-        ("EOB", "Explanation of Benefits"),
-        ("CR", "Correspondence"),
-        ("PH", "Patient Photo"),
-        ("OT", "Other"),
-    ],
+    "document_type": list(_DOC_CATALOGS["document_type"]),
+    # IMG-DOC-4: the Imaging upload picker's own catalog — a radiograph sub-type
+    # is not a Documents sub-type, so the two screens stop sharing labels. One
+    # list in ``document_vocabulary.BUILTIN_CATALOGS`` (seed == fallback).
+    "imaging_document_type": list(_DOC_CATALOGS["imaging_document_type"]),
     # ── Auxiliary code tables (Setup -> Procedure Codes), AUX-1 / AUX-2 ──────────
     # Modifier Codes — standard CPT/HCPCS modifiers (key1 = code, description = label).
     "MODIFIER": [

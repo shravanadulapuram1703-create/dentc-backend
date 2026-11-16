@@ -41,9 +41,10 @@ def _dump(obj) -> dict | None:  # noqa: ANN001
 
 
 def resolve_responsible_party(db: Session, tenant_id: int, rp_key: str | None) -> ResponsibleParty | None:
-    """Resolve ``patients.responsible_party_id`` (a string) to a row — by numeric
-    FK first, then by ``legacy_id`` (PO-2). Returns None if unresolvable (migrated
-    guarantor not yet imported) or self-linked to the patient's own id."""
+    """**Deprecated** (RP-2): resolves a raw key to a ``responsible_parties`` row,
+    which is wrong for a self-guarantor whose own patient id equals an RP id.
+    Kept for callers outside this repo; everything here uses
+    ``family_account_service.guarantor_person`` on the typed columns."""
     if not rp_key:
         return None
     row = None
@@ -60,6 +61,13 @@ def resolve_responsible_party(db: Session, tenant_id: int, rp_key: str | None) -
             )
         ).scalar_one_or_none()
     return row
+
+
+def guarantor_party_row(db: Session, patient: Patient) -> ResponsibleParty | None:
+    """The non-patient guarantor row, when the guarantor is one (RP-2)."""
+    if patient.guarantor_party_id is None:
+        return None
+    return db.get(ResponsibleParty, patient.guarantor_party_id)
 
 
 def _insurance(db: Session, patient_id: int) -> list[dict]:
@@ -117,10 +125,10 @@ def get_patient_overview(db: Session, patient_id: int, tenant_id: int) -> dict:
             select(PatientInsPaymentPlan).where(PatientInsPaymentPlan.patient_id == patient_id)).scalars()],
     }
 
-    rp = resolve_responsible_party(db, tenant_id, patient.responsible_party_id)
-    members = patient_intake_service.get_responsible_party_roster(
-        db, patient.responsible_party_id, tenant_id
-    ) if patient.responsible_party_id else []
+    from app.services import family_account_service
+
+    rp = guarantor_party_row(db, patient)
+    members = patient_intake_service.get_account_roster(db, patient.account_id, tenant_id)
 
     return {
         "patient": patient,
@@ -129,7 +137,11 @@ def get_patient_overview(db: Session, patient_id: int, tenant_id: int) -> dict:
             "first_visit": patient.first_visit, "last_visit": last_visit or patient.last_visit,
             "next_visit": next_visit, "next_recall": patient.next_recall,
         },
+        # RP-2: only a non-patient guarantor is a responsible_parties row; a
+        # self / head-of-household guarantor is described by ``guarantor``.
         "responsible_party": _dump(rp),
+        "guarantor": family_account_service.guarantor_payload(db, patient),
+        "account_id": patient.account_id,
         "account_members": members,
         "appointments": [_dump(a) for a in appts],
         "recalls": [_dump(r) for r in recalls],
@@ -141,16 +153,29 @@ def get_patient_overview(db: Session, patient_id: int, tenant_id: int) -> dict:
 
 # ── PO-4: family (account-scoped) appointments ────────────────────────────────
 def get_family_appointments(
-    db: Session, tenant_id: int, responsible_party_id: str, *, upcoming_only: bool = False
+    db: Session, tenant_id: int, responsible_party_id: str | None = None, *,
+    upcoming_only: bool = False, account_id: int | None = None, patient_id: int | None = None,
 ) -> list[dict]:
     """Appointments across every patient on an account (legacy VIEW FUTURE FAMILY
-    APPT). Scopes by the raw ``responsible_party_id`` string so migrated accounts work."""
-    member_ids = list(db.execute(
-        select(Patient.id).where(
+    APPT). RP-3: ``account_id`` (or ``patient_id`` → their account) is canonical;
+    the raw ``responsible_party_id`` string is still accepted and resolved to the
+    accounts its holders belong to."""
+    if patient_id is not None:
+        account_id = db.execute(select(Patient.account_id).where(
+            Patient.id == patient_id, Patient.tenant_id == tenant_id)).scalar_one_or_none()
+    if account_id is not None:
+        member_ids = list(db.execute(select(Patient.id).where(
+            Patient.tenant_id == tenant_id, Patient.account_id == account_id)).scalars())
+    elif responsible_party_id:
+        accounts = select(Patient.account_id).where(
             Patient.tenant_id == tenant_id,
-            Patient.responsible_party_id == str(responsible_party_id),
-        )
-    ).scalars())
+            Patient.responsible_party_id == str(responsible_party_id))
+        member_ids = list(db.execute(select(Patient.id).where(
+            Patient.tenant_id == tenant_id,
+            (Patient.account_id.in_(accounts))
+            | (Patient.responsible_party_id == str(responsible_party_id)))).scalars())
+    else:
+        return []
     if not member_ids:
         return []
     stmt = select(Appointment).where(

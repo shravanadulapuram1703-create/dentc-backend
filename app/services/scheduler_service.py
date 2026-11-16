@@ -70,6 +70,14 @@ def _patient_name(p: Patient | None) -> str | None:
     return name or p.chart_no or f"Patient {p.id}"
 
 
+def _short_guarantor(g: dict | None) -> dict | None:
+    """RP-11: the popover needs kind/id/name, not the whole payload."""
+    if not g:
+        return None
+    return {"kind": g["kind"], "id": g["id"], "name": g["name"],
+            "relationship": g["relationship"]}
+
+
 def _batch_balances(db: Session, patient_ids: set[int]) -> dict[int, Decimal]:
     """Account balance (charges − payments) per patient in two aggregate queries."""
     if not patient_ids:
@@ -182,7 +190,21 @@ def list_scheduler_appointments(
     from app.services import lab_tracking_service as lab_svc  # noqa: PLC0415
 
     lab_names = lab_svc.vendor_names(db, {a.lab_vendor_id for a, *_ in records if a.lab_vendor_id})
-    balances = _batch_balances(db, patient_ids)
+    # RP-10/RP-11: ``account_balance`` is the account total (every member of the
+    # patient's ``account_id``), ``patient_balance`` the patient's own figure, and
+    # the block carries the typed guarantor — still one batched pass.
+    from app.services import family_account_service  # noqa: PLC0415
+
+    feed_patients = {p.id: p for _a, p, *_ in records if p is not None}
+    account_ids = {p.account_id for p in feed_patients.values() if p.account_id is not None}
+    member_rows = db.execute(
+        select(Patient.id, Patient.account_id).where(Patient.account_id.in_(account_ids))
+    ).all() if account_ids else []
+    balances = _batch_balances(db, patient_ids | {pid for pid, _ in member_rows})
+    account_totals: dict[int, Decimal] = {}
+    for pid, acc_id in member_rows:
+        account_totals[acc_id] = account_totals.get(acc_id, Decimal(0)) + balances.get(pid, Decimal(0))
+    guarantors = family_account_service.guarantors_for(db, feed_patients.values())
     # SCHED-PT-1: pending treatment in one grouped statement for the whole feed.
     from app.services import treatment_service  # noqa: PLC0415
 
@@ -233,7 +255,13 @@ def list_scheduler_appointments(
             "responsible_party_id": patient.responsible_party_id if patient else None,
             "service_summary": services.get(appt.id),
             "insurance_eligibility": eligibility.get(appt.patient_id) if appt.patient_id else None,
-            "account_balance": bal if bal is not None else None,
+            "account_balance": (
+                account_totals.get(patient.account_id, bal) if patient is not None
+                and patient.account_id is not None else bal
+            ) if bal is not None else None,
+            "patient_balance": bal,
+            "account_id": patient.account_id if patient else None,
+            "guarantor": _short_guarantor(guarantors.get(patient.id)) if patient else None,
             "pending_tx_count": pending_tx.get(appt.patient_id, {}).get("count", 0),
             "pending_tx_scheduled_count":
                 pending_tx.get(appt.patient_id, {}).get("scheduled_count", 0),
@@ -360,20 +388,22 @@ def get_patient_context(db: Session, patient_id: int, tenant_id: int) -> dict:
         }
         for t, pid, cname, gnum, ptype, legacy_type in insurance_rows
     ]
-    # AL-12: "Responsible: <name>" in the ledger title row. `responsible_party_id`
-    # is a free-form string (numeric FK for app-created, legacy key for migrated),
-    # so it goes through the same resolver the Patient Overview uses.
-    rp = patient_overview_service.resolve_responsible_party(
-        db, tenant_id, patient.responsible_party_id
-    )
+    # AL-12: "Responsible: <name>" in the ledger title row. RP-2: resolved from
+    # the typed guarantor columns — a self-guarantor's own id is no longer looked
+    # up in the responsible_parties table (where it named another family).
+    from app.services import family_account_service  # noqa: PLC0415
+
+    guarantor = family_account_service.guarantor_payload(db, patient)
     responsible_party = None
-    if rp is not None:
+    if guarantor["kind"] != "unresolved":
         responsible_party = {
-            "id": rp.id,
-            "legacy_id": rp.legacy_id,
-            "name": " ".join(p for p in (rp.first_name, rp.last_name) if p).strip() or None,
+            "id": guarantor["id"],
+            "kind": guarantor["kind"],
+            "legacy_id": guarantor["legacy_id"],
+            "name": " ".join(p for p in (guarantor["first_name"], guarantor["last_name"]) if p).strip()
+            or None,
             "relationship": patient.responsible_party_relationship,
-            "home_phone": getattr(rp, "home_phone", None),
+            "home_phone": guarantor["home_phone"],
         }
 
     from app.services import medical_alert_summary_service as alert_summary_svc  # noqa: PLC0415
@@ -391,6 +421,8 @@ def get_patient_context(db: Session, patient_id: int, tenant_id: int) -> dict:
         ),
         "responsible_party": responsible_party,
         "responsible_party_id": patient.responsible_party_id,
+        "account_id": patient.account_id,
+        "guarantor": guarantor,
         "visit": {
             "first_visit": patient.first_visit,
             "last_visit": patient.last_visit,

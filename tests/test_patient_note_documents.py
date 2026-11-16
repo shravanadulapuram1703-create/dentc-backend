@@ -273,7 +273,9 @@ def test_limits_endpoint_publishes_what_the_server_enforces(client):
     assert ".pdf" in body["allowed_extensions"] and ".png" in body["allowed_extensions"]
     # The picker also learns which context values the upload accepts, rather than
     # hardcoding "note" and finding out at runtime that it was rejected.
-    assert body["allowed_contexts"] == ["note"]
+    assert "note" in body["allowed_contexts"]
+    # IMG-DOC-1: one owner per screen, not just Notes.
+    assert {"documents", "imaging"} <= set(body["allowed_contexts"])
 
 
 # ── NOTE-DOC-4: the document_type vocabulary ─────────────────────────────────

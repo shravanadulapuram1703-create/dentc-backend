@@ -26,6 +26,7 @@ from app.db.models.account import (
     OfficePhoneAssignment,
 )
 from app.db.models.audit import AuditLog
+from app.db.models.accounts import Account, AccountChangeEvent, AccountParty
 from app.db.models.aux_codes import IcdCode, PlaceOfServiceCode
 from app.db.models.patient_extra import (
     ConsentSignature,
@@ -292,3 +293,8 @@ __all__ = [
     # DICOM archive (GCS + Postgres index)
     "StoredObject", "DicomStudy", "DicomSeries", "DicomInstance",
 ]
+__all__ += ["Account", "AccountParty", "AccountChangeEvent"]
+
+from app.db.models.accounts import _install as _install_account_hooks  # noqa: E402
+
+_install_account_hooks()

@@ -28,7 +28,7 @@ from app.db.models import (
     ResponsibleParty,
 )
 from app.integrations import redis_store
-from app.services import balance_service, patient_extra_service, patient_rules_service
+from app.services import balance_service, family_account_service, patient_extra_service, patient_rules_service
 from app.services import medical_history_service as mh
 from app.services.patient_service import assign_chart_no
 
@@ -125,10 +125,27 @@ def _register_patient(db: Session, tenant_id: int, req, *, user_id: int | None) 
             raw["responsible_party_relationship"] = rp.relationship
         elif rp.is_self:
             raw["responsible_party_relationship"] = patient_rules_service.RESP_PARTY_REL_SELF
-        # Link an already-existing guarantor now; is_self / inline person resolved
-        # after the patient has an id.
-        if not rp.is_self and rp.person is None and rp.responsible_party_id:
-            raw["responsible_party_id"] = rp.responsible_party_id
+        # RP-5/RP-7: the guarantor is validated and resolved *before* the insert
+        # so the account hook (models/accounts.py) files the patient straight
+        # into the right account; Self is stamped once the id exists.
+        raw.pop("responsible_party_id", None)
+        raw.pop("guarantor_patient_id", None)
+        raw.pop("guarantor_party_id", None)
+        raw.pop("account_id", None)
+        spec = rp.model_dump(exclude_none=True)
+        if spec.get("person") is not None:
+            spec["person"] = rp.person.model_dump(exclude_unset=True)
+        spec.pop("relationship", None)
+        if not spec or spec == {"is_self": False}:
+            spec = {"is_self": True}
+        target = family_account_service.resolve_spec(db, tenant_id, spec, user_id=user_id)
+        if target["kind"] == "self":
+            raw["account_id"] = target.get("account_id")
+            raw["responsible_party_relationship"] = patient_rules_service.RESP_PARTY_REL_SELF
+        else:
+            raw["account_id"] = target.get("account_id")
+            raw["guarantor_patient_id"] = target.get("guarantor_patient_id")
+            raw["guarantor_party_id"] = target.get("guarantor_party_id")
 
     # Add/Edit Patient checkbox integrity: contradictory Patient Type tags are
     # rejected and the implied Patient Status flags forced, before the duplicate
@@ -152,17 +169,7 @@ def _register_patient(db: Session, tenant_id: int, req, *, user_id: int | None) 
     db.flush()  # obtain id for chart_no + child FKs
     assign_chart_no(db, patient)
 
-    if rp is not None:
-        if rp.is_self:
-            patient.responsible_party_id = str(patient.id)
-        elif rp.person is not None:
-            # LEG-10: create the non-self guarantor and link it in the same txn.
-            person = rp.person.model_dump(exclude_unset=True)
-            patient_rules_service.fold_middle_name(person)
-            guarantor = ResponsibleParty(tenant_id=tenant_id, created_by=user_id, **person)
-            db.add(guarantor)
-            db.flush()
-            patient.responsible_party_id = str(guarantor.id)
+    family_account_service.sync_alias(patient)
 
     # GAP-AP-22: alerts and questionnaire answers go through the same reconcile
     # the composite Medical History write and the bulk endpoints use, so the
@@ -214,6 +221,8 @@ def _register_patient(db: Session, tenant_id: int, req, *, user_id: int | None) 
         "patient_id": patient.id,
         "chart_no": patient.chart_no,
         "responsible_party_id": patient.responsible_party_id,
+        "account_id": patient.account_id,
+        "guarantor": family_account_service.guarantor_payload(db, patient),
         "medical_alert_ids": [a.id for a in alerts["rows"]],
         "questionnaire_response_ids": [q.id for q in answers["rows"]],
         "recall_ids": [r.id for r in recall_rows],
@@ -314,11 +323,11 @@ def get_account_plans(db: Session, patient_id: int, tenant_id: int) -> list[dict
         raise NotFoundError(f"Patient '{patient_id}' was not found")
 
     account_ids = {patient_id}
-    if patient.responsible_party_id:
+    if patient.account_id is not None:  # RP-3: account membership, not the raw string
         account_ids.update(db.execute(
             select(Patient.id).where(
                 Patient.tenant_id == tenant_id,
-                Patient.responsible_party_id == patient.responsible_party_id,
+                Patient.account_id == patient.account_id,
             )
         ).scalars())
 
@@ -384,7 +393,7 @@ def _scheduled_recall(db: Session, patient_id: int) -> date | None:
 def _member_row(db: Session, tenant_id: int, p: Patient, today: date) -> dict:
     """One roster row with the aging/estimate/visit block the Overview grids need."""
     try:
-        bal = balance_service.get_patient_balance(db, p.id, tenant_id)
+        bal = balance_service.patient_balance_core(db, p.id, tenant_id)
     except Exception:  # noqa: BLE001 — a balance failure must not sink the roster
         bal = {}
     last_visit, next_visit = _visits(db, p.id, today)
@@ -399,7 +408,37 @@ def _member_row(db: Session, tenant_id: int, p: Patient, today: date) -> dict:
         "estimated_patient": _f(bal.get("estimated_patient")),
         "estimated_insurance": _f(bal.get("estimated_insurance")),
         "aging": bal.get("aging") or {},
+        # RP-10
+        "dob": p.dob,
+        "relationship": p.responsible_party_relationship,
+        "guarantor_kind": (
+            ("self" if p.guarantor_patient_id == p.id else "patient")
+            if p.guarantor_patient_id is not None
+            else "responsible_party" if p.guarantor_party_id is not None else "unresolved"
+        ),
+        "is_guarantor": p.guarantor_patient_id == p.id,
+        "next_recall": p.next_recall,
+        "account_id": p.account_id,
     }
+
+
+def get_account_roster(db: Session, account_id: int | None, tenant_id: int) -> list[dict]:
+    """RP-3: every member of an account, guarantor-of-the-account flagged."""
+    if account_id is None:
+        return []
+    from app.db.models import Account
+
+    acc = db.get(Account, account_id)
+    patients = db.execute(
+        select(Patient).where(Patient.tenant_id == tenant_id, Patient.account_id == account_id)
+        .order_by(Patient.last_name, Patient.first_name).limit(200)
+    ).scalars().all()
+    today = date.today()
+    rows = [_member_row(db, tenant_id, p, today) for p in patients]
+    if acc is not None:
+        for r in rows:
+            r["is_guarantor"] = r["patient_id"] == acc.primary_guarantor_patient_id
+    return rows
 
 
 def get_responsible_party_roster(db: Session, rp_key: str, tenant_id: int) -> list[dict]:
@@ -407,15 +446,45 @@ def get_responsible_party_roster(db: Session, rp_key: str, tenant_id: int) -> li
     aging / estimates / visits / scheduled recall — the legacy Step-2 "Responsible
     for following Patients" account roster.
 
-    PO-3: matches on the **raw** ``responsible_party_id`` string, so it works for
-    both new-system numeric FKs and migrated legacy guarantor ids (no 404 — an
-    unknown key simply yields an empty roster)."""
+    RP-3: resolved to **accounts**, not by matching the raw string. A numeric key
+    naming a ``responsible_parties`` row means that party's accounts; anything
+    else is the legacy alias (a patient id for self/head of household, a migrated
+    RPID) and means the accounts its holders belong to. Unknown → empty (no 404,
+    PO-3)."""
+    from app.db.models import Account, AccountParty
+
+    key = str(rp_key).strip()
+    account_ids: set[int] = set()
+    if key.isdigit() and len(key) <= 9:
+        party_id = db.execute(select(ResponsibleParty.id).where(
+            ResponsibleParty.id == int(key), ResponsibleParty.tenant_id == tenant_id)).scalar_one_or_none()
+        if party_id is not None:
+            account_ids |= set(db.execute(select(Account.id).where(
+                Account.tenant_id == tenant_id, Account.primary_guarantor_party_id == party_id)).scalars())
+            account_ids |= set(db.execute(select(AccountParty.account_id).where(
+                AccountParty.responsible_party_id == party_id,
+                AccountParty.is_active.is_(True))).scalars())
+            account_ids |= set(db.execute(select(Patient.account_id).where(
+                Patient.tenant_id == tenant_id, Patient.guarantor_party_id == party_id)).scalars())
+    if not account_ids:
+        account_ids |= set(db.execute(select(Patient.account_id).where(
+            Patient.tenant_id == tenant_id, Patient.responsible_party_id == key)).scalars())
+        account_ids |= set(db.execute(select(Account.id).where(
+            Account.tenant_id == tenant_id, Account.legacy_key == key)).scalars())
+    account_ids.discard(None)
+    if not account_ids:
+        return []
     patients = db.execute(
         select(Patient).where(
-            Patient.tenant_id == tenant_id,
-            Patient.responsible_party_id == str(rp_key),
+            Patient.tenant_id == tenant_id, Patient.account_id.in_(account_ids),
         ).order_by(Patient.last_name, Patient.first_name).limit(50)
     ).scalars().all()
-
+    primaries = {a.id: a.primary_guarantor_patient_id for a in db.execute(
+        select(Account).where(Account.id.in_(account_ids))).scalars()}
     today = date.today()
-    return [_member_row(db, tenant_id, p, today) for p in patients]
+    rows = []
+    for p in patients:
+        row = _member_row(db, tenant_id, p, today)
+        row["is_guarantor"] = primaries.get(p.account_id) == p.id
+        rows.append(row)
+    return rows

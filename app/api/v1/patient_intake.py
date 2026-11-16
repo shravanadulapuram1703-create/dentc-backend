@@ -130,11 +130,15 @@ def list_rp_patients(db: DbSession, tenant_id: TenantId, rp_id: Annotated[str, P
 )
 def list_family_appointments(
     db: DbSession, tenant_id: TenantId,
-    responsible_party_id: Annotated[str, Query(description="Account guarantor id (raw string)")],
+    responsible_party_id: Annotated[
+        str | None, Query(description="Deprecated: the legacy guarantor key (raw string)")] = None,
     upcoming_only: Annotated[bool, Query()] = False,
+    account_id: Annotated[int | None, Query(description="RP-3: the account")] = None,
+    patient_id: Annotated[int | None, Query(description="RP-3: any member — resolves to their account")] = None,
 ):
     return overview_svc.get_family_appointments(
-        db, tenant_id, responsible_party_id, upcoming_only=upcoming_only
+        db, tenant_id, responsible_party_id, upcoming_only=upcoming_only,
+        account_id=account_id, patient_id=patient_id,
     )
 
 

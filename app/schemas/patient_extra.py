@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models import (
     ClaimAttachment,
@@ -17,7 +17,41 @@ from app.db.models import (
 )
 from app.schemas.factory import build_schemas
 
-PatientDocumentRead = build_schemas(PatientDocument, "PatientDocument", read_exclude=("file_path",))[2]
+_PatientDocumentReadBase = build_schemas(PatientDocument, "PatientDocument", read_exclude=("file_path",))[2]
+
+
+class PatientDocumentRead(_PatientDocumentReadBase):  # type: ignore[misc, valid-type]
+    """IMG-DOC-1/4: the row (``context`` is a column) plus two derived fields."""
+
+    # The catalog label for ``document_type`` when it resolves (a code such as
+    # ``IC`` reads "Insurance Card"), else the stored text.
+    document_type_label: str | None = None
+    # IMG-DOC-5 PATCH only: whether the bytes followed a context move into the
+    # new folder (null when the context did not change).
+    relocated: bool | None = None
+
+
+class PatientDocumentUpdate(BaseModel):
+    """IMG-DOC-5: ``PATCH /patient-documents/{id}``. Every field optional; an
+    unknown key is a 422 so a typo cannot pass as a no-op."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    context: str | None = Field(
+        None, description="Move between 'documents' and 'imaging' (the only movable contexts)",
+    )
+    document_type: str | None = Field(None, max_length=50)
+    description: str | None = Field(None, max_length=500)
+
+
+class DocumentTypeOption(BaseModel):
+    code: str
+    label: str
+
+
+class DocumentTypeCatalog(BaseModel):
+    group_code: str
+    options: list[DocumentTypeOption]
 ClaimAttachmentRead = build_schemas(ClaimAttachment, "ClaimAttachment", read_exclude=("file_path",))[2]
 # LTR-10: the sign response. SIG-4: it is the generic ``PatientConsentRead``
 # (``sig_string`` excluded, ``signature_status``/``has_sig_string`` enriched) -
@@ -93,3 +127,10 @@ class UploadLimits(BaseModel):
     # folder in the storage bucket, so an unlisted value is rejected rather than
     # silently filed under the default.
     allowed_contexts: list[str]
+    # IMG-DOC-5: the contexts PATCH may move a document between.
+    movable_contexts: list[str] = []
+    # IMG-DOC-4: the picker source per context (``documents`` / ``note`` read
+    # the ``document_type`` definitions group, ``imaging`` reads
+    # ``imaging_document_type``) and whether the server enforces it yet.
+    document_type_enforced: bool = False
+    document_types: dict[str, DocumentTypeCatalog] = {}

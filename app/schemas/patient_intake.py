@@ -85,16 +85,28 @@ class ResponsiblePartyPersonIn(BaseModel):
 
 
 class ResponsiblePartyIn(BaseModel):
-    """Relationship of the patient to their responsible party (GAP-AP-7/15).
-    ``is_self`` self-links the patient as their own guarantor; ``responsible_party_id``
-    links an already-existing party; ``person`` creates a new guarantor inline
-    (LEG-10) and links it — the three are mutually exclusive, resolved in that order
-    of precedence (is_self > person > responsible_party_id)."""
+    """Relationship of the patient to their responsible party (GAP-AP-7/15, RP-5).
+
+    Exactly one way of naming the guarantor is used, by precedence
+    ``is_self > guarantor_patient_id > account_id > person > responsible_party_id``:
+
+    * ``is_self`` — the patient is their own guarantor (a new account, or
+      ``account_id`` to be a self-responsible member of an existing one);
+    * ``guarantor_patient_id`` — an existing **patient** is the guarantor (head of
+      household); the new patient joins that patient's account;
+    * ``account_id`` — join an existing account under its primary guarantor;
+    * ``person`` — create a new **non-patient** guarantor inline (LEG-10);
+    * ``responsible_party_id`` — an existing ``responsible_parties`` row id or a
+      legacy RPID (validated, RP-7).
+
+    Omitting the block entirely registers the patient as Self (RP-4)."""
 
     # GAP-AP-25: the resp_party_rel *code* (S/SP/P/G/C/D/O); a lowercase key or
     # a label is accepted and folded to the code.
     relationship: str | None = Field(None, max_length=50)
     is_self: bool = False
+    guarantor_patient_id: int | None = None
+    account_id: int | None = None
     responsible_party_id: str | None = Field(None, max_length=50)
     person: ResponsiblePartyPersonIn | None = None
 
@@ -239,7 +251,10 @@ class RegisteredInsuranceRead(BaseModel):
 class RegisterResponse(BaseModel):
     patient_id: int
     chart_no: str | None = None
-    responsible_party_id: str | None = None
+    responsible_party_id: str | None = None  # RP-1: deprecated alias
+    # RP-5: the account the patient landed in + the typed guarantor (``Guarantor`` shape).
+    account_id: int | None = None
+    guarantor: dict | None = None
     medical_alert_ids: list[int] = Field(default_factory=list)
     questionnaire_response_ids: list[int] = Field(default_factory=list)
     recall_ids: list[int] = Field(default_factory=list)
@@ -343,3 +358,10 @@ class RosterPatientRead(BaseModel):
     estimated_patient: float = 0.0
     estimated_insurance: float = 0.0
     aging: dict[str, float] = Field(default_factory=dict)
+    # RP-10: so the Overview can drop its per-member fan-out (MEMBER_ENRICH_CAP).
+    dob: date | None = None
+    relationship: str | None = None
+    guarantor_kind: str | None = None
+    is_guarantor: bool = False
+    next_recall: date | None = None
+    account_id: int | None = None
