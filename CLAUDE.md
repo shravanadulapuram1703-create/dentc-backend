@@ -49,6 +49,26 @@ or `by_alias` that would convert to camelCase.
 authoritative DB schema (`migration/db/schema.sql`). **Reference-only** — don't
 modify unless explicitly doing data-migration work.
 
+### Reports & Analytics module (in progress)
+Server-side report engine replacing the client-side report pages. **The plan is the spec** — read it, don't
+redesign: `../dentc-frontend/docs/reports/module-plan/` (sibling checkout of the frontend repo; start at `README.md`; implementation
+prompts in `13_agent_prompts.md`; decisions in `decisions_log.md`; progress in `implementation_log.md`).
+- What decides what: `02_architecture.md` engine, runs, artifacts, API · `03_data_foundation.md` `rpt_*` views,
+  repairs, reconciliation R-nn · `04_filter_framework.md` parameter types · `05_metric_catalog.md` metrics ·
+  `06_dashboards.md` · `08_security_compliance.md` rights, office rule, audit · `catalog/<family>.md` one spec per
+  report · `catalog/parity/<category>.parity.json` legacy control → parameter mapping (the parity lint enforces it) ·
+  `work_items.md` ids, acceptance, dependencies · `10_backend_plan.md` build order per phase.
+- New packages: `app/reports/` (engine), `app/reporting/sql/` (one SQL file + one Alembic revision per `rpt_*` view),
+  router `app/api/v1/report_engine.py`; everything gated by `REPORTS_ENGINE_ENABLED` (404 `reports_engine_disabled`).
+- Report SQL reads **only `rpt_*` views**, inside **one read-only REPEATABLE READ transaction per run**. Office scope
+  always from `report_scope.allowed_offices()` — strict: a user with zero office assignments gets no office data in
+  reports (decision BD-01), unlike the rest of the app. Rights through the single `authorize()`.
+- snake_case everywhere, report keys `<category>.<snake_name>` exactly as in the catalog.
+- Tests: the SQLite suite stays green; report SQL is tested on the local `postgres:15` tier (ENG-17). Run migrations
+  (upgrade **and** downgrade) only on a local database — never on UAT or a client database from an agent session.
+  Steps that change production data are `scripts/ops/<ops_id>.py` scripts with a preflight, run by a person.
+- At the end of every session append an entry to `implementation_log.md` (items done / partial, checks, follow-ups).
+
 ---
 
 ## Architecture
@@ -1581,6 +1601,26 @@ left as-is, non-breaking), `GET /treatment-plan-items/pending-summary?patient_id
 `LEGACY_ITEM_STATUS_MAP`; dev DB already canonical, `scripts/normalize_treatment_item_statuses.py`
 for other environments. Rule published on `/metadata/treatment-plan-rules → pending_rule`.
 
+**Tx Plan annual max** (TX-MAX-1…6 of
+`dentc-frontend/docs/treatment-plans/tx_plan_annual_max_backend_devreport.md` /
+[response](docs/treatment plans/tx_plan_annual_max_backend_response.md); **no migration**).
+Each item write split against the patient's *full* remaining benefit (deductible taken per
+line, 1,689.20 on a $1,000 max). `re_estimate` now walks every line through
+`estimate_service.split_line` — the charge path's arithmetic (copay model, dental-max
+exemption, ortho max, max-before-deductible) — against **one** running balance per benefit
+year; item create / re-price / re-order / delete re-net the plan (`renet_plans`, own commit,
+failure logged not raised, skipped when the PATCH types `insurance_estimate`;
+`TX_PLAN_AUTO_RENET`). [app/services/benefit_usage_service.py](app/services/benefit_usage_service.py)
+derives the remaining max from in-benefit-year claims (paid when settled, max(paid, est) when
+open), **capped** by a current-year slot column; a column written before the benefit year
+began is ignored (year reset). Read by `coverage_context`, so every estimate surface changed;
+published on `PatientInsuranceRead` (`max_remaining_effective`/`benefits_used_ytd`/…).
+completed/alternative/referred-out lines never consume; the patient's other open plans are
+netted first (older plan wins, only the target plan is written); a line booked in a later
+benefit year gets fresh limits. `TreatmentPlanReport.primary_insurance` +
+`annual_max_remaining_after` (dry run). Secondary stays out of the plan estimate (matches the
+charge path).
+
 **Patient print module** (Print buttons on Patient Overview · Transactions Entry ·
 Account/Patient Ledger · Insurance Details; PRINT-1…10 of
 `dentc-frontend/docs/print/patient_print_backend_devreport.md` /
@@ -2022,7 +2062,8 @@ nothing said which owned a row. Vocabulary lives once in
 - **Breaking**: `PatientBalance.account_balance` is now the true account total (`balance` /
   `patient_balance_total` = the patient's own; `balance_service.patient_balance_core` is the
   cached per-patient figure); same on the scheduler feed (+ `patient_balance`). PATCH
-  `responsible_party_id: null` → 422 `guarantor_required`, unknown key → 422
+  with all guarantor keys null/blank = *not touched* (PE-5; was a 422 that sank the whole
+  PATCH), unknown key → 422
   `responsible_party_not_found`; re-sending the current alias is a no-op. Account membership
   everywhere (`account_scope`, roster, family appts, account plans) is `account_id`, never the string.
 - RP-14 `scripts/import_legacy_responsible_parties.py` (RespParty.txt → `responsible_parties`,

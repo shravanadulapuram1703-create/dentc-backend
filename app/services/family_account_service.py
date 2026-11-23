@@ -784,11 +784,14 @@ def apply_patch_guarantor(db: Session, tenant_id: int, existing: Patient, payloa
     if not touched:
         return None
     if all(v is None or (isinstance(v, str) and not v.strip()) for v in touched.values()):
-        raise ValidationError(
-            "A patient must always have a responsible party; send a replacement guarantor "
-            "(or use POST /patients/{id}/change-guarantor)",
-            details={"code": "guarantor_required", "fields": sorted(touched)},
-        )
+        # PE-5: an all-blank guarantor block means "not set by this step", not
+        # "clear the guarantor" — a patient can never be left without one, so
+        # there is no clear to honour. Refusing here 422'd the whole PATCH
+        # (fee schedule, demographics, …) for a payload shape the schema
+        # advertises as valid. The keys are already popped, so nothing is
+        # written; changing the guarantor needs a real value or
+        # POST /patients/{id}/change-guarantor.
+        return None
     spec: dict[str, Any] = {}
     if touched.get("guarantor_patient_id") is not None:
         spec["guarantor_patient_id"] = touched["guarantor_patient_id"]

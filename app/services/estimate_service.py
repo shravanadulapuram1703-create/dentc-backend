@@ -269,20 +269,35 @@ def estimate(
 class CoverageTier:
     """One active dental coverage slot, with its plan, rules and running balances.
 
-    ``ded_remaining`` / ``max_remaining`` / ``ortho_remaining`` prefer the
-    per-patient slot figure and fall back to the plan limit **only when the slot
-    value is NULL** — a stored ``0`` means the benefit is exhausted, which is not
-    the same as "unknown".
+    The opening balances come from ``benefit_usage_service.slot_benefits``
+    (TX-MAX-3): the annual max is derived from the slot's claims in the current
+    benefit year, capped by a current-year slot column; a column written before
+    the benefit year began is ignored (the year reset). Without a ``benefits``
+    block the slot column is used, falling back to the plan limit **only when
+    the slot value is NULL** — a stored ``0`` means the benefit is exhausted,
+    which is not the same as "unknown".
     """
 
     __slots__ = ("rank", "slot", "plan", "rules", "ded_remaining", "max_remaining",
-                 "ortho_remaining")
+                 "ortho_remaining", "benefits")
 
-    def __init__(self, rank, slot, plan, rules):  # noqa: ANN001
+    def __init__(self, rank, slot, plan, rules, benefits=None):  # noqa: ANN001
         self.rank = rank
         self.slot = slot
         self.plan = plan
         self.rules = rules
+        self.benefits = benefits
+        if benefits is not None:
+            self.ded_remaining = _money(benefits.deductible_remaining_effective)
+            self.max_remaining = (
+                _money(benefits.max_remaining_effective)
+                if benefits.max_remaining_effective is not None else None
+            )
+            self.ortho_remaining = (
+                _money(benefits.ortho_remaining_effective)
+                if benefits.ortho_remaining_effective is not None else None
+            )
+            return
         self.ded_remaining = _money(
             slot.deductible_remaining if slot.deductible_remaining is not None
             else (plan.individual_deductible if plan else None)
@@ -296,15 +311,38 @@ class CoverageTier:
             else (_money(plan.ortho_max) if plan and plan.ortho_max is not None else None)
         )
 
+    def clone(self) -> "CoverageTier":
+        """A copy with its own running balances (rules/plan/slot shared)."""
+        twin = CoverageTier.__new__(CoverageTier)
+        for name in CoverageTier.__slots__:
+            setattr(twin, name, getattr(self, name))
+        return twin
 
-def coverage_context(db: Session, patient_id: int) -> list[CoverageTier]:
+    def reset_for_new_year(self) -> None:
+        """TX-MAX-5: a later benefit year opens with the plan's full limits.
+        Ortho is lifetime by default, so its balance carries over."""
+        plan = self.plan
+        self.ded_remaining = _money(plan.individual_deductible if plan else None)
+        self.max_remaining = (
+            _money(plan.individual_max) if plan is not None and plan.individual_max is not None else None
+        )
+        if plan is not None and not getattr(plan, "lifetime_ortho_benefits", True):
+            self.ortho_remaining = (
+                _money(plan.ortho_max) if plan.ortho_max is not None else None
+            )
+
+
+def coverage_context(db: Session, patient_id: int, *, on: date | None = None) -> list[CoverageTier]:
     """The patient's active **dental** coverage, primary first.
 
     The single definition of "the patient's coverage" for pricing — the resolver,
     the estimate engine and the printed day sheet all read this, replacing three
     slightly different pickers. A medical (``legacy_plan_type='M'``) slot never
-    prices dental; a slot with no plan is skipped.
+    prices dental; a slot with no plan is skipped. Opening balances are the
+    TX-MAX-3 effective figures for the benefit year containing ``on`` (today).
     """
+    from app.services import benefit_usage_service  # local: keeps import order flat
+
     rows = db.execute(
         select(PatientInsurance).where(
             PatientInsurance.patient_id == patient_id,
@@ -312,7 +350,7 @@ def coverage_context(db: Session, patient_id: int) -> list[CoverageTier]:
         )
     ).scalars().all()
 
-    tiers: list[CoverageTier] = []
+    picked: list[tuple[PatientInsurance, InsurancePlan]] = []
     for slot in rows:
         if slot.ins_plan_id is None:
             continue
@@ -321,10 +359,19 @@ def coverage_context(db: Session, patient_id: int) -> list[CoverageTier]:
         plan = db.get(InsurancePlan, slot.ins_plan_id)
         if plan is None:
             continue
-        tiers.append(CoverageTier(
+        picked.append((slot, plan))
+
+    benefits = benefit_usage_service.slot_benefits(
+        db, [s for s, _ in picked], on=on, plans={p.id: p for _, p in picked},
+    )
+    tiers = [
+        CoverageTier(
             rank=(slot.insurance_type or "primary").lower(),
             slot=slot, plan=plan, rules=_coverage_rules(db, plan.id),
-        ))
+            benefits=benefits.get(slot.id),
+        )
+        for slot, plan in picked
+    ]
 
     def _order(tier: CoverageTier) -> int:
         try:
@@ -597,6 +644,53 @@ def _price_legacy(db: Session, data: dict, tenant_id: int | None) -> dict:
     return data
 
 
+def split_line(
+    db: Session,
+    tiers: list[CoverageTier],
+    *,
+    fee: Decimal,
+    code: str,
+    quote: dict | None,
+    category: str | None = None,
+    category_known: bool = False,
+    include_secondary: bool = False,
+) -> dict:
+    """One line's split against ``tiers``, consuming their running balances.
+
+    The single entry point the charge write path, the item write path and the
+    plan-level ``treatment_service.re_estimate`` (TX-MAX-2) share — the benefit
+    model comes from the quote that priced the code (copay vs percentage), the
+    arithmetic from :func:`_split_amounts`. Pass the *same* ``tiers`` list for
+    every line of a plan and the deductible / annual max net across them."""
+    quote = quote or {}
+    primary = tiers[0] if tiers else None
+    secondary = tiers[1] if len(tiers) > 1 else None
+    if not category_known:
+        category = covcat.categories_for(db, [code]).get(code)
+    proc = db.get(ProcedureCode, code)
+    is_ortho = bool(getattr(proc, "is_ortho", False))
+    exempt = bool(getattr(proc, "exempt_from_dental_max", False))
+    model = quote.get("pricing_model") or "percentage"
+    warnings: list[str] = []
+    coverage_pct, prim_ins, sec_ins, line_ded, rule_id = _split_amounts(
+        fee, model=model, payer_amount=quote.get("payer_amount"), primary=primary,
+        secondary=secondary, category=category, code=code, is_ortho=is_ortho,
+        exempt=exempt, include_secondary=include_secondary, warnings=warnings,
+    )
+    insurance_estimate = _money(prim_ins + sec_ins)
+    return {
+        "insurance_estimate": insurance_estimate,
+        "primary_insurance_estimate": _money(prim_ins),
+        "sec_insurance_estimate": _money(sec_ins),
+        "patient_estimate": _money(max(fee - insurance_estimate, _ZERO)),
+        "estimated_deductible": _money(line_ded),
+        "coverage_pct": coverage_pct,
+        "coverage_rule_id": rule_id,
+        "benefit_model": model if primary or model == "copay" else "self_pay",
+        "warnings": warnings,
+    }
+
+
 def _fill_split(
     db: Session,
     data: dict,
@@ -611,29 +705,14 @@ def _fill_split(
     insurance/deductible figures are **always** overwritten — they are never read
     from a client payload (§3.4)."""
     tiers = coverage_context(db, patient_id) if patient_id else []
-    primary = tiers[0] if tiers else None
-    secondary = tiers[1] if len(tiers) > 1 else None
-    category = covcat.categories_for(db, [code]).get(code)
-    proc = db.get(ProcedureCode, code)
-    is_ortho = bool(getattr(proc, "is_ortho", False))
-    exempt = bool(getattr(proc, "exempt_from_dental_max", False))
-    model = quote.get("pricing_model") or "percentage"
-    payer_amount = quote.get("payer_amount")
-    warnings: list[str] = []
-
-    coverage_pct, prim_ins, sec_ins, line_ded, rule_id = _split_amounts(
-        fee, model=model, payer_amount=payer_amount, primary=primary,
-        secondary=secondary, category=category, code=code, is_ortho=is_ortho,
-        exempt=exempt, include_secondary=False, warnings=warnings,
-    )
-    insurance_estimate = _money(prim_ins + sec_ins)
-    data["insurance_estimate"] = insurance_estimate
-    data["sec_insurance_estimate"] = _money(sec_ins)
-    data["patient_estimate"] = _money(max(fee - insurance_estimate, _ZERO))
-    data["estimated_deductible"] = _money(line_ded)
-    data["coverage_pct"] = coverage_pct
-    if rule_id is not None:
-        data["coverage_rule_id"] = rule_id
+    split = split_line(db, tiers, fee=fee, code=code, quote=quote)
+    data["insurance_estimate"] = split["insurance_estimate"]
+    data["sec_insurance_estimate"] = split["sec_insurance_estimate"]
+    data["patient_estimate"] = split["patient_estimate"]
+    data["estimated_deductible"] = split["estimated_deductible"]
+    data["coverage_pct"] = split["coverage_pct"]
+    if split["coverage_rule_id"] is not None:
+        data["coverage_rule_id"] = split["coverage_rule_id"]
 
 
 def _apply_split_create(

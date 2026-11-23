@@ -1,5 +1,6 @@
 # ── Runtime ────────────────────────────────────────────────────────────────
-fastapi>=0.110
+# Pinned (02 C14): the generated frontend client depends on the exact OpenAPI output.
+fastapi==0.128.0
 uvicorn[standard]>=0.29
 gunicorn>=21
 SQLAlchemy>=2.0
@@ -26,6 +27,12 @@ numpy>=1.26
 Pillow>=10.0
 pylibjpeg>=2.0
 pylibjpeg-openjpeg>=2.0
+# Reports & Analytics engine (ENG-02): XLSX export, schedule cron parsing, Cloud
+# Tasks queue for background runs, XLSX reading.
+XlsxWriter>=3.2
+croniter>=2.0
+google-cloud-tasks>=2.16
+openpyxl>=3.1
 
 # ── Dev / test ───────────────────────────────────────────────────────────────
 pytest>=8.0

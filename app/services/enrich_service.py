@@ -323,3 +323,27 @@ def enrich_office(db: Session, items, tenant_id=None) -> None:  # noqa: ANN001
         office.logo_url = lh["logo_url"]
         office.letterhead = {k: v for k, v in lh.items() if k != "logo_path"}
         office.deleted_by_name = names.get(office.deleted_by) if getattr(office, "deleted_by", None) else None
+
+
+def enrich_patient_insurance(db, items, tenant_id=None) -> None:  # noqa: ANN001, ARG001
+    """TX-MAX-3: the effective benefit figures (one claims read per page)."""
+    from app.services.benefit_usage_service import slot_benefits
+
+    items = list(items)
+    if db is None or not items:
+        return
+    benefits = slot_benefits(db, items)
+    for row in items:
+        b = benefits.get(row.id)
+        if b is None:
+            continue
+        row.benefit_year_start = b.year_start
+        row.benefit_year_end = b.year_end
+        row.annual_max = b.annual_max
+        row.benefits_used_ytd = b.benefits_used_ytd
+        row.benefit_claim_count = b.claim_count
+        row.max_remaining_effective = b.max_remaining_effective
+        row.max_remaining_source = b.max_remaining_source
+        row.deductible_remaining_effective = b.deductible_remaining_effective
+        row.deductible_remaining_source = b.deductible_remaining_source
+        row.slot_values_stale = b.slot_values_stale

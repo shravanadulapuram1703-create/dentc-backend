@@ -162,11 +162,31 @@ def test_patch_unknown_rp_key_422(client, db_session):
     assert r.json()["error"]["details"]["code"] == "responsible_party_not_found"
 
 
-def test_patch_null_rp_422(client, db_session):
+def test_patch_null_guarantor_keys_are_untouched_and_other_fields_save(client, db_session):
+    """PE-5: a null/blank guarantor block is "not touched", never a 422 that
+    sinks the rest of the PATCH."""
+    mom = _patient(db_session, "Mom", "Fee")
+    kid = _patient(db_session, "Kid", "Fee")
+    r = client.patch(f"{API}/patients/{kid.id}", json={"guarantor_patient_id": mom.id})
+    assert r.status_code == 200, r.text
+    account = r.json()["account_id"]
+    r = client.patch(f"{API}/patients/{kid.id}", json={
+        "responsible_party_id": None, "guarantor_patient_id": None,
+        "guarantor_party_id": None, "account_id": None, "first_name": "Renamed",
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["first_name"] == "Renamed"
+    assert body["guarantor_patient_id"] == mom.id
+    assert body["account_id"] == account
+    assert body["responsible_party_id"] == str(mom.id)
+
+
+def test_patch_blank_rp_alias_is_noop(client, db_session):
     p = _patient(db_session)
-    r = client.patch(f"{API}/patients/{p.id}", json={"responsible_party_id": None})
-    assert r.status_code == 422
-    assert r.json()["error"]["details"]["code"] == "guarantor_required"
+    r = client.patch(f"{API}/patients/{p.id}", json={"responsible_party_id": "  "})
+    assert r.status_code == 200, r.text
+    assert r.json()["guarantor"]["kind"] == "self"
 
 
 def test_patch_same_alias_is_noop_and_other_fields_save(client, db_session):

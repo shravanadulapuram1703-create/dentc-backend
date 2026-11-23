@@ -16,6 +16,7 @@ ENV PORT=8080
 EXPOSE 8080
 
 # FastAPI app object is app.main:app, served by gunicorn + uvicorn workers.
+# GUNICORN_TIMEOUT (default 120 s) is raised to 1800 on the report worker service (ENG-02).
 # --forwarded-allow-ips="*" trusts X-Forwarded-* from Cloud Run's front end (which
 # terminates TLS and forwards as http). Without it uvicorn ignores
 # X-Forwarded-Proto: https, so trailing-slash 307 redirects and any generated URLs
@@ -25,7 +26,7 @@ CMD exec gunicorn app.main:app \
     -k uvicorn.workers.UvicornWorker \
     -b 0.0.0.0:${PORT} \
     --workers ${GUNICORN_WORKERS:-2} \
-    --timeout 120 \
+    --timeout ${GUNICORN_TIMEOUT:-120} \
     --forwarded-allow-ips="*" \
     --access-logfile - \
     --error-logfile -

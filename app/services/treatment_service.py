@@ -10,6 +10,13 @@
   the first version compared ``D2740`` lexically against ``03A``–``03A`` and
   returned 0 % on every migrated plan. ``use_new_fees`` re-prices each line
   through ``pricing_service`` and records the schedule (PLAN-29).
+- **TX-MAX-1..6** ``re_estimate`` runs every line through
+  ``estimate_service.split_line`` (the charge engine: copay model, dental-max
+  exemption, ortho max, max-before-deductible) against one running balance per
+  benefit year, opened from ``benefit_usage_service`` (claims-derived remaining
+  max); completed / alternative / referred-out lines never consume it; the
+  patient's other open plans are netted first (older plan wins); item create /
+  re-price / re-order / delete re-nets the plan (:func:`renet_plans`).
 - **PLAN-6** ``plan_report`` — server-side report payload (header + lines + totals).
 - **PLAN-13/14** ``TreatmentPlanItemCRUD`` — item delete is a soft-delete that
   also archives the item's insurance-details (so a detail FK can never make an
@@ -45,9 +52,10 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date as date_type
 from datetime import datetime, timedelta, timezone
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import case, func, or_, select, update
@@ -62,8 +70,7 @@ from app.db.models import (
     AppointmentProcedure,
     FeeSchedule,
     IcdCode,
-    InsuranceCoverageRule,
-    InsurancePlan,
+    InsuranceCarrier,
     Office,
     Operatory,
     Patient,
@@ -86,6 +93,7 @@ from app.schemas.treatment import (
     BookedProcedureRead,
     BookFromPlanResult,
     ItemIcdCodeRead,
+    PlanReportInsurance,
     PlanReportItem,
     PlanReportPatient,
     ReEstimateLine,
@@ -96,10 +104,10 @@ from app.schemas.treatment import (
 )
 from app.services import coverage_category_service as covcat
 from app.services import permission_service, pricing_service, procedure_events
-from app.services.estimate_service import match_coverage_rule
 from app.services.procedure_rules_service import apply_entry_rules
 from app.services.user_admin_service import resolve_user_names
 
+_log = logging.getLogger(__name__)
 _CENTS = Decimal("0.01")
 ITEM_SOURCE = "treatment_plan_items"
 #: The status an item returns to when the charge that completed it is voided.
@@ -743,6 +751,10 @@ class TreatmentPlanItemCRUD(CRUDBase):
             db.flush()
             _set_icd_codes(db, obj.id, ordered)
         self._commit(db)
+        # TX-MAX-1: net the new line against the plan's other lines (deductible
+        # once, annual max across the plan) instead of returning a per-line
+        # figure split against the patient's full remaining benefit.
+        renet_plans(db, [obj.plan_id], tenant_id)
         db.refresh(obj)
         self._audit(obj, after=dict(payload))
         procedure_events.announce(
@@ -773,7 +785,14 @@ class TreatmentPlanItemCRUD(CRUDBase):
         _fill_item_split(db, payload, plan, tenant_id, current=current)
         if icd_ids is not None:
             _set_icd_codes(db, current.id, _validate_icd_ids(db, icd_ids))
+        old_plan_id = current.plan_id
         obj = super().update(db, obj_id, payload, tenant_id=tenant_id, updated_by=updated_by)
+        # TX-MAX-1: a re-price / re-order / status / plan move re-nets the plan(s).
+        # A PATCH that types an Est Ins is a manual override (TX-EST-1) and is
+        # left alone — a re-net would overwrite it.
+        if RENET_FIELDS.intersection(data) and "insurance_estimate" not in data:
+            renet_plans(db, [obj.plan_id, old_plan_id], tenant_id)
+            db.refresh(obj)
         procedure_events.announce(
             tenant_id, patient_id, source=ITEM_SOURCE, action="updated",
             entity_id=obj.id, treatment_plan_id=obj.plan_id, treatment_plan_item_id=obj.id,
@@ -792,6 +811,8 @@ class TreatmentPlanItemCRUD(CRUDBase):
         )
         setattr(obj, self.soft_delete_field, self.soft_delete_value)  # is_archived = True
         self._commit(db)
+        # TX-MAX-1: a removed line frees benefit for the lines after it.
+        renet_plans(db, [obj.plan_id], tenant_id)
         procedure_events.announce(
             tenant_id, patient_id, source=ITEM_SOURCE, action="deleted",
             entity_id=obj.id, treatment_plan_id=obj.plan_id, treatment_plan_item_id=obj.id,
@@ -1134,20 +1155,11 @@ def post_item_to_ledger(
 
 
 # ── PLAN-3: insurance re-estimate ────────────────────────────────────────────
-def _active_insurance(db: Session, patient_id: int) -> PatientInsurance | None:
-    rows = db.execute(
-        select(PatientInsurance).where(
-            PatientInsurance.patient_id == patient_id,
-            PatientInsurance.is_active.is_(True),
-            PatientInsurance.ins_plan_id.is_not(None),
-        )
-    ).scalars().all()
-    primary = next((r for r in rows if (r.insurance_type or "").lower() == "primary"), None)
-    return primary or (rows[0] if rows else None)
-
-
 def _upsert_detail(db: Session, item: TreatmentPlanItem, ins_plan_id, ins, pat,
-                   ded_applied, cov_pct, max_left) -> None:  # noqa: ANN001
+                   ded_applied, cov_pct, max_left, *, create: bool = True) -> None:  # noqa: ANN001
+    """Write the line's estimate onto its live insurance-detail row. With
+    ``create=False`` (an uninsured patient) an existing row is zeroed but none is
+    created — PLAN-17: an uninsured line must not grow an empty insurance row."""
     detail = db.execute(
         select(TreatmentPlanInsuranceDetail)
         .where(
@@ -1157,6 +1169,8 @@ def _upsert_detail(db: Session, item: TreatmentPlanItem, ins_plan_id, ins, pat,
         .order_by(TreatmentPlanInsuranceDetail.id.asc())
     ).scalars().first()
     if detail is None:
+        if not create:
+            return
         detail = TreatmentPlanInsuranceDetail(plan_item_id=item.id)
         db.add(detail)
     detail.ins_plan_id = ins_plan_id
@@ -1168,115 +1182,253 @@ def _upsert_detail(db: Session, item: TreatmentPlanItem, ins_plan_id, ins, pat,
     detail.is_archived = False
 
 
-def re_estimate(
-    db: Session, plan_id: str, tenant_id: int, *, phase_id: int | None = None,
-    use_new_fees: bool = False,
+#: TX-MAX-4: lines that are already treated (their charge's claim is what uses
+#: the benefit, TX-MAX-3) or will not be performed here. Still estimated, against
+#: what is left at their position, but they never use up the deductible or max.
+NON_CONSUMING_ITEM_STATUSES: tuple[str, ...] = (
+    COMPLETED_STATUS, "alternative", "referred_out", "external_referral",
+)
+#: TX-MAX-5: a plan in one of these states no longer competes for the benefit.
+CLOSED_PLAN_STATUSES: frozenset[str] = frozenset({
+    "completed", "complete", "closed", "inactive", "archived", "rejected",
+    "declined", "cancelled", "canceled",
+})
+
+
+def item_consumes_benefit(item: TreatmentPlanItem) -> bool:
+    return normalise_item_status(item.status) not in NON_CONSUMING_ITEM_STATUSES
+
+
+def _line_service_date(item: TreatmentPlanItem, today: date_type) -> date_type:
+    """When the line will be performed: its booking, else its planned start,
+    else today. A date in the past means it has not happened yet -> today."""
+    planned = item.scheduled_date or item.start_date
+    return planned if planned is not None and planned > today else today
+
+
+def _net_plan(
+    db: Session, plan: TreatmentPlan, tenant_id: int, *, phase_id: int | None = None,
+    use_new_fees: bool = False, write: bool = True,
 ) -> ReEstimateResult:
-    plan = _require_plan(db, plan_id, tenant_id)
-    pins = _active_insurance(db, plan.patient_id)
+    """TX-MAX-2/4/5: the plan-level estimate, through the one split engine.
 
-    insured = pins is not None
-    ins_plan_id = pins.ins_plan_id if pins else None
-    rules: list[InsuranceCoverageRule] = []
-    ded_left = Decimal("0")
-    max_left: Decimal | None = None  # None = no annual maximum / unlimited
-    if insured:
-        plan_ins = db.get(InsurancePlan, ins_plan_id)
-        ded = pins.deductible_remaining
-        if ded is None and plan_ins is not None:
-            ded = plan_ins.individual_deductible
-        ded_left = ded or Decimal("0")
-        mx = pins.max_remaining
-        if mx is None and plan_ins is not None:
-            mx = plan_ins.individual_max
-        max_left = mx  # may stay None (unlimited)
-        rules = list(db.execute(
-            select(InsuranceCoverageRule).where(InsuranceCoverageRule.ins_plan_id == ins_plan_id)
-        ).scalars().all())
+    Every line is priced by ``estimate_service.split_line`` — the arithmetic,
+    band matcher, copay model, ``exempt_from_dental_max`` and ortho max the
+    charge path uses — against **one** running balance per benefit year, opened
+    from the TX-MAX-3 effective figures. The walk covers every open plan of the
+    patient in (plan created, priority, item created) order, so an older plan's
+    lines are netted before this one's; only this plan's lines (one phase when
+    ``phase_id``) are written. ``write=False`` is a dry run (no mutation)."""
+    from app.services import benefit_usage_service, estimate_service  # local: import-light
 
-    stmt = select(TreatmentPlanItem).where(
-        TreatmentPlanItem.plan_id == plan_id,
-        TreatmentPlanItem.is_archived.is_(False),
-    )
-    if phase_id is not None:
-        stmt = stmt.where(TreatmentPlanItem.phase_id == phase_id)
-    items = db.execute(
-        stmt.order_by(TreatmentPlanItem.priority.asc(), TreatmentPlanItem.created_at.asc())
+    today = office_today(_plan_office_tz(db, plan))
+    tiers_now = estimate_service.coverage_context(db, plan.patient_id, on=today)
+    primary = tiers_now[0] if tiers_now else None
+    insured = primary is not None
+    ins_plan_id = primary.plan.id if primary else None
+    benefits = primary.benefits if primary else None
+    year_now = benefit_usage_service.benefit_year_window(primary.plan if primary else None, today)[0]
+    max_before = primary.max_remaining if primary else None
+    ded_before = primary.ded_remaining if primary else None
+
+    plans = db.execute(
+        select(TreatmentPlan).where(TreatmentPlan.patient_id == plan.patient_id)
     ).scalars().all()
-
-    # FEE-1: one batched classification of every line's coverage category.
-    categories = covcat.categories_for(db, [it.procedure_code for it in items]) if insured else {}
-    # PLAN-29 / "Use New Fees": one pricing context for the whole plan.
-    ctx = None
-    if use_new_fees:
-        ctx = pricing_service.build_context(
-            db, patient_id=plan.patient_id, office_id=plan.office_id, ins_plan_id=ins_plan_id,
+    open_plans = [
+        p for p in plans
+        if p.id == plan.id or (p.status or "").strip().lower() not in CLOSED_PLAN_STATUSES
+    ]
+    plan_order = {
+        p.id: i for i, p in enumerate(sorted(
+            open_plans, key=lambda p: (p.created_at or datetime.min, p.id)))
+    }
+    items = list(db.execute(
+        select(TreatmentPlanItem).where(
+            TreatmentPlanItem.plan_id.in_(list(plan_order)),
+            TreatmentPlanItem.is_archived.is_(False),
         )
+    ).scalars().all())
+    items.sort(key=lambda it: (plan_order[it.plan_id], it.priority or 0,
+                               it.created_at or datetime.min, it.id))
 
-    lines: list[ReEstimateLine] = []
-    tot_fee = tot_ins = tot_pat = Decimal("0")
-    for it in items:
-        fee_schedule_id = None
-        fee_source = None
-        if use_new_fees:
+    categories = covcat.categories_for(db, list({it.procedure_code for it in items})) if items else {}
+    ctx = pricing_service.build_context(
+        db, patient_id=plan.patient_id, office_id=plan.office_id, ins_plan_id=ins_plan_id,
+    )
+    quotes: dict[tuple[str, str | None], dict | None] = {}
+
+    def _quote(it: TreatmentPlanItem) -> dict | None:
+        key = (it.procedure_code, it.provider_id)
+        if key not in quotes:
+            line_ctx = ctx
+            if it.provider_id:
+                line_ctx = pricing_service.build_context(
+                    db, patient_id=plan.patient_id, office_id=plan.office_id,
+                    provider_id=it.provider_id, ins_plan_id=ins_plan_id,
+                )
             try:
-                quote = pricing_service.resolve_procedure_fee(
-                    db, tenant_id, it.procedure_code, ctx=ctx,
+                quotes[key] = pricing_service.resolve_procedure_fee(
+                    db, tenant_id, it.procedure_code, ctx=line_ctx,
                 )
             except NotFoundError:
-                quote = None
-            if quote is not None:
-                it.fee = Decimal(str(quote["fee"]))
-                fee_schedule_id = quote.get("fee_schedule_id")
-                fee_source = quote.get("fee_source")
+                quotes[key] = None
+        return quotes[key]
+
+    year_tiers: dict[date_type, list] = {year_now: tiers_now}
+
+    def _tiers_for(on: date_type):  # noqa: ANN202
+        if primary is None:
+            return year_now, tiers_now
+        start = benefit_usage_service.benefit_year_window(primary.plan, on)[0]
+        if start not in year_tiers:
+            fresh = [t.clone() for t in tiers_now]
+            for t in fresh:
+                t.reset_for_new_year()
+            year_tiers[start] = fresh
+        return start, year_tiers[start]
+
+    lines: list[ReEstimateLine] = []
+    netted: list[str] = []
+    tot_fee = tot_ins = tot_pat = Decimal("0")
+    max_after = max_before
+    ded_after = ded_before
+    for it in items:
+        own = it.plan_id == plan.id
+        target = own and (phase_id is None or it.phase_id == phase_id)
+        consumes = item_consumes_benefit(it)
+        if not own and not consumes:
+            continue  # another plan's non-consuming line moves nothing
+        quote = _quote(it)
+        fee = it.fee or Decimal("0")
+        fee_schedule_id = fee_source = None
+        if target and use_new_fees and quote is not None:
+            fee = Decimal(str(quote["fee"]))
+            fee_schedule_id = quote.get("fee_schedule_id")
+            fee_source = quote.get("fee_source")
+        year_start, tiers = _tiers_for(_line_service_date(it, today))
+        run_tiers = tiers if consumes else [t.clone() for t in tiers]
+        split = estimate_service.split_line(
+            db, run_tiers, fee=fee, code=it.procedure_code, quote=quote,
+            category=categories.get(it.procedure_code), category_known=True,
+        )
+        if not own:
+            if split["insurance_estimate"] > 0 and it.plan_id not in netted:
+                netted.append(it.plan_id)
+            continue
+        cur_primary = tiers[0] if tiers else None
+        line_max_left = cur_primary.max_remaining if cur_primary else None
+        if tiers_now:
+            max_after = tiers_now[0].max_remaining
+            ded_after = tiers_now[0].ded_remaining
+        if not target:
+            continue
+        ins = split["insurance_estimate"]
+        pat = fee - ins
+        rule_start = None
+        if split["coverage_rule_id"] is not None and cur_primary is not None:
+            rule = next((r for r in cur_primary.rules if r.id == split["coverage_rule_id"]), None)
+            rule_start = rule.start_code if rule is not None else None
+        if write:
+            if fee_schedule_id is not None or fee_source is not None:
+                it.fee = fee
                 if fee_schedule_id:
                     it.fee_schedule_id = fee_schedule_id
-        fee = it.fee or Decimal("0")
-
-        rule = match_coverage_rule(rules, it.procedure_code, categories.get(it.procedure_code)) \
-            if insured else None
-        cov_pct = Decimal(str(rule.coverage_pct)) if rule is not None and rule.coverage_pct is not None \
-            else Decimal("0")
-        ded_waived = bool(rule.ded_waived) if rule is not None else False
-
-        ded_applied = Decimal("0")
-        base = fee
-        if insured and rule is not None and not ded_waived and ded_left > 0 and cov_pct > 0:
-            ded_applied = min(ded_left, fee)
-            base = fee - ded_applied
-            ded_left -= ded_applied
-
-        ins = Decimal("0")
-        if insured:
-            ins = (base * cov_pct / Decimal("100")).quantize(_CENTS, rounding=ROUND_HALF_UP)
-            if max_left is not None:
-                ins = min(ins, max(max_left, Decimal("0")))
-                max_left -= ins
-        pat = fee - ins
-
-        it.insurance_estimate = ins
-        _upsert_detail(db, it, ins_plan_id, ins, pat, ded_applied, cov_pct, max_left)
-
+                if fee_source:
+                    it.fee_source = fee_source
+            it.insurance_estimate = ins
+            it.sec_insurance_estimate = split["sec_insurance_estimate"]
+            it.estimated_deductible = split["estimated_deductible"]
+            it.coverage_pct = split["coverage_pct"]
+            it.coverage_rule_id = split["coverage_rule_id"]
+            _upsert_detail(db, it, ins_plan_id, ins, pat, split["estimated_deductible"],
+                           split["coverage_pct"], line_max_left, create=insured)
         lines.append(ReEstimateLine(
             item_id=it.id, procedure_code=it.procedure_code, fee=fee,
-            coverage_pct=cov_pct, deductible_applied=ded_applied,
+            coverage_pct=split["coverage_pct"], deductible_applied=split["estimated_deductible"],
             insurance_estimate=ins, patient_estimate=pat,
             coverage_category=categories.get(it.procedure_code),
-            rule_start_code=rule.start_code if rule is not None else None,
-            fee_schedule_id=fee_schedule_id, fee_source=fee_source,
+            rule_start_code=rule_start, fee_schedule_id=fee_schedule_id, fee_source=fee_source,
+            status=normalise_item_status(it.status), consumes_benefit=consumes,
+            benefit_year_start=year_start if insured else None,
+            primary_insurance_estimate=split["primary_insurance_estimate"],
+            benefit_model=split["benefit_model"], annual_max_remaining_after=line_max_left,
         ))
         tot_fee += fee
         tot_ins += ins
         tot_pat += pat
 
-    db.commit()
     return ReEstimateResult(
         plan_id=plan.id, insured=insured, ins_plan_id=ins_plan_id, phase_id=phase_id,
         use_new_fees=use_new_fees,
-        deductible_remaining_after=ded_left if insured else None,
-        annual_max_remaining_after=max_left,
+        deductible_remaining_after=ded_after if insured else None,
+        annual_max_remaining_after=max_after if insured else None,
         total_fee=tot_fee, total_insurance_estimate=tot_ins, total_patient_estimate=tot_pat,
         lines=lines,
+        benefit_year_start=year_now if insured else None,
+        benefits_used_ytd=benefits.benefits_used_ytd if benefits is not None else None,
+        annual_max_remaining_before=max_before,
+        deductible_remaining_before=ded_before if insured else None,
+        max_remaining_source=benefits.max_remaining_source if benefits is not None else None,
+        netted_plan_ids=netted,
+    )
+
+
+def re_estimate(
+    db: Session, plan_id: str, tenant_id: int, *, phase_id: int | None = None,
+    use_new_fees: bool = False, commit: bool = True,
+) -> ReEstimateResult:
+    """PLAN-3 / TX-MAX-2: re-estimate a plan and write every line's split."""
+    plan = _require_plan(db, plan_id, tenant_id)
+    result = _net_plan(db, plan, tenant_id, phase_id=phase_id, use_new_fees=use_new_fees)
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    return result
+
+
+#: TX-MAX-1: an item write touching one of these re-nets the plan.
+RENET_FIELDS: frozenset[str] = frozenset({
+    "fee", "procedure_code", "priority", "plan_id", "phase_id", "status",
+    "scheduled_date", "start_date", "is_archived",
+})
+
+
+def renet_plans(db: Session, plan_ids, tenant_id: int | None) -> None:  # noqa: ANN001
+    """TX-MAX-1: after an item create / re-price / re-order / delete, re-net the
+    plan(s) so no line is left holding a figure that breaks the annual max.
+
+    Runs after the item write has committed, in its own commit: an estimate
+    failure must never cost the user the line they just added — it is rolled
+    back and logged, and the provisional per-line figure stays."""
+    from app.core.config import settings
+
+    if tenant_id is None or not settings.PRICING_ENGINE_V2 or not settings.TX_PLAN_AUTO_RENET:
+        return
+    for pid in dict.fromkeys(p for p in plan_ids if p):
+        try:
+            re_estimate(db, pid, tenant_id)
+        except Exception:  # noqa: BLE001 — never fail the item write over an estimate
+            db.rollback()
+            _log.warning("tx_plan_renet_failed plan_id=%s", pid, exc_info=True)
+
+
+def _primary_insurance_block(db: Session, tiers) -> PlanReportInsurance | None:  # noqa: ANN001
+    """TX-MAX-6: the print header's "Primary Insurance" + its benefit figures."""
+    if not tiers:
+        return None
+    t = tiers[0]
+    carrier = db.get(InsuranceCarrier, t.plan.carrier_id) if t.plan.carrier_id else None
+    carrier_name = carrier.name if carrier is not None else None
+    group = t.plan.group_number
+    label = " ".join(x for x in (carrier_name, f"#{group}" if group else None) if x) or None
+    b = t.benefits
+    return PlanReportInsurance(
+        patient_insurance_id=t.slot.id, ins_plan_id=t.plan.id, carrier_id=t.plan.carrier_id,
+        carrier_name=carrier_name, group_number=group, label=label,
+        annual_max=b.annual_max if b is not None else t.plan.individual_max,
+        benefits_used_ytd=b.benefits_used_ytd if b is not None else None,
+        annual_max_remaining=t.max_remaining, deductible_remaining=t.ded_remaining,
     )
 
 
@@ -1319,7 +1471,20 @@ def plan_report(db: Session, plan_id: str, tenant_id: int) -> TreatmentPlanRepor
         tot_pat += pat
         tot_disc += disc
 
+    # TX-MAX-6: header coverage + what is left of the benefit after this plan
+    # (a dry run of the same netting re-estimate does — nothing is written).
+    from app.services import estimate_service  # local: import-light
+
+    primary_block = _primary_insurance_block(db, estimate_service.coverage_context(
+        db, plan.patient_id, on=office_today(_plan_office_tz(db, plan))))
+    netting = _net_plan(db, plan, tenant_id, write=False) if primary_block is not None else None
+
     return TreatmentPlanReport(
+        primary_insurance=primary_block,
+        annual_max_remaining_after=netting.annual_max_remaining_after if netting else None,
+        deductible_remaining_after=netting.deductible_remaining_after if netting else None,
+        benefit_year_start=netting.benefit_year_start if netting else None,
+        max_remaining_source=netting.max_remaining_source if netting else None,
         plan_id=plan.id, name=plan.name, status=plan.status,
         patient=PlanReportPatient(
             id=patient.id, chart_no=patient.chart_no, first_name=patient.first_name,
