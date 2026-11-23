@@ -31,6 +31,7 @@ import asyncio
 import json
 from typing import Any
 
+from app.core.config import settings
 from app.core.logging import get_logger
 from app.integrations import redis_store
 from app.integrations.redis_pubsub import fanout
@@ -41,8 +42,19 @@ logger = get_logger(__name__)
 _loop: asyncio.AbstractEventLoop | None = None
 
 
+def _channel_prefix() -> str:
+    """ENG-56: ``<REDIS_NAMESPACE>:msg`` when a namespace is set, else ``msg``.
+
+    Client services share one Redis instance; REDIS_DB separates keys but NOT
+    Pub/Sub channels, so the namespace in the channel name is what keeps one
+    client's envelopes away from another client's subscribers.
+    """
+    ns = settings.REDIS_NAMESPACE.strip()
+    return f"{ns}:msg" if ns else "msg"
+
+
 def channel_for(tenant_id: int, user_id: int) -> str:
-    return f"msg:{tenant_id}:{user_id}"
+    return f"{_channel_prefix()}:{tenant_id}:{user_id}"
 
 
 # PROC-INT-3: a tenant-wide topic on the same bus. Procedure/plan writes need to
@@ -55,13 +67,22 @@ TENANT_TOPIC = "tenant"
 
 
 def tenant_channel_for(tenant_id: int) -> str:
-    return f"msg:{tenant_id}:{TENANT_TOPIC}"
+    return f"{_channel_prefix()}:{tenant_id}:{TENANT_TOPIC}"
 
 
 def _parse_channel(channel: str) -> tuple[int, int | None] | None:
-    """``msg:{tenant}:{user}`` -> (tenant, user); ``msg:{tenant}:tenant`` -> (tenant, None)."""
-    parts = channel.split(":")
-    if len(parts) != 3 or parts[0] != "msg":
+    """``[ns:]msg:{tenant}:{user}`` -> (tenant, user).
+
+    ``[ns:]msg:{tenant}:tenant`` -> (tenant, None).
+
+    A channel of another namespace (or none, when this service has one) is not ours
+    and parses to ``None``.
+    """
+    prefix = _channel_prefix() + ":"
+    if not channel.startswith(prefix):
+        return None
+    parts = ["msg", *channel[len(prefix):].split(":")]
+    if len(parts) != 3:
         return None
     try:
         tenant_id = int(parts[1])

@@ -261,6 +261,15 @@ class ReEstimateLine(BaseModel):
     # PLAN-29: set when ``use_new_fees`` re-priced the line.
     fee_schedule_id: Optional[int] = None
     fee_source: Optional[str] = None
+    # TX-MAX-2/4/5: the shared split engine's extra outputs.
+    status: Optional[str] = None
+    #: False for completed / alternative / referred-out lines — estimated
+    #: against what is left, but they never use up the deductible or max.
+    consumes_benefit: bool = True
+    benefit_year_start: Optional[date] = None
+    primary_insurance_estimate: Optional[Decimal] = None
+    benefit_model: Optional[str] = None
+    annual_max_remaining_after: Optional[Decimal] = None
 
 
 class ReEstimateResult(BaseModel):
@@ -275,6 +284,15 @@ class ReEstimateResult(BaseModel):
     total_insurance_estimate: Decimal
     total_patient_estimate: Decimal
     lines: list[ReEstimateLine]
+    # TX-MAX-3: where the opening balances came from.
+    benefit_year_start: Optional[date] = None
+    benefits_used_ytd: Optional[Decimal] = None
+    annual_max_remaining_before: Optional[Decimal] = None
+    deductible_remaining_before: Optional[Decimal] = None
+    max_remaining_source: Optional[str] = None
+    # TX-MAX-5: other open plans of the patient whose (earlier) lines were netted
+    # against this year's benefit before this plan's lines.
+    netted_plan_ids: list[str] = Field(default_factory=list)
 
 
 # ── PLAN-6: server-side report payload ───────────────────────────────────────
@@ -307,6 +325,22 @@ class PlanReportItem(BaseModel):
     deductible_applied: Optional[Decimal] = None
 
 
+class PlanReportInsurance(BaseModel):
+    """TX-MAX-6: the patient's active primary dental coverage."""
+
+    patient_insurance_id: int
+    ins_plan_id: Optional[int] = None
+    carrier_id: Optional[int] = None
+    carrier_name: Optional[str] = None
+    group_number: Optional[str] = None
+    #: carrier + group number (there is no plan-name column — AL-12 convention).
+    label: Optional[str] = None
+    annual_max: Optional[Decimal] = None
+    benefits_used_ytd: Optional[Decimal] = None
+    annual_max_remaining: Optional[Decimal] = None
+    deductible_remaining: Optional[Decimal] = None
+
+
 class TreatmentPlanReport(BaseModel):
     plan_id: str
     name: str
@@ -318,6 +352,13 @@ class TreatmentPlanReport(BaseModel):
     total_insurance_estimate: Decimal
     total_patient_estimate: Decimal
     items: list[PlanReportItem]
+    # TX-MAX-6: the print header + "Annual max remaining" under the totals,
+    # computed by a dry run of the same netting re-estimate uses.
+    primary_insurance: Optional[PlanReportInsurance] = None
+    annual_max_remaining_after: Optional[Decimal] = None
+    deductible_remaining_after: Optional[Decimal] = None
+    benefit_year_start: Optional[date] = None
+    max_remaining_source: Optional[str] = None
 
 
 # ── PLAN-APPT-5: atomic book-from-plan ───────────────────────────────────────

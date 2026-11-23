@@ -32,6 +32,38 @@ already round-trips the full multi-select.
 
 ---
 
+## PE-5 — null guarantor keys no longer sink the PATCH · fixed (option 1, no migration)
+
+*2026-11-21.* `family_account_service.apply_patch_guarantor` now treats a PATCH whose
+guarantor keys (`responsible_party_id`, `guarantor_patient_id`, `guarantor_party_id`,
+`account_id`) are **all** `null`/blank as **not touched**: the keys are dropped, the
+guarantor and account are left exactly as stored, and every other field in the body
+(`fee_schedule_id`, demographics, …) saves normally → **200**. The old 422
+`guarantor_required` is gone from the PATCH path.
+
+Why this, rather than keeping the 422 and documenting it: a patient can never be left
+without a guarantor, so there was never a "clear" to honour — the refusal only ever
+fired on the "not set by this step" payload shape the schema advertises as valid.
+
+Unchanged:
+- A **non-empty** value still changes the guarantor (with the same validation: unknown
+  key → 422 `responsible_party_not_found`, dependents → 409 `guarantor_has_dependents`).
+- If one key is set and the others are null, the set one wins (precedence unchanged).
+- `POST /patients/{id}/change-guarantor` still 422s `guarantor_required` when it is
+  given no target — that endpoint exists only to change the guarantor.
+
+Your `stripEmptyGuarantorKeys` is now belt-and-braces; it can stay or go.
+
+On the side note: `PatientUpdate` is applied `exclude_unset` (only keys present in the
+body are written), so **omitted** fields are never cleared — but an explicit `null` on a
+plain column *does* clear it. Guarantor keys are the one exception, per above.
+
+Tests: `tests/test_responsible_party_accounts.py`
+(`test_patch_null_guarantor_keys_are_untouched_and_other_fields_save`,
+`test_patch_blank_rp_alias_is_noop`).
+
+---
+
 ## Note
 
 `/patients/{id}/context` remains the lightweight cross-module summary; the full

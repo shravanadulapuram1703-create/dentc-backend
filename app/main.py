@@ -40,6 +40,13 @@ async def lifespan(_: FastAPI):
     # secret is set, and the per-IP throttle is shared across workers only with
     # Redis. Say so loudly outside dev rather than run unprotected in silence.
     if settings.ENV != "dev":
+        # ENG-56: without a namespace, services of different clients on the shared
+        # Redis instance receive each other's Pub/Sub envelopes.
+        if settings.REDIS_ENABLED and not settings.REDIS_NAMESPACE.strip():
+            logger.warning(
+                "REDIS_NAMESPACE is unset — Pub/Sub channel names are not separated "
+                "from other client services on the same Redis instance"
+            )
         if not settings.APPOINTNOW_TURNSTILE_SECRET:
             logger.warning(
                 "AppointNow: APPOINTNOW_TURNSTILE_SECRET is unset — the public "
@@ -96,7 +103,8 @@ def create_app() -> FastAPI:
         # X-Office-ID (OFF-SCOPE-3, the caller's working office) — are all
         # allowed through preflight without listing each one.
         allow_headers=["*"],
-        expose_headers=["X-Request-ID", "X-Process-Time"],
+        # ENG-02: Content-Disposition so browser code can read a download file name.
+        expose_headers=["X-Request-ID", "X-Process-Time", "Content-Disposition"],
     )
 
     register_exception_handlers(app)
@@ -168,6 +176,7 @@ def create_app() -> FastAPI:
         }
 
     _assert_unique_operation_ids(app)
+    _assert_no_internal_routes(app)
     _customise_openapi(app)
     return app
 
@@ -178,6 +187,19 @@ def _assert_unique_operation_ids(app: FastAPI) -> None:
     dupes = [oid for oid, n in Counter(ids).items() if n > 1]
     if dupes:
         raise RuntimeError(f"Duplicate operation_id(s): {dupes}")
+
+
+def _assert_no_internal_routes(app: FastAPI) -> None:
+    """ENG-01: the public API service never serves worker-only ``/internal/`` routes.
+
+    Internal report routes are registered only for SERVICE_ROLE=report_worker
+    (or ``all`` under ENV=dev); the API service is deployed unauthenticated.
+    """
+    if settings.SERVICE_ROLE != "api":
+        return
+    leaked = [r.path for r in app.routes if "/internal/" in getattr(r, "path", "")]
+    if leaked:
+        raise RuntimeError(f"Internal route(s) mounted on the API service: {leaked}")
 
 
 def _customise_openapi(app: FastAPI) -> None:

@@ -8,6 +8,7 @@ is defined exactly once.
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
@@ -128,4 +129,26 @@ OfficeRead = create_model(
     letterhead=(Optional[OfficeLetterhead], None),
     # OFF-QA-16: who deleted the office (``deleted_by`` resolved).
     deleted_by_name=(Optional[str], None),
+)
+
+
+# TX-MAX-3: ``max_remaining`` / ``deductible_remaining`` are imported or typed
+# snapshots nothing decrements. The effective figures every estimate now uses —
+# claims in the current benefit year subtracted from the plan's annual max, a
+# column written before the year began ignored — ride along so the slot screen
+# shows the same "remaining" the estimate engine prices against. Set by
+# ``enrich_service.enrich_patient_insurance``.
+_patient_insurance_base = build_schemas(m.PatientInsurance, "PatientInsuranceFull")[2]
+PatientInsuranceRead = create_model(
+    "PatientInsuranceRead", __base__=_patient_insurance_base,
+    benefit_year_start=(Optional[date], None),
+    benefit_year_end=(Optional[date], None),
+    annual_max=(Optional[Decimal], None),
+    benefits_used_ytd=(Optional[Decimal], None),
+    benefit_claim_count=(Optional[int], None),
+    max_remaining_effective=(Optional[Decimal], None),
+    max_remaining_source=(Optional[str], None),
+    deductible_remaining_effective=(Optional[Decimal], None),
+    deductible_remaining_source=(Optional[str], None),
+    slot_values_stale=(Optional[bool], None),
 )

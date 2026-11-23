@@ -12,7 +12,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import quote_plus
 
-from pydantic import Field, computed_field, field_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _log = logging.getLogger("app.config")
@@ -423,6 +423,10 @@ class Settings(BaseSettings):
     # re-price every charge. With it off, ``resolve_procedure_fee`` keeps its
     # previous order and the new columns are written but not yet consulted.
     PRICING_ENGINE_V2: bool = True
+    # TX-MAX-1: a treatment-plan item create / re-price / re-order / delete
+    # re-nets the whole plan (deductible once, annual max across the lines) in
+    # the same request. Ops kill switch; only acts while PRICING_ENGINE_V2 is on.
+    TX_PLAN_AUTO_RENET: bool = True
     # A charge whose code no reachable fee schedule prices. The per-office
     # ``offices.unpriced_charge_policy`` wins; this is the fallback when an office
     # has not chosen. ``flag`` posts at 0.00 and records it as unpriced (plus a
@@ -465,6 +469,24 @@ class Settings(BaseSettings):
     # office that has *saved* its weekly schedule. Kill switch for ops.
     OFFICE_HOURS_ENFORCED: bool = True
 
+    # ── Reports & Analytics engine (docs/reports/module-plan 02 §12.4) ───────
+    # The public engine routers are ALWAYS mounted so the OpenAPI document (and
+    # the generated Orval client) is identical in every environment; while this
+    # flag is off a router-level dependency answers 404 ``reports_engine_disabled``.
+    REPORTS_ENGINE_ENABLED: bool = False
+    # ``api`` (public service) | ``report_worker`` (internal routes only) | ``all``
+    # (both in one process — accepted only when ENV = dev; refused at start-up
+    # elsewhere because internal routes would sit on the unauthenticated API).
+    SERVICE_ROLE: Literal["api", "report_worker", "all"] = "api"
+    # Artifact storage: unset resolves to ``local`` under ENV = dev, else ``gcs``.
+    REPORT_STORAGE_BACKEND: Literal["local", "gcs"] | None = None
+    # Reports bucket; falls back to GCS_BUCKET_DOCUMENTS until ENG-46 (P2).
+    GCS_BUCKET_REPORTS: str | None = None
+    # ENG-56: client slug prefixed to Redis Pub/Sub channel names so services of
+    # different clients sharing one Redis instance never see each other's
+    # envelopes. Empty keeps today's channel names (msg:{tenant}:{user}).
+    REDIS_NAMESPACE: str = ""
+
     # ── Logging ────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
     LOG_JSON: bool = False
@@ -490,6 +512,25 @@ class Settings(BaseSettings):
                 )
             return cleaned
         return v
+
+    @model_validator(mode="after")
+    def _service_role_guard(self) -> Settings:
+        # ENG-01 fail-closed: SERVICE_ROLE=all would mount the worker-only
+        # /internal/reports/* routes on the public, unauthenticated API service.
+        if self.SERVICE_ROLE == "all" and self.ENV != "dev":
+            raise ValueError("SERVICE_ROLE=all is accepted only when ENV=dev")
+        return self
+
+    @property
+    def report_storage_backend(self) -> str:
+        """Resolved artifact storage backend (02 §7.5)."""
+        if self.REPORT_STORAGE_BACKEND:
+            return self.REPORT_STORAGE_BACKEND
+        return "local" if self.ENV == "dev" else "gcs"
+
+    @property
+    def report_bucket(self) -> str | None:
+        return self.GCS_BUCKET_REPORTS or self.GCS_BUCKET_DOCUMENTS
 
     @computed_field  # type: ignore[prop-decorator]
     @property

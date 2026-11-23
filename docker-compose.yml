@@ -28,3 +28,23 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
+
+  # PostgreSQL test tier of the reports engine (ENG-17, tests/reports/pg/).
+  #   docker compose up -d postgres
+  #   set TEST_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/postgres
+  #   pytest tests/reports
+  # Port 5433 so it never collides with a local Postgres on 5432. Throwaway: the
+  # tier creates and drops its own rpt_test_* databases on it.
+  postgres:
+    image: postgres:15
+    container_name: dentc-postgres-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

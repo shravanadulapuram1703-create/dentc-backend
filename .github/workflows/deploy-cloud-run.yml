@@ -40,7 +40,47 @@ env:
   # GCS_BUCKET_DOCUMENTS: rd-phi-dicom-originals
   GCS_BUCKET_DOCUMENTS: tdg-dicom-originals
 jobs:
+  # Reports & Analytics engine gate (ENG-17, 02 §15.1): the deploy waits for the
+  # reports test suites (unit + PostgreSQL tier). The rest of the existing suite is
+  # not a deploy gate yet - it joins once it is green in CI.
+  reports-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Reports test suites (unit + PostgreSQL tier)
+        run: python -m pytest tests/reports -q
+      - name: Canary - a failing PostgreSQL test must fail this job
+        # Runs only once the baseline schema is committed (until then the tier skips).
+        run: |
+          if [ -f tests/pg/baseline_schema.sql ]; then
+            if RPT_PG_CANARY_FAIL=1 python -m pytest tests/reports/pg/test_pg_tier.py::test_tier_canary -q; then
+              echo "canary passed but must fail: the PostgreSQL tier is not gating" && exit 1
+            fi
+          else
+            echo "baseline schema not committed yet - PostgreSQL tier skipped"
+          fi
+
   deploy:
+    needs: reports-tests
     runs-on: ubuntu-latest
 
     steps:

@@ -42,6 +42,7 @@ from app.api.v1 import (
     restorative,
     procedure_codes,
     provider_setup,
+    report_engine,
     reports,
     scheduler,
     sms,
@@ -109,6 +110,8 @@ api_router.include_router(audit.router)
 api_router.include_router(audit.patient_router)
 # Reports module: practice-wide aggregation (summary/trends/AR/aging).
 api_router.include_router(reports.router)
+# Reports & Analytics engine (ENG-01): always mounted, gated by REPORTS_ENGINE_ENABLED.
+api_router.include_router(report_engine.router)
 # OFF-SCOPE-18: office(s) financial dashboard, aggregated server-side.
 api_router.include_router(dashboard.router)
 # Help Center support tickets (Jira proxy) + Utilities execution/audit.

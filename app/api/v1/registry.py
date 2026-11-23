@@ -38,6 +38,7 @@ from app.services.enrich_service import (
     enrich_insurance_plan,
     enrich_ortho_plan,
     enrich_patient_carrier,
+    enrich_patient_insurance,
     enrich_patient_office,
     enrich_patient_procedure,
     enrich_patient_provider,
@@ -171,6 +172,7 @@ from app.schemas.enriched import (
     PatientProcedureCreate,
     PatientProcedureRead,
     PatientProcedureUpdate,
+    PatientInsuranceRead,
     ProviderRead,
     TreatmentPlanCreate,
     TreatmentPlanRead,
@@ -428,13 +430,19 @@ _PATIENTS = [
     # (INS-PT); is_active toggles a slot on/off.
     # PatientInsuranceCRUD enforces the Coverage Type panel's ordinal integrity:
     # an active secondary slot requires an active primary of the same plan type.
-    _cfg(m.PatientInsurance, "PatientInsurance", "patient-insurance", "Patients",
-         "patient_insurance", "patient_insurance",
-         filters=("patient_id", "insurance_type", "ins_plan_id",
-                  "legacy_plan_type", "is_active"),
-         crud_class=PatientInsuranceCRUD,
-         # ACCESS-RIGHTS C1: DELETE = removing a patient's insurance plan link.
-         delete_permissions=("patient_delete_patient_insurance_plan_information",)),
+    # TX-MAX-3: the read carries the effective benefit figures (claims-derived
+    # remaining max, benefit year, stale-column flag) the estimate engine uses.
+    dataclasses.replace(
+        _cfg(m.PatientInsurance, "PatientInsurance", "patient-insurance", "Patients",
+             "patient_insurance", "patient_insurance",
+             filters=("patient_id", "insurance_type", "ins_plan_id",
+                      "legacy_plan_type", "is_active"),
+             crud_class=PatientInsuranceCRUD,
+             # ACCESS-RIGHTS C1: DELETE = removing a patient's insurance plan link.
+             delete_permissions=("patient_delete_patient_insurance_plan_information",)),
+        read_schema=PatientInsuranceRead,
+        read_enrich=enrich_patient_insurance,
+    ),
     # MA-2: ``?patient_ids=`` bulk read; PatientAlertCRUD scopes tenancy through
     # the owning patient (the table has no tenant_id column).
     CrudConfig(

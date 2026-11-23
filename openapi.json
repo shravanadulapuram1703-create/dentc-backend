@@ -3884,7 +3884,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PaymentAllocationRead"
+                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
                   },
                   "title": "Response Allocate Payment"
                 }
@@ -3981,7 +3981,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PaymentAllocationRead"
+                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
                   },
                   "title": "Response Allocate Adjustment"
                 }
@@ -4068,7 +4068,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PaymentAllocationRead"
+                    "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
                   },
                   "title": "Response List Adjustment Allocations"
                 }
@@ -90263,7 +90263,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+                  "$ref": "#/components/schemas/PaymentAllocationRead"
                 }
               }
             }
@@ -90376,7 +90376,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+                  "$ref": "#/components/schemas/PaymentAllocationRead"
                 }
               }
             }
@@ -90498,7 +90498,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+                  "$ref": "#/components/schemas/PaymentAllocationRead"
                 }
               }
             }
@@ -121462,7 +121462,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -140690,7 +140690,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/PageMeta"
+            "$ref": "#/components/schemas/app__schemas__messaging__PageMeta"
           }
         },
         "type": "object",
@@ -155947,7 +155947,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           },
           "counts": {
             "$ref": "#/components/schemas/LabStatusCounts"
@@ -160353,6 +160353,16 @@
               }
             ]
           },
+          "guarantor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Guarantor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "referred_by": {
             "anyOf": [
               {
@@ -162087,12 +162097,14 @@
         "properties": {
           "alert_code": {
             "type": "string",
+            "maxLength": 100,
             "title": "Alert Code"
           },
           "alert_label": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 255
               },
               {
                 "type": "null"
@@ -162103,7 +162115,8 @@
           "section": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -162114,12 +162127,7 @@
           "response": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "yes",
-                  "no",
-                  "unknown"
-                ]
+                "type": "string"
               },
               {
                 "type": "null"
@@ -162165,7 +162173,8 @@
         "required": [
           "alert_code"
         ],
-        "title": "MedicalAlertIn"
+        "title": "MedicalAlertIn",
+        "description": "One alert answer on the composite. Same vocabulary as the generic\nresource (``yes|no|unknown``, MH-5) \u2014 case-folded rather than a strict\n``Literal`` so a ``\"Yes\"`` from a form does not 422 the whole registration."
       },
       "MedicalAlertSummary": {
         "properties": {
@@ -163764,7 +163773,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/MedicalAlertIn"
+                  "$ref": "#/components/schemas/app__schemas__medical_history__MedicalAlertIn"
                 },
                 "type": "array"
               },
@@ -172202,19 +172211,35 @@
         "properties": {
           "page": {
             "type": "integer",
-            "title": "Page"
+            "minimum": 1.0,
+            "title": "Page",
+            "examples": [
+              1
+            ]
           },
           "size": {
             "type": "integer",
-            "title": "Size"
+            "minimum": 1.0,
+            "title": "Size",
+            "examples": [
+              20
+            ]
           },
           "total": {
             "type": "integer",
-            "title": "Total"
+            "minimum": 0.0,
+            "title": "Total",
+            "examples": [
+              137
+            ]
           },
           "pages": {
             "type": "integer",
-            "title": "Pages"
+            "minimum": 0.0,
+            "title": "Pages",
+            "examples": [
+              7
+            ]
           }
         },
         "type": "object",
@@ -172236,7 +172261,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172256,7 +172281,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172276,7 +172301,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172296,7 +172321,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172316,7 +172341,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172336,7 +172361,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172356,7 +172381,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172376,7 +172401,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172396,7 +172421,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172416,7 +172441,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172436,7 +172461,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172456,7 +172481,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172476,7 +172501,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172496,7 +172521,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172516,7 +172541,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172536,7 +172561,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172556,7 +172581,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172576,7 +172601,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172596,7 +172621,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172616,7 +172641,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172636,7 +172661,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172656,7 +172681,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172676,7 +172701,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172696,7 +172721,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172716,7 +172741,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172736,7 +172761,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172756,7 +172781,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172776,7 +172801,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172796,7 +172821,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172816,7 +172841,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172836,7 +172861,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172856,7 +172881,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172876,7 +172901,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172896,7 +172921,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172916,7 +172941,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172936,7 +172961,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172956,7 +172981,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172976,7 +173001,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -172996,7 +173021,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173016,7 +173041,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173036,7 +173061,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173056,7 +173081,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173076,7 +173101,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173096,7 +173121,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173116,7 +173141,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173136,7 +173161,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173156,7 +173181,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173176,7 +173201,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173196,7 +173221,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173216,7 +173241,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173236,7 +173261,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173256,7 +173281,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173276,7 +173301,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173296,7 +173321,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173316,7 +173341,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173336,7 +173361,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173356,7 +173381,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173376,7 +173401,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173396,7 +173421,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173416,7 +173441,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173436,7 +173461,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173456,7 +173481,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173476,7 +173501,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173496,7 +173521,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173516,7 +173541,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173536,7 +173561,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173556,7 +173581,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173570,13 +173595,13 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__factory__PaymentAllocationRead"
+              "$ref": "#/components/schemas/PaymentAllocationRead"
             },
             "type": "array",
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173596,7 +173621,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173616,7 +173641,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173636,7 +173661,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173656,7 +173681,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173676,7 +173701,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173696,7 +173721,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173716,7 +173741,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173736,7 +173761,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173756,7 +173781,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173776,7 +173801,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173796,7 +173821,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173816,7 +173841,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173836,7 +173861,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173856,7 +173881,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173876,7 +173901,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173896,7 +173921,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173916,7 +173941,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173936,7 +173961,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173956,7 +173981,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173976,7 +174001,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -173996,7 +174021,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174016,7 +174041,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174036,7 +174061,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174056,7 +174081,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174076,7 +174101,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174096,7 +174121,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174116,7 +174141,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174136,7 +174161,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174156,7 +174181,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174176,7 +174201,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174196,7 +174221,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174216,7 +174241,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174236,7 +174261,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174256,7 +174281,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174276,7 +174301,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174296,7 +174321,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -174316,7 +174341,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           }
         },
         "type": "object",
@@ -178884,6 +178909,122 @@
               }
             ],
             "title": "Updated At"
+          },
+          "benefit_year_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefit Year Start"
+          },
+          "benefit_year_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefit Year End"
+          },
+          "annual_max": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Max"
+          },
+          "benefits_used_ytd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefits Used Ytd"
+          },
+          "benefit_claim_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefit Claim Count"
+          },
+          "max_remaining_effective": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Remaining Effective"
+          },
+          "max_remaining_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Remaining Source"
+          },
+          "deductible_remaining_effective": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deductible Remaining Effective"
+          },
+          "deductible_remaining_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deductible Remaining Source"
+          },
+          "slot_values_stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot Values Stale"
           }
         },
         "type": "object",
@@ -188794,13 +188935,31 @@
       },
       "PaymentAllocationRead": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
+          },
+          "legacy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Id"
+          },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -188824,17 +188983,6 @@
             ],
             "title": "Adjustment Id"
           },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
-          },
           "claim_id": {
             "anyOf": [
               {
@@ -188846,6 +188994,17 @@
             ],
             "title": "Claim Id"
           },
+          "ins_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ins Plan Id"
+          },
           "provider_id": {
             "anyOf": [
               {
@@ -188856,6 +189015,18 @@
               }
             ],
             "title": "Provider Id"
+          },
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -188873,24 +189044,22 @@
             ],
             "title": "Alloc Type"
           },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
           }
         },
         "type": "object",
         "required": [
-          "id",
           "patient_id",
-          "amount"
+          "amount",
+          "id",
+          "created_at"
         ],
         "title": "PaymentAllocationRead"
       },
@@ -194449,7 +194618,7 @@
             "title": "Items"
           },
           "meta": {
-            "$ref": "#/components/schemas/app__schemas__common__PageMeta"
+            "$ref": "#/components/schemas/PageMeta"
           },
           "created_at": {
             "anyOf": [
@@ -194805,6 +194974,123 @@
           "finished_at"
         ],
         "title": "PlanReEstimateResult"
+      },
+      "PlanReportInsurance": {
+        "properties": {
+          "patient_insurance_id": {
+            "type": "integer",
+            "title": "Patient Insurance Id"
+          },
+          "ins_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ins Plan Id"
+          },
+          "carrier_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier Id"
+          },
+          "carrier_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier Name"
+          },
+          "group_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Number"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "annual_max": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Max"
+          },
+          "benefits_used_ytd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefits Used Ytd"
+          },
+          "annual_max_remaining": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Max Remaining"
+          },
+          "deductible_remaining": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deductible Remaining"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_insurance_id"
+        ],
+        "title": "PlanReportInsurance",
+        "description": "TX-MAX-6: the patient's active primary dental coverage."
       },
       "PlanReportItem": {
         "properties": {
@@ -197227,7 +197513,7 @@
           },
           "allocations": {
             "items": {
-              "$ref": "#/components/schemas/PaymentAllocationRead"
+              "$ref": "#/components/schemas/app__schemas__billing__PaymentAllocationRead"
             },
             "type": "array",
             "title": "Allocations"
@@ -204299,6 +204585,69 @@
               }
             ],
             "title": "Fee Source"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "consumes_benefit": {
+            "type": "boolean",
+            "title": "Consumes Benefit",
+            "default": true
+          },
+          "benefit_year_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefit Year Start"
+          },
+          "primary_insurance_estimate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Insurance Estimate"
+          },
+          "benefit_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefit Model"
+          },
+          "annual_max_remaining_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Max Remaining After"
           }
         },
         "type": "object",
@@ -204395,6 +204744,72 @@
             },
             "type": "array",
             "title": "Lines"
+          },
+          "benefit_year_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefit Year Start"
+          },
+          "benefits_used_ytd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefits Used Ytd"
+          },
+          "annual_max_remaining_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Max Remaining Before"
+          },
+          "deductible_remaining_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deductible Remaining Before"
+          },
+          "max_remaining_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Remaining Source"
+          },
+          "netted_plan_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Netted Plan Ids"
           }
         },
         "type": "object",
@@ -206221,7 +206636,7 @@
           },
           "medical_alerts": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__patient_intake__MedicalAlertIn"
+              "$ref": "#/components/schemas/MedicalAlertIn"
             },
             "type": "array",
             "title": "Medical Alerts"
@@ -218340,6 +218755,63 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "primary_insurance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanReportInsurance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "annual_max_remaining_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Max Remaining After"
+          },
+          "deductible_remaining_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deductible Remaining After"
+          },
+          "benefit_year_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benefit Year Start"
+          },
+          "max_remaining_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Remaining Source"
           }
         },
         "type": "object",
@@ -221117,77 +221589,15 @@
         ],
         "title": "WizardSchedule"
       },
-      "app__schemas__common__PageMeta": {
+      "app__schemas__billing__PaymentAllocationRead": {
         "properties": {
-          "page": {
+          "id": {
             "type": "integer",
-            "minimum": 1.0,
-            "title": "Page",
-            "examples": [
-              1
-            ]
+            "title": "Id"
           },
-          "size": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Size",
-            "examples": [
-              20
-            ]
-          },
-          "total": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Total",
-            "examples": [
-              137
-            ]
-          },
-          "pages": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Pages",
-            "examples": [
-              7
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "page",
-          "size",
-          "total",
-          "pages"
-        ],
-        "title": "PageMeta"
-      },
-      "app__schemas__factory__PaymentAllocationRead": {
-        "properties": {
           "patient_id": {
             "type": "integer",
             "title": "Patient Id"
-          },
-          "legacy_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Id"
-          },
-          "procedure_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Procedure Id"
           },
           "payment_id": {
             "anyOf": [
@@ -221211,6 +221621,17 @@
             ],
             "title": "Adjustment Id"
           },
+          "procedure_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procedure Id"
+          },
           "claim_id": {
             "anyOf": [
               {
@@ -221222,17 +221643,6 @@
             ],
             "title": "Claim Id"
           },
-          "ins_plan_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ins Plan Id"
-          },
           "provider_id": {
             "anyOf": [
               {
@@ -221243,18 +221653,6 @@
               }
             ],
             "title": "Provider Id"
-          },
-          "alloc_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alloc Date"
           },
           "amount": {
             "type": "string",
@@ -221272,55 +221670,37 @@
             ],
             "title": "Alloc Type"
           },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
+          "alloc_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alloc Date"
           }
         },
         "type": "object",
         "required": [
-          "patient_id",
-          "amount",
           "id",
-          "created_at"
+          "patient_id",
+          "amount"
         ],
         "title": "PaymentAllocationRead"
       },
-      "app__schemas__office_setup__FeeScheduleOption": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "FeeScheduleOption"
-      },
-      "app__schemas__patient_intake__MedicalAlertIn": {
+      "app__schemas__medical_history__MedicalAlertIn": {
         "properties": {
           "alert_code": {
             "type": "string",
-            "maxLength": 100,
             "title": "Alert Code"
           },
           "alert_label": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 255
+                "type": "string"
               },
               {
                 "type": "null"
@@ -221331,8 +221711,7 @@
           "section": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 100
+                "type": "string"
               },
               {
                 "type": "null"
@@ -221343,7 +221722,12 @@
           "response": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no",
+                  "unknown"
+                ]
               },
               {
                 "type": "null"
@@ -221389,8 +221773,53 @@
         "required": [
           "alert_code"
         ],
-        "title": "MedicalAlertIn",
-        "description": "One alert answer on the composite. Same vocabulary as the generic\nresource (``yes|no|unknown``, MH-5) \u2014 case-folded rather than a strict\n``Literal`` so a ``\"Yes\"`` from a form does not 422 the whole registration."
+        "title": "MedicalAlertIn"
+      },
+      "app__schemas__messaging__PageMeta": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pages": {
+            "type": "integer",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "size",
+          "total",
+          "pages"
+        ],
+        "title": "PageMeta"
+      },
+      "app__schemas__office_setup__FeeScheduleOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "FeeScheduleOption"
       }
     },
     "securitySchemes": {
